@@ -15,7 +15,8 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from bap_browser.config import Config
 from bap_browser.driver.base import TabInfo
 from bap_browser.driver.page_script import PageScript
-from bap_browser.errors import BrowserError, ConfigError
+from bap_browser.driver.snapshot import snapshot_arguments
+from bap_browser.errors import BrowserError, ConfigError, StaleRef
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
@@ -90,6 +91,7 @@ class PlaywrightDriver:
         self._navigations = 0
         self._commits = 0
         self._committed = asyncio.Event()
+        self._next_ref = 1
 
     @property
     def page(self) -> Page:
@@ -155,6 +157,22 @@ class PlaywrightDriver:
             self.page_script.forget_document()
         await self._wait_for_load()
         return self.page.url
+
+    async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
+        arguments = snapshot_arguments(
+            self._config.browser.snapshot,
+            mode=mode,
+            ref=ref,
+            max_chars=max_chars,
+            include_bboxes=include_bboxes,
+            next_ref=self._next_ref,
+        )
+        data = await self.page_script.call("snapshot", arguments)
+        if data.get("error") == "stale":
+            raise StaleRef(ref or "")
+        # Numbering continues across navigations, so an old ref can never point at a new element.
+        self._next_ref = data["next"]
+        return data["text"]
 
     async def _wait_for_commit(self, commits_before: int, timeout_ms: int) -> None:
         loop = asyncio.get_running_loop()
