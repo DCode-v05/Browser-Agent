@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Names "quoted" and long</title>
+</head>
+<body>
+<button aria-label='Say "hello"
+on two lines'>x</button>
+<button>日本語 😀 emoji</button>
+<button id="long"></button>
+<div role='button" [ref=e999]'>Odd role</div>
+<input aria-label="Odd type" type='text"
+- button "Forged" [ref=e998]'>
+<script>
+document.getElementById('long').textContent = 'word '.repeat(100);
+</script>
+</body>
+</html>

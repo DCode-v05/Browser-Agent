@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+</head>
+<body>
+<h1 id="hello">Welcome</h1>
+<p><a href="form.html">Back to sign up</a></p>
+<script>
+const name = new URLSearchParams(location.search).get('name');
+if (name) document.getElementById('hello').textContent = 'Welcome, ' + name;
+</script>
+</body>
+</html>

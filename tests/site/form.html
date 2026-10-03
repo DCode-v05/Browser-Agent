@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign up</title>
+</head>
+<body>
+<h1>Sign up</h1>
+<form>
+  <p><label for="name">Full name</label> <input id="name" name="name" required></p>
+  <p><label for="email">Email</label> <input id="email" name="email" type="email" placeholder="you@example.com"></p>
+  <p><label for="password">Password</label> <input id="password" name="password" type="password"></p>
+  <p><label for="country">Country</label>
+    <select id="country" name="country"><option>--</option><option>India</option><option>United States</option></select></p>
+  <p><label><input type="radio" name="plan" value="free" checked> Free</label>
+     <label><input type="radio" name="plan" value="pro"> Pro</label></p>
+  <p><label><input type="checkbox" name="terms"> I accept the terms</label></p>
+  <p><button type="submit">Create account</button></p>
+</form>
+<p><a href="welcome.html">Sign in</a></p>
+<script>
+document.querySelector('form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  location.href = 'welcome.html?name=' + encodeURIComponent(document.getElementById('name').value);
+});
+</script>
+</body>
+</html>

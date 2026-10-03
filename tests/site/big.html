@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Big list</title>
+</head>
+<body>
+<ul id="list"></ul>
+<script>
+const count = Number(new URLSearchParams(location.search).get('n') || 1000);
+const list = document.getElementById('list');
+for (let i = 1; i <= count; i++) {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.textContent = 'Item ' + i;
+  item.append(button);
+  list.append(item);
+}
+</script>
+</body>
+</html>

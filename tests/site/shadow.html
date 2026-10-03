@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shadow</title>
+</head>
+<body>
+<my-card><span slot="label">Slotted label</span><em>Not slotted, so not rendered</em></my-card>
+<script>
+customElements.define('my-card', class extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' }).innerHTML = '<button>Shadow button</button> <slot name="label"></slot>';
+  }
+});
+</script>
+</body>
+</html>

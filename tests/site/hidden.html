@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hidden text</title>
+<style>.decorated::after { content: "SECRET-style"; }</style>
+</head>
+<body>
+<h1>Visible heading</h1>
+<p>Visible paragraph</p>
+<div style="display:none">SECRET-display-none <button>Hidden button A</button></div>
+<div style="visibility:hidden">SECRET-visibility <button>Hidden button B</button></div>
+<div aria-hidden="true">SECRET-aria-hidden <button>Hidden button C</button></div>
+<div inert>SECRET-inert <button>Hidden button D</button></div>
+<div hidden>SECRET-hidden-attribute</div>
+<template>SECRET-template</template>
+<script type="text/plain">SECRET-script</script>
+<noscript>SECRET-noscript</noscript>
+<div style="visibility:hidden"><span style="visibility:visible">Shown inside a hidden parent</span></div>
+<div style="display:contents"><button>Button in a box-less wrapper</button></div>
+<button>Visible button</button>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clickables</title>
+</head>
+<body>
+<div onclick="document.title='clicked div'">Div with handler</div>
+<span tabindex="0">Span with tab index</span>
+<div id="pointer" style="cursor:pointer"><span>Pointer parent</span></div>
+<div>Plain text</div>
+<button><span style="cursor:pointer">Real button</span></button>
+<script>
+document.getElementById('pointer').addEventListener('click', () => { document.title = 'clicked pointer'; });
+</script>
+</body>
+</html>
