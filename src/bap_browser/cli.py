@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import logging
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from bap_browser import __version__
-from bap_browser.config import defaults, load_config_with_sources
+from bap_browser.config import defaults, load_config, load_config_with_sources
 from bap_browser.config_doc import reference_markdown
 from bap_browser.errors import ConfigError
 
@@ -51,6 +53,10 @@ def _parser() -> argparse.ArgumentParser:
 
     doc = config_commands.add_parser("doc", help="print the configuration reference")
     doc.set_defaults(run=_config_doc)
+
+    mcp = commands.add_parser("mcp", help="serve the browser tools over MCP on stdio, for an agent to start")
+    mcp.add_argument("--config", help="path of config.json")
+    mcp.set_defaults(run=_mcp)
     return parser
 
 
@@ -83,6 +89,17 @@ def _config_init(args: argparse.Namespace) -> int:
 
 def _config_doc(args: argparse.Namespace) -> int:
     print(reference_markdown(), end="")
+    return 0
+
+
+def _mcp(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    # Standard output carries the protocol, so everything else goes to the error stream.
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
+    # Imported here so that the config commands start without loading the browser and MCP libraries.
+    from bap_browser.mcp.server import run_stdio
+
+    asyncio.run(run_stdio(config))
     return 0
 
 
