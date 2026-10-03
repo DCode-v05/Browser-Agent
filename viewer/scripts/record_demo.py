@@ -34,7 +34,12 @@ def main() -> None:
     def box(page: Page, name: str, selector: str) -> None:
         rect = page.locator(selector).bounding_box()
         assert rect is not None, selector
-        boxes[name] = {"x": round(rect["x"]), "y": round(rect["y"]), "w": round(rect["width"]), "h": round(rect["height"])}
+        boxes[name] = {
+            "x": round(rect["x"]),
+            "y": round(rect["y"]),
+            "w": round(rect["width"]),
+            "h": round(rect["height"]),
+        }
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()

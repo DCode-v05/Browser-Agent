@@ -58,7 +58,7 @@ const TIMED = new Set<ServerEvent['type']>([
 type Waiting = { kind: 'approval'; id: string; beat: Beat } | { kind: 'help'; id: string; beat: Beat; personFrameShown: boolean };
 
 export class DemoConnection implements Connection {
-  private readonly queue: Beat[];
+  private queue: Beat[] = [];
   private readonly pace: number;
   private readonly realNow: () => number;
   private handlers: ConnectionHandlers | undefined;
@@ -69,27 +69,38 @@ export class DemoConnection implements Connection {
   private waiting: Waiting | null = null;
   private held: 'paused' | 'person' | null = null;
   private over = false;
+  private readonly startAt: number | undefined;
   /** The session clock at the last beat, in seconds, and the real time of that beat. */
-  private base: number;
-  private realBase: number;
+  private base = 0;
+  private realBase = 0;
 
   constructor(
     private readonly session: RecordedSession,
     options: DemoOptions = {},
   ) {
-    this.queue = [...session.beats];
     this.pace = options.pace ?? 1;
     this.realNow = options.realNow ?? (() => Date.now());
     this.heartbeatMs = options.heartbeatMs ?? 0;
-    this.base = options.startAt ?? this.realNow() / 1000;
+    this.startAt = options.startAt;
+    this.rewind();
+  }
+
+  /** Back to the start of the recording, so the connection can be opened again. */
+  private rewind(): void {
+    this.queue = [...this.session.beats];
+    this.waiting = null;
+    this.held = null;
+    this.over = false;
+    this.base = this.startAt ?? this.realNow() / 1000;
     this.realBase = this.realNow();
   }
 
   start(handlers: ConnectionHandlers): void {
+    this.rewind();
     this.handlers = handlers;
     handlers.onStatus('connected');
     this.schedule();
-    for (const command of this.session.commands ?? []) this.send(command);
+    for (const command of this.session.commands ?? []) this.handle(command);
     if (this.session.afterwards) handlers.onStatus(this.session.afterwards);
     if (this.heartbeatMs && !this.session.stalls && !this.over) {
       this.emit({ type: 'picture_current' });
@@ -109,6 +120,10 @@ export class DemoConnection implements Connection {
   }
 
   send(command: ClientCommand): void {
+    this.handle(command);
+  }
+
+  private handle(command: ClientCommand): void {
     if (this.over) return;
     switch (command.type) {
       case 'approve':

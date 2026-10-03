@@ -224,6 +224,15 @@ describe('pictures and connection', () => {
     expect(state.notices.map((notice) => notice.id)).toEqual([1, 2]);
   });
 
+  it('what happened before the viewer caught up is marked as seen, so it is not announced again', () => {
+    const before = play([started, { type: 'download_saved', name: 'a.pdf', size: 1, ts: T0 }]);
+    expect(before.noticesSeen).toBe(0);
+    const caughtUp = reduce(before, { type: 'caught_up' });
+    expect(caughtUp.noticesSeen).toBe(1);
+    const later = play([{ type: 'download_saved', name: 'b.pdf', size: 1, ts: T0 }], caughtUp);
+    expect(later.notices.filter((notice) => notice.id > later.noticesSeen).map((notice) => notice.id)).toEqual([2]);
+  });
+
   it('state is never changed in place', () => {
     const before = play([started]);
     const snapshot = JSON.stringify(before);

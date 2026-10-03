@@ -1,0 +1,37 @@
+// Values the service owns (`viewer.*` in its configuration) and hands to the viewer. Until the
+// service does, these mirror its defaults.
+
+export interface ViewerOptions {
+  /** When "Live" becomes the stale notice, in seconds. */
+  staleAfterS: number;
+  /** The gap between steps that becomes an idle divider, in seconds. */
+  idleDividerS: number;
+  /** The keys that leave the live picture during takeover. */
+  releaseChord: string;
+  /** How long a toast stays, in milliseconds. */
+  toastMs: number;
+  /** How often the clock on screen is refreshed, in milliseconds. 0 leaves it still. */
+  tickMs: number;
+}
+
+export const DEFAULT_OPTIONS: ViewerOptions = {
+  staleAfterS: 5,
+  idleDividerS: 10,
+  releaseChord: 'Ctrl+Alt+Enter',
+  toastMs: 4000,
+  tickMs: 1000,
+};
+
+/** True when a key event is the release chord, such as "Ctrl+Alt+Enter". */
+export function matchesChord(event: { key: string; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean }, chord: string): boolean {
+  const parts = chord.split('+').map((part) => part.trim().toLowerCase());
+  const key = parts.at(-1);
+  const wants = (name: string) => parts.slice(0, -1).includes(name);
+  return (
+    event.key.toLowerCase() === key &&
+    event.ctrlKey === wants('ctrl') &&
+    event.altKey === wants('alt') &&
+    event.shiftKey === wants('shift') &&
+    event.metaKey === wants('meta')
+  );
+}

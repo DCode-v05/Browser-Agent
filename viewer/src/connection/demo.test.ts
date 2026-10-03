@@ -104,6 +104,17 @@ describe('playing a recorded session', () => {
     expect(types()).toEqual(['session_started']);
   });
 
+  it('can be started again after closing, and plays from the beginning', () => {
+    const { connection, events } = run([started(), stepStart(1)]);
+    vi.advanceTimersByTime(1100);
+    connection.close();
+    const again: string[] = [];
+    connection.start({ onEvent: (event) => again.push(event.type), onFrame: () => undefined, onStatus: () => undefined });
+    vi.advanceTimersByTime(1100);
+    expect(events.map((event) => event.type)).toEqual(['session_started', 'step_started']);
+    expect(again).toEqual(['session_started', 'step_started']);
+  });
+
   it('can end in a lost connection, for the disconnected state', () => {
     const { statuses } = run([started()], { pace: 0, afterwards: 'reconnecting' });
     expect(statuses).toEqual(['connected', 'reconnecting']);

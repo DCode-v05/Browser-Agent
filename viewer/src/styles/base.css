@@ -1,0 +1,178 @@
+/* The ground everything stands on. Every colour, size and duration is a token (spec 9.5). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: var(--weight-regular) var(--text-body) / var(--line) var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+ul,
+fieldset {
+  margin: 0;
+  padding: 0;
+}
+
+fieldset {
+  border: 0;
+  min-width: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.sr-only {
+  position: absolute;
+  width: var(--hairline);
+  height: var(--hairline);
+  margin: calc(-1 * var(--hairline));
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.icon {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.icon[data-size='large'] {
+  width: var(--icon-large);
+  height: var(--icon-large);
+}
+
+/* Buttons */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-secondary);
+  font-weight: var(--weight-emphasis);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--surface-2);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button[data-kind='primary'] {
+  background: var(--agent);
+  border-color: var(--agent);
+  color: var(--surface);
+}
+
+.button[data-kind='person'] {
+  background: var(--person);
+  border-color: var(--person);
+  color: var(--surface);
+}
+
+.button[data-kind='danger'] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button[data-kind='danger']:hover {
+  background: var(--danger-tint);
+}
+
+.button[data-kind='danger-solid'] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--surface);
+}
+
+.button[data-kind='primary']:hover,
+.button[data-kind='person']:hover,
+.button[data-kind='danger-solid']:hover {
+  opacity: 0.9;
+}
+
+.button[data-kind='quiet'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 var(--space-2);
+}
+
+.button[data-kind='quiet']:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Things that arrive fade in once. Nothing loops except the small "live" dot (spec 9.10). */
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-1));
+  }
+}
+
+@keyframes live {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

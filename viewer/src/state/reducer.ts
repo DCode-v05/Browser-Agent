@@ -91,6 +91,8 @@ export interface ViewerState {
   downloads: { name: string; size: number }[];
   /** Things that happened and deserve a word to the person. Each is shown once, by its id. */
   notices: Notice[];
+  /** The id of the last notice that came before the viewer caught up with the session. Those are not shown again. */
+  noticesSeen: number;
   ended: { reason: EndReason; detail?: string; at: number } | null;
   frame: { src: string; at: number } | null;
   /** Goes up when the settings changed, so the settings screen reads them again. */
@@ -112,6 +114,7 @@ export const initialState: ViewerState = {
   dialog: null,
   downloads: [],
   notices: [],
+  noticesSeen: 0,
   ended: null,
   frame: null,
   settingsVersion: 0,
@@ -120,7 +123,9 @@ export const initialState: ViewerState = {
 export type Action =
   | { type: 'event'; event: ServerEvent }
   | { type: 'frame'; src: string; at: number }
-  | { type: 'connection'; status: ConnectionStatus };
+  | { type: 'connection'; status: ConnectionStatus }
+  /** Everything that had already happened has been replayed. */
+  | { type: 'caught_up' };
 
 export function reduce(state: ViewerState, action: Action): ViewerState {
   switch (action.type) {
@@ -128,6 +133,8 @@ export function reduce(state: ViewerState, action: Action): ViewerState {
       return { ...state, frame: { src: action.src, at: action.at } };
     case 'connection':
       return { ...state, connection: action.status };
+    case 'caught_up':
+      return { ...state, noticesSeen: state.notices.at(-1)?.id ?? 0 };
     case 'event':
       return applyEvent(state, action.event);
   }

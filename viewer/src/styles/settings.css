@@ -1,0 +1,403 @@
+/* The settings screen (spec 9.12). Tokens only. */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, var(--dialog-width));
+  height: min(100%, var(--settings-height));
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  animation: arrive var(--duration-enter) var(--ease);
+}
+
+.settings-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.settings-title {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-emphasis);
+  line-height: var(--line-tight);
+}
+
+.settings-message {
+  padding: var(--space-5);
+  color: var(--text-muted);
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--settings-groups-width) minmax(0, 1fr);
+}
+
+.settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-right: var(--border-width) solid var(--border);
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.settings-group {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-group .icon {
+  display: none;
+  color: var(--text-muted);
+}
+
+.settings-group:hover {
+  background: var(--surface-2);
+}
+
+.settings-group[aria-selected='true'] {
+  background: var(--agent-tint);
+  color: var(--agent);
+  font-weight: var(--weight-emphasis);
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  overflow-y: auto;
+}
+
+.settings-panel-head .button {
+  display: none;
+}
+
+.settings-group-title {
+  font-size: var(--text-title);
+  font-weight: var(--weight-emphasis);
+}
+
+.settings-panel-head {
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+/* One setting: its name, one line saying what it does, its control. */
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: var(--border-width) solid var(--border);
+}
+
+.settings-panel-head + .setting {
+  border-top: 0;
+}
+
+.setting-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.setting-words {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-title {
+  padding: 0;
+  font-weight: var(--weight-emphasis);
+}
+
+.setting-description,
+.setting-hint,
+.setting-path {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.setting-path {
+  font-family: var(--font-mono);
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--target-min);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--agent);
+  background: var(--agent-tint);
+  box-shadow: inset 0 0 0 var(--border-width) var(--agent);
+}
+
+.choice[data-disabled='true'] {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.choice input {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  margin: calc(var(--space-1) / 2) 0 0;
+  accent-color: var(--agent);
+}
+
+.choice-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.choice-hint {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--switch-height);
+  background: var(--surface-2);
+}
+
+.switch-knob {
+  position: absolute;
+  left: calc((var(--switch-height) - var(--switch-knob)) / 2);
+  width: var(--switch-knob);
+  height: var(--switch-knob);
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: transform var(--duration-state) var(--ease);
+}
+
+.switch[aria-checked='true']::before {
+  border-color: var(--agent);
+  background: var(--agent);
+}
+
+.switch[aria-checked='true'] .switch-knob {
+  background: var(--surface);
+  transform: translateX(calc(var(--switch-width) - var(--switch-height)));
+}
+
+/* The word says the state too, so nothing depends on colour alone. */
+.switch-word {
+  min-width: var(--space-5);
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+  text-align: left;
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+}
+
+.select {
+  flex: none;
+  max-width: 50%;
+  min-height: var(--target-min);
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.site-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fixed-sites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.fixed-site {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+}
+
+.sites {
+  width: 100%;
+  min-height: var(--list-height);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+  line-height: var(--line);
+  resize: vertical;
+}
+
+.setting-locked,
+.setting-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-secondary);
+}
+
+.setting-locked {
+  color: var(--text-muted);
+}
+
+.setting-status {
+  font-weight: var(--weight-emphasis);
+  animation: arrive var(--duration-enter) var(--ease);
+}
+
+.setting-status[data-tone='saved'] {
+  color: var(--success);
+}
+
+.setting-status[data-tone='refused'] {
+  color: var(--danger);
+}
+
+.about .button {
+  align-self: flex-start;
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+}
+
+.config-key {
+  font-weight: var(--weight-emphasis);
+}
+
+.config-source {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+
+/* Below 700 px the groups become a list, and choosing one shows its settings on a screen of their own. */
+
+@media (max-width: 699px) {
+  .settings {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+  }
+
+  .settings-head {
+    padding-left: var(--space-4);
+  }
+
+  .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings[data-pane='groups'] .settings-panel,
+  .settings[data-pane='settings'] .settings-groups {
+    display: none;
+  }
+
+  .settings-groups {
+    padding: var(--space-3) var(--space-4);
+    border-right: 0;
+    background: var(--surface);
+  }
+
+  .settings-group {
+    min-height: calc(var(--target-min) + var(--space-3));
+    border-bottom: var(--border-width) solid var(--border);
+    border-radius: 0;
+  }
+
+  .settings-group .icon {
+    display: block;
+  }
+
+  .settings-group[aria-selected='true'] {
+    background: transparent;
+    color: var(--text);
+    font-weight: var(--weight-regular);
+  }
+
+  .settings-panel {
+    padding: var(--space-3) var(--space-4) var(--space-5);
+  }
+
+  .settings-panel-head .button {
+    display: inline-flex;
+    margin: 0 0 var(--space-2) calc(-1 * var(--space-2));
+  }
+
+  .select {
+    max-width: 60%;
+  }
+}

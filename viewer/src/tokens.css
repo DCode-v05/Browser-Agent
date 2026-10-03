@@ -36,6 +36,8 @@
   --weight-regular: 400;
   --weight-emphasis: 600;
   --line: 1.45;
+  --line-tight: 1.25;
+  --tracking-caps: 0.06em;
 
   /* Space */
   --space-1: 4px;
@@ -59,6 +61,7 @@
   /* Motion */
   --duration-state: 120ms;
   --duration-enter: 200ms;
+  --duration-live: 1s;
   --ease: ease-out;
 
   /* Focus and targets */
@@ -72,6 +75,20 @@
   --activity-width: 392px;
   --settings-groups-width: 184px;
   --dialog-width: 760px;
+  --settings-height: 600px;
+  --confirm-width: 420px;
+  --toast-width: 380px;
+  --placeholder-width: 360px;
+  --icon: 16px;
+  --icon-large: 20px;
+  --dot: 8px;
+  --status-icon: 36px;
+  --row-number-width: 28px;
+  --switch-width: 40px;
+  --switch-height: 22px;
+  --switch-knob: 16px;
+  --list-height: 84px;
+  --hairline: 1px;
 }
 
 @media (prefers-color-scheme: dark) {
