@@ -2,7 +2,7 @@
 
 Run from the repository root:  uv run python viewer/scripts/record_demo.py
 
-It opens the made-up site in `demo_site/`, does what the recorded agent does, and saves one
+It opens the made-up site in `src/bap_browser/demo_site/`, does what the recorded agent does, and saves one
 picture per step into `viewer/src/demo/frames/`, with the box of each element the agent acts on
 in `viewer/src/demo/boxes.json`.
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 
 HERE = Path(__file__).parent
-SITE = HERE / "demo_site"
+SITE = HERE.parents[1] / "src" / "bap_browser" / "demo_site"
 OUT = HERE.parent / "src" / "demo"
 FRAMES = OUT / "frames"
 WIDTH, HEIGHT = 1280, 800
