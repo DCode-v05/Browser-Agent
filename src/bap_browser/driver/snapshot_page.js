@@ -461,6 +461,17 @@
     return { describe: described, hadText };
   }
 
+  // What an element is and where, without touching the page.
+  function locate(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const role = roleOf(el) || el.tagName.toLowerCase();
+    const point = target(el);
+    const shown = point && point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight;
+    return { role, name: nameOf(el, role, a) || textOf(el, a.maxName, a), box: shown ? point.box.split(',').map(Number) : null };
+  }
+
+  operations.locate = locate;
   operations.prepare = prepare;
   operations.focus = focus;
   globalThis.__bap.withActions = true;

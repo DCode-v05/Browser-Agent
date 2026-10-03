@@ -22,6 +22,24 @@ class TabInfo:
 
 
 @dataclass(frozen=True)
+class Box:
+    """A rectangle in page pixels, from the top left of what the browser shows."""
+
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass(frozen=True)
+class Located:
+    role: str
+    name: str
+    box: Box | None
+    """Where the element is. None when it is outside what the browser shows."""
+
+
+@dataclass(frozen=True)
 class ActionOutcome:
     target: str
     """The element acted on, as the snapshot names it: 'button "Create account"'."""
@@ -40,6 +58,8 @@ class Driver(Protocol):
     async def tabs(self) -> list[TabInfo]: ...
 
     async def navigate(self, url: str) -> str: ...
+
+    async def locate(self, ref: str) -> Located: ...
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str: ...
 

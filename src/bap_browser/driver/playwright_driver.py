@@ -13,7 +13,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from bap_browser.config import Config
-from bap_browser.driver.base import ActionOutcome, MouseButton, TabInfo
+from bap_browser.driver.base import ActionOutcome, Box, Located, MouseButton, TabInfo
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.snapshot import snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
@@ -81,6 +81,21 @@ def context_options(config: Config) -> dict[str, Any]:
 
 def first_line(error: Exception) -> str:
     return str(error).splitlines()[0]
+
+
+# Why a page did not open, for the person watching. The agent gets the browser's own words.
+LOAD_FAILURES = {
+    "ERR_NAME_NOT_RESOLVED": "the site was not found",
+    "ERR_CONNECTION_REFUSED": "the site refused the connection",
+    "ERR_INTERNET_DISCONNECTED": "there is no connection",
+    "ERR_CERT_": "the site's certificate is not trusted",
+    "Timeout": "the page took too long",
+}
+
+
+def load_failure(error: Exception) -> str:
+    text = str(error)
+    return next((words for sign, words in LOAD_FAILURES.items() if sign in text), "the page did not load")
 
 
 class PlaywrightDriver:
@@ -154,11 +169,19 @@ class PlaywrightDriver:
                 # The browser shows its own error page for an address it could not load. A
                 # navigation started before that page arrives would be interrupted by it.
                 await self._wait_for_commit(commits, self._config.browser.timeouts.settle_ms)
-            raise BrowserError(f"Could not open {url}: {first_line(exc)}") from exc
+            raise BrowserError(f"Could not open {url}: {first_line(exc)}", reason=load_failure(exc)) from exc
         finally:
             self.page_script.forget_document()
         await self._wait_for_load()
         return self.page.url
+
+    async def locate(self, ref: str) -> Located:
+        found = await self.page_script.call(
+            "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        )
+        if found.get("error") == "stale":
+            raise StaleRef(ref)
+        return Located(found["role"], found["name"], Box(*found["box"]) if found["box"] else None)
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         arguments = snapshot_arguments(
@@ -201,7 +224,9 @@ class PlaywrightDriver:
                 for key in reversed(modifiers):
                     await keyboard.up(key)
         except PlaywrightError as exc:
-            raise BrowserError(f"Could not click {ref}: {first_line(exc)}") from exc
+            raise BrowserError(
+                f"Could not click {ref}: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
         return ActionOutcome(point["describe"], await self._settle(navigations, commits))
 
     async def type_text(
@@ -227,7 +252,8 @@ class PlaywrightDriver:
                 await keyboard.press("Enter")
         except PlaywrightError as exc:
             raise BrowserError(
-                f"Could not type into {ref or 'the focused element'}: {first_line(exc)}"
+                f"Could not type into {ref or 'the focused element'}: {first_line(exc)}",
+                reason="the browser did not respond",
             ) from exc
         navigated_to = await self._settle(navigations, commits) if submit else None
         return ActionOutcome(field["describe"], navigated_to)
@@ -241,13 +267,18 @@ class PlaywrightDriver:
         if error == "stale":
             raise StaleRef(ref or "")
         if error == "nothing_focused":
-            raise BadInput("Nothing is focused. Give the ref of the field to type into.")
+            raise BadInput(
+                "Nothing is focused. Give the ref of the field to type into.", reason="nothing is focused"
+            )
         if error == "not_editable":
             raise BadInput(
                 f"{subject} ({result['describe']}) is not a text field. "
-                "Use browser_click for buttons, checkboxes and links."
+                "Use browser_click for buttons, checkboxes and links.",
+                reason="it is not a text field",
             )
-        raise BrowserError(f"Could not act on {subject} ({result['describe']}): {result['reason']}.")
+        raise BrowserError(
+            f"Could not act on {subject} ({result['describe']}): {result['reason']}.", reason=result["reason"]
+        )
 
     async def _settle(self, navigations_before: int, commits_before: int) -> str | None:
         """Waits for a navigation the action started. Returns the new address, or None if there was none."""

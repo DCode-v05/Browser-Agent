@@ -4,6 +4,11 @@
 class BapError(Exception):
     """A failure returned to the agent as a tool result. The message is written for a model."""
 
+    def __init__(self, message: str, *, reason: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason or message
+        """The same failure in a few words, for the person watching."""
+
 
 class BadInput(BapError):
     """The call's arguments cannot be used."""
@@ -15,13 +20,18 @@ class StaleRef(BapError):
     def __init__(self, ref: str) -> None:
         super().__init__(
             f"Ref '{ref}' is stale or unknown (the page changed or navigated). "
-            "Take a new snapshot and use a fresh ref."
+            "Take a new snapshot and use a fresh ref.",
+            reason="the page changed",
         )
         self.ref = ref
 
 
 class PolicyBlocked(BapError):
-    """The safety policy refused the action."""
+    """The safety policy refused an address."""
+
+    def __init__(self, message: str, *, url: str, reason: str) -> None:
+        super().__init__(message, reason=reason)
+        self.url = url
 
 
 class BrowserError(BapError):

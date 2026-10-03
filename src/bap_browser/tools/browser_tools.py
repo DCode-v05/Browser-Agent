@@ -57,7 +57,12 @@ async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
     url = session.policy.normalise(args.url)
     decision = await session.policy.check(url)
     if not decision.allowed:
-        raise PolicyBlocked(f"navigation to {url} blocked: {decision.reason}")
+        raise PolicyBlocked(
+            f"navigation to {url} blocked: {decision.reason}",
+            url=url,
+            # The setting's name is for whoever runs the deployment, not for the person watching.
+            reason=decision.reason.split(" (")[0],
+        )
     driver = await session.driver()
     text = f"Navigated to {await driver.navigate(url)}"
     if session.config.browser.snapshot.after_navigation:

@@ -6,7 +6,7 @@ from typing import Any
 
 from bap_browser.config import Config
 from bap_browser.driver import BrowserSession
-from bap_browser.driver.base import ActionOutcome, TabInfo
+from bap_browser.driver.base import ActionOutcome, Box, Located, TabInfo
 from bap_browser.errors import StaleRef
 from bap_browser.tools import Toolkit
 
@@ -38,6 +38,13 @@ class FakeDriver:
 
     async def tabs(self) -> list[TabInfo]:
         return [TabInfo("t1", self.url, "Fake", True)]
+
+    async def locate(self, ref: str) -> Located:
+        if ref == "e9":
+            raise StaleRef(ref)
+        if ref == "e3":
+            return Located("textbox", "Email", Box(10, 60, 200, 24))
+        return Located("button", "Go", Box(10, 20, 80, 24))
 
     async def navigate(self, url: str) -> str:
         self.calls.append(("navigate", url))
@@ -242,3 +249,116 @@ async def test_the_log_can_be_turned_off_and_arguments_left_out(make_config, tmp
     await quiet.call("browser_type", {"ref": "e3", "text": "abc"})
     line = json.loads((quiet_folder / "log" / "e.jsonl").read_text(encoding="utf-8"))
     assert "args" not in line
+
+
+class Seen:
+    """Records what the toolkit reports, the way the session service will receive it."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[Any, ...]] = []
+        self.sizes: list[int] = []
+
+    def step_started(self, step: int, tool: str, label: str, target: Box | None) -> None:
+        self.events.append(("started", step, tool, label, target))
+
+    def step_finished(
+        self, step: int, ok: bool, ms: float, chars: int, summary: str, tabs: Sequence[TabInfo]
+    ) -> None:
+        assert ms >= 0
+        self.sizes.append(chars)
+        self.events.append(("finished", step, ok, summary, [tab.url for tab in tabs]))
+
+    def navigation_blocked(self, url: str, reason: str) -> None:
+        self.events.append(("blocked", url, reason))
+
+
+def watched(
+    make_config: Callable[..., Config], folder: Path, **sections: Any
+) -> tuple[Toolkit, FakeDriver, Seen]:
+    driver, seen = FakeDriver(), Seen()
+    return Toolkit(BrowserSession(make_config(folder, **sections), driver), observer=seen), driver, seen
+
+
+async def test_each_call_is_reported_as_a_step_that_starts_and_then_finishes(
+    make_config, tmp_path: Path
+) -> None:
+    tools, _, seen = watched(make_config, tmp_path)
+    opened = await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
+    await tools.call("browser_click", {"ref": "e1"})
+    assert seen.events == [
+        ("started", 1, "browser_navigate", "Opening 93.184.216.34", None),
+        ("finished", 1, True, "Opened 93.184.216.34", ["https://93.184.216.34/"]),
+        ("started", 2, "browser_click", 'Clicking "Go"', Box(10, 20, 80, 24)),
+        ("finished", 2, True, 'Clicked "Go" (button)', ["https://93.184.216.34/"]),
+    ]
+    assert seen.sizes[0] == len(opened.text)
+
+
+async def test_a_typing_step_never_carries_its_text(make_config, tmp_path: Path) -> None:
+    tools, _, seen = watched(make_config, tmp_path)
+    await tools.call("browser_snapshot", {})
+    await tools.call("browser_type", {"ref": "e3", "text": "ada@example.com"})
+    assert seen.events[2:] == [
+        ("started", 2, "browser_type", 'Typing 15 characters into "Email"', Box(10, 60, 200, 24)),
+        ("finished", 2, True, 'Typed 15 characters into "Email"', ["about:blank"]),
+    ]
+    assert "ada@example.com" not in repr(seen.events)
+
+
+async def test_a_failed_step_says_why_in_words_for_a_person(make_config, tmp_path: Path) -> None:
+    tools, driver, seen = watched(make_config, tmp_path)
+    await tools.call("browser_snapshot", {})
+    driver.fail_with = StaleRef("e9")
+    await tools.call("browser_click", {"ref": "e9"})
+    assert seen.events[2:] == [
+        ("started", 2, "browser_click", "Clicking e9", None),
+        ("finished", 2, False, "Could not click e9: the page changed", ["about:blank"]),
+    ]
+
+
+async def test_a_blocked_address_is_a_step_and_is_reported_as_blocked(make_config, tmp_path: Path) -> None:
+    tools, driver, seen = watched(make_config, tmp_path, safety={"block_private_networks": True})
+    await tools.call("browser_navigate", {"url": "http://10.0.0.5/admin"})
+    assert seen.events == [
+        ("started", 1, "browser_navigate", "Opening 10.0.0.5/admin", None),
+        ("blocked", "http://10.0.0.5/admin", "private address"),
+        ("finished", 1, False, "Could not open 10.0.0.5/admin: private address", []),
+    ]
+    assert driver.started == 0
+
+
+async def test_a_call_that_cannot_run_is_still_a_step(make_config, tmp_path: Path) -> None:
+    tools, driver, seen = watched(make_config, tmp_path)
+    await tools.call("browser_fly", {})
+    await tools.call("browser_click", {"reff": "e1"})
+    assert seen.events == [
+        ("started", 1, "browser_fly", "browser_fly", None),
+        ("finished", 1, False, "Could not run browser_fly: unknown tool", []),
+        ("started", 2, "browser_click", "Clicking", None),
+        ("finished", 2, False, "Could not click: missing argument 'ref'", []),
+    ]
+    assert driver.started == 0
+
+
+async def test_an_unexpected_failure_is_reported_without_its_details(
+    make_config, tmp_path: Path, caplog
+) -> None:
+    tools, driver, seen = watched(make_config, tmp_path)
+    await tools.call("browser_snapshot", {})
+    driver.fail_with = RuntimeError("boom at /secret/path")
+    await tools.call("browser_click", {"ref": "e1"})
+    assert seen.events[-1] == (
+        "finished",
+        2,
+        False,
+        'Could not click "Go": something went wrong',
+        ["about:blank"],
+    )
+    assert "boom" in caplog.text
+
+
+async def test_what_is_reported_is_redacted(make_config, tmp_path: Path) -> None:
+    tools, _, seen = watched(make_config, tmp_path, safety={"redact_patterns": ["93\\.184\\.216\\.34"]})
+    await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
+    assert seen.events[0][3] == "Opening [REDACTED]"
+    assert seen.events[1][3] == "Opened [REDACTED]"

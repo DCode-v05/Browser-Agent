@@ -36,7 +36,9 @@ class PageScript:
             return await self._call(operation, arguments)
         except _DocumentGone as exc:
             self._context_id = None
-            raise BrowserError("The page changed while it was being read. Try again.") from exc
+            raise BrowserError(
+                "The page changed while it was being read. Try again.", reason="the page changed"
+            ) from exc
 
     async def frames_passed(self, count: int, frame_ms: int) -> bool:
         """Waits for `count` animation frames. False means the document went away: a navigation."""
@@ -95,5 +97,5 @@ class PageScript:
         details = reply.get("exceptionDetails")
         if details:
             text = details.get("exception", {}).get("description") or details.get("text") or "script error"
-            raise BrowserError(text.splitlines()[0])
+            raise BrowserError(text.splitlines()[0], reason="the page could not be read")
         return reply["result"].get("value")
