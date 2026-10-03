@@ -1,0 +1,4 @@
+# One line ending everywhere, so the test pages and the page script are the same bytes on every machine.
+* text=auto eol=lf
+*.jpg binary
+*.png binary

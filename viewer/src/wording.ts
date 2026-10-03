@@ -172,6 +172,9 @@ export const W = {
     agent: 'Agent',
     browser: 'Browser',
     sessions: 'Sessions',
+    /** The page's title for a screen reader when the viewer is shown inside a client. */
+    embeddedTitle: 'Browser session',
+    controls: 'Session controls',
   },
 
   backend: {

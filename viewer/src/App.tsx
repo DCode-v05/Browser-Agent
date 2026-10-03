@@ -231,11 +231,13 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   return (
     <div className="app" data-view={full ? 'full' : 'split'} data-state={view.key} data-embedded={embedded}>
       <header className="top-bar">
-        {!embedded && (
-          <span className="brand">
+        {embedded ? (
+          <h1 className="sr-only">{W.topBar.embeddedTitle}</h1>
+        ) : (
+          <h1 className="brand">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-name">{W.product}</span>
-          </span>
+          </h1>
         )}
         {state.session && (
           <>
@@ -272,7 +274,11 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         </Button>
       </header>
 
-      {full && status}
+      {full && (
+        <section className="control-bar" aria-label={W.topBar.controls}>
+          {status}
+        </section>
+      )}
 
       <main className="workspace">
         <BrowserPane

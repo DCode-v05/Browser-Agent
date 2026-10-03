@@ -96,12 +96,12 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
           trapTab(event);
         }}
       >
-        <header className="settings-head">
+        <div className="settings-head">
           <h2 className="settings-title">{W.settings.title}</h2>
           <Button kind="quiet" icon="close" onClick={onClose} label={W.buttons.close}>
             {null}
           </Button>
-        </header>
+        </div>
         {failed && <p className="settings-message">{W.settings.failed}</p>}
         {!answer && !failed && <p className="settings-message">{W.settings.loading}</p>}
         {answer && group && (

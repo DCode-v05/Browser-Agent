@@ -3,10 +3,23 @@ on:
   push:
   pull_request:
 jobs:
-  python:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The viewer first: the Python tests open the built viewer in a real browser.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: npm --prefix viewer ci
+      - run: npm --prefix viewer run typecheck
+      - run: npm --prefix viewer run lint
+      - run: npm --prefix viewer run test
+      - run: npm --prefix viewer run build
+
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run ruff format --check .

@@ -11,6 +11,11 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Types: `uv run pyright`
 - Run as an MCP server: `uv run bap-browser mcp`
 - Show the configuration: `uv run bap-browser config show --sources`
+- Viewer install: `npm --prefix viewer install`
+- Viewer checks: `npm --prefix viewer run typecheck`, `run lint`, `run test`, `run build`
+- Viewer in a real browser: build it, then `uv run pytest tests/viewer -q` (screenshots land in `.bap-browser/viewer-shots/`)
+- Viewer by hand: `npm --prefix viewer run dev`, then open `?demo=signup` or `?state=<name>` (add `&theme=dark`, `&surface=mobile`)
+- Record the demo pictures again: `uv run python viewer/scripts/record_demo.py`
 
 ## Rules
 - Every tunable value lives in `src/bap_browser/config.py`. No tunable number anywhere else.
@@ -29,3 +34,9 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Tests fail on any warning (`filterwarnings = error`). Fix the cause; for a warning raised inside a
   dependency, add an ignore for that exact message in `pyproject.toml` with a comment saying why.
 - `README.md` must exist before `uv sync`: the build reads it.
+- `uv run pytest` needs the built viewer (`npm --prefix viewer run build`); `tests/viewer` fails with that message otherwise.
+- Test files cannot import each other (pytest runs with `--import-mode=importlib`). Share through fixtures in `conftest.py`.
+- Viewer styles use tokens only: no colour, pixel size, duration or font outside `viewer/src/tokens.css` (a test enforces it).
+- Every string a person reads is in `viewer/src/wording.ts`.
+- The viewer's settings screen is drawn from the settings answer; it holds no list of settings of its own.
+- Run `ruff format` on `src tests viewer/scripts`, never on `docs/` (it is excluded: the formatter rewrites code examples in Markdown).

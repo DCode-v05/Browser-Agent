@@ -24,7 +24,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin-right: var(--space-2);
+  margin: 0 var(--space-2) 0 0;
+  line-height: var(--line-tight);
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
   white-space: nowrap;
@@ -913,7 +914,9 @@
   }
 
   .workspace {
+    flex: none;
     grid-template-columns: minmax(0, 1fr);
+    align-content: start;
   }
 
   /* With one column there is nothing to switch between. */
@@ -952,16 +955,33 @@
 
 @media (max-width: 699px) {
   .chip[data-kind='session'],
-  .brand-name,
   .connection {
     display: none;
+  }
+
+  .brand-name {
+    position: absolute;
+    width: var(--hairline);
+    height: var(--hairline);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .frame-area {
     padding: var(--space-2);
   }
 
-  .frame-hint {
+  /* A phone has no Ctrl key to press, and little room on the picture. */
+  .frame-hint,
+  .status[data-layout='bar'] .status-detail {
     display: none;
+  }
+
+  .frame-label {
+    left: var(--space-2);
+    bottom: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--text-caption);
   }
 }
