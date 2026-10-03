@@ -108,10 +108,16 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "viewer.history_events": 500,
     "viewer.stale_after_s": 5,
     "viewer.idle_divider_s": 10,
+    "viewer.picture_heartbeat_s": 2,
     "viewer.takeover.release_chord": "Ctrl+Alt+Enter",
     "viewer.theme": "system",
     "viewer.embed_origins": [],
     "viewer.show_agent_pointer": True,
+    "agent.provider": "anthropic",
+    "agent.model": "claude-opus-5-5",
+    "agent.api_key_env": "ANTHROPIC_API_KEY",
+    "agent.max_steps": 40,
+    "agent.max_tokens": 4096,
     "settings.file": ".bap-browser/settings.json",
     "settings.locked": [],
     "logging.level": "INFO",
@@ -266,3 +272,13 @@ def test_the_configuration_holds_no_secret() -> None:
     dumped = json.dumps(defaults().model_dump())
     assert '"token"' not in dumped
     assert "password" not in dumped
+
+
+def test_the_scripted_model_can_be_chosen(tmp_path: Path) -> None:
+    config = load_config(write(tmp_path / "config.json", {"agent": {"provider": "scripted"}}), env={})
+    assert config.agent.provider == "scripted"
+
+
+def test_a_model_provider_that_does_not_exist_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match=r"bad value for 'agent.provider' \(from config.json\)"):
+        load_config(write(tmp_path / "config.json", {"agent": {"provider": "somebody"}}), env={})

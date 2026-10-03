@@ -289,6 +289,7 @@ class Viewer(Section):
     history_events: int = setting(500, "Replayed when a viewer connects")
     stale_after_s: int = setting(5, 'When "Live" becomes the stale notice')
     idle_divider_s: int = setting(10, "Gap that becomes an idle divider")
+    picture_heartbeat_s: int = setting(2, "How often the service confirms a still picture is current")
     takeover: Takeover = Takeover()
     theme: Literal["system", "light", "dark"] = setting("system", "Or `light`, `dark`")
     embed_origins: list[str] = setting(
@@ -297,6 +298,19 @@ class Viewer(Section):
     show_agent_pointer: bool = setting(
         True, "Draw the target highlight and the agent's pointer over the live picture"
     )
+
+
+class Agent(Section):
+    provider: Literal["anthropic", "scripted"] = setting(
+        "anthropic", "Whose model the loop calls. `scripted` replays fixed replies and needs no key"
+    )
+    model: str = setting("claude-opus-5-5", "The model's name at that provider")
+    api_key_env: str = setting(
+        "ANTHROPIC_API_KEY",
+        "The environment variable that holds the key. The key is never in `config.json`",
+    )
+    max_steps: int = setting(40, "Tool calls after which the loop stops")
+    max_tokens: int = setting(4096, "The most a single reply may be")
 
 
 class Settings(Section):
@@ -332,6 +346,7 @@ class Config(Section):
     server: Server = Server()
     mcp: Mcp = Mcp()
     viewer: Viewer = Viewer()
+    agent: Agent = Agent()
     settings: Settings = Settings()
     logging: Logging = Logging()
     bench: Bench = Bench()

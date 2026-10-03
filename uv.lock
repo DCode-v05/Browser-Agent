@@ -45,6 +45,8 @@ dependencies = [
     { name = "mcp" },
     { name = "playwright" },
     { name = "pydantic" },
+    { name = "starlette" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -60,6 +62,8 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "playwright", specifier = ">=1.63,<2" },
     { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "starlette", specifier = ">=1.7,<2" },
+    { name = "uvicorn", specifier = ">=0.54,<1" },
 ]
 
 [package.metadata.requires-dev]
