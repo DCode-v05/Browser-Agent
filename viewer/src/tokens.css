@@ -1,0 +1,129 @@
+/* The design tokens (spec 9.5). Colour, type, spacing, radius, shadow and motion come only from here. */
+
+:root {
+  color-scheme: light;
+
+  /* Colour: light */
+  --bg: #F5F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #EEF0F3;
+  --border: #D5D9E0;
+  --border-strong: #7C8696;
+  --text: #14171C;
+  --text-muted: #5A6270;
+  --focus: #1D4ED8;
+  --agent: #4338CA;
+  --agent-tint: #EEF2FF;
+  --person: #0F766E;
+  --person-tint: #E6F7F5;
+  --waiting: #A14C08;
+  --waiting-tint: #FFF4E0;
+  --danger: #B91C1C;
+  --danger-tint: #FDECEC;
+  --success: #15703A;
+  --success-tint: #E8F7EE;
+  --scrim: rgb(20 23 28 / 0.45);
+  --frame-dim: rgb(245 246 248 / 0.72);
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace;
+  --text-caption: 12px;
+  --text-secondary: 13px;
+  --text-body: 14px;
+  --text-title: 16px;
+  --text-heading: 20px;
+  --weight-regular: 400;
+  --weight-emphasis: 600;
+  --line: 1.45;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Shape */
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-panel: 14px;
+  --border-width: 1px;
+  --control-border-width: 3px;
+
+  /* Depth */
+  --shadow-card: 0 1px 2px rgb(20 23 28 / 0.06), 0 1px 3px rgb(20 23 28 / 0.08);
+  --shadow-overlay: 0 16px 40px rgb(20 23 28 / 0.22);
+
+  /* Motion */
+  --duration-state: 120ms;
+  --duration-enter: 200ms;
+  --ease: ease-out;
+
+  /* Focus and targets */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --target-min: 32px;
+  --target-floor: 24px;
+
+  /* Layout */
+  --top-bar-height: 48px;
+  --activity-width: 392px;
+  --settings-groups-width: 184px;
+  --dialog-width: 760px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E1014;
+    --surface: #161920;
+    --surface-2: #1E222B;
+    --border: #2C323D;
+    --border-strong: #6B7585;
+    --text: #E9EBEF;
+    --text-muted: #9AA3B2;
+    --focus: #93C5FD;
+    --agent: #A5B4FC;
+    --agent-tint: #1E2147;
+    --person: #5EEAD4;
+    --person-tint: #0F2F2C;
+    --waiting: #FCD34D;
+    --waiting-tint: #3A2C0A;
+    --danger: #FCA5A5;
+    --danger-tint: #3B1414;
+    --success: #86EFAC;
+    --success-tint: #0F2E1B;
+    --scrim: rgb(0 0 0 / 0.6);
+    --frame-dim: rgb(14 16 20 / 0.72);
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+    --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1014;
+  --surface: #161920;
+  --surface-2: #1E222B;
+  --border: #2C323D;
+  --border-strong: #6B7585;
+  --text: #E9EBEF;
+  --text-muted: #9AA3B2;
+  --focus: #93C5FD;
+  --agent: #A5B4FC;
+  --agent-tint: #1E2147;
+  --person: #5EEAD4;
+  --person-tint: #0F2F2C;
+  --waiting: #FCD34D;
+  --waiting-tint: #3A2C0A;
+  --danger: #FCA5A5;
+  --danger-tint: #3B1414;
+  --success: #86EFAC;
+  --success-tint: #0F2E1B;
+  --scrim: rgb(0 0 0 / 0.6);
+  --frame-dim: rgb(14 16 20 / 0.72);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+}

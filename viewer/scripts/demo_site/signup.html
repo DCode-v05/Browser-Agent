@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign up</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Northfield</div>
+  <nav><span>Product</span><span>Pricing</span><span>Customers</span><b>Sign up</b></nav>
+  <div class="spacer"></div>
+  <span class="pill">Already a member? Sign in</span>
+</header>
+<main>
+  <section>
+    <h1>Create your Northfield account</h1>
+    <p class="lead">Invoices, contracts and approvals in one place. Free for teams of up to five.</p>
+    <ul class="points">
+      <li>Send your first invoice in under two minutes</li>
+      <li>Reminders that chase late payments for you</li>
+      <li>Export everything to your accountant in one click</li>
+    </ul>
+    <p class="quote">"We closed our books three days earlier in the first month." <br><span class="muted">Priya N., finance lead</span></p>
+  </section>
+  <form class="card" action="verify.html">
+    <div class="field"><label for="name">Full name</label><input id="name" type="text" required></div>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" placeholder="you@example.com"></div>
+    <div class="row">
+      <div class="field"><label for="password">Password</label><input id="password" type="password"></div>
+      <div class="field"><label for="country">Country</label>
+        <select id="country"><option>--</option><option>India</option><option>United States</option><option>Germany</option></select></div>
+    </div>
+    <div class="field"><label for="cv">Company registration (PDF)</label>
+      <div class="upload"><button type="button" id="cv-button">Choose file</button><span id="cv-name">No file chosen</span>
+        <input id="cv" type="file" hidden></div></div>
+    <label class="check"><input id="terms" type="checkbox"> I accept the terms</label>
+    <button class="primary" id="create" type="submit">Create account</button>
+  </form>
+</main>
+<script>
+document.getElementById('cv').addEventListener('change', (event) => {
+  document.getElementById('cv-name').textContent = event.target.files[0] ? event.target.files[0].name : 'No file chosen';
+});
+</script>
+</body>
+</html>
