@@ -12,7 +12,7 @@ function settle(session: RecordedSession): { state: ViewerState; now: number } {
   let state = initialState;
   const connection = new DemoConnection(session, { pace: 0, startAt: 1000, realNow: () => 0, heartbeatMs: 2000 });
   connection.start({
-    onEvent: (event) => (state = reduce(state, { type: 'event', event })),
+    onEvent: (event, picture) => (state = reduce(state, { type: 'event', event, picture })),
     onFrame: (src, at) => (state = reduce(state, { type: 'frame', src, at })),
     onStatus: (status) => (state = reduce(state, { type: 'connection', status })),
   });

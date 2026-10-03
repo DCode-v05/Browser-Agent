@@ -99,3 +99,22 @@ async def test_at_twice_the_text_size_the_layout_reflows_to_one_column(browser, 
         assert await page.get_by_role("button", name="Allow once").is_visible()
     finally:
         await page.close()
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("size", ["desktop", "phone"])
+async def test_opened_without_its_link_it_says_what_to_do_and_shows_no_session(
+    open_view, size: str, theme: str
+) -> None:
+    view = await open_view(f"theme={theme}", size)
+    await view.page.get_by_role("heading", name="This link can't open the session").wait_for()
+    assert await view.page.get_by_text("Open it again from where you started the session.").count() > 0
+    assert await view.page.get_by_role("button", name="Stop session").count() == 0
+    # The instruction is the whole point of this screen, so none of it may be cut off.
+    assert await view.page.evaluate(
+        "[...document.querySelectorAll('.status-detail')].every((e) => e.scrollWidth <= e.clientWidth)"
+    )
+    assert await view.sideways_overflow() <= 0
+    assert await view.accessibility_violations() == []
+    await view.shot(f"refused-{size}-{theme}")
+    assert view.errors == []

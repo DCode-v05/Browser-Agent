@@ -135,6 +135,23 @@ describe('what each state looks like (spec 9.3)', () => {
     });
   });
 
+  it('a refused link says what to do, offers no controls, and is not called a lost connection', () => {
+    const state = reduce(after(started), { type: 'connection', status: 'refused' });
+    expect(describeState(reduce(state, { type: 'frame', src: 'a.jpg', at: T0 + 1 }), T0 + 2, STALE_AFTER)).toMatchObject({
+      key: 'refused',
+      status: "This link can't open the session",
+      detail: 'Open it again from where you started the session.',
+      controls: [],
+      urgency: 'assertive',
+      frame: 'disconnected',
+    });
+  });
+
+  it('a refused link with nothing shown yet has no picture to dim', () => {
+    const state = reduce(initialState, { type: 'connection', status: 'refused' });
+    expect(describeState(state, T0, STALE_AFTER)).toMatchObject({ key: 'refused', frame: 'empty', controls: [] });
+  });
+
   it('disconnected hides the controls and says the picture is not live', () => {
     const state = reduce(after(started), { type: 'connection', status: 'reconnecting' });
     expect(describeState(state, T0 + 1, STALE_AFTER)).toMatchObject({

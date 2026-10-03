@@ -473,6 +473,11 @@
   text-overflow: ellipsis;
 }
 
+/* What to do next is read in full, however narrow the screen. */
+.status[data-state='refused'] .status-detail {
+  white-space: normal;
+}
+
 .status-time {
   align-self: start;
   color: var(--text-muted);

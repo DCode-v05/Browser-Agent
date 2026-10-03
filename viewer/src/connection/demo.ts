@@ -68,6 +68,8 @@ export class DemoConnection implements Connection {
   private readonly heartbeatMs: number;
   private waiting: Waiting | null = null;
   private held: 'paused' | 'person' | null = null;
+  /** The picture on screen, which a step that finishes now keeps. */
+  private shown: string | undefined;
   private over = false;
   private readonly startAt: number | undefined;
   /** The session clock at the last beat, in seconds, and the real time of that beat. */
@@ -90,6 +92,7 @@ export class DemoConnection implements Connection {
     this.queue = [...this.session.beats];
     this.waiting = null;
     this.held = null;
+    this.shown = undefined;
     this.over = false;
     this.base = this.startAt ?? this.realNow() / 1000;
     this.realBase = this.realNow();
@@ -101,6 +104,7 @@ export class DemoConnection implements Connection {
     handlers.onStatus('connected');
     this.schedule();
     for (const command of this.session.commands ?? []) this.handle(command);
+    handlers.onCaughtUp?.();
     if (this.session.afterwards) handlers.onStatus(this.session.afterwards);
     if (this.heartbeatMs && !this.session.stalls && !this.over) {
       this.emit({ type: 'picture_current' });
@@ -186,7 +190,7 @@ export class DemoConnection implements Connection {
     // The clock follows the recording, so a recorded gap is a gap whatever the pace.
     this.base = Math.max(this.now(), this.base + beat.after / 1000);
     this.realBase = this.realNow();
-    if (beat.frame) this.handlers?.onFrame(beat.frame, this.base);
+    if (beat.frame) this.show(beat.frame, this.base);
     if (!beat.event) return;
     this.emit(beat.event);
     if (beat.event.type === 'approval_requested' && beat.approval) {
@@ -206,8 +210,13 @@ export class DemoConnection implements Connection {
 
   private emit(draft: EventDraft): void {
     const event = (TIMED.has(draft.type) ? { ...draft, ts: this.now() } : draft) as ServerEvent;
-    this.handlers?.onEvent(event);
+    this.handlers?.onEvent(event, event.type === 'step_finished' ? this.shown : undefined);
     if (event.type === 'session_ended') this.close();
+  }
+
+  private show(frame: string, at: number): void {
+    this.shown = frame;
+    this.handlers?.onFrame(frame, at);
   }
 
   private control(state: ControlState): void {
@@ -257,6 +266,6 @@ export class DemoConnection implements Connection {
     const frame = waiting.beat.help?.personFrame;
     if (!frame) return;
     waiting.personFrameShown = true;
-    this.handlers?.onFrame(frame, this.now());
+    this.show(frame, this.now());
   }
 }

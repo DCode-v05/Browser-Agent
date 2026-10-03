@@ -90,6 +90,18 @@ describe('playing a recorded session', () => {
     expect(order).toEqual(['session_started', 'step_started', 'one.jpg', 'step_finished']);
   });
 
+  it('a finished step comes with the picture shown at that moment', () => {
+    const pictures: (string | undefined)[] = [];
+    const beats = [started(), { after: 10, frame: 'page.jpg' }, stepStart(1), stepEnd(1), stepStart(2), stepEnd(2, 200, true, 'two.jpg')];
+    const connection = new DemoConnection({ name: 'test', beats }, { pace: 0, startAt: START, realNow: () => Date.now() });
+    connection.start({
+      onEvent: (event, picture) => void (event.type === 'step_finished' && pictures.push(picture)),
+      onFrame: () => undefined,
+      onStatus: () => undefined,
+    });
+    expect(pictures).toEqual(['page.jpg', 'two.jpg']);
+  });
+
   it('at pace 0 it plays at once, keeping the recorded gaps on the clock', () => {
     const { events, types } = run([started(), stepStart(1), stepEnd(1), stepStart(2, 14_000)], { pace: 0 });
     expect(types()).toEqual(['session_started', 'step_started', 'step_finished', 'step_started']);
@@ -113,6 +125,21 @@ describe('playing a recorded session', () => {
     vi.advanceTimersByTime(1100);
     expect(events.map((event) => event.type)).toEqual(['session_started', 'step_started']);
     expect(again).toEqual(['session_started', 'step_started']);
+  });
+
+  it('says it has caught up once what was there at the start has been played', () => {
+    const order: string[] = [];
+    const connection = new DemoConnection(
+      { name: 'test', beats: [started(), stepStart(1)], commands: [{ type: 'pause' }], afterwards: 'reconnecting' },
+      { pace: 0, startAt: START, realNow: () => Date.now() },
+    );
+    connection.start({
+      onEvent: (event) => order.push(event.type),
+      onFrame: () => undefined,
+      onStatus: (status) => order.push(status),
+      onCaughtUp: () => order.push('caught up'),
+    });
+    expect(order).toEqual(['connected', 'session_started', 'step_started', 'control_changed', 'caught up', 'reconnecting']);
   });
 
   it('can end in a lost connection, for the disconnected state', () => {

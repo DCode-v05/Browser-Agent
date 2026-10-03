@@ -14,7 +14,8 @@ import type {
   TabInfo,
 } from '../protocol';
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
+/** `refused`: the service did not accept the token. Trying again would change nothing. */
+export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'refused';
 
 export interface Step {
   n: number;
@@ -91,7 +92,9 @@ export interface ViewerState {
   downloads: { name: string; size: number }[];
   /** Things that happened and deserve a word to the person. Each is shown once, by its id. */
   notices: Notice[];
-  /** The id of the last notice that came before the viewer caught up with the session. Those are not shown again. */
+  /** False while a connection replays what had already happened. Nothing replayed is shown as new. */
+  caughtUp: boolean;
+  /** The id of the last notice that was replayed. Those are not shown again. */
   noticesSeen: number;
   ended: { reason: EndReason; detail?: string; at: number } | null;
   frame: { src: string; at: number } | null;
@@ -114,6 +117,7 @@ export const initialState: ViewerState = {
   dialog: null,
   downloads: [],
   notices: [],
+  caughtUp: false,
   noticesSeen: 0,
   ended: null,
   frame: null,
@@ -121,7 +125,7 @@ export const initialState: ViewerState = {
 };
 
 export type Action =
-  | { type: 'event'; event: ServerEvent }
+  | { type: 'event'; event: ServerEvent; picture?: string }
   | { type: 'frame'; src: string; at: number }
   | { type: 'connection'; status: ConnectionStatus }
   /** Everything that had already happened has been replayed. */
@@ -132,12 +136,18 @@ export function reduce(state: ViewerState, action: Action): ViewerState {
     case 'frame':
       return { ...state, frame: { src: action.src, at: action.at } };
     case 'connection':
-      return { ...state, connection: action.status };
+      // A connection that has just opened replays the session before anything new arrives.
+      return { ...state, connection: action.status, caughtUp: action.status === 'connected' ? false : state.caughtUp };
     case 'caught_up':
-      return { ...state, noticesSeen: state.notices.at(-1)?.id ?? 0 };
+      return { ...state, caughtUp: true, noticesSeen: state.notices.at(-1)?.id ?? 0 };
     case 'event':
-      return applyEvent(state, action.event);
+      return applyEvent(state, action.event, action.picture);
   }
+}
+
+/** The notices a person has not been shown yet. */
+export function unseenNotices(state: ViewerState): Notice[] {
+  return state.caughtUp ? state.notices.filter((notice) => notice.id > state.noticesSeen) : [];
 }
 
 function withNotice(state: ViewerState, notice: NewNotice): ViewerState {
@@ -145,12 +155,13 @@ function withNotice(state: ViewerState, notice: NewNotice): ViewerState {
   return { ...state, notices: [...state.notices, { ...notice, id } as Notice] };
 }
 
-function applyEvent(state: ViewerState, event: ServerEvent): ViewerState {
+function applyEvent(state: ViewerState, event: ServerEvent, picture: string | undefined): ViewerState {
   switch (event.type) {
     case 'session_started':
       return {
         ...initialState,
         connection: state.connection,
+        caughtUp: state.caughtUp,
         frame: state.frame,
         settingsVersion: state.settingsVersion,
         session: {
@@ -186,7 +197,7 @@ function applyEvent(state: ViewerState, event: ServerEvent): ViewerState {
               chars: event.chars,
               summary: event.summary,
               url: event.url,
-              picture: state.frame?.src,
+              picture,
             }
           : step,
       );

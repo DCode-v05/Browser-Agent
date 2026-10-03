@@ -13,7 +13,8 @@ export type StateKey =
   | 'paused'
   | 'blocked'
   | 'ended'
-  | 'disconnected';
+  | 'disconnected'
+  | 'refused';
 
 export type Tone = 'none' | 'agent' | 'person' | 'waiting' | 'neutral' | 'danger';
 export type ControlName = 'pause' | 'resume' | 'take_over' | 'hand_back' | 'done' | 'could_not' | 'stop';
@@ -40,6 +41,7 @@ function currentAction(state: ViewerState): string {
 }
 
 function frameState(state: ViewerState, key: StateKey, now: number, staleAfterS: number): FrameState {
+  if (key === 'refused') return state.frame ? 'disconnected' : 'empty';
   if (key === 'disconnected') return 'disconnected';
   if (key === 'ended') return 'ended';
   if (key === 'no_agent') return 'empty';
@@ -60,6 +62,9 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
     frame: frameState(state, view.key, now, staleAfterS),
   });
 
+  if (state.connection === 'refused') {
+    return finish({ key: 'refused', status: W.status.refused, detail: W.refused, tone: 'none', label: W.label.disconnected, controls: [], urgency: 'assertive' });
+  }
   if (state.connection !== 'connected' && state.session) {
     return finish({ key: 'disconnected', status: W.status.disconnected, detail: '', tone: 'none', label: W.label.disconnected, controls: [], urgency: 'assertive' });
   }

@@ -127,11 +127,12 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
 
   if (view.frame === 'empty' || view.frame === 'own_browser') {
     const own = view.frame === 'own_browser';
+    const refused = view.key === 'refused';
     return (
       <div className="frame frame-placeholder" data-tone={own ? view.tone : 'none'}>
         <Icon name={own ? 'globe' : 'monitor'} size="large" />
-        <p className="placeholder-title">{own ? W.frame.ownBrowser : W.frame.waitingForAgent}</p>
-        {!own && <p className="placeholder-hint">{W.frame.waitingForAgentHint}</p>}
+        <p className="placeholder-title">{own ? W.frame.ownBrowser : refused ? W.frame.noSession : W.frame.waitingForAgent}</p>
+        {!own && !refused && <p className="placeholder-hint">{W.frame.waitingForAgentHint}</p>}
         {own && view.label && <FrameLabel tone={view.tone} label={view.label} />}
       </div>
     );

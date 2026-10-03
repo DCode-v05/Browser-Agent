@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ServerEvent } from '../protocol';
-import { initialState, reduce, type ViewerState } from './reducer';
+import { initialState, reduce, unseenNotices, type ViewerState } from './reducer';
 
 const T0 = 1_759_480_000;
 
@@ -78,10 +78,9 @@ describe('steps', () => {
     ]);
   });
 
-  it('a finished step keeps its result, the address and the picture shown at that moment', () => {
+  it('a finished step keeps its result, the address and the picture that came with it', () => {
     let state = play([started, stepStarted(1, 'browser_navigate', 'Opening example.com/signup')]);
-    state = reduce(state, { type: 'frame', src: 'frame-1.jpg', at: T0 + 1.2 });
-    state = play([stepFinished(1, 'Opened example.com/signup', { ms: 120, chars: 640 })], state);
+    state = reduce(state, { type: 'event', event: stepFinished(1, 'Opened example.com/signup', { ms: 120, chars: 640 }), picture: 'frame-1.jpg' });
     expect(state.steps[0]).toMatchObject({ status: 'ok', ms: 120, chars: 640, summary: 'Opened example.com/signup', picture: 'frame-1.jpg' });
     expect(state.url).toBe('https://example.com/signup');
     expect(state.chars).toBe(640);
@@ -196,6 +195,13 @@ describe('blocked pages, downloads, settings', () => {
 });
 
 describe('pictures and connection', () => {
+  it('a finished step that came with no picture has none, whatever the live picture shows', () => {
+    let state = play([started, stepStarted(1, 'browser_navigate', 'Opening example.com/signup')]);
+    state = reduce(state, { type: 'frame', src: 'live.jpg', at: T0 + 1 });
+    state = play([stepFinished(1, 'Opened example.com/signup')], state);
+    expect(state.steps[0].picture).toBeUndefined();
+  });
+
   it('the newest picture replaces the last', () => {
     let state = reduce(initialState, { type: 'frame', src: 'a.jpg', at: 1 });
     state = reduce(state, { type: 'frame', src: 'b.jpg', at: 2 });
@@ -224,13 +230,33 @@ describe('pictures and connection', () => {
     expect(state.notices.map((notice) => notice.id)).toEqual([1, 2]);
   });
 
-  it('what happened before the viewer caught up is marked as seen, so it is not announced again', () => {
-    const before = play([started, { type: 'download_saved', name: 'a.pdf', size: 1, ts: T0 }]);
-    expect(before.noticesSeen).toBe(0);
+  const download = (name: string): ServerEvent => ({ type: 'download_saved', name, size: 1, ts: T0 });
+  const unseen = (state: ViewerState) => unseenNotices(state).map((notice) => notice.id);
+
+  it('what happened before the viewer caught up is not shown as new; what comes after is', () => {
+    const before = play([started, download('a.pdf')]);
+    expect(unseen(before)).toEqual([]);
     const caughtUp = reduce(before, { type: 'caught_up' });
-    expect(caughtUp.noticesSeen).toBe(1);
-    const later = play([{ type: 'download_saved', name: 'b.pdf', size: 1, ts: T0 }], caughtUp);
-    expect(later.notices.filter((notice) => notice.id > later.noticesSeen).map((notice) => notice.id)).toEqual([2]);
+    expect(unseen(caughtUp)).toEqual([]);
+    expect(unseen(play([download('b.pdf')], caughtUp))).toEqual([2]);
+  });
+
+  it('a session that starts after the viewer caught up shows its notices as new', () => {
+    const state = play([started, download('a.pdf')], reduce(initialState, { type: 'caught_up' }));
+    expect(unseen(state)).toEqual([1]);
+  });
+
+  it('a connection that comes back replays the session, and none of it is shown as new', () => {
+    let state = play([download('b.pdf')], reduce(play([started, download('a.pdf')]), { type: 'caught_up' }));
+    expect(unseen(state)).toEqual([2]);
+    state = reduce(state, { type: 'connection', status: 'reconnecting' });
+    state = reduce(state, { type: 'connection', status: 'connected' });
+    state = play([started, download('a.pdf'), download('b.pdf')], state);
+    expect(unseen(state)).toEqual([]);
+    state = reduce(state, { type: 'caught_up' });
+    expect(unseen(state)).toEqual([]);
+    expect(state.notices.map((notice) => notice.id)).toEqual([1, 2]);
+    expect(unseen(play([download('c.pdf')], state))).toEqual([3]);
   });
 
   it('state is never changed in place', () => {

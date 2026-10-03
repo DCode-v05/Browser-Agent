@@ -12,7 +12,7 @@ import { StepDrawer, Timeline } from './components/Timeline';
 import type { Connection } from './connection/connection';
 import { DEFAULT_OPTIONS, type ViewerOptions } from './options';
 import type { ClientCommand, Surface } from './protocol';
-import { initialState, reduce, type Notice } from './state/reducer';
+import { initialState, reduce, unseenNotices, type Notice } from './state/reducer';
 import { formatSize } from './state/timeline';
 import { describeState } from './state/view';
 import type { SettingsAnswer, SettingsSource } from './settings/types';
@@ -88,11 +88,11 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
 
   useEffect(() => {
     connection.start({
-      onEvent: (event) => dispatch({ type: 'event', event }),
+      onEvent: (event, picture) => dispatch({ type: 'event', event, picture }),
       onFrame: (src, at) => dispatch({ type: 'frame', src, at }),
       onStatus: (status) => dispatch({ type: 'connection', status }),
+      onCaughtUp: () => dispatch({ type: 'caught_up' }),
     });
-    dispatch({ type: 'caught_up' });
     return () => connection.close();
   }, [connection]);
 
@@ -126,13 +126,12 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const toasts = useMemo(
     () =>
       [
-        ...state.notices
-          .filter((notice) => notice.id > state.noticesSeen)
+        ...unseenNotices(state)
           .map(toastFor)
           .filter((item): item is Toast => item !== null),
         ...ownToasts,
       ].filter((item) => !dismissed.has(item.key)),
-    [state.notices, state.noticesSeen, ownToasts, dismissed],
+    [state, ownToasts, dismissed],
   );
   const dismiss = useCallback((key: string) => setDismissed((keys) => new Set(keys).add(key)), []);
 

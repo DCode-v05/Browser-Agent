@@ -20,6 +20,7 @@ const STATE_ICON: Record<StateKey, IconName> = {
   blocked: 'blocked',
   ended: 'check',
   disconnected: 'alert',
+  refused: 'alert',
 };
 
 interface ButtonProps {
@@ -118,7 +119,7 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
         <h2 className="status-title">{title}</h2>
         {detail && <p className="status-detail">{detail}</p>}
       </div>
-      {view.since > 0 && view.key !== 'ended' && view.key !== 'disconnected' && (
+      {view.since > 0 && view.key !== 'ended' && view.key !== 'disconnected' && view.key !== 'refused' && (
         <span className="status-time">
           <span className="sr-only">Elapsed </span>
           {formatElapsed(now - view.since)}

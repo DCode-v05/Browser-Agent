@@ -36,6 +36,15 @@ describe('the settings a surface receives', () => {
     expect(answer.surface).toBe(surface);
   });
 
+  it('can be limited to the settings the viewer keeps by itself', async () => {
+    const settings = createDemoSettings(['colour_mode', 'show_agent_pointer']);
+    const answer = await settings.load('web');
+    expect(ids(answer)).toEqual(['show_agent_pointer', 'colour_mode']);
+    expect(answer.groups.map((group) => group.title)).toEqual(['Live view', 'Appearance']);
+    expect(await settings.change('web', { ask_before: 'every_action' })).toEqual({ ok: false, setting: 'ask_before', reason: 'not_on_this_surface' });
+    expect((await settings.change('web', { colour_mode: 'dark' })).ok).toBe(true);
+  });
+
   it('web has 16 settings and mobile 13 in milestone 1, as the spec counts them', () => {
     expect(WEB).toHaveLength(16);
     expect(MOBILE).toHaveLength(13);

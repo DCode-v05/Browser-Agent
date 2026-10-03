@@ -322,14 +322,16 @@ function problemWith(entry: Entry | undefined, surface: Surface, value: SettingV
   return 'not_a_choice';
 }
 
-export function createDemoSettings(): SettingsSource {
-  const values = new Map<string, SettingValue>(CATALOGUE.map((entry) => [entry.id, entry.default]));
+/** `only` limits the catalogue to the settings named. */
+export function createDemoSettings(only?: readonly string[]): SettingsSource {
+  const catalogue = only ? CATALOGUE.filter((entry) => only.includes(entry.id)) : CATALOGUE;
+  const values = new Map<string, SettingValue>(catalogue.map((entry) => [entry.id, entry.default]));
 
   function answer(surface: Surface): SettingsAnswer {
     const groups = GROUPS.map((title) => ({
       id: title.toLowerCase().replace(' ', '_'),
       title,
-      settings: CATALOGUE.filter((entry) => entry.group === title && entry.surfaces.includes(surface)).map((entry) =>
+      settings: catalogue.filter((entry) => entry.group === title && entry.surfaces.includes(surface)).map((entry) =>
         toSetting(entry, values.get(entry.id) ?? null),
       ),
     }));
@@ -342,7 +344,7 @@ export function createDemoSettings(): SettingsSource {
     async change(surface, changes): Promise<ChangeResult> {
       // Nothing is changed when any one change in the request is refused.
       for (const [id, value] of Object.entries(changes)) {
-        const reason = problemWith(CATALOGUE.find((entry) => entry.id === id), surface, value);
+        const reason = problemWith(catalogue.find((entry) => entry.id === id), surface, value);
         if (reason) return { ok: false, setting: id, reason };
       }
       for (const [id, value] of Object.entries(changes)) values.set(id, value);

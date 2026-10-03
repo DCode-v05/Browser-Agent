@@ -341,8 +341,21 @@ Rules:
 
 One WebSocket per viewer and session. The viewer's first message carries the token; nothing is sent
 to it before that. Text messages are JSON events and commands. Binary messages are picture frames:
-one type byte followed by a JPEG. On connect the viewer receives the last `viewer.history_events`
-events, so a reload loses nothing.
+one type byte followed by a JPEG.
+
+On connect, and again each time a lost connection comes back, the viewer receives in this order:
+
+1. `session_started`, always, however much history has been dropped.
+2. The last `viewer.history_events` events. When older events have been dropped, the current
+   `control_changed` and `tab_changed` are sent as well, so the viewer's state is right without them.
+3. The newest picture, when there is one, so a still page is visible at once.
+4. `caught_up`.
+
+So a reload loses nothing but the pictures of earlier steps, which the history does not carry. A viewer
+that only lost its connection keeps the pictures it already had.
+
+A token the service does not accept closes the WebSocket with code 4401. The viewer does not try
+again: it says the link cannot open the session and what to do (section 9.3).
 
 | Direction | Messages |
 |---|---|
@@ -383,13 +396,13 @@ Fields of each event. Times are in seconds on the service's clock.
 | `navigation_blocked` | `url`, `reason`, `ts` |
 | `settings_changed` | `changes` |
 | `picture_current` | `ts` |
-| `caught_up` | none |
+| `caught_up` | `ts` (the service's clock now, which the viewer sets its own by) |
 | `session_ended` | `reason` (`person`, `agent`, `timeout`, `failed`), `detail`, `ts` |
 
 Three of these keep the viewer honest:
 
 - **`picture_current`.** The browser sends a picture only when the page changes. While a session is live and the page is still, the service says so every `viewer.picture_heartbeat_s`. The viewer calls the picture stale only when neither a picture nor this event has arrived for `viewer.stale_after_s`, so a quiet page never looks broken.
-- **`caught_up`.** Sent after the history has been replayed on connect. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new.
+- **`caught_up`.** Sent after the history has been replayed. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new. A step that finishes after it keeps the picture on screen at that moment as its own.
 - **`approval_closed` with `unwatched`.** An approval that was denied because nobody was watching stays on screen as a card until a person dismisses it.
 
 Typed text and form values never appear in an event: `step_started` for `browser_type` carries the
@@ -1022,6 +1035,7 @@ column is unchanged.
 | Blocked | "Blocked: " and the reason | Danger colour, "Blocked" | Take over, Stop | Immediately |
 | Ended | "Session ended" and why | None; last picture dimmed | Summary card | Politely |
 | Disconnected | "Connection lost. Reconnecting…" | Picture dimmed, "Not live" | None until reconnected | Immediately |
+| Link refused | "This link can't open the session", then "Open it again from where you started the session." | Picture dimmed, "Not live"; with nothing shown yet, "No session to show" | None | Immediately |
 | Stale picture | "Live" becomes "No new picture for 5 s" | Unchanged | Unchanged | Not announced |
 | Browser not connected (milestone 2) | "Your Chrome is not connected. Reconnecting…" | Waiting colour, "Browser not connected" | Stop; Connect, when the extension is missing | Immediately |
 
@@ -1123,6 +1137,7 @@ Rules: sentence case; buttons start with a verb; say what will happen; no jargon
 | Time limit on a card | "2:41 left, then this is denied" |
 | Nobody was watching | "A step needed your approval and no one was watching, so it was denied." |
 | Disconnected | "Connection lost. Reconnecting…" |
+| Link refused, or the page opened without its link | "This link can't open the session" · "Open it again from where you started the session." · "No session to show" · "Not connected" |
 | Empty timeline | "Steps appear here as the agent works." |
 | Browser names | "Cloud browser" · "My Chrome" · "Built-in browser" |
 | Settings | "Settings" · group names "Browser", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced" |
@@ -2558,7 +2573,7 @@ Later = deferred · No = not building.
 | UI-13 | Take over and hand back, with remote input | SK, GC, BW | M1 |
 | UI-14 | Help card for an agent's request, answered Done or Couldn't do it | CF, GC | M1 |
 | UI-15 | Dialog card for page dialogs | none | M1 |
-| UI-16 | States for blocked, ended, disconnected and stale picture | BB | M1 |
+| UI-16 | States for blocked, ended, disconnected, link refused and stale picture | BB | M1 |
 | UI-17 | Keyboard operation, screen-reader announcements, reduced motion | no vendor documents this | M1 |
 | UI-18 | Session summary card and counters | SK, Manus, H | M1 |
 | UI-19 | Autonomy mode switch | ANT, CX | M1, in the settings screen |

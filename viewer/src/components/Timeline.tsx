@@ -81,7 +81,7 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
         )}
       </div>
       </div>
-      {rows.length === 0 && <p className="timeline-empty">{W.timeline.empty}</p>}
+      {rows.length === 0 && state.connection !== 'refused' && <p className="timeline-empty">{W.timeline.empty}</p>}
       {state.session && (
         <p className="counters">{W.timeline.counters(W.timeline.steps(state.steps.length), formatElapsed(elapsed), W.timeline.chars(formatCount(state.chars)))}</p>
       )}

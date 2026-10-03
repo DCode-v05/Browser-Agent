@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { App, type AppProps } from './App';
+import type { Connection, ConnectionHandlers } from './connection/connection';
 import { DemoConnection } from './connection/demo';
 import { createDemoSettings } from './demo/settings';
 import { STATES } from './demo/sessions';
@@ -487,5 +488,66 @@ describe('inside a client', () => {
     show('agent');
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByText('Cloud browser')).toBeInTheDocument();
+  });
+});
+
+describe('what had already happened when the viewer connected', () => {
+  function connect() {
+    let handlers: ConnectionHandlers | undefined;
+    const connection: Connection = {
+      start: (given) => {
+        handlers = given;
+        given.onStatus('connected');
+      },
+      send: () => undefined,
+      now: () => 1000,
+      close: () => undefined,
+    };
+    const createConnection = () => connection;
+    const { container } = render(<App createConnection={createConnection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
+    return { handlers: () => handlers!, toasts: () => within(container.querySelector<HTMLElement>('.toasts')!) };
+  }
+
+  it('is not popped up as new, and what comes after is', () => {
+    const { handlers, toasts } = connect();
+    act(() => handlers().onEvent({ type: 'download_saved', name: 'old-report.pdf', size: 2048, ts: 990 }));
+    expect(toasts().queryByText(/old-report\.pdf/)).not.toBeInTheDocument();
+    act(() => handlers().onCaughtUp?.());
+    expect(toasts().queryByText(/old-report\.pdf/)).not.toBeInTheDocument();
+    act(() => handlers().onEvent({ type: 'download_saved', name: 'new-report.pdf', size: 2048, ts: 1001 }));
+    expect(toasts().getByText(/new-report\.pdf/)).toBeInTheDocument();
+  });
+});
+
+describe('a link that the service refuses', () => {
+  it('says what to do instead of promising to reconnect, and offers no controls', () => {
+    const connection: Connection = {
+      start: (handlers) => handlers.onStatus('refused'),
+      send: () => undefined,
+      now: () => 1000,
+      close: () => undefined,
+    };
+    const createConnection = () => connection;
+    render(<App createConnection={createConnection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
+    expect(screen.getByRole('heading', { name: "This link can't open the session" })).toBeInTheDocument();
+    expect(screen.getAllByText('Open it again from where you started the session.').length).toBeGreaterThan(0);
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+    expect(screen.queryByText(/Reconnecting/)).not.toBeInTheDocument();
+    noButton('Pause');
+    noButton('Stop session');
+  });
+
+  it('promises neither a browser nor steps', () => {
+    const connection: Connection = {
+      start: (handlers) => handlers.onStatus('refused'),
+      send: () => undefined,
+      now: () => 1000,
+      close: () => undefined,
+    };
+    const createConnection = () => connection;
+    render(<App createConnection={createConnection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
+    expect(screen.getByText('No session to show')).toBeInTheDocument();
+    expect(screen.queryByText('When an agent connects, its browser appears here.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Steps appear here as the agent works.')).not.toBeInTheDocument();
   });
 });

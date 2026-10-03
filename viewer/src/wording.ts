@@ -15,7 +15,10 @@ export const W = {
     blocked: (reason: string) => `Blocked: ${reason}`,
     ended: 'Session ended',
     disconnected: 'Connection lost. Reconnecting…',
+    refused: "This link can't open the session",
   },
+
+  refused: 'Open it again from where you started the session.',
 
   // The words on the border of the live picture.
   label: {
@@ -120,6 +123,7 @@ export const W = {
     ownBrowser: 'The agent is working in your own browser. Watch it there; its steps appear here.',
     waitingForAgent: 'Nothing to show yet',
     waitingForAgentHint: 'When an agent connects, its browser appears here.',
+    noSession: 'No session to show',
     blockedPage: 'This page was blocked',
   },
 
@@ -165,6 +169,7 @@ export const W = {
     connected: 'Connected',
     connecting: 'Connecting…',
     reconnecting: 'Reconnecting…',
+    refused: 'Not connected',
   },
 
   topBar: {

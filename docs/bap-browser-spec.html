@@ -933,8 +933,19 @@ starts once per service, not once per session.</p>
 <h3 id="48-viewer-protocol">4.8 Viewer protocol</h3>
 <p>One WebSocket per viewer and session. The viewer's first message carries the token; nothing is sent
 to it before that. Text messages are JSON events and commands. Binary messages are picture frames:
-one type byte followed by a JPEG. On connect the viewer receives the last <code>viewer.history_events</code>
-events, so a reload loses nothing.</p>
+one type byte followed by a JPEG.</p>
+<p>On connect, and again each time a lost connection comes back, the viewer receives in this order:</p>
+<ol>
+<li><code>session_started</code>, always, however much history has been dropped.</li>
+<li>The last <code>viewer.history_events</code> events. When older events have been dropped, the current
+   <code>control_changed</code> and <code>tab_changed</code> are sent as well, so the viewer's state is right without them.</li>
+<li>The newest picture, when there is one, so a still page is visible at once.</li>
+<li><code>caught_up</code>.</li>
+</ol>
+<p>So a reload loses nothing but the pictures of earlier steps, which the history does not carry. A viewer
+that only lost its connection keeps the pictures it already had.</p>
+<p>A token the service does not accept closes the WebSocket with code 4401. The viewer does not try
+again: it says the link cannot open the session and what to do (section 9.3).</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -1036,7 +1047,7 @@ events, so a reload loses nothing.</p>
 </tr>
 <tr>
 <td><code>caught_up</code></td>
-<td>none</td>
+<td><code>ts</code> (the service's clock now, which the viewer sets its own by)</td>
 </tr>
 <tr>
 <td><code>session_ended</code></td>
@@ -1047,7 +1058,7 @@ events, so a reload loses nothing.</p>
 <p>Three of these keep the viewer honest:</p>
 <ul>
 <li><strong><code>picture_current</code>.</strong> The browser sends a picture only when the page changes. While a session is live and the page is still, the service says so every <code>viewer.picture_heartbeat_s</code>. The viewer calls the picture stale only when neither a picture nor this event has arrived for <code>viewer.stale_after_s</code>, so a quiet page never looks broken.</li>
-<li><strong><code>caught_up</code>.</strong> Sent after the history has been replayed on connect. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new.</li>
+<li><strong><code>caught_up</code>.</strong> Sent after the history has been replayed. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new. A step that finishes after it keeps the picture on screen at that moment as its own.</li>
 <li><strong><code>approval_closed</code> with <code>unwatched</code>.</strong> An approval that was denied because nobody was watching stays on screen as a card until a person dismisses it.</li>
 </ul>
 <p>Typed text and form values never appear in an event: <code>step_started</code> for <code>browser_type</code> carries the
@@ -2116,6 +2127,13 @@ column is unchanged.</p>
 <td>Immediately</td>
 </tr>
 <tr>
+<td>Link refused</td>
+<td>"This link can't open the session", then "Open it again from where you started the session."</td>
+<td>Picture dimmed, "Not live"; with nothing shown yet, "No session to show"</td>
+<td>None</td>
+<td>Immediately</td>
+</tr>
+<tr>
 <td>Stale picture</td>
 <td>"Live" becomes "No new picture for 5 s"</td>
 <td>Unchanged</td>
@@ -2485,6 +2503,10 @@ theme, at 4.95:1.</p>
 <tr>
 <td>Disconnected</td>
 <td>"Connection lost. Reconnecting…"</td>
+</tr>
+<tr>
+<td>Link refused, or the page opened without its link</td>
+<td>"This link can't open the session" · "Open it again from where you started the session." · "No session to show" · "Not connected"</td>
 </tr>
 <tr>
 <td>Empty timeline</td>
@@ -7508,7 +7530,7 @@ Later = deferred · No = not building.</p>
 </tr>
 <tr>
 <td>UI-16</td>
-<td>States for blocked, ended, disconnected and stale picture</td>
+<td>States for blocked, ended, disconnected, link refused and stale picture</td>
 <td>BB</td>
 <td><span class="ph ph-m1">M1</span></td>
 </tr>
