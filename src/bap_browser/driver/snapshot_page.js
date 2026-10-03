@@ -334,3 +334,134 @@
   // Shared with the action operations added to this file.
   globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES };
 })();
+
+// Operations that prepare an element for an action. The driver then sends the real input events.
+(() => {
+  if (globalThis.__bap.withActions) return;
+  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES } =
+    globalThis.__bapParts;
+
+  function describe(el, a) {
+    const role = roleOf(el) || el.tagName.toLowerCase();
+    const name = nameOf(el, role, a) || textOf(el, a.maxName, a);
+    return name ? `${role} ${quote(name)}` : role;
+  }
+
+  // True when `node` is `ancestor` or sits inside it, looking through shadow roots.
+  function within(node, ancestor) {
+    for (let current = node; current; current = current.parentNode || current.host) {
+      if (current === ancestor) return true;
+    }
+    return false;
+  }
+
+  function labelOf(hit, el) {
+    return Array.from(el.labels || []).some((label) => within(hit, label));
+  }
+
+  function elementAt(x, y) {
+    let root = document;
+    let hit = null;
+    for (;;) {
+      const found = root.elementFromPoint(x, y);
+      if (!found || found === hit) return hit;
+      hit = found;
+      if (!found.shadowRoot) return hit;
+      root = found.shadowRoot;
+    }
+  }
+
+  function target(el) {
+    for (const rect of el.getClientRects()) {
+      if (rect.width > 0 && rect.height > 0) {
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, box: [rect.left, rect.top, rect.width, rect.height].join() };
+      }
+    }
+    return null;
+  }
+
+  const disabled = (el) => el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true';
+
+  // Waits until the element is visible, enabled, holding still and not covered, then gives the
+  // point to click. When the time runs out it says which of these failed.
+  async function prepare(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const described = describe(el, a);
+    const deadline = performance.now() + a.timeoutMs;
+    let lastBox = '';
+    for (;;) {
+      if (!el.isConnected) return { error: 'stale' };
+      let reason;
+      if (visibility(el) !== SHOWN) reason = 'it is not visible';
+      else if (disabled(el)) reason = 'it is disabled';
+      else {
+        let point = target(el);
+        if (point && (point.x < 0 || point.y < 0 || point.x >= innerWidth || point.y >= innerHeight)) {
+          el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+          point = target(el);
+        }
+        if (!point) reason = 'it has no size';
+        else if (point.box !== lastBox) {
+          lastBox = point.box;
+          reason = 'it is still moving';
+        } else {
+          const hit = elementAt(point.x, point.y);
+          if (hit && (within(hit, el) || labelOf(hit, el))) return { x: point.x, y: point.y, describe: described };
+          reason = hit ? 'it is covered by ' + describe(hit, a) : 'it is outside the visible area';
+        }
+      }
+      if (performance.now() >= deadline) return { error: 'not_ready', reason, describe: described };
+      await nextFrame(a.frameMs);
+    }
+  }
+
+  function focused() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+    return el;
+  }
+
+  // Focuses a text field and selects what it holds (or puts the caret at its end), so that the
+  // text the driver inserts next replaces it (or follows it).
+  function focus(a) {
+    const el = a.ref ? resolve(a.ref) : focused();
+    if (a.ref && !el) return { error: 'stale' };
+    if (!el || el === document.body || el === document.documentElement) return { error: 'nothing_focused' };
+    const described = describe(el, a);
+    const tag = el.tagName;
+    const field = tag === 'TEXTAREA' || (tag === 'INPUT' && TEXT_INPUT_TYPES.has(inputType(el)));
+    if (!field && !el.isContentEditable) return { error: 'not_editable', describe: described };
+    if (visibility(el) !== SHOWN) return { error: 'not_ready', reason: 'it is not visible', describe: described };
+    if (disabled(el) || el.readOnly === true) {
+      return { error: 'not_ready', reason: 'it is disabled or read-only', describe: described };
+    }
+    el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    el.focus();
+    let hadText;
+    if (field) {
+      hadText = el.value.length > 0;
+      if (a.clear) el.select();
+      else {
+        try {
+          el.setSelectionRange(el.value.length, el.value.length);
+        } catch {
+          // Email and number fields have no selection range; after focus the caret is already at the end.
+        }
+      }
+    } else {
+      hadText = el.textContent.length > 0;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      if (!a.clear) range.collapse(false);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    return { describe: described, hadText };
+  }
+
+  operations.prepare = prepare;
+  operations.focus = focus;
+  globalThis.__bap.withActions = true;
+})();
