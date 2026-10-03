@@ -32,7 +32,9 @@ THEMES = ["light", "dark"]
 @pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("theme", THEMES)
 @pytest.mark.parametrize("state", STATES)
-async def test_a_state_is_clean_readable_and_fits(open_view: OpenView, state: str, theme: str, size: str) -> None:
+async def test_a_state_is_clean_readable_and_fits(
+    open_view: OpenView, state: str, theme: str, size: str
+) -> None:
     view = await open_view(f"state={state}&theme={theme}", size)
     await view.shot(f"{state}-{theme}-{size}")
     assert view.errors == []
@@ -40,7 +42,9 @@ async def test_a_state_is_clean_readable_and_fits(open_view: OpenView, state: st
     assert await view.accessibility_violations() == []
 
 
-@pytest.mark.parametrize("state", ["agent", "waiting_approval", "person_requested", "person", "paused", "blocked"])
+@pytest.mark.parametrize(
+    "state", ["agent", "waiting_approval", "person_requested", "person", "paused", "blocked"]
+)
 async def test_who_is_driving_is_said_in_words_on_the_picture(open_view: OpenView, state: str) -> None:
     view = await open_view(f"state={state}")
     label = view.page.locator(".frame-label")
@@ -71,7 +75,9 @@ async def test_the_picture_keeps_the_browsers_shape(open_view: OpenView) -> None
 
 async def test_inside_a_client_the_product_name_is_dropped(open_view: OpenView) -> None:
     assert await (await open_view("state=agent")).page.get_by_text("bap-browser", exact=True).count() == 1
-    assert await (await open_view("state=agent&embed")).page.get_by_text("bap-browser", exact=True).count() == 0
+    assert (
+        await (await open_view("state=agent&embed")).page.get_by_text("bap-browser", exact=True).count() == 0
+    )
 
 
 async def test_at_twice_the_text_size_the_layout_reflows_to_one_column(browser, viewer_url: str) -> None:
@@ -80,11 +86,16 @@ async def test_at_twice_the_text_size_the_layout_reflows_to_one_column(browser, 
     try:
         await page.goto(f"{viewer_url}?state=waiting_approval")
         await page.wait_for_selector(".app")
-        assert await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") == 0
+        assert (
+            await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+            == 0
+        )
         browser_box = await page.locator(".browser").bounding_box()
         activity_box = await page.locator(".activity").bounding_box()
         assert browser_box and activity_box
-        assert activity_box["y"] >= browser_box["y"] + browser_box["height"], "the activity column sits under the browser"
+        assert activity_box["y"] >= browser_box["y"] + browser_box["height"], (
+            "the activity column sits under the browser"
+        )
         assert await page.get_by_role("button", name="Allow once").is_visible()
     finally:
         await page.close()

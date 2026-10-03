@@ -20,7 +20,9 @@ async def test_the_full_run_from_start_to_summary(open_view: OpenView) -> None:
     await page.get_by_text("Allowed once", exact=True).wait_for()
     await page.get_by_role("group", name="Verification needed").wait_for()
     await page.get_by_role("button", name="Take over").click()
-    await page.get_by_text("You're in control. The agent is waiting. Nothing you type is recorded.").wait_for()
+    await page.get_by_text(
+        "You're in control. The agent is waiting. Nothing you type is recorded."
+    ).wait_for()
     await page.get_by_role("img", name="Live browser view").click()
     await page.keyboard.type("481516")
     await page.get_by_role("button", name="Done").click()
@@ -33,7 +35,11 @@ async def test_the_full_run_from_start_to_summary(open_view: OpenView) -> None:
 async def test_denying_an_approval_shows_the_step_as_failed(open_view: OpenView) -> None:
     view = await open_view("demo=signup&pace=0.05")
     await view.page.get_by_role("button", name="Deny").click()
-    await view.page.get_by_role("log", name="Steps").get_by_text("Could not upload cv.pdf: a person did not approve it").wait_for()
+    await (
+        view.page.get_by_role("log", name="Steps")
+        .get_by_text("Could not upload cv.pdf: a person did not approve it")
+        .wait_for()
+    )
     assert await view.page.get_by_role("log", name="Steps").get_by_text("Failed", exact=True).count() == 1
     assert view.errors == []
 
@@ -122,7 +128,9 @@ async def test_the_keyboard_reaches_every_control_and_shows_where_it_is(open_vie
         # After the last control the focus leaves the page for the browser's own controls.
         if await page.evaluate("document.activeElement === document.body"):
             break
-        name = await page.evaluate("(document.activeElement.getAttribute('aria-label') || document.activeElement.textContent || '').trim()")
+        name = await page.evaluate(
+            "(document.activeElement.getAttribute('aria-label') || document.activeElement.textContent || '').trim()"
+        )
         reached.append(name)
         outline = await page.evaluate("getComputedStyle(document.activeElement).outlineStyle")
         assert outline == "solid", f"no focus ring on {name!r}"
@@ -140,18 +148,30 @@ async def test_the_keys_of_the_keyboard_map_work(open_view: OpenView) -> None:
     await page.get_by_role("heading", name="Agent is working").wait_for()
     await page.keyboard.press("f")
     assert await page.locator(".app").get_attribute("data-view") == "full"
-    assert await page.get_by_role("button", name="Stop session").is_visible(), "stop stays one action away in full view"
+    assert await page.get_by_role("button", name="Stop session").is_visible(), (
+        "stop stays one action away in full view"
+    )
     await page.keyboard.press("f")
     await page.keyboard.press("t")
-    await page.get_by_text("You're in control. The agent is waiting. Nothing you type is recorded.").wait_for()
+    await page.get_by_text(
+        "You're in control. The agent is waiting. Nothing you type is recorded."
+    ).wait_for()
 
 
 async def test_with_reduced_motion_nothing_animates(open_view: OpenView) -> None:
     moving = await open_view("state=agent")
-    assert await moving.page.locator(".live-dot").evaluate("dot => getComputedStyle(dot).animationName") == "live"
+    assert (
+        await moving.page.locator(".live-dot").evaluate("dot => getComputedStyle(dot).animationName")
+        == "live"
+    )
     still = await open_view("state=agent", reduced_motion=True)
-    assert await still.page.locator(".live-dot").evaluate("dot => getComputedStyle(dot).animationName") == "none"
-    assert await still.page.locator(".frame-label").evaluate("label => getComputedStyle(label).animationName") == "none"
+    assert (
+        await still.page.locator(".live-dot").evaluate("dot => getComputedStyle(dot).animationName") == "none"
+    )
+    assert (
+        await still.page.locator(".frame-label").evaluate("label => getComputedStyle(label).animationName")
+        == "none"
+    )
 
 
 async def test_only_opacity_and_transform_are_animated(open_view: OpenView) -> None:

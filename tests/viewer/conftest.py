@@ -54,11 +54,15 @@ class View:
     def __init__(self, page: Page) -> None:
         self.page = page
         self.errors: list[str] = []
-        page.on("console", lambda message: self.errors.append(message.text) if message.type == "error" else None)
+        page.on(
+            "console", lambda message: self.errors.append(message.text) if message.type == "error" else None
+        )
         page.on("pageerror", lambda error: self.errors.append(str(error)))
 
     async def sideways_overflow(self) -> int:
-        return await self.page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        return await self.page.evaluate(
+            "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+        )
 
     async def settled(self) -> None:
         """Waits until everything has finished arriving. An element still fading in is paler than it will be."""
@@ -94,7 +98,8 @@ async def open_view(browser: Browser, viewer_url: str) -> AsyncIterator[OpenView
     async def open_(query: str, size: str = "desktop", *, reduced_motion: bool = False) -> View:
         width, height = SIZES[size]
         page = await browser.new_page(
-            viewport={"width": width, "height": height}, reduced_motion="reduce" if reduced_motion else "no-preference"
+            viewport={"width": width, "height": height},
+            reduced_motion="reduce" if reduced_motion else "no-preference",
         )
         pages.append(page)
         view = View(page)
