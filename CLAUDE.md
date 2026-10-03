@@ -35,7 +35,7 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
   dependency, add an ignore for that exact message in `pyproject.toml` with a comment saying why.
 - `README.md` must exist before `uv sync`: the build reads it.
 - `uv run pytest` needs the built viewer (`npm --prefix viewer run build`); `tests/viewer` fails with that message otherwise.
-- Test files cannot import each other (pytest runs with `--import-mode=importlib`). Share through fixtures in `conftest.py`.
+- Test files cannot import each other (pytest runs with `--import-mode=importlib`). Share through fixtures in `conftest.py`, or through a module in `tests/support/`, which is on the tests' import path.
 - Viewer styles use tokens only: no colour, pixel size, duration or font outside `viewer/src/tokens.css` (a test enforces it).
 - Every string a person reads is in `viewer/src/wording.ts`.
 - The viewer's settings screen is drawn from the settings answer; it holds no list of settings of its own.
