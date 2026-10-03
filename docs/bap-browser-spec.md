@@ -346,7 +346,7 @@ events, so a reload loses nothing.
 
 | Direction | Messages |
 |---|---|
-| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `download_saved`, `navigation_blocked`, `settings_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
+| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
 | Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab` |
 
 Examples:
@@ -363,6 +363,34 @@ Examples:
 
 {"type":"control_changed","state":"person","since":1759480012.4}
 ```
+
+Fields of each event. Times are in seconds on the service's clock.
+
+| Event | Fields |
+|---|---|
+| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `ts` |
+| `control_changed` | `state` (`agent`, `waiting_approval`, `person_requested`, `person`, `paused`, `ended`), `since` |
+| `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
+| `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
+| `tab_changed` | `tabs`: each with `id`, `title`, `url`, `active`, `attention` |
+| `approval_requested` | `id`, `tool`, `summary`, `site`, `expires_in_s`, `ts` |
+| `approval_closed` | `id`, `outcome` (`allowed`, `allowed_site`, `denied`, `expired`, `unwatched`) |
+| `help_requested` | `id`, `reason`, `kind`, `expires_in_s`, `ts` |
+| `help_closed` | `id`, `outcome` (`done`, `could_not`, `timed_out`) |
+| `dialog_opened` | `id`, `kind` (`alert`, `confirm`, `prompt`, `beforeunload`), `text`, `expires_in_s`, `ts` |
+| `dialog_closed` | `id`, `outcome` (`accepted`, `dismissed`, `timed_out`) |
+| `download_saved` | `name`, `size`, `ts` |
+| `navigation_blocked` | `url`, `reason`, `ts` |
+| `settings_changed` | `changes` |
+| `picture_current` | `ts` |
+| `caught_up` | none |
+| `session_ended` | `reason` (`person`, `agent`, `timeout`, `failed`), `detail`, `ts` |
+
+Three of these keep the viewer honest:
+
+- **`picture_current`.** The browser sends a picture only when the page changes. While a session is live and the page is still, the service says so every `viewer.picture_heartbeat_s`. The viewer calls the picture stale only when neither a picture nor this event has arrived for `viewer.stale_after_s`, so a quiet page never looks broken.
+- **`caught_up`.** Sent after the history has been replayed on connect. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new.
+- **`approval_closed` with `unwatched`.** An approval that was denied because nobody was watching stays on screen as a card until a person dismisses it.
 
 Typed text and form values never appear in an event: `step_started` for `browser_type` carries the
 character count only.
@@ -989,7 +1017,7 @@ column is unchanged.
 | Agent | "Agent is working", the current action, elapsed time | Agent colour, "Agent is working" | Pause, Take over, Stop | Politely, on each new action |
 | Waiting for approval | "Waiting for your approval" | Waiting colour, "Paused for approval" | The approval card; Stop | Immediately |
 | Person requested | "The agent asked for help: " and its reason | Waiting colour, "Agent asked for help" | Take over, Couldn't do it, Stop | Immediately |
-| Person | "You're in control" | Person colour, "You're in control" | Hand back, Done, Couldn't do it, Stop | Immediately |
+| Person | "You're in control" | Person colour, "You're in control" | Answering a request for help: Done, Couldn't do it, Stop. After taking over unasked: Hand back, Stop | Immediately |
 | Paused | "Paused" | Neutral, "Paused" | Resume, Take over, Stop | Politely |
 | Blocked | "Blocked: " and the reason | Danger colour, "Blocked" | Take over, Stop | Immediately |
 | Ended | "Session ended" and why | None; last picture dimmed | Summary card | Politely |
@@ -1167,7 +1195,8 @@ Target: WCAG 2.2 level AA.
 
 - State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.
 - **Recorded sessions.** `viewer/src/demo/` holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. `?demo=<name>` plays one with no service, at real pace or stepped by hand, and `?state=<name>` opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.
-- The live frame draws each binary frame onto a canvas; a second canvas above it carries the highlight and pointer.
+- The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.
+- In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away.
 - During takeover, pointer positions are scaled from the canvas to page pixels and sent as `pointer`, `wheel` and `key` commands.
 - `npm run build` writes the viewer into `src/bap_browser/viewer_dist/`, which the service serves.
 
@@ -1215,7 +1244,8 @@ Rules:
 - The screen is drawn from the settings API. The viewer holds no list of settings of its own.
 - A change is saved as soon as it is made. There is no Save button. The row shows "Saved" for a moment, or "Saved. Applies to the next session."
 - A locked setting is shown with its value, disabled, and the words "Set by your organisation". It is never hidden, so a person can see why something is not possible.
-- A refused change puts the control back and says why in the row.
+- A refused change puts the control back and says why in the row. A site list is the exception: it keeps what was typed, so the entry can be corrected instead of typed again.
+- Entries of a site list that the deployment set are shown above the box, marked as set by the organisation, and cannot be removed.
 - A site list takes one site per line. `example.com` covers the site and its subdomains. A bad entry is refused with the reason, in the row.
 - Clear browsing data asks first, in words that say what will be lost.
 - Opening the screen does not pause the agent. Stop, pause and approvals stay reachable: an approval that arrives is announced, and `A` closes the screen and moves to it.
@@ -1328,11 +1358,17 @@ change applies. A build returns only the settings whose feature it contains.
 
 ```json
 {"surface":"web","groups":[{"id":"approvals","title":"Approvals","settings":[
-  {"id":"ask_before","title":"Ask before","control":"choice",
-   "choices":[{"value":"risky","label":"Risky actions"},
-              {"value":"every_action","label":"Every action"}],
+  {"id":"ask_before","title":"Ask before","description":"When the agent must wait for your approval.",
+   "control":"choice",
+   "choices":[{"value":"risky","label":"Risky actions","hint":"Uploads and page scripts"},
+              {"value":"every_action","label":"Every action","hint":"Each click, key press and page change"}],
    "value":"risky","default":"risky","locked":false,"applies":"now"}]}]}
 ```
+
+Kinds of control: `choice` (a few options, each with a hint), `select` (a dropdown), `switch`, `list` (sites,
+one per line, with the deployment's own entries in `fixed`), `action` (a button; `confirm` holds the
+question it asks first), `path` (a folder on the person's machine) and `about` (read-only). A choice that
+would loosen what the deployment requires carries `disabled`.
 
 `PATCH /api/settings` takes `{"surface":"web","changes":{"ask_before":"every_action"}}` and returns the
 new values. A refused change returns the setting's ID and the reason: `locked`, `not_on_this_surface`,
@@ -1510,6 +1546,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `quality_levels.high` | `{max_fps: 30, jpeg_quality: 85, max_width: 1600}` | For a fast connection |
 | `history_events` | 500 | Replayed when a viewer connects |
 | `stale_after_s` | 5 | When "Live" becomes the stale notice |
+| `picture_heartbeat_s` | 2 | How often the service confirms a still picture is current |
 | `idle_divider_s` | 10 | Gap that becomes an idle divider |
 | `takeover.release_chord` | `Ctrl+Alt+Enter` | Keys that leave the live frame |
 | `theme` | `system` | Or `light`, `dark` |
@@ -1544,6 +1581,16 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `consequential_words` | `["pay", "buy", "order", "purchase", "checkout", "subscribe", "send", "delete", "remove", "transfer", "confirm", "publish", "authorize", "authorise", "grant"]` | A control whose name holds one of these makes the action consequential |
 | `preview_timeout_s` | 120 | Then a preview is cancelled |
 | `allow_evaluate` | `false` | Whether page scripts may run in a person's own browser |
+
+**`agent`** (the reference agent loop, section 16.5)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `provider` | `anthropic` | Whose model the loop calls. `scripted` replays fixed replies and needs no key |
+| `model` | `claude-opus-5-5` | The model's name at that provider |
+| `api_key_env` | `ANTHROPIC_API_KEY` | The environment variable that holds the key. The key is never in `config.json` |
+| `max_steps` | 40 | Tool calls after which the loop stops |
+| `max_tokens` | 4096 | The most a single reply may be |
 
 **`logging`, `bench`**
 
@@ -2015,7 +2062,7 @@ Built as thin slices, each working end to end and tested before the next begins.
 | 1. Viewer experience | The viewer first, because it is what a person sees: scaffold with its checks in CI; design tokens; every component and state in section 9; the settings screen; both themes, keyboard, screen reader, reduced motion, narrow and phone layout, shown inside another page. All of it runs on recorded sessions (section 9.11), with no service needed | Viewer tests and accessibility check pass; every state has its screenshot in both themes |
 | 2. Configuration and policy | `config.py` with every milestone 1 key in section 10, the loader, `config show`, `init` and `doc`; address policy; redaction; error and result types | Unit tests pass |
 | 3. First path through | The driver interface and the Playwright driver; launch Chromium; `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type` through the tool layer, in-process and over MCP stdio | A scripted MCP client fills and submits the test form |
-| 4. Watch it live | Session service, event stream and live frames, feeding the viewer of slice 1 | The slice-3 run is visible live in the viewer |
+| 4. Live loop | A basic agent loop (`bap-browser agent`, section 16.5) and, built around it, the session service, the event stream and live pictures feeding the viewer of slice 1. A scripted model lets the whole path run in tests with no key | One command runs the sample task while the viewer shows each step live |
 | 5. All reading and acting tools | The remaining reading, pointer, keyboard, scroll, wait, tab, dialog, file and diagnostic tools; Chrome and Edge; attach and persistent profile; `doctor` | End-to-end suite passes on three browsers |
 | 6. Control | Who is driving; approvals; pause, resume, stop; take over and hand back with remote input; `browser_request_human`; token, `Host` and `Origin` checks; MCP over HTTP with `serve`. The viewer's cards and buttons act on the real session | Service and safety tests pass |
 | 7. Settings | The settings catalogue for web, mobile and desktop; saved user settings; locks and limits; the settings API. The settings screen reads and saves through it | Settings tests pass |
@@ -2024,7 +2071,7 @@ Built as thin slices, each working end to end and tested before the next begins.
 
 **Milestone 1 is accepted when**
 
-1. An agent connected over MCP fills and submits the sample form on the local test site while the viewer shows each step live.
+1. An agent connected over MCP fills and submits the sample form on the local test site while the viewer shows each step live. The reference agent loop does the same from one command.
 2. During that run a person approves an upload, denies a second, pauses and resumes, takes over to type into a field and hands back; the agent continues correctly each time.
 3. The agent calls `browser_request_human`; the person completes the step and answers "Done"; the agent continues.
 4. The same run passes with the core inside the micro VM image, with the viewer opened from outside it at desktop width and at phone width.
@@ -2452,7 +2499,7 @@ Later = deferred · No = not building.
 | IF-06 | MCP over HTTP | PWM | M1 |
 | IF-07 | Tool groups, to keep the tool list small | PWM, CDM | Next |
 | IF-08 | Tool definitions usable by any model | all | M1 |
-| IF-09 | A built-in agent loop | BU, BW | Later |
+| IF-09 | A built-in agent loop | BU, BW | M1 as a basic reference loop for checking the system end to end; a full agent Later |
 | IF-10 | Anthropic browser toolset format | ANT | Later |
 | IF-11 | Anthropic computer toolset on the page | ANT | Later |
 | IF-12 | OpenAI computer tool format | OAI | Later |
@@ -2652,6 +2699,35 @@ The viewer and the settings API are still served to the UI clients: the agent co
 
 The product backend starts the micro VM, passes it the configuration (the `config.json` content and
 the token in the environment) and gives the UI client the viewer's address. It takes no other part.
+
+### 16.5 The reference agent loop
+
+A basic agent loop ships with bap-browser. It is not the product's agent. It exists so that the whole
+path can be checked with one command, and as the smallest example of an agent core that uses the
+library in its own process, the way an agent core does inside the micro VM.
+
+```bash
+bap-browser agent "Sign up on the test site as Ada Lovelace, ada@example.com"
+```
+
+The command starts the core, one session and the viewer in one process, prints the viewer's address
+to the error stream, and runs the loop until the task is done, the step limit is reached, or a person
+stops the session.
+
+The loop:
+
+1. Send the task, the tool definitions and the conversation so far to the model.
+2. When the model calls tools, run each through the tool layer and add the results to the conversation.
+3. Repeat until the model answers without calling a tool, or `agent.max_steps` is reached.
+
+| Part | Detail |
+|---|---|
+| Model | Behind one small interface: the conversation and the tool definitions go in, text and tool calls come out. Two implementations: a hosted model, with its key read from the environment; and a scripted model that replays fixed replies, so tests and demonstrations need no key |
+| Tools | The same definitions and the same tool layer an outside agent gets. The loop has no way around the policy, the control states or the event log |
+| What a person sees | Every step in the viewer, live, with the same controls: pause, take over, stop, approvals |
+| Limits | `agent.max_steps`; `agent.max_tokens` per reply. A stopped session ends the loop |
+| Result | The model's final answer, printed; the event log holds the steps |
+| Not included | Memory, planning, sub-agents, and retries beyond what the model does by itself |
 
 ---
 

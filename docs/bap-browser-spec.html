@@ -300,6 +300,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#162-recipes">16.2 Recipes</a></li>
 <li><a href="#163-from-python">16.3 From Python</a></li>
 <li><a href="#164-in-the-micro-vm">16.4 In the micro VM</a></li>
+<li><a href="#165-the-reference-agent-loop">16.5 The reference agent loop</a></li>
 </ul>
 </li>
 <li class="s"><a href="#17-running-it-windows-and-the-micro-vm">17. Running it: Windows and the micro VM</a>
@@ -944,7 +945,7 @@ events, so a reload loses nothing.</p>
 <tbody>
 <tr>
 <td>Service to viewer</td>
-<td><code>session_started</code>, <code>control_changed</code>, <code>step_started</code>, <code>step_finished</code>, <code>tab_changed</code>, <code>approval_requested</code>, <code>approval_closed</code>, <code>help_requested</code>, <code>help_closed</code>, <code>dialog_opened</code>, <code>download_saved</code>, <code>navigation_blocked</code>, <code>settings_changed</code>, <code>bridge_changed</code> (milestone 2), <code>session_ended</code>, frame</td>
+<td><code>session_started</code>, <code>control_changed</code>, <code>step_started</code>, <code>step_finished</code>, <code>tab_changed</code>, <code>approval_requested</code>, <code>approval_closed</code>, <code>help_requested</code>, <code>help_closed</code>, <code>dialog_opened</code>, <code>dialog_closed</code>, <code>download_saved</code>, <code>picture_current</code>, <code>caught_up</code>, <code>navigation_blocked</code>, <code>settings_changed</code>, <code>bridge_changed</code> (milestone 2), <code>session_ended</code>, frame</td>
 </tr>
 <tr>
 <td>Viewer to service</td>
@@ -964,6 +965,91 @@ events, so a reload loses nothing.</p>
 
 {&quot;type&quot;:&quot;control_changed&quot;,&quot;state&quot;:&quot;person&quot;,&quot;since&quot;:1759480012.4}
 </code></pre>
+<p>Fields of each event. Times are in seconds on the service's clock.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>session_started</code></td>
+<td><code>session</code>, <code>agent</code>, <code>backend</code>, <code>browser</code>, <code>viewport</code> (<code>width</code>, <code>height</code>), <code>ts</code></td>
+</tr>
+<tr>
+<td><code>control_changed</code></td>
+<td><code>state</code> (<code>agent</code>, <code>waiting_approval</code>, <code>person_requested</code>, <code>person</code>, <code>paused</code>, <code>ended</code>), <code>since</code></td>
+</tr>
+<tr>
+<td><code>step_started</code></td>
+<td><code>step</code>, <code>tool</code>, <code>label</code> (what the agent is doing, as a sentence), <code>target</code> (the element's box, when there is one), <code>ts</code></td>
+</tr>
+<tr>
+<td><code>step_finished</code></td>
+<td><code>step</code>, <code>ok</code>, <code>ms</code>, <code>chars</code>, <code>summary</code> (what happened, as a sentence), <code>url</code></td>
+</tr>
+<tr>
+<td><code>tab_changed</code></td>
+<td><code>tabs</code>: each with <code>id</code>, <code>title</code>, <code>url</code>, <code>active</code>, <code>attention</code></td>
+</tr>
+<tr>
+<td><code>approval_requested</code></td>
+<td><code>id</code>, <code>tool</code>, <code>summary</code>, <code>site</code>, <code>expires_in_s</code>, <code>ts</code></td>
+</tr>
+<tr>
+<td><code>approval_closed</code></td>
+<td><code>id</code>, <code>outcome</code> (<code>allowed</code>, <code>allowed_site</code>, <code>denied</code>, <code>expired</code>, <code>unwatched</code>)</td>
+</tr>
+<tr>
+<td><code>help_requested</code></td>
+<td><code>id</code>, <code>reason</code>, <code>kind</code>, <code>expires_in_s</code>, <code>ts</code></td>
+</tr>
+<tr>
+<td><code>help_closed</code></td>
+<td><code>id</code>, <code>outcome</code> (<code>done</code>, <code>could_not</code>, <code>timed_out</code>)</td>
+</tr>
+<tr>
+<td><code>dialog_opened</code></td>
+<td><code>id</code>, <code>kind</code> (<code>alert</code>, <code>confirm</code>, <code>prompt</code>, <code>beforeunload</code>), <code>text</code>, <code>expires_in_s</code>, <code>ts</code></td>
+</tr>
+<tr>
+<td><code>dialog_closed</code></td>
+<td><code>id</code>, <code>outcome</code> (<code>accepted</code>, <code>dismissed</code>, <code>timed_out</code>)</td>
+</tr>
+<tr>
+<td><code>download_saved</code></td>
+<td><code>name</code>, <code>size</code>, <code>ts</code></td>
+</tr>
+<tr>
+<td><code>navigation_blocked</code></td>
+<td><code>url</code>, <code>reason</code>, <code>ts</code></td>
+</tr>
+<tr>
+<td><code>settings_changed</code></td>
+<td><code>changes</code></td>
+</tr>
+<tr>
+<td><code>picture_current</code></td>
+<td><code>ts</code></td>
+</tr>
+<tr>
+<td><code>caught_up</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>session_ended</code></td>
+<td><code>reason</code> (<code>person</code>, <code>agent</code>, <code>timeout</code>, <code>failed</code>), <code>detail</code>, <code>ts</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Three of these keep the viewer honest:</p>
+<ul>
+<li><strong><code>picture_current</code>.</strong> The browser sends a picture only when the page changes. While a session is live and the page is still, the service says so every <code>viewer.picture_heartbeat_s</code>. The viewer calls the picture stale only when neither a picture nor this event has arrived for <code>viewer.stale_after_s</code>, so a quiet page never looks broken.</li>
+<li><strong><code>caught_up</code>.</strong> Sent after the history has been replayed on connect. What happened before it is shown in the timeline but is not popped up again as a toast or announced as new.</li>
+<li><strong><code>approval_closed</code> with <code>unwatched</code>.</strong> An approval that was denied because nobody was watching stays on screen as a card until a person dismisses it.</li>
+</ul>
 <p>Typed text and form values never appear in an event: <code>step_started</code> for <code>browser_type</code> carries the
 character count only.</p>
 <p>A take-over Chrome session sends no picture frames by default, because the person is looking at their
@@ -1998,7 +2084,7 @@ column is unchanged.</p>
 <td>Person</td>
 <td>"You're in control"</td>
 <td>Person colour, "You're in control"</td>
-<td>Hand back, Done, Couldn't do it, Stop</td>
+<td>Answering a request for help: Done, Couldn't do it, Stop. After taking over unasked: Hand back, Stop</td>
 <td>Immediately</td>
 </tr>
 <tr>
@@ -2577,7 +2663,8 @@ duration and opens the step drawer.</p>
 <ul>
 <li>State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.</li>
 <li><strong>Recorded sessions.</strong> <code>viewer/src/demo/</code> holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. <code>?demo=&lt;name&gt;</code> plays one with no service, at real pace or stepped by hand, and <code>?state=&lt;name&gt;</code> opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.</li>
-<li>The live frame draws each binary frame onto a canvas; a second canvas above it carries the highlight and pointer.</li>
+<li>The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.</li>
+<li>In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away.</li>
 <li>During takeover, pointer positions are scaled from the canvas to page pixels and sent as <code>pointer</code>, <code>wheel</code> and <code>key</code> commands.</li>
 <li><code>npm run build</code> writes the viewer into <code>src/bap_browser/viewer_dist/</code>, which the service serves.</li>
 </ul>
@@ -2684,7 +2771,8 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <li>The screen is drawn from the settings API. The viewer holds no list of settings of its own.</li>
 <li>A change is saved as soon as it is made. There is no Save button. The row shows "Saved" for a moment, or "Saved. Applies to the next session."</li>
 <li>A locked setting is shown with its value, disabled, and the words "Set by your organisation". It is never hidden, so a person can see why something is not possible.</li>
-<li>A refused change puts the control back and says why in the row.</li>
+<li>A refused change puts the control back and says why in the row. A site list is the exception: it keeps what was typed, so the entry can be corrected instead of typed again.</li>
+<li>Entries of a site list that the deployment set are shown above the box, marked as set by the organisation, and cannot be removed.</li>
 <li>A site list takes one site per line. <code>example.com</code> covers the site and its subdomains. A bad entry is refused with the reason, in the row.</li>
 <li>Clear browsing data asks first, in words that say what will be lost.</li>
 <li>Opening the screen does not pause the agent. Stop, pause and approvals stay reachable: an approval that arrives is announced, and <code>A</code> closes the screen and moves to it.</li>
@@ -3044,11 +3132,16 @@ to the next session; the screen says so. Every other setting applies to the agen
 name, kind of control, choices, current value, default, whether it is locked and why, and when a
 change applies. A build returns only the settings whose feature it contains.</p>
 <pre><code class="language-json">{&quot;surface&quot;:&quot;web&quot;,&quot;groups&quot;:[{&quot;id&quot;:&quot;approvals&quot;,&quot;title&quot;:&quot;Approvals&quot;,&quot;settings&quot;:[
-  {&quot;id&quot;:&quot;ask_before&quot;,&quot;title&quot;:&quot;Ask before&quot;,&quot;control&quot;:&quot;choice&quot;,
-   &quot;choices&quot;:[{&quot;value&quot;:&quot;risky&quot;,&quot;label&quot;:&quot;Risky actions&quot;},
-              {&quot;value&quot;:&quot;every_action&quot;,&quot;label&quot;:&quot;Every action&quot;}],
+  {&quot;id&quot;:&quot;ask_before&quot;,&quot;title&quot;:&quot;Ask before&quot;,&quot;description&quot;:&quot;When the agent must wait for your approval.&quot;,
+   &quot;control&quot;:&quot;choice&quot;,
+   &quot;choices&quot;:[{&quot;value&quot;:&quot;risky&quot;,&quot;label&quot;:&quot;Risky actions&quot;,&quot;hint&quot;:&quot;Uploads and page scripts&quot;},
+              {&quot;value&quot;:&quot;every_action&quot;,&quot;label&quot;:&quot;Every action&quot;,&quot;hint&quot;:&quot;Each click, key press and page change&quot;}],
    &quot;value&quot;:&quot;risky&quot;,&quot;default&quot;:&quot;risky&quot;,&quot;locked&quot;:false,&quot;applies&quot;:&quot;now&quot;}]}]}
 </code></pre>
+<p>Kinds of control: <code>choice</code> (a few options, each with a hint), <code>select</code> (a dropdown), <code>switch</code>, <code>list</code> (sites,
+one per line, with the deployment's own entries in <code>fixed</code>), <code>action</code> (a button; <code>confirm</code> holds the
+question it asks first), <code>path</code> (a folder on the person's machine) and <code>about</code> (read-only). A choice that
+would loosen what the deployment requires carries <code>disabled</code>.</p>
 <p><code>PATCH /api/settings</code> takes <code>{"surface":"web","changes":{"ask_before":"every_action"}}</code> and returns the
 new values. A refused change returns the setting's ID and the reason: <code>locked</code>, <code>not_on_this_surface</code>,
 <code>would_loosen</code> or <code>not_a_choice</code>. Nothing is changed when any one change in the request is refused.
@@ -3717,6 +3810,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>When "Live" becomes the stale notice</td>
 </tr>
 <tr>
+<td><code>picture_heartbeat_s</code></td>
+<td>2</td>
+<td>How often the service confirms a still picture is current</td>
+</tr>
+<tr>
 <td><code>idle_divider_s</code></td>
 <td>10</td>
 <td>Gap that becomes an idle divider</td>
@@ -3846,6 +3944,43 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>allow_evaluate</code></td>
 <td><code>false</code></td>
 <td>Whether page scripts may run in a person's own browser</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong><code>agent</code></strong> (the reference agent loop, section 16.5)</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>provider</code></td>
+<td><code>anthropic</code></td>
+<td>Whose model the loop calls. <code>scripted</code> replays fixed replies and needs no key</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>claude-opus-5-5</code></td>
+<td>The model's name at that provider</td>
+</tr>
+<tr>
+<td><code>api_key_env</code></td>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>The environment variable that holds the key. The key is never in <code>config.json</code></td>
+</tr>
+<tr>
+<td><code>max_steps</code></td>
+<td>40</td>
+<td>Tool calls after which the loop stops</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>4096</td>
+<td>The most a single reply may be</td>
 </tr>
 </tbody>
 </table></div>
@@ -5157,9 +5292,9 @@ completes web, milestone 3 completes desktop.</p>
 <td>A scripted MCP client fills and submits the test form</td>
 </tr>
 <tr>
-<td>4. Watch it live</td>
-<td>Session service, event stream and live frames, feeding the viewer of slice 1</td>
-<td>The slice-3 run is visible live in the viewer</td>
+<td>4. Live loop</td>
+<td>A basic agent loop (<code>bap-browser agent</code>, section 16.5) and, built around it, the session service, the event stream and live pictures feeding the viewer of slice 1. A scripted model lets the whole path run in tests with no key</td>
+<td>One command runs the sample task while the viewer shows each step live</td>
 </tr>
 <tr>
 <td>5. All reading and acting tools</td>
@@ -5190,7 +5325,7 @@ completes web, milestone 3 completes desktop.</p>
 </table></div>
 <p><strong>Milestone 1 is accepted when</strong></p>
 <ol>
-<li>An agent connected over MCP fills and submits the sample form on the local test site while the viewer shows each step live.</li>
+<li>An agent connected over MCP fills and submits the sample form on the local test site while the viewer shows each step live. The reference agent loop does the same from one command.</li>
 <li>During that run a person approves an upload, denies a second, pauses and resumes, takes over to type into a field and hands back; the agent continues correctly each time.</li>
 <li>The agent calls <code>browser_request_human</code>; the person completes the step and answers "Done"; the agent continues.</li>
 <li>The same run passes with the core inside the micro VM image, with the viewer opened from outside it at desktop width and at phone width.</li>
@@ -7072,7 +7207,7 @@ Later = deferred · No = not building.</p>
 <td>IF-09</td>
 <td>A built-in agent loop</td>
 <td>BU, BW</td>
-<td><span class="ph ph-later">Later</span></td>
+<td><span class="ph ph-m1">M1</span>as a basic reference loop for checking the system end to end; a full agent Later</td>
 </tr>
 <tr>
 <td>IF-10</td>
@@ -7842,7 +7977,7 @@ from bap_browser.tools import Toolkit
 async with open_session(load_config()) as session:
     tools = Toolkit(session)
     page = await tools.call(&quot;browser_navigate&quot;, {&quot;url&quot;: &quot;example.com&quot;})
-    print(page.text)                       # the snapshot, with refs
+    print(page.text)  # the snapshot, with refs
     await tools.call(&quot;browser_click&quot;, {&quot;ref&quot;: &quot;e1&quot;})
 </code></pre>
 <p>The viewer and the settings API are still served to the UI clients: the agent core starts them with
@@ -7876,6 +8011,55 @@ async with open_session(load_config()) as session:
 </table></div>
 <p>The product backend starts the micro VM, passes it the configuration (the <code>config.json</code> content and
 the token in the environment) and gives the UI client the viewer's address. It takes no other part.</p>
+<h3 id="165-the-reference-agent-loop">16.5 The reference agent loop</h3>
+<p>A basic agent loop ships with bap-browser. It is not the product's agent. It exists so that the whole
+path can be checked with one command, and as the smallest example of an agent core that uses the
+library in its own process, the way an agent core does inside the micro VM.</p>
+<pre><code class="language-bash">bap-browser agent &quot;Sign up on the test site as Ada Lovelace, ada@example.com&quot;
+</code></pre>
+<p>The command starts the core, one session and the viewer in one process, prints the viewer's address
+to the error stream, and runs the loop until the task is done, the step limit is reached, or a person
+stops the session.</p>
+<p>The loop:</p>
+<ol>
+<li>Send the task, the tool definitions and the conversation so far to the model.</li>
+<li>When the model calls tools, run each through the tool layer and add the results to the conversation.</li>
+<li>Repeat until the model answers without calling a tool, or <code>agent.max_steps</code> is reached.</li>
+</ol>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model</td>
+<td>Behind one small interface: the conversation and the tool definitions go in, text and tool calls come out. Two implementations: a hosted model, with its key read from the environment; and a scripted model that replays fixed replies, so tests and demonstrations need no key</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>The same definitions and the same tool layer an outside agent gets. The loop has no way around the policy, the control states or the event log</td>
+</tr>
+<tr>
+<td>What a person sees</td>
+<td>Every step in the viewer, live, with the same controls: pause, take over, stop, approvals</td>
+</tr>
+<tr>
+<td>Limits</td>
+<td><code>agent.max_steps</code>; <code>agent.max_tokens</code> per reply. A stopped session ends the loop</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>The model's final answer, printed; the event log holds the steps</td>
+</tr>
+<tr>
+<td>Not included</td>
+<td>Memory, planning, sub-agents, and retries beyond what the model does by itself</td>
+</tr>
+</tbody>
+</table></div>
 
 <h2 id="17-running-it-windows-and-the-micro-vm">17. Running it: Windows and the micro VM</h2>
 <h3 id="171-on-windows">17.1 On Windows</h3>
