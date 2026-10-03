@@ -1,0 +1,19 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run pyright
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest
+        env:
+          # Hosted runners do not allow the user namespaces Chromium's sandbox needs.
+          BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How browser agents see pages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400&family=Azeret+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f9f9f7;--sunken:#fcfcfb;--line:#0000001a;
+  --text:#0b0b0b;--text-2:#383835;--muted:#6f6d68;--accent:#be3b5f;
+  --serif:"Newsreader",Georgia,serif;
+  --sans:"Stack Sans Text",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --mono:"Azeret Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#151515;--sunken:#1a1a19;--line:#ffffff1a;
+  --text:#f5f4ef;--text-2:#e3e1d9;--muted:#a5a39b;color-scheme:dark}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text-2);font:300 17px/1.65 var(--sans);letter-spacing:-0.006em;-webkit-font-smoothing:antialiased}
+main{max-width:760px;margin:0 auto;padding:64px 16px 80px}
+h1{font:400 44px/1.1 var(--serif);letter-spacing:-0.02em;color:var(--text)}
+h2{font:400 26px/1.3 var(--serif);color:var(--text);margin:48px 0 14px}
+.meta{font:400 12px/1.5 var(--mono);color:var(--muted);margin-top:14px}
+.verdict{margin-top:32px;padding:20px 22px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--sunken)}
+.verdict b{color:var(--text);font-weight:500}
+p+p{margin-top:12px}
+b{color:var(--text);font-weight:500}
+code{font:400 14px var(--mono)}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:560px}
+th{font:400 12px/1.5 var(--mono);color:var(--muted);text-align:left;padding:12px 14px;border-bottom:1px solid var(--line)}
+td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td:first-child{color:var(--text);font-weight:500;width:30%}
+ol,ul{padding-left:20px}
+li+li{margin-top:10px}
+.note{font-size:15px;color:var(--muted);margin-top:14px}
+.sources li{font-size:15px}
+a{color:var(--text)}
+@media (max-width:600px){
+  main{padding-top:40px}h1{font-size:34px}
+  /* On phones each table row becomes a small card instead of side-scrolling */
+  table{min-width:0}thead{display:none}
+  tr{display:block;padding:14px;border-bottom:1px solid var(--line)}tr:last-child{border-bottom:0}
+  td{display:block;padding:0;border:0}td:first-child{width:auto;margin-bottom:6px}
+  td:nth-child(2)::before,td:nth-child(3)::before{font:400 12px/1.5 var(--mono);color:var(--muted);display:block;margin-top:6px}
+  td:nth-child(2)::before{content:"Sees"}td:nth-child(3)::before{content:"Acts"}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>How browser agents see pages</h1>
+<p class="meta">Checked against OpenAI and Hermes docs and source code, 3 October 2026</p>
+
+<div class="verdict">
+<p><b>The claim:</b> DOM and screenshots are how browser agents work.</p>
+<p><b>Answer: partly true.</b> Both are real inputs, but neither OpenAI nor Hermes is built as "DOM + screenshots". OpenAI's click tool uses screenshots only. Hermes leads with the accessibility tree. Both now prefer letting the model write code.</p>
+</div>
+
+<h2>What each one does</h2>
+<div class="wrap">
+<table>
+<thead><tr><th>System</th><th>What the model sees</th><th>How it acts</th></tr></thead>
+<tbody>
+<tr><td>OpenAI <code>computer</code> tool</td><td>Screenshots only, no DOM</td><td>Clicks at pixel positions, types, scrolls, presses keys</td></tr>
+<tr><td>OpenAI code execution (recommended)</td><td>Screenshots plus what the script prints</td><td>Model writes a Playwright or PyAutoGUI script; one call does many steps</td></tr>
+<tr><td>OpenAI hosted browser (Agents API)</td><td>Not visible to us; only screenshots come back</td><td>Not exposed</td></tr>
+<tr><td>Codex / ChatGPT desktop browser</td><td>Screenshots and rendered page; DOM only in an opt-in Developer mode</td><td>Model writes JavaScript in a REPL</td></tr>
+<tr><td>Hermes built-in tools</td><td>Accessibility tree as text, elements tagged <code>@e1</code>, <code>@e2</code>; screenshots as a fallback</td><td>Clicks and types by element ID</td></tr>
+<tr><td>Hermes default mode</td><td>Whatever its code pulls: JavaScript, accessibility tree, screenshots</td><td>Model writes Python with Browser Use helpers</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">Codex CLI has no browser. The browser lives in the ChatGPT desktop app.</p>
+
+<h2>Where the proposal is off</h2>
+<ol>
+<li><b>The DOM isn't the main input anywhere.</b> A raw DOM is thousands of nested elements. Too big and noisy to feed the model every turn.</li>
+<li><b>It misses the accessibility tree.</b> The browser builds it from the DOM: a short list of buttons, links and inputs with their labels, the same thing a screen reader reads. This is what Hermes relies on first.</li>
+<li><b>The bigger shift is code mode.</b> The model writes a script that does several steps in one call, instead of one click per turn. Fewer round trips, and the script can use any of the inputs.</li>
+</ol>
+
+<h2>What we should build</h2>
+<ul>
+<li><b>Main input:</b> accessibility tree with element IDs. Cheap and precise.</li>
+<li><b>Screenshots:</b> to check results, and for what text can't capture (charts, canvas, layout bugs).</li>
+<li><b>DOM and JavaScript:</b> for pulling data and debugging, not as the main input.</li>
+<li><b>Actions:</b> a code tool (Playwright or Chrome DevTools Protocol) for multi-step work, plus simple click and type tools by element ID.</li>
+</ul>
+<p class="note">OpenAI's hosted browser and ChatGPT's browser are closed source, so for those this reflects their docs and public code only.</p>
+
+<h2>Sources</h2>
+<ul class="sources">
+<li><a href="https://developers.openai.com/api/docs/guides/tools-computer-use">OpenAI: Computer use (Responses API)</a></li>
+<li><a href="https://developers.openai.com/api/docs/guides/agents-api/tools/computer-use">OpenAI: Computer use (Agents API)</a></li>
+<li><a href="https://developers.openai.com/codex/browser">OpenAI: Codex browser</a></li>
+<li><a href="https://github.com/openai/codex">openai/codex source</a></li>
+<li><a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/browser">Hermes: Browser docs</a></li>
+<li><a href="https://github.com/nousresearch/hermes-agent">nousresearch/hermes-agent source</a></li>
+</ul>
+</main>
+</body>
+</html>
