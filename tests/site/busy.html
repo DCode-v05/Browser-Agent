@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Busy</title>
+</head>
+<body>
+<button id="work">Work</button>
+<script>
+// The page stops answering for four seconds, shortly after the click has been handled.
+document.getElementById('work').addEventListener('click', () => {
+  setTimeout(() => {
+    const end = performance.now() + 4000;
+    while (performance.now() < end) {}
+  }, 0);
+});
+</script>
+</body>
+</html>

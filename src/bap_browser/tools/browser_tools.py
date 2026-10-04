@@ -65,7 +65,7 @@ async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
             # The setting's name is for whoever runs the deployment, not for the person watching.
             reason=decision.reason.split(" (")[0],
         )
-    driver = await session.driver()
+    driver = await session.driver(may_restart=True)
     text = f"Navigated to {session.shown_address(await driver.navigate(url))}"
     if session.config.browser.snapshot.after_navigation:
         text += "\n" + await _page(session, driver)

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scrolled box</title>
+</head>
+<body>
+<div id="box" style="height: 120px; overflow: auto; border: 1px solid"></div>
+<p id="below">Text below the box</p>
+<p id="clicked"></p>
+<script>
+const box = document.getElementById('box');
+for (let i = 1; i <= 12; i++) {
+  const row = document.createElement('div');
+  const button = document.createElement('button');
+  button.textContent = 'Row ' + i;
+  button.addEventListener('click', () => { document.getElementById('clicked').textContent = 'Clicked row ' + i; });
+  row.append(button);
+  box.append(row);
+}
+</script>
+</body>
+</html>

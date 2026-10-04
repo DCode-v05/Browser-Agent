@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -21,13 +22,31 @@ class _DocumentGone(Exception):
 
 
 class PageScript:
-    def __init__(self, cdp: CDPSession) -> None:
+    def __init__(self, cdp: CDPSession, reply_ms: int) -> None:
         self._cdp = cdp
+        self._reply_ms = reply_ms
         self._frame_id: str | None = None
         self._context_id: int | None = None
 
-    async def call(self, operation: str, arguments: dict[str, Any]) -> Any:
-        """Runs one operation. A document replaced part-way is tried once more on the new one."""
+    async def call(self, operation: str, arguments: dict[str, Any], *, wait_ms: int = 0) -> Any:
+        """Runs one operation. `wait_ms` is how long the operation itself may wait inside the page.
+
+        A page can be too busy to answer, or be held up by a navigation that never finishes. The
+        call then fails; it never waits for ever.
+        """
+        limit = (self._reply_ms + wait_ms) / 1000
+        try:
+            async with asyncio.timeout(limit):
+                return await self._call_on_the_live_document(operation, arguments)
+        except TimeoutError:
+            raise BrowserError(
+                f"The page did not answer within {limit:g} s. It may be busy or still loading. "
+                "Try again, or open another page with browser_navigate.",
+                reason="the page is not answering",
+            ) from None
+
+    async def _call_on_the_live_document(self, operation: str, arguments: dict[str, Any]) -> Any:
+        """A document replaced part-way is tried once more on the new one."""
         try:
             return await self._call(operation, arguments)
         except _DocumentGone:
@@ -43,10 +62,14 @@ class PageScript:
     async def frames_passed(self, count: int, frame_ms: int) -> bool:
         """Waits for `count` animation frames. False means the document went away: a navigation."""
         try:
-            await self._call("frames", {"count": count, "frameMs": frame_ms})
+            async with asyncio.timeout((self._reply_ms + count * frame_ms) / 1000):
+                await self._call("frames", {"count": count, "frameMs": frame_ms})
         except _DocumentGone:
             self._context_id = None
             return False
+        except TimeoutError:
+            # A page too busy to draw a frame is still the same document.
+            return True
         return True
 
     def forget_document(self) -> None:

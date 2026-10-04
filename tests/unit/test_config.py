@@ -29,6 +29,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "browser.timeouts.load_wait_ms": 5000,
     "browser.timeouts.settle_ms": 3000,
     "browser.timeouts.frame_ms": 100,
+    "browser.timeouts.page_reply_ms": 5000,
     "browser.timeouts.popup_adopt_ms": 3000,
     "browser.timeouts.wait_max_s": 30,
     "browser.timeouts.idle_session_s": 900,

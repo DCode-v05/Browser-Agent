@@ -397,6 +397,7 @@
     const described = describe(el, a);
     const deadline = performance.now() + a.timeoutMs;
     let lastBox = '';
+    let broughtIntoView = false;
     for (;;) {
       if (!el.isConnected) return { error: 'stale' };
       let reason;
@@ -415,6 +416,13 @@
         } else {
           const hit = elementAt(point.x, point.y);
           if (hit && (within(hit, el) || labelOf(hit, el))) return { x: point.x, y: point.y, describe: described };
+          if (!broughtIntoView) {
+            // Inside a list or a dialog that scrolls by itself, the element can be within the window
+            // and still out of sight. It is brought into view once before it is called covered.
+            broughtIntoView = true;
+            el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+            lastBox = '';
+          }
           reason = hit ? 'it is covered by ' + describe(hit, a) : 'it is outside the visible area';
         }
       }
@@ -445,6 +453,11 @@
     }
     el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
     el.focus();
+    // A page can send the focus elsewhere as soon as it arrives. What is typed next would land there.
+    const active = focused();
+    if (active !== el && !(el.isContentEditable && active && active.contains(el))) {
+      return { error: 'not_ready', reason: 'the page moved the focus to another element', describe: described };
+    }
     let hadText;
     if (field) {
       hadText = el.value.length > 0;

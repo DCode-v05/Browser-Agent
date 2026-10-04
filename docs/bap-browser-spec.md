@@ -1450,6 +1450,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `launch_ms` | 30000 | Launch or attach |
 | `navigation_ms` | 30000 | A navigation |
 | `action_ms` | 10000 | One action, including waiting for the element |
+| `page_reply_ms` | 5000 | Longest wait for the page to answer. A page too busy to answer fails the call |
 | `load_wait_ms` | 5000 | Longest wait for the load event after a navigation |
 | `settle_ms` | 3000 | Longest wait for the page to settle after an action |
 | `frame_ms` | 100 | Longest wait for the next animation frame, on a page that is not being painted |

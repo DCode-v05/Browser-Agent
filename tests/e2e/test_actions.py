@@ -214,3 +214,25 @@ async def test_rich_text_and_text_areas_take_text(driver: PlaywrightDriver, site
     assert await driver.page.input_value("textarea") == "line one\nline two"
     await driver.type_text(ref_of(page, 'textbox "Editor"'), "new text")
     assert await driver.page.inner_text("[contenteditable]") == "new text"
+
+
+async def test_typing_fails_when_the_page_moves_the_focus_elsewhere(
+    driver: PlaywrightDriver, site: str
+) -> None:
+    await driver.navigate(f"{site}/focus_moves.html")
+    password = ref_of(await read(driver), 'textbox "Password"')
+    with pytest.raises(BrowserError, match="the page moved the focus to another element"):
+        await driver.type_text(password, "hunter2-secret")
+    assert await driver.page.input_value("#search") == ""
+    assert await driver.page.input_value("#password") == ""
+
+
+async def test_an_element_inside_a_scrolled_box_is_scrolled_to_and_clicked(
+    driver: PlaywrightDriver, site: str
+) -> None:
+    await driver.navigate(f"{site}/scroll_box.html")
+    page = await read(driver)
+    for row in (2, 8, 12, 1):
+        outcome = await driver.click(ref_of(page, f'button "Row {row}"'))
+        assert outcome == ActionOutcome(f'button "Row {row}"')
+        assert await driver.page.text_content("#clicked") == f"Clicked row {row}"

@@ -23,16 +23,18 @@ class FakeDriver:
         self.most_at_once = 0
         self.fail_with: Exception | None = None
         self.next_address: str | None = None
+        self.alive = True
         """Where the next navigation ends up, when that is not where it was sent."""
 
     async def start(self) -> None:
         self.started += 1
+        self.alive = True
 
     async def close(self) -> None:
         self.calls.append(("close", None))
 
     def is_alive(self) -> bool:
-        return self.started > 0
+        return self.started > 0 and self.alive
 
     def description(self) -> str:
         return "Fake 1.0"

@@ -86,6 +86,9 @@ class Timeouts(Section):
     frame_ms: int = setting(
         100, "Longest wait for the next animation frame, on a page that is not being painted"
     )
+    page_reply_ms: int = setting(
+        5000, "Longest wait for the page to answer. A page too busy to answer fails the call"
+    )
     popup_adopt_ms: int = setting(3000, "Longest wait for a new tab to load before it is reported")
     wait_max_s: int = setting(30, "Ceiling for `browser_wait`")
     idle_session_s: int = setting(900, "Close a session unused for this long; 0 means never")

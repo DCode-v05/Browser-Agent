@@ -139,7 +139,8 @@ class PlaywrightDriver:
             raise BrowserError(f"The browser could not be started: {first_line(exc)}") from exc
         page.on("request", self._on_request)
         page.on("framenavigated", self._on_frame_navigated)
-        self._browser, self._page, self._script = browser, page, PageScript(cdp)
+        self._browser, self._page = browser, page
+        self._script = PageScript(cdp, timeouts.page_reply_ms)
 
     async def close(self) -> None:
         await self._stack.aclose()
@@ -155,8 +156,9 @@ class PlaywrightDriver:
 
     async def tabs(self) -> list[TabInfo]:
         try:
-            title = await self.page.title()
-        except PlaywrightError:
+            async with asyncio.timeout(self._config.browser.timeouts.page_reply_ms / 1000):
+                title = await self.page.title()
+        except (PlaywrightError, TimeoutError):
             title = ""
         return [TabInfo(TAB_ID, self.page.url, title, True)]
 
@@ -211,6 +213,7 @@ class PlaywrightDriver:
                 "frameMs": browser.timeouts.frame_ms,
                 "maxName": browser.snapshot.max_name_chars,
             },
+            wait_ms=browser.timeouts.action_ms,
         )
         self._raise_for(point, ref)
         navigations, commits = self._navigations, self._commits

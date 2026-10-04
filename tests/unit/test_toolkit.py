@@ -363,3 +363,21 @@ async def test_a_page_cannot_make_a_result_as_long_as_it_likes(make_config, tmp_
     driver.next_address = "https://93.184.216.34/#" + "B" * 500_000
     opened = await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
     assert len(opened.text) < 1000
+
+
+async def test_when_the_browser_has_gone_the_result_says_so_and_a_navigation_starts_it_again(
+    make_config, tmp_path: Path
+) -> None:
+    tools, driver, seen = watched(make_config, tmp_path)
+    await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
+    driver.alive = False
+    for name, arguments in (("browser_snapshot", {}), ("browser_click", {"ref": "e1"})):
+        result = await tools.call(name, arguments)
+        assert result.is_error
+        assert result.text == "The browser closed. Open a page with browser_navigate to start it again."
+    assert seen.events[-1] == ("finished", 3, False, "Could not click e1: the browser closed", [])
+    assert ("close", None) in driver.calls
+    again = await tools.call("browser_navigate", {"url": "https://93.184.216.34/next"})
+    assert not again.is_error
+    assert driver.started == 2
+    assert not (await tools.call("browser_snapshot", {})).is_error

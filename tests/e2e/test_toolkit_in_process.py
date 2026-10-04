@@ -73,3 +73,23 @@ async def test_a_page_cannot_make_a_result_as_long_as_it_likes(
         read = await tools.call("browser_snapshot", {"max_chars": 500})
     assert len(clicked.text) < 1000, len(clicked.text)
     assert len(read.text) < 1000, len(read.text)
+
+
+async def test_a_browser_that_went_away_is_said_to_be_gone_and_a_navigation_starts_a_new_one(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    async with open_session(make_config(tmp_path)) as session:
+        tools = Toolkit(session)
+        page = await tools.call("browser_navigate", {"url": f"{site}/form.html"})
+        browser = (await session.driver()).page.context.browser  # type: ignore[attr-defined]
+        await browser.close()
+
+        gone = await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Create account"')})
+        assert gone.is_error
+        assert gone.text == "The browser closed. Open a page with browser_navigate to start it again."
+
+        again = await tools.call("browser_navigate", {"url": f"{site}/form.html"})
+        assert again.text.startswith(f"Navigated to {site}/form.html\nPage: Sign up\n")
+        # The new browser's elements get new refs: one from the browser that closed can never match.
+        old = ref_of(page.text, 'button "Create account"')
+        assert ref_of(again.text, 'button "Create account"') != old
