@@ -374,8 +374,10 @@ async def test_a_persons_mouse_and_keys_reach_the_page_only_while_they_drive(
         ("wheel", (10, 20, 0, 120)),
     ]
     await session.handle({"type": "hand_back"})
+    # What they still held down was let go for them. Nothing they do after that reaches the page.
+    handed_back = list(driver.calls)
     await session.handle(click)
-    assert len(driver.calls) == 4
+    assert driver.calls == handed_back
 
 
 async def test_what_a_person_types_is_neither_logged_nor_told_to_viewers(

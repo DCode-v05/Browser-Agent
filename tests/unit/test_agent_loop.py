@@ -158,3 +158,27 @@ def test_a_ref_is_found_by_what_the_element_is_called() -> None:
     page = 'Page: Sign up\n- textbox "Full name" [ref=e3] [required]\n  - button "Create account" [ref=e12]'
     assert ref_of(page, 'textbox "Full name"') == "e3"
     assert ref_of(page, 'button "Create account"') == "e12"
+
+
+async def test_a_session_that_has_ended_is_noticed_before_the_model_is_asked_again(
+    make_config, tmp_path: Path
+) -> None:
+    tools, _ = kit(make_config, tmp_path)
+    asked = 0
+    ended = False
+
+    class Counting:
+        async def complete(
+            self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
+        ) -> Reply:
+            nonlocal asked, ended
+            asked += 1
+            ended = True
+            return Reply("", (ToolCall("a", "browser_snapshot", {}),))
+
+    with pytest.raises(Unfinished):
+        await run_agent("Read", tools, Counting(), SETTINGS, ended=lambda: ended)
+    with pytest.raises(Unfinished):
+        await run_agent("Read", tools, Counting(), SETTINGS, ended=lambda: True)
+    # The second run was over before it began: a model that is paid for by the call is not called.
+    assert asked == 1

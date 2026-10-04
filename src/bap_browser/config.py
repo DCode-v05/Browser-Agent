@@ -268,6 +268,9 @@ class Server(Section):
     state_file: str = setting(".bap-browser/service.json", "Holds the viewer address for the local user")
     auth_wait_s: int = setting(10, "How long a new viewer connection may take to send its token")
     shutdown_wait_s: int = setting(3, "How long stopping waits for open connections to finish")
+    command_backlog: int = setting(
+        256, "How many of a viewer's commands may wait their turn. More than that are dropped"
+    )
 
 
 class Mcp(Section):

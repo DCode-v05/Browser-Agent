@@ -1564,6 +1564,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `server.token_env` | `BAP_BROWSER_TOKEN` | If unset, a token is generated at start |
 | `server.auth_wait_s` | 10 | How long a new viewer connection may take to send its token |
 | `server.shutdown_wait_s` | 3 | How long stopping waits for open connections to finish |
+| `server.command_backlog` | 256 | How many of a viewer's commands may wait their turn. More than that are dropped |
 | `server.state_file` | `.bap-browser/service.json` | Holds the viewer address for the local user |
 | `mcp.server_name` | `bap-browser` | |
 | `mcp.http_path` | `/mcp` | |

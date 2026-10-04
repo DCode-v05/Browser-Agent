@@ -249,6 +249,29 @@ async def test_a_persons_commands_act_on_the_session(running: Running) -> None:
     assert ("pointer", ("down", 40, 30, "left")) in driver.calls
 
 
+async def test_stop_is_done_at_once_even_with_a_pause_ahead_of_it_that_is_still_waiting(
+    running: Running,
+) -> None:
+    service, session, driver = await running()
+    driver.hold = asyncio.Event()
+    click = asyncio.create_task(session.toolkit.call("browser_click", {"ref": "e1"}))
+    try:
+        async with connect(socket_address(service)) as socket:
+            await sign_in(socket)
+            await until_caught_up(socket)
+            # The pause begins when the click has finished, and this click does not finish.
+            await socket.send(json.dumps({"type": "pause"}))
+            await socket.send(json.dumps({"type": "stop"}))
+            async with asyncio.timeout(3):
+                while (told := await received(socket)).get("type") != "session_ended":
+                    pass
+            assert told["reason"] == "person"
+    finally:
+        driver.hold.set()
+        await click
+    assert session.control == "ended"
+
+
 async def test_messages_that_make_no_sense_are_ignored_and_the_connection_stays(running: Running) -> None:
     service, session, _ = await running()
     async with connect(socket_address(service)) as socket:

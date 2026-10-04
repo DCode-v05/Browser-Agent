@@ -61,6 +61,9 @@ class ServiceSession:
         self._size = (0, 0)
         self._last_picture = 0.0
         self._heartbeat: asyncio.Task[None] | None = None
+        # What a person is holding down in the page, so that it can be let go for them.
+        self._held_keys: list[str] = []
+        self._held_buttons: dict[MouseButton, tuple[float, float]] = {}
 
     async def start(self) -> None:
         """Starts the browser and tells viewers what this session is."""
@@ -126,11 +129,23 @@ class ServiceSession:
         action, key = command.get("action"), command.get("key")
         try:
             if kind == "pointer" and x is not None and y is not None:
-                button = BUTTONS.get(command.get("button"))  # type: ignore[arg-type]
-                if action in ("move", "down", "up") and button is not None:
+                given = command.get("button")
+                button = BUTTONS.get(given) if type(given) is int else None
+                if action == "move":
+                    # A move names no button of its own.
+                    await driver.pointer("move", x, y, button or "left")
+                elif action in ("down", "up") and button is not None:
+                    if action == "down":
+                        self._held_buttons[button] = (x, y)
+                    else:
+                        self._held_buttons.pop(button, None)
                     await driver.pointer(action, x, y, button)
             elif kind == "key" and action in ("down", "up"):
                 if isinstance(key, str) and 0 < len(key) <= LONGEST_KEY_NAME:
+                    if action == "up":
+                        self._held_keys = [held for held in self._held_keys if held != key]
+                    elif key not in self._held_keys:
+                        self._held_keys.append(key)
                     await driver.key(action, key)
             elif kind == "wheel" and x is not None and y is not None:
                 # One turn of the wheel never moves the page by more than one screen.
@@ -141,6 +156,22 @@ class ServiceSession:
         except BapError:
             # The page did not take it. A person sees that in the picture; there is nobody to tell.
             return
+
+    async def _let_go(self) -> None:
+        """Releases every key and button the person still holds. A key that comes up after the
+        hand-back never reaches the page, and a Control left down would turn the agent's next click
+        into something else."""
+        driver = self.browser.started_driver
+        keys, buttons = self._held_keys, self._held_buttons
+        self._held_keys, self._held_buttons = [], {}
+        if driver is None:
+            return
+        for key in reversed(keys):
+            with contextlib.suppress(BapError):
+                await driver.key("up", key)
+        for button, (x, y) in buttons.items():
+            with contextlib.suppress(BapError):
+                await driver.pointer("up", x, y, button)
 
     def _picture(self, jpeg: bytes) -> None:
         self._last_picture = asyncio.get_running_loop().time()
@@ -235,7 +266,11 @@ class ServiceSession:
             await self._set_control(state)
 
     async def _hand_back(self) -> None:
+        await self._let_go()
         tabs = await self.toolkit.tabs()
+        if self.control != "person":
+            # The session was stopped, or another viewer handed it back, while the tabs were being read.
+            return
         self._publish_tabs(tabs)
         before, after = self._address_at_takeover, self._active_address(tabs)
         change = (
@@ -250,6 +285,9 @@ class ServiceSession:
         await self._set_control("agent")
 
     async def _set_control(self, state: ControlState) -> None:
+        if self.control == "ended":
+            # Nothing brings an ended session back.
+            return
         self.control = state
         self.hub.publish({"type": "control_changed", "state": state, "since": self._clock()})
         await self._announce()

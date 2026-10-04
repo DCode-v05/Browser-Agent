@@ -91,7 +91,7 @@ def create_app(config: Config, sessions: Mapping[str, ServiceSession], token: st
             for item in replay:
                 await _send(socket, item)
             await _send(socket, {"type": "caught_up", "ts": time.time()})
-            await _serve_viewer(socket, session, subscriber)
+            await _serve_viewer(socket, session, subscriber, config.server.command_backlog)
         except WebSocketDisconnect:
             pass
         finally:
@@ -112,8 +112,11 @@ def create_app(config: Config, sessions: Mapping[str, ServiceSession], token: st
     )
 
 
-async def _serve_viewer(socket: WebSocket, session: ServiceSession, subscriber: Subscriber) -> None:
+async def _serve_viewer(
+    socket: WebSocket, session: ServiceSession, subscriber: Subscriber, backlog: int
+) -> None:
     """Sends the viewer what happens, and does what the person asks, until either side stops."""
+    waiting: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     async def tell() -> None:
         while True:
@@ -122,16 +125,28 @@ async def _serve_viewer(socket: WebSocket, session: ServiceSession, subscriber: 
     async def listen() -> None:
         while True:
             command = _command(await socket.receive())
-            if command is not None:
+            if command is None:
+                continue
+            if command.get("type") == "stop":
+                # Stop never waits its turn: a pause or a take-over ahead of it may be waiting for an
+                # action that does not end.
                 await session.handle(command)
+            elif waiting.qsize() < backlog:
+                waiting.put_nowait(command)
+            # Past the limit a command is dropped: the page is not keeping up with what is sent.
 
-    telling, listening = asyncio.create_task(tell()), asyncio.create_task(listen())
+    async def act() -> None:
+        # One at a time and in order: what a person types must reach the page as it was typed.
+        while True:
+            await session.handle(await waiting.get())
+
+    tasks = [asyncio.create_task(work()) for work in (tell, listen, act)]
     try:
-        done, _ = await asyncio.wait({telling, listening}, return_when=asyncio.FIRST_COMPLETED)
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     finally:
-        for task in (telling, listening):
+        for task in tasks:
             task.cancel()
-        await asyncio.gather(telling, listening, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
     failure = next((task.exception() for task in done if not task.cancelled() and task.exception()), None)
     if isinstance(failure, FellBehind):
         # The viewer stopped reading. It connects again and is sent everything from the start.

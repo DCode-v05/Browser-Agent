@@ -102,6 +102,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "server.state_file": ".bap-browser/service.json",
     "server.auth_wait_s": 10,
     "server.shutdown_wait_s": 3,
+    "server.command_backlog": 256,
     "mcp.server_name": "bap-browser",
     "mcp.http_path": "/mcp",
     "viewer.quality": "standard",

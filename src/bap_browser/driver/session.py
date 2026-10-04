@@ -13,6 +13,8 @@ from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
 
+SESSION_ENDED = "The session has ended."
+
 
 class BrowserSession:
     def __init__(self, config: Config, driver: Driver | None = None) -> None:
@@ -22,6 +24,7 @@ class BrowserSession:
         self._driver: Driver = driver if driver is not None else PlaywrightDriver(config)
         self._started = False
         self._lost = False
+        self._closed = False
 
     def shown_address(self, url: str) -> str:
         """An address as it may appear in a result, an event or the log: no name and password, and capped,
@@ -39,8 +42,10 @@ class BrowserSession:
         A browser that has gone away (it crashed, or a person closed its window) is started again
         only by a call that opens a page. Any other call is told that the page it meant is gone.
         """
+        if self._closed:
+            raise BrowserError(SESSION_ENDED, reason="the session ended")
         if self._started and not self._driver.is_alive():
-            await self.close()
+            await self._stop()
             self._lost = True
         if self._lost and not may_restart:
             raise BrowserError(
@@ -50,9 +55,18 @@ class BrowserSession:
         if not self._started:
             await self._driver.start()
             self._started, self._lost = True, False
+            if self._closed:
+                # The session was ended while the browser was starting.
+                await self._stop()
+                raise BrowserError(SESSION_ENDED, reason="the session ended")
         return self._driver
 
     async def close(self) -> None:
+        """Ends the session for good. No later call starts the browser again."""
+        self._closed = True
+        await self._stop()
+
+    async def _stop(self) -> None:
         if self._started:
             self._started = False
             await self._driver.close()

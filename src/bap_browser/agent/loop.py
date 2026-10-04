@@ -43,6 +43,8 @@ async def run_agent(
     messages: list[Message] = [Said("user", task)]
     calls = 0
     while True:
+        if ended():
+            raise Unfinished(SESSION_ENDED)
         reply = await model.complete(SYSTEM, messages, toolkit.definitions())
         messages.append(Said("assistant", reply.text, reply.tool_calls))
         if not reply.tool_calls:
