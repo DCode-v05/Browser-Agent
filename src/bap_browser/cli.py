@@ -57,6 +57,35 @@ def _parser() -> argparse.ArgumentParser:
     mcp = commands.add_parser("mcp", help="serve the browser tools over MCP on stdio, for an agent to start")
     mcp.add_argument("--config", help="path of config.json")
     mcp.set_defaults(run=_mcp)
+
+    agent = commands.add_parser(
+        "agent", help="run the reference agent on a task, with the viewer to watch and control it"
+    )
+    agent.add_argument("task", nargs="?", help="what the agent should do")
+    agent.add_argument("--config", help="path of config.json")
+    agent.add_argument(
+        "--demo",
+        action="store_true",
+        help="sign up on the built-in demo site with a scripted model; needs no key",
+    )
+    agent.add_argument(
+        "--pace",
+        type=float,
+        default=1.0,
+        help="seconds the demonstration waits before each step, for a person watching (default 1)",
+    )
+    agent.add_argument(
+        "--wait-for-viewer", action="store_true", help="start the task only once a viewer has connected"
+    )
+    agent.add_argument(
+        "--open", action="store_true", help="open the viewer in your browser, and wait for it to connect"
+    )
+    agent.add_argument(
+        "--exit-when-done",
+        action="store_true",
+        help="end when the task is finished, instead of keeping the viewer open",
+    )
+    agent.set_defaults(run=_agent)
     return parser
 
 
@@ -100,6 +129,44 @@ def _mcp(args: argparse.Namespace) -> int:
     from bap_browser.mcp.server import run_stdio
 
     asyncio.run(run_stdio(config))
+    return 0
+
+
+def _agent(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if not args.demo:
+        if not args.task:
+            raise ConfigError(
+                'say what the agent should do, for example: bap-browser agent "Find the opening hours", '
+                "or run the demonstration: bap-browser agent --demo"
+            )
+        if config.agent.provider == "scripted":
+            raise ConfigError(
+                "the scripted model only plays the demonstration. Run: bap-browser agent --demo"
+            )
+        raise ConfigError(
+            f"agent.provider is '{config.agent.provider}', and the hosted model is not part of this build "
+            "yet. Run the demonstration instead: bap-browser agent --demo"
+        )
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
+    # Imported here so that the config commands start without loading the browser and the web server.
+    from bap_browser.agent.command import Interrupted, run_with_viewer
+    from bap_browser.agent.demo import TASK, demo_script
+
+    try:
+        answer = asyncio.run(
+            run_with_viewer(
+                config,
+                args.task or TASK,
+                lambda service: demo_script(f"{service.address}/demo-site", args.pace),
+                exit_when_done=args.exit_when_done,
+                wait_for_viewer=args.wait_for_viewer,
+                open_viewer=args.open,
+            )
+        )
+    except (Interrupted, KeyboardInterrupt):
+        return 130
+    print(answer)
     return 0
 
 

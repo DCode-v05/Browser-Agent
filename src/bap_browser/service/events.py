@@ -55,6 +55,7 @@ class EventHub:
         self._tabs: Event | None = None
         self._frame: bytes | None = None
         self._subscribers: list[Subscriber] = []
+        self._viewer_arrived = asyncio.Event()
 
     @property
     def viewers(self) -> int:
@@ -85,7 +86,12 @@ class EventHub:
         """What already happened, and the queue of what follows."""
         subscriber = Subscriber(self._history.maxlen or None)
         self._subscribers.append(subscriber)
+        self._viewer_arrived.set()
         return self._replay(), subscriber
+
+    async def wait_for_viewer(self) -> None:
+        """Returns once a viewer has connected, so that a person misses nothing of what follows."""
+        await self._viewer_arrived.wait()
 
     def unsubscribe(self, subscriber: Subscriber) -> None:
         if subscriber in self._subscribers:

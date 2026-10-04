@@ -1,6 +1,7 @@
 """The session service on a real port: the viewer's files, the API, and the viewer's WebSocket (spec 4.7 to 4.10)."""
 
 import asyncio
+import http.client
 import json
 import time
 import urllib.error
@@ -293,3 +294,69 @@ async def test_the_token_can_come_from_the_environment(
 ) -> None:
     monkeypatch.setenv("BAP_BROWSER_TOKEN", "from-the-environment")
     assert Service(make_config(tmp_path), {}, port=0).token == "from-the-environment"
+
+
+async def test_the_viewer_address_is_kept_in_a_file_only_while_the_service_runs(
+    make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    state = tmp_path / "state" / "service.json"
+    config = make_config(tmp_path, server={"state_file": str(state)})
+    service = Service(config, {}, token=TOKEN, port=0)
+    await service.start()
+    try:
+        assert json.loads(state.read_text(encoding="utf-8")) == {"viewer": service.viewer_address}
+    finally:
+        await service.stop()
+    assert not state.exists()
+
+
+async def test_a_session_can_wait_for_its_first_viewer(running: Running) -> None:
+    service, session, _ = await running()
+    waiting = asyncio.create_task(session.hub.wait_for_viewer())
+    await asyncio.sleep(0)
+    assert not waiting.done()
+    async with connect(socket_address(service)) as socket:
+        await sign_in(socket)
+        await until_caught_up(socket)
+        await asyncio.wait_for(waiting, 2)
+
+
+async def test_stopping_is_given_a_time_limit(running: Running) -> None:
+    """On Windows, a connection that a closed browser cut is never counted as closed by asyncio
+    (its transport raises ConnectionResetError before it detaches from the server), and a web server
+    that waits for every connection then never stops. The hang needs a real browser being closed,
+    which tests/viewer/test_live_session.py does; here the limit that ends the wait is checked."""
+    service, _, _ = await running(server={"shutdown_wait_s": 2})
+    assert service.shutdown_wait_s == 2
+    started = time.monotonic()
+    await service.stop()
+    assert time.monotonic() - started < 2
+
+
+def ask_twice_on_one_connection(port: int) -> tuple[str | None, bool]:
+    """What the service says about the connection, and whether a second request can use it."""
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("GET", "/healthz")
+        first = connection.getresponse()
+        first.read()
+        said = first.getheader("connection")
+        try:
+            connection.request("GET", "/healthz")
+            connection.getresponse().read()
+        except (http.client.HTTPException, OSError):
+            return said, False
+        return said, connection.sock is not None and not first.will_close
+    finally:
+        connection.close()
+
+
+async def test_no_connection_is_kept_open_between_requests(running: Running) -> None:
+    """A browser that is closed cuts the idle connections it still holds. On Windows, Python's asyncio
+    can then fail to let go of such a connection: stopping waits out its whole time limit and a socket
+    stays open. The agent's own browser loads the demo site from this service and is closed at the end
+    of every session, so the service ends each connection itself, as soon as it has answered."""
+    service, _, _ = await running()
+    said, kept = await asyncio.to_thread(ask_twice_on_one_connection, service.port)
+    assert said == "close"
+    assert not kept

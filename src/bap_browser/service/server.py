@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import secrets
 import socket
 from collections.abc import Mapping
+from pathlib import Path
 
 import uvicorn
 
@@ -32,6 +34,7 @@ class Service:
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         self._app = create_app(config, sessions, self.token)
         self._wanted_port = config.server.port if port is None else port
+        self.shutdown_wait_s = config.server.shutdown_wait_s
         self.port = 0
         self._server: uvicorn.Server | None = None
         self._serving: asyncio.Task[None] | None = None
@@ -58,6 +61,9 @@ class Service:
                 server_header=False,
                 lifespan="off",
                 ws_max_size=LARGEST_VIEWER_MESSAGE,
+                # Without a limit, stopping can wait for ever: on Windows asyncio never counts a
+                # connection that the other side cut as closed.
+                timeout_graceful_shutdown=self.shutdown_wait_s,
             )
         )
         self._serving = asyncio.create_task(self._server.serve(sockets=[listener]))
@@ -65,6 +71,8 @@ class Service:
             if self._serving.done():
                 await self._serving
             await asyncio.sleep(0)
+        # Files are written off the event loop, which is busy with sessions.
+        await asyncio.to_thread(self._write_state)
 
     async def wait(self) -> None:
         """Returns when the service has stopped: it was told to, or the process was interrupted."""
@@ -77,3 +85,15 @@ class Service:
         self._server.should_exit = True
         await self._serving
         self._server = self._serving = None
+        await asyncio.to_thread(self._remove_state)
+
+    def _remove_state(self) -> None:
+        Path(self._config.server.state_file).unlink(missing_ok=True)
+
+    def _write_state(self) -> None:
+        """The viewer address, for the local user to open again. The file is theirs alone to read."""
+        state = Path(self._config.server.state_file)
+        state.parent.mkdir(parents=True, exist_ok=True)
+        handle = os.open(state, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(handle, "w", encoding="utf-8") as file:
+            json.dump({"viewer": self.viewer_address}, file)

@@ -267,6 +267,7 @@ class Server(Section):
     token_env: str = setting("BAP_BROWSER_TOKEN", "If unset, a token is generated at start")
     state_file: str = setting(".bap-browser/service.json", "Holds the viewer address for the local user")
     auth_wait_s: int = setting(10, "How long a new viewer connection may take to send its token")
+    shutdown_wait_s: int = setting(3, "How long stopping waits for open connections to finish")
 
 
 class Mcp(Section):

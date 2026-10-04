@@ -162,7 +162,13 @@ def _command(message: Message) -> dict[str, Any] | None:
 
 
 class _ResponseHeaders:
-    """Headers on every response: who may show the viewer inside their page, and nothing guessed or leaked."""
+    """Headers on every response: who may show the viewer inside their page, nothing guessed or leaked,
+    and no connection left open afterwards.
+
+    A browser that is closed cuts the idle connections it still holds, and on Windows Python's asyncio
+    can then fail to let go of such a connection. The agent's own browser loads the demo site from
+    this service and is closed at the end of every session, so each answer ends its connection.
+    """
 
     def __init__(self, app: ASGIApp, embed_origins: list[str]) -> None:
         self._app = app
@@ -171,6 +177,7 @@ class _ResponseHeaders:
             (b"content-security-policy", f"frame-ancestors {ancestors}".encode()),
             (b"x-content-type-options", b"nosniff"),
             (b"referrer-policy", b"no-referrer"),
+            (b"connection", b"close"),
         ]
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
