@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import math
 import time
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from bap_browser.config import Config
-from bap_browser.driver.base import Box, Driver, TabInfo
+from bap_browser.driver.base import Box, Driver, MouseButton, TabInfo
 from bap_browser.driver.session import BrowserSession
+from bap_browser.errors import BapError
 from bap_browser.service.events import EventHub
 from bap_browser.tools.gate import Admission
 from bap_browser.tools.toolkit import Toolkit
@@ -25,6 +28,9 @@ HELD = {
 }
 ENDED_BY_A_PERSON = "The session was ended by a person."
 ENDED = "The session has ended."
+# Which button a pointer command names, as browsers number them.
+BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
+LONGEST_KEY_NAME = 32
 
 
 class ServiceSession:
@@ -52,11 +58,14 @@ class ServiceSession:
         self._tabs: list[dict[str, Any]] | None = None
         self._address_at_takeover = ""
         self._note = ""
+        self._size = (0, 0)
+        self._last_picture = 0.0
+        self._heartbeat: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         """Starts the browser and tells viewers what this session is."""
         driver = await self.browser.driver()
-        width, height = await driver.viewport()
+        self._size = width, height = await driver.viewport()
         self.hub.publish(
             {
                 "type": "session_started",
@@ -69,6 +78,9 @@ class ServiceSession:
             }
         )
         self._publish_tabs(await self.toolkit.tabs())
+        viewer = self.config.viewer
+        await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
+        self._heartbeat = asyncio.create_task(self._keep_viewers_current())
 
     async def close(self, reason: EndReason = "agent", detail: str | None = None) -> None:
         """Ends the session at once: viewers are told, waiting calls are let go, the browser closes."""
@@ -81,6 +93,10 @@ class ServiceSession:
         self.control = "ended"
         self.hub.publish(event)
         await self._announce()
+        if self._heartbeat is not None and self._heartbeat is not asyncio.current_task():
+            self._heartbeat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._heartbeat
         await self.browser.close()
 
     async def handle(self, command: Mapping[str, Any]) -> None:
@@ -96,6 +112,51 @@ class ServiceSession:
             await self._hand_back()
         elif kind == "stop":
             await self.close("person")
+        elif kind in ("pointer", "key", "wheel") and self.control == "person":
+            await self._input(kind, command)
+
+    # A person's mouse and keyboard. None of it is logged, and none of it is told to viewers or the agent.
+
+    async def _input(self, kind: str, command: Mapping[str, Any]) -> None:
+        driver = self.browser.started_driver
+        if driver is None:
+            return
+        width, height = self._size
+        x, y = _number(command.get("x"), 0, width), _number(command.get("y"), 0, height)
+        action, key = command.get("action"), command.get("key")
+        try:
+            if kind == "pointer" and x is not None and y is not None:
+                button = BUTTONS.get(command.get("button"))  # type: ignore[arg-type]
+                if action in ("move", "down", "up") and button is not None:
+                    await driver.pointer(action, x, y, button)
+            elif kind == "key" and action in ("down", "up"):
+                if isinstance(key, str) and 0 < len(key) <= LONGEST_KEY_NAME:
+                    await driver.key(action, key)
+            elif kind == "wheel" and x is not None and y is not None:
+                # One turn of the wheel never moves the page by more than one screen.
+                dx = _number(command.get("dx"), -math.inf, math.inf, cut_to=width)
+                dy = _number(command.get("dy"), -math.inf, math.inf, cut_to=height)
+                if dx is not None and dy is not None:
+                    await driver.wheel(x, y, dx, dy)
+        except BapError:
+            # The page did not take it. A person sees that in the picture; there is nobody to tell.
+            return
+
+    def _picture(self, jpeg: bytes) -> None:
+        self._last_picture = asyncio.get_running_loop().time()
+        self.hub.publish_frame(jpeg)
+
+    async def _keep_viewers_current(self) -> None:
+        """A page that is still sends no pictures, and an address can change without a step. Viewers
+        are told that the picture is still current, and which page is open, at a steady pace."""
+        period = self.config.viewer.picture_heartbeat_s
+        while self.control != "ended":
+            await asyncio.sleep(period)
+            if self.control == "ended":
+                return
+            self._publish_tabs(await self.toolkit.tabs())
+            if asyncio.get_running_loop().time() - self._last_picture >= period:
+                self.hub.publish({"type": "picture_current", "ts": self._clock()}, keep=False)
 
     # What the tool layer reports (StepObserver).
 
@@ -210,3 +271,12 @@ class ServiceSession:
         if shown != self._tabs:
             self._tabs = shown
             self.hub.publish({"type": "tab_changed", "tabs": shown})
+
+
+def _number(value: Any, lowest: float, highest: float, *, cut_to: float | None = None) -> float | None:
+    """A finite number within the limits, or None. With `cut_to`, a larger one is cut to that size instead."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    if cut_to is not None:
+        return max(-cut_to, min(cut_to, value))
+    return value if lowest <= value <= highest else None

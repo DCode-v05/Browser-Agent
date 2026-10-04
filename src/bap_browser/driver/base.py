@@ -6,11 +6,15 @@ sent as one message over the bridge channel.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from bap_browser.config import QualityLevel
+
 MouseButton = Literal["left", "right", "middle"]
+PointerAction = Literal["move", "down", "up"]
+KeyAction = Literal["down", "up"]
 
 
 @dataclass(frozen=True)
@@ -74,3 +78,17 @@ class Driver(Protocol):
     async def type_text(
         self, ref: str | None, text: str, *, clear: bool, submit: bool, slowly: bool
     ) -> ActionOutcome: ...
+
+    async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
+        """Sends a JPEG picture of the page to `on_frame` whenever the page changes, within the level's limits."""
+        ...
+
+    async def stop_frames(self) -> None: ...
+
+    # What a person does with the mouse and the keyboard while they are in control.
+
+    async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None: ...
+
+    async def key(self, action: KeyAction, key: str) -> None: ...
+
+    async def wheel(self, x: float, y: float, dx: float, dy: float) -> None: ...

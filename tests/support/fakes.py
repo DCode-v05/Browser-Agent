@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
+from bap_browser.config import QualityLevel
 from bap_browser.driver.base import ActionOutcome, Box, Located, TabInfo
 from bap_browser.errors import StaleRef
 
@@ -24,6 +25,9 @@ class FakeDriver:
         self.fail_with: Exception | None = None
         self.next_address: str | None = None
         self.title = "Fake"
+        self.on_frame: Callable[[bytes], None] = lambda frame: None
+        """Call it to send a picture, as the browser would."""
+        self.level: QualityLevel | None = None
         self.hold: asyncio.Event | None = None
         """When set, a click waits for it: an action in progress, for as long as a test needs."""
         self.alive = True
@@ -47,6 +51,21 @@ class FakeDriver:
 
     async def viewport(self) -> tuple[int, int]:
         return 1280, 800
+
+    async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
+        self.on_frame, self.level = on_frame, level
+
+    async def stop_frames(self) -> None:
+        self.level = None
+
+    async def pointer(self, action: str, x: float, y: float, button: str) -> None:
+        self.calls.append(("pointer", (action, x, y, button)))
+
+    async def key(self, action: str, key: str) -> None:
+        self.calls.append(("key", (action, key)))
+
+    async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
+        self.calls.append(("wheel", (x, y, dx, dy)))
 
     async def locate(self, ref: str) -> Located:
         if ref == "e9":

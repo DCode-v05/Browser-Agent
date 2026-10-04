@@ -1,10 +1,11 @@
 """One session as the service runs it: what viewers are told, and who is driving (spec 4.5, 4.8)."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fakes import FakeDriver
 
 from bap_browser.config import Config
@@ -14,13 +15,28 @@ NOW = 1_759_480_000.0
 PUBLIC = "https://93.184.216.34"
 
 
-async def started(
-    make_config: Callable[..., Config], folder: Path, **sections: Any
-) -> tuple[ServiceSession, FakeDriver]:
-    driver = FakeDriver()
-    session = ServiceSession(make_config(folder, **sections), driver, agent="Test agent", clock=lambda: NOW)
-    await session.start()
-    return session, driver
+Started = Callable[..., Awaitable[tuple[ServiceSession, FakeDriver]]]
+
+
+@pytest.fixture
+async def started() -> AsyncIterator[Started]:
+    """Starts a session on a fake browser, and closes every one it started when the test is over."""
+    sessions: list[ServiceSession] = []
+
+    async def start(
+        make_config: Callable[..., Config], folder: Path, **sections: Any
+    ) -> tuple[ServiceSession, FakeDriver]:
+        driver = FakeDriver()
+        session = ServiceSession(
+            make_config(folder, **sections), driver, agent="Test agent", clock=lambda: NOW
+        )
+        sessions.append(session)
+        await session.start()
+        return session, driver
+
+    yield start
+    for session in sessions:
+        await session.close()
 
 
 def sent(session: ServiceSession) -> list[dict[str, Any]]:
@@ -41,7 +57,9 @@ async def settle() -> None:
         await asyncio.sleep(0)
 
 
-async def test_a_session_starts_its_browser_and_says_what_it_is(make_config, tmp_path: Path) -> None:
+async def test_a_session_starts_its_browser_and_says_what_it_is(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, driver = await started(make_config, tmp_path)
     assert driver.started == 1
     assert sent(session) == [
@@ -62,7 +80,9 @@ async def test_a_session_starts_its_browser_and_says_what_it_is(make_config, tmp
     assert session.control == "agent"
 
 
-async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(make_config, tmp_path: Path) -> None:
+async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, _ = await started(make_config, tmp_path)
     opened = await session.toolkit.call("browser_navigate", {"url": f"{PUBLIC}/"})
     await session.toolkit.call("browser_click", {"ref": "e1"})
@@ -101,7 +121,7 @@ async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(make_config
     ]
 
 
-async def test_a_blocked_address_is_shown_as_blocked(make_config, tmp_path: Path) -> None:
+async def test_a_blocked_address_is_shown_as_blocked(make_config, tmp_path: Path, started: Started) -> None:
     session, _ = await started(make_config, tmp_path, safety={"block_private_networks": True})
     await session.toolkit.call("browser_navigate", {"url": "http://10.0.0.5/admin"})
     assert sent(session)[3] == {
@@ -113,7 +133,7 @@ async def test_a_blocked_address_is_shown_as_blocked(make_config, tmp_path: Path
     assert kinds(session)[2:] == ["step_started", "navigation_blocked", "step_finished"]
 
 
-async def test_what_viewers_are_told_is_redacted(make_config, tmp_path: Path) -> None:
+async def test_what_viewers_are_told_is_redacted(make_config, tmp_path: Path, started: Started) -> None:
     session, driver = await started(make_config, tmp_path, safety={"redact_patterns": ["tok-[a-z]+"]})
     driver.title = "Order tok-abc"
     await session.toolkit.call("browser_navigate", {"url": f"{PUBLIC}/?key=tok-abc"})
@@ -127,7 +147,7 @@ async def test_what_viewers_are_told_is_redacted(make_config, tmp_path: Path) ->
 
 
 async def test_a_paused_session_holds_the_agents_call_until_it_is_resumed(
-    make_config, tmp_path: Path
+    make_config, tmp_path: Path, started: Started
 ) -> None:
     session, driver = await started(make_config, tmp_path)
     await session.handle({"type": "pause"})
@@ -143,7 +163,9 @@ async def test_a_paused_session_holds_the_agents_call_until_it_is_resumed(
     assert sent(session)[2] == {"type": "control_changed", "state": "paused", "since": NOW}
 
 
-async def test_a_held_call_gives_up_politely_and_nothing_was_done(make_config, tmp_path: Path) -> None:
+async def test_a_held_call_gives_up_politely_and_nothing_was_done(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, driver = await started(make_config, tmp_path, control={"hold_timeout_s": 0})
     await session.handle({"type": "pause"})
     paused = await session.toolkit.call("browser_click", {"ref": "e1"})
@@ -159,7 +181,9 @@ async def test_a_held_call_gives_up_politely_and_nothing_was_done(make_config, t
     assert "step_started" not in kinds(session)
 
 
-async def test_taking_over_waits_for_the_action_in_progress(make_config, tmp_path: Path) -> None:
+async def test_taking_over_waits_for_the_action_in_progress(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, driver = await started(make_config, tmp_path)
     driver.hold = asyncio.Event()
     click = asyncio.create_task(session.toolkit.call("browser_click", {"ref": "e1"}))
@@ -173,7 +197,9 @@ async def test_taking_over_waits_for_the_action_in_progress(make_config, tmp_pat
     assert kinds(session)[2:] == ["step_started", "step_finished", "control:person"]
 
 
-async def test_after_a_hand_back_the_next_result_says_what_changed_once(make_config, tmp_path: Path) -> None:
+async def test_after_a_hand_back_the_next_result_says_what_changed_once(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, driver = await started(make_config, tmp_path)
     await session.toolkit.call("browser_navigate", {"url": f"{PUBLIC}/signup"})
     await session.handle({"type": "take_over"})
@@ -202,7 +228,9 @@ async def test_after_a_hand_back_the_next_result_says_what_changed_once(make_con
     ]
 
 
-async def test_a_hand_back_with_nothing_changed_says_so(make_config, tmp_path: Path) -> None:
+async def test_a_hand_back_with_nothing_changed_says_so(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, _ = await started(make_config, tmp_path)
     await session.toolkit.call("browser_navigate", {"url": f"{PUBLIC}/signup"})
     await session.handle({"type": "take_over"})
@@ -215,7 +243,7 @@ async def test_a_hand_back_with_nothing_changed_says_so(make_config, tmp_path: P
     )
 
 
-async def test_resuming_after_a_pause_adds_no_note(make_config, tmp_path: Path) -> None:
+async def test_resuming_after_a_pause_adds_no_note(make_config, tmp_path: Path, started: Started) -> None:
     session, _ = await started(make_config, tmp_path)
     await session.handle({"type": "pause"})
     await session.handle({"type": "resume"})
@@ -223,7 +251,7 @@ async def test_resuming_after_a_pause_adds_no_note(make_config, tmp_path: Path) 
 
 
 async def test_stop_ends_the_session_at_once_and_every_later_call_is_told(
-    make_config, tmp_path: Path
+    make_config, tmp_path: Path, started: Started
 ) -> None:
     session, driver = await started(make_config, tmp_path)
     await session.handle({"type": "pause"})
@@ -242,7 +270,9 @@ async def test_stop_ends_the_session_at_once_and_every_later_call_is_told(
     assert [call for call in driver.calls if call[0] != "close"] == []
 
 
-async def test_a_session_the_agent_finished_says_so_and_closes_once(make_config, tmp_path: Path) -> None:
+async def test_a_session_the_agent_finished_says_so_and_closes_once(
+    make_config, tmp_path: Path, started: Started
+) -> None:
     session, driver = await started(make_config, tmp_path)
     await session.close("agent")
     await session.close("agent")
@@ -253,7 +283,7 @@ async def test_a_session_the_agent_finished_says_so_and_closes_once(make_config,
 
 
 async def test_commands_that_do_not_apply_or_make_no_sense_change_nothing(
-    make_config, tmp_path: Path
+    make_config, tmp_path: Path, started: Started
 ) -> None:
     session, _ = await started(make_config, tmp_path)
     before = sent(session)
@@ -276,7 +306,7 @@ async def test_commands_that_do_not_apply_or_make_no_sense_change_nothing(
 
 
 async def test_a_person_can_take_over_from_a_pause_and_pause_is_not_a_way_out_of_it(
-    make_config, tmp_path: Path
+    make_config, tmp_path: Path, started: Started
 ) -> None:
     session, _ = await started(make_config, tmp_path)
     await session.handle({"type": "pause"})
@@ -287,3 +317,110 @@ async def test_a_person_can_take_over_from_a_pause_and_pause_is_not_a_way_out_of
     assert session.control == "person"
     await session.handle({"type": "hand_back"})
     assert session.control == "agent"
+
+
+async def test_pictures_from_the_browser_reach_viewers_at_the_level_the_configuration_names(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, driver = await started(make_config, tmp_path, viewer={"quality": "data_saver"})
+    assert driver.level is not None and (driver.level.max_fps, driver.level.max_width) == (8, 800)
+    _, viewer = session.hub.subscribe()
+    driver.on_frame(b"picture-1")
+    assert await asyncio.wait_for(viewer.next(), 1) == b"picture-1"
+    assert session.hub.subscribe()[0][-1] == b"picture-1"
+
+
+async def test_a_still_page_is_confirmed_as_current_and_a_moving_one_is_not(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, driver = await started(make_config, tmp_path, viewer={"picture_heartbeat_s": 1})
+    _, viewer = session.hub.subscribe()
+    driver.on_frame(b"picture-1")
+    assert await asyncio.wait_for(viewer.next(), 1) == b"picture-1"
+    assert await asyncio.wait_for(viewer.next(), 3) == {"type": "picture_current", "ts": NOW}
+    # It means nothing to a viewer that connects later, so it is not kept.
+    assert "picture_current" not in kinds(session)
+
+
+async def test_an_address_that_changes_between_steps_reaches_viewers(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, driver = await started(make_config, tmp_path, viewer={"picture_heartbeat_s": 1})
+    _, viewer = session.hub.subscribe()
+    driver.url = f"{PUBLIC}/moved-by-the-page"
+    event = await asyncio.wait_for(viewer.next(), 3)
+    assert event == {
+        "type": "tab_changed",
+        "tabs": [{"id": "t1", "title": "Fake", "url": f"{PUBLIC}/moved-by-the-page", "active": True}],
+    }
+
+
+async def test_a_persons_mouse_and_keys_reach_the_page_only_while_they_drive(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, driver = await started(make_config, tmp_path)
+    click = {"type": "pointer", "action": "down", "x": 100, "y": 50.5, "button": 0}
+    await session.handle(click)
+    assert driver.calls == []
+    await session.handle({"type": "take_over"})
+    await session.handle(click)
+    await session.handle({"type": "pointer", "action": "up", "x": 100, "y": 50.5, "button": 2})
+    await session.handle({"type": "key", "action": "down", "key": "a", "code": "KeyA"})
+    await session.handle({"type": "wheel", "x": 10, "y": 20, "dx": 0, "dy": 120})
+    assert driver.calls == [
+        ("pointer", ("down", 100, 50.5, "left")),
+        ("pointer", ("up", 100, 50.5, "right")),
+        ("key", ("down", "a")),
+        ("wheel", (10, 20, 0, 120)),
+    ]
+    await session.handle({"type": "hand_back"})
+    await session.handle(click)
+    assert len(driver.calls) == 4
+
+
+async def test_what_a_person_types_is_neither_logged_nor_told_to_viewers(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, _ = await started(make_config, tmp_path)
+    await session.handle({"type": "take_over"})
+    for key in "hunter2":
+        await session.handle({"type": "key", "action": "down", "key": key, "code": ""})
+    assert "hunter2" not in repr(sent(session))
+    assert not (tmp_path / "events.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        {"type": "pointer", "action": "down", "x": float("nan"), "y": 5, "button": 0},
+        {"type": "pointer", "action": "down", "x": -1, "y": 5, "button": 0},
+        {"type": "pointer", "action": "down", "x": 5, "y": 801, "button": 0},
+        {"type": "pointer", "action": "down", "x": "5", "y": 5, "button": 0},
+        {"type": "pointer", "action": "down", "x": True, "y": 5, "button": 0},
+        {"type": "pointer", "action": "drag", "x": 5, "y": 5, "button": 0},
+        {"type": "pointer", "action": "down", "x": 5, "y": 5, "button": 7},
+        {"type": "pointer", "action": "down", "x": 5, "y": 5},
+        {"type": "key", "action": "down", "key": ""},
+        {"type": "key", "action": "down", "key": "x" * 200},
+        {"type": "key", "action": "down", "key": 5},
+        {"type": "key", "action": "hold", "key": "a"},
+        {"type": "wheel", "x": 5, "y": 5, "dx": float("inf"), "dy": 0},
+        {"type": "wheel", "x": 5, "y": 5, "dx": 0},
+    ],
+)
+async def test_input_that_makes_no_sense_never_reaches_the_page(
+    make_config, tmp_path: Path, started: Started, command: dict[str, Any]
+) -> None:
+    session, driver = await started(make_config, tmp_path)
+    await session.handle({"type": "take_over"})
+    await session.handle(command)
+    assert driver.calls == []
+
+
+async def test_a_wheel_turn_larger_than_the_page_is_cut_to_one_screen(
+    make_config, tmp_path: Path, started: Started
+) -> None:
+    session, driver = await started(make_config, tmp_path)
+    await session.handle({"type": "take_over"})
+    await session.handle({"type": "wheel", "x": 5, "y": 5, "dx": -99999, "dy": 99999})
+    assert driver.calls == [("wheel", (5, 5, -1280, 800))]

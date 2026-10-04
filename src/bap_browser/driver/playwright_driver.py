@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from playwright.async_api import Browser, Frame, Page, Request, async_playwright
+from playwright.async_api import Browser, CDPSession, Frame, Page, Request, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from bap_browser.config import Config
-from bap_browser.driver.base import ActionOutcome, Box, Located, MouseButton, TabInfo
+from bap_browser.config import Config, QualityLevel
+from bap_browser.driver.base import (
+    ActionOutcome,
+    Box,
+    KeyAction,
+    Located,
+    MouseButton,
+    PointerAction,
+    TabInfo,
+)
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.snapshot import snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
@@ -109,6 +118,10 @@ class PlaywrightDriver:
         self._commits = 0
         self._committed = asyncio.Event()
         self._next_ref = 1
+        self._cdp: CDPSession | None = None
+        self._frames: tuple[Callable[[bytes], None], QualityLevel] | None = None
+        self._next_acknowledgement = 0.0
+        self._acknowledging: set[asyncio.Task[None]] = set()
 
     @property
     def page(self) -> Page:
@@ -139,12 +152,18 @@ class PlaywrightDriver:
             raise BrowserError(f"The browser could not be started: {first_line(exc)}") from exc
         page.on("request", self._on_request)
         page.on("framenavigated", self._on_frame_navigated)
-        self._browser, self._page = browser, page
+        cdp.on("Page.screencastFrame", self._on_picture)
+        self._browser, self._page, self._cdp = browser, page, cdp
         self._script = PageScript(cdp, timeouts.page_reply_ms)
+        if self._frames is not None:
+            # A browser that was started again goes on sending pictures to whoever was watching.
+            await self._begin_pictures(self._frames[1])
 
     async def close(self) -> None:
+        for task in self._acknowledging:
+            task.cancel()
         await self._stack.aclose()
-        self._browser = self._page = self._script = None
+        self._browser = self._page = self._script = self._cdp = None
 
     def is_alive(self) -> bool:
         return self._browser is not None and self._browser.is_connected()
@@ -267,6 +286,87 @@ class PlaywrightDriver:
             ) from exc
         navigated_to = await self._settle(navigations, commits) if submit else None
         return ActionOutcome(field["describe"], navigated_to)
+
+    async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
+        self._frames = (on_frame, level)
+        await self._begin_pictures(level)
+
+    async def stop_frames(self) -> None:
+        self._frames = None
+        if self._cdp is not None:
+            with contextlib.suppress(PlaywrightError):
+                await self._cdp.send("Page.stopScreencast")
+
+    async def _begin_pictures(self, level: QualityLevel) -> None:
+        if self._cdp is None:
+            raise BrowserError("The browser has not been started.")
+        width, height = await self.viewport()
+        try:
+            await self._cdp.send(
+                "Page.startScreencast",
+                {
+                    "format": "jpeg",
+                    "quality": level.jpeg_quality,
+                    "maxWidth": level.max_width,
+                    "maxHeight": max(1, round(level.max_width * height / width)),
+                },
+            )
+        except PlaywrightError as exc:
+            raise BrowserError(f"The live picture could not be started: {first_line(exc)}") from exc
+
+    def _on_picture(self, frame: dict[str, Any]) -> None:
+        if self._frames is None:
+            return
+        on_frame, level = self._frames
+        on_frame(base64.b64decode(frame["data"]))
+        task = asyncio.create_task(self._acknowledge(frame["sessionId"], level.max_fps))
+        self._acknowledging.add(task)
+        task.add_done_callback(self._acknowledging.discard)
+
+    async def _acknowledge(self, picture: int, max_fps: int) -> None:
+        """The browser sends its next picture only once this one is acknowledged. Waiting here is what
+        limits the rate, and the picture that follows is always the newest one."""
+        now = asyncio.get_running_loop().time()
+        wait = self._next_acknowledgement - now
+        self._next_acknowledgement = max(now, self._next_acknowledgement) + 1 / max_fps
+        if wait > 0:
+            await asyncio.sleep(wait)
+        if self._cdp is not None:
+            with contextlib.suppress(PlaywrightError):
+                await self._cdp.send("Page.screencastFrameAck", {"sessionId": picture})
+
+    async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton = "left") -> None:
+        mouse = self.page.mouse
+        try:
+            await mouse.move(x, y)
+            if action == "down":
+                await mouse.down(button=button)
+            elif action == "up":
+                await mouse.up(button=button)
+        except PlaywrightError as exc:
+            raise BrowserError(f"The pointer could not be moved: {first_line(exc)}") from exc
+
+    async def key(self, action: KeyAction, key: str) -> None:
+        keyboard = self.page.keyboard
+        try:
+            if action == "down":
+                await keyboard.down(key)
+            else:
+                await keyboard.up(key)
+        except PlaywrightError as exc:
+            if "Unknown key" not in str(exc):
+                raise BrowserError(f"The key could not be pressed: {first_line(exc)}") from exc
+            # A character that is on no key of the keyboard Playwright knows, such as é, is put in as
+            # text. A name that is no key and no character, such as "Dead", is left out.
+            if action == "down" and len(key) == 1:
+                await keyboard.insert_text(key)
+
+    async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
+        try:
+            await self.page.mouse.move(x, y)
+            await self.page.mouse.wheel(dx, dy)
+        except PlaywrightError as exc:
+            raise BrowserError(f"The page could not be scrolled: {first_line(exc)}") from exc
 
     @staticmethod
     def _raise_for(result: dict[str, Any], ref: str | None) -> None:
