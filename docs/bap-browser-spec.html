@@ -3792,6 +3792,16 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>If unset, a token is generated at start</td>
 </tr>
 <tr>
+<td><code>server.auth_wait_s</code></td>
+<td>10</td>
+<td>How long a new viewer connection may take to send its token</td>
+</tr>
+<tr>
+<td><code>server.shutdown_wait_s</code></td>
+<td>3</td>
+<td>How long stopping waits for open connections to finish</td>
+</tr>
+<tr>
 <td><code>server.state_file</code></td>
 <td><code>.bap-browser/service.json</code></td>
 <td>Holds the viewer address for the local user</td>
@@ -8055,10 +8065,43 @@ the token in the environment) and gives the UI client the viewer's address. It t
 path can be checked with one command, and as the smallest example of an agent core that uses the
 library in its own process, the way an agent core does inside the micro VM.</p>
 <pre><code class="language-bash">bap-browser agent &quot;Sign up on the test site as Ada Lovelace, ada@example.com&quot;
+bap-browser agent --demo --open
 </code></pre>
-<p>The command starts the core, one session and the viewer in one process, prints the viewer's address
-to the error stream, and runs the loop until the task is done, the step limit is reached, or a person
-stops the session.</p>
+<p>The command starts the core, one session and the viewer in one process on a free port, prints the
+viewer's address to the error stream, and runs the loop until the task is done, the step limit is
+reached, or a person stops the session. The answer is the only thing written to standard output.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--demo</code></td>
+<td>Runs the demonstration: the scripted model signs up on the demo site that ships with bap-browser (<code>/demo-site/</code>). Needs no key</td>
+</tr>
+<tr>
+<td><code>--open</code></td>
+<td>Opens the viewer in the person's browser and starts once it has connected</td>
+</tr>
+<tr>
+<td><code>--wait-for-viewer</code></td>
+<td>Starts once a viewer has connected, without opening one</td>
+</tr>
+<tr>
+<td><code>--pace SECONDS</code></td>
+<td>How long the demonstration waits before each step, so a person can follow it. Default 1</td>
+</tr>
+<tr>
+<td><code>--exit-when-done</code></td>
+<td>Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C</td>
+</tr>
+</tbody>
+</table></div>
+<p>In this build only the scripted model exists, so the command runs with <code>--demo</code>. The hosted model is
+added when its provider has been chosen.</p>
 <p>The loop:</p>
 <ol>
 <li>Send the task, the tool definitions and the conversation so far to the model.</li>

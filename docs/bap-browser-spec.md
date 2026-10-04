@@ -2740,11 +2740,23 @@ library in its own process, the way an agent core does inside the micro VM.
 
 ```bash
 bap-browser agent "Sign up on the test site as Ada Lovelace, ada@example.com"
+bap-browser agent --demo --open
 ```
 
-The command starts the core, one session and the viewer in one process, prints the viewer's address
-to the error stream, and runs the loop until the task is done, the step limit is reached, or a person
-stops the session.
+The command starts the core, one session and the viewer in one process on a free port, prints the
+viewer's address to the error stream, and runs the loop until the task is done, the step limit is
+reached, or a person stops the session. The answer is the only thing written to standard output.
+
+| Option | Effect |
+|---|---|
+| `--demo` | Runs the demonstration: the scripted model signs up on the demo site that ships with bap-browser (`/demo-site/`). Needs no key |
+| `--open` | Opens the viewer in the person's browser and starts once it has connected |
+| `--wait-for-viewer` | Starts once a viewer has connected, without opening one |
+| `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
+| `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
+
+In this build only the scripted model exists, so the command runs with `--demo`. The hosted model is
+added when its provider has been chosen.
 
 The loop:
 

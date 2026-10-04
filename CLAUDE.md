@@ -10,6 +10,7 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Format: `uv run ruff format .`; check: `uv run ruff format --check .` and `uv run ruff check .`
 - Types: `uv run pyright`
 - Run as an MCP server: `uv run bap-browser mcp`
+- Run the whole path with no model key: `uv run bap-browser agent --demo --open` (the viewer must be built)
 - Show the configuration: `uv run bap-browser config show --sources`
 - Viewer install: `npm --prefix viewer install`
 - Viewer checks: `npm --prefix viewer run typecheck`, `run lint`, `run test`, `run build`
@@ -39,4 +40,11 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Viewer styles use tokens only: no colour, pixel size, duration or font outside `viewer/src/tokens.css` (a test enforces it).
 - Every string a person reads is in `viewer/src/wording.ts`.
 - The viewer's settings screen is drawn from the settings answer; it holds no list of settings of its own.
+- Write Python that holds backslash escapes (`\r\n`, regular expressions) with the Write tool, not
+  through a shell heredoc: the heredoc turns the escapes into real characters.
+- On Windows, Python's asyncio does not release a connection that the other side cut (a browser that
+  was closed). The service therefore ends each HTTP connection after its answer and stops waiting
+  after `server.shutdown_wait_s`. A test that closes a browser page while it is connected leaves a
+  socket open and fails the run on its warning: stop the service first.
+- A browser keeps up to two live pictures on their way. A test of the picture rate must allow for them.
 - Run `ruff format` on `src tests viewer/scripts`, never on `docs/` (it is excluded: the formatter rewrites code examples in Markdown).
