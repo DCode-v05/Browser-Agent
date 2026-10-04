@@ -57,6 +57,14 @@ def canonical_address(url: str) -> str:
     return urlunsplit((scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
+AUTHORITY = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)([^/?#]*)")
+
+
+def without_credentials(url: str) -> str:
+    """The address without the name and password it may carry. Those are never shown, sent or logged."""
+    return AUTHORITY.sub(lambda found: found.group(1) + found.group(2).rpartition("@")[2], url, count=1)
+
+
 def canonical_host(text: str) -> str:
     """One spelling for a host: lower case, an IP address in its usual form, an international name as xn--."""
     text = text.removesuffix(":")

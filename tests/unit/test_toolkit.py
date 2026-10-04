@@ -295,3 +295,71 @@ async def test_what_is_reported_is_redacted(make_config, tmp_path: Path) -> None
     await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
     assert seen.events[0][3] == "Opening [REDACTED]"
     assert seen.events[1][3] == "Opened [REDACTED]"
+
+
+async def test_a_name_and_password_in_an_address_reach_neither_the_log_nor_a_watcher(
+    make_config, tmp_path: Path
+) -> None:
+    tools, _, seen = watched(make_config, tmp_path)
+    result = await tools.call("browser_navigate", {"url": "https://ada:hunter2@93.184.216.34/a?b=1"})
+    assert result.text.startswith("Navigated to https://93.184.216.34/a?b=1\n")
+    assert result.text.endswith("[tabs] t1* https://93.184.216.34/a?b=1")
+    assert "hunter2" not in repr(seen.events)
+    assert "hunter2" not in (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+
+
+async def test_a_blocked_address_is_reported_without_its_name_and_password(
+    make_config, tmp_path: Path
+) -> None:
+    tools, _, seen = watched(make_config, tmp_path, safety={"block_private_networks": True})
+    result = await tools.call("browser_navigate", {"url": "http://ada:hunter2@10.0.0.5/admin?x=1"})
+    assert result.text == (
+        "navigation to http://10.0.0.5/admin?x=1 blocked: private address (safety.block_private_networks)"
+    )
+    assert seen.events[1] == ("blocked", "http://10.0.0.5/admin?x=1", "private address")
+    assert "hunter2" not in (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+
+
+async def test_the_log_keeps_what_was_done_and_not_what_the_page_holds(make_config, tmp_path: Path) -> None:
+    tools, _ = kit(make_config, tmp_path)
+    await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
+    await tools.call("browser_snapshot", {})
+    await tools.call("browser_click", {"ref": "e1"})
+    log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+    lines = [json.loads(line) for line in log.splitlines()]
+    assert [line["result"] for line in lines] == [
+        "Navigated to https://93.184.216.34/",
+        "Page: Fake",
+        'Clicked e1 (button "Go")',
+    ]
+    assert lines[1]["chars"] == len(SNAPSHOT + "\n[tabs] t1* https://93.184.216.34/")
+
+
+async def test_the_arguments_of_a_call_that_cannot_run_are_logged_by_name_only(
+    make_config, tmp_path: Path
+) -> None:
+    tools, _ = kit(make_config, tmp_path)
+    await tools.call("browser_type", {"ref": "e3", "value": "wrong-arg-secret"})
+    await tools.call("browser_type", {"text": 4111111111111111})
+    await tools.call("browser_type", {"text": ["list-secret"]})
+    await tools.call("browser_fly", {"text": "typed-into-nothing"})
+    log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+    for secret in ("wrong-arg-secret", "4111111111111111", "list-secret", "typed-into-nothing"):
+        assert secret not in log
+    assert [json.loads(line)["args"] for line in log.splitlines()] == [
+        {"ref": "<str>", "value": "<str>"},
+        {"text": "<int>"},
+        {"text": "<list>"},
+        {"text": "<str>"},
+    ]
+
+
+async def test_a_page_cannot_make_a_result_as_long_as_it_likes(make_config, tmp_path: Path) -> None:
+    tools, driver = kit(make_config, tmp_path)
+    driver.url = "https://93.184.216.34/#" + "A" * 500_000
+    clicked = await tools.call("browser_click", {"ref": "e1"})
+    assert len(clicked.text) < 1000
+    assert clicked.text.endswith("…")
+    driver.next_address = "https://93.184.216.34/#" + "B" * 500_000
+    opened = await tools.call("browser_navigate", {"url": "https://93.184.216.34/"})
+    assert len(opened.text) < 1000

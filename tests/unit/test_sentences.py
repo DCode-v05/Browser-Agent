@@ -110,3 +110,19 @@ def test_arguments_of_the_wrong_kind_do_not_break_a_sentence() -> None:
     assert label_for("browser_navigate", {"url": 7}, None) == "Opening a page"
     assert label_for("browser_type", {"text": None}, None) == "Typing"
     assert label_for("browser_click", {"ref": ["e1"]}, None) == "Clicking"
+
+
+def test_a_name_and_password_in_an_address_are_never_shown() -> None:
+    arguments = {"url": "https://ada:hunter2@example.com/login"}
+    assert label_for("browser_navigate", arguments, None) == "Opening example.com/login"
+    assert summary_for("browser_navigate", arguments, None, "the site was not found") == (
+        "Could not open example.com/login: the site was not found"
+    )
+
+
+def test_only_a_real_ref_is_shown_as_one() -> None:
+    assert label_for("browser_click", {"ref": "my card is 4111 1111"}, None) == "Clicking"
+    assert summary_for("browser_click", {"ref": "my card is 4111 1111"}, None, "bad value for 'ref'") == (
+        "Could not click: bad value for 'ref'"
+    )
+    assert label_for("browser_click", {"ref": "f2e7"}, None) == "Clicking f2e7"

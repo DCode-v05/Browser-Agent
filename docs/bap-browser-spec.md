@@ -889,9 +889,15 @@ deployment requires.
 
 - Text that is not rendered on the page.
 - Password values, in snapshots, results, events and logs.
+- A name and password written into an address, in results, events and logs.
 - Anything typed while a person is in control, and any snapshot or screenshot from that period.
 - The service token and the viewer address.
 - Anything matching `safety.redact_patterns`, replaced by `[REDACTED]` in every result.
+
+What a field holds (other than a password) is shown to the model in a snapshot, because that is how
+it checks its own work. It goes no further: typed text and field values never reach the event log or
+the viewer's events. The log keeps what was done, not what the page holds, and a field with no label
+is never named after its content.
 
 ### 8.4 Human checks
 
@@ -1619,8 +1625,8 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 |---|---|---|
 | `logging.level` | `INFO` | |
 | `logging.event_log` | `.bap-browser/events.jsonl` | One line per tool call; `null` disables |
-| `logging.log_tool_args` | `true` | Arguments are logged with typed text and form values replaced by their length |
-| `logging.max_result_chars` | 2000 | Result excerpt kept per line |
+| `logging.log_tool_args` | `true` | Arguments are logged with typed text replaced by its length and without a name and password in an address. A call that could not run is logged with the names of its arguments only |
+| `logging.max_result_chars` | 2000 | The first line of the result, which says what was done, cut to this length. The page's content is never logged |
 | `bench.runs` / `bench.warmup` | 30 / 5 | Samples per line |
 | `bench.budget_file` | `perf/budget.json` | |
 | `bench.results_dir` | `.bap-browser/bench` | |

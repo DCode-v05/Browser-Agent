@@ -6,11 +6,13 @@ count, never as the text.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
 from bap_browser.driver.base import Located
+from bap_browser.tools.registry import REF_PATTERN
 
 # A row is under 60 characters.
 ROW_CHARS = 59
@@ -64,21 +66,23 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
 
 
 def _address(arguments: Mapping[str, Any]) -> str:
-    """The site and the path, the way a person says an address. The query can hold secrets and is left out."""
+    """The site and the path, the way a person says an address. A name and password before the site,
+    and the query, can hold secrets and are left out."""
     url = arguments.get("url")
     if not isinstance(url, str) or not url:
         return "a page"
     parts = urlsplit(url if "://" in url or url.startswith(("about:", "data:", "blob:")) else f"//{url}")
     if not parts.netloc:
         return f"{parts.scheme}:{parts.path}" if parts.scheme else url
-    return parts.netloc + parts.path.rstrip("/")
+    return parts.netloc.rpartition("@")[2] + parts.path.rstrip("/")
 
 
 def _element(arguments: Mapping[str, Any], target: Located | None) -> str:
     if target is not None:
         return f'"{target.name}"' if target.name else f"a {target.role}"
     ref = arguments.get("ref")
-    return ref if isinstance(ref, str) else ""
+    # Anything else an agent put there is not a ref, and is not repeated to the person watching.
+    return ref if isinstance(ref, str) and re.fullmatch(REF_PATTERN, ref) else ""
 
 
 def _into(arguments: Mapping[str, Any], target: Located | None) -> str:

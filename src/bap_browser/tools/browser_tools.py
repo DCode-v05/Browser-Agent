@@ -58,14 +58,15 @@ async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
     # Only the address the policy judged is handed to the browser, never the text as it was given.
     url = decision.url
     if not decision.allowed:
+        shown = session.shown_address(url)
         raise PolicyBlocked(
-            f"navigation to {url} blocked: {decision.reason}",
-            url=url,
+            f"navigation to {shown} blocked: {decision.reason}",
+            url=shown,
             # The setting's name is for whoever runs the deployment, not for the person watching.
             reason=decision.reason.split(" (")[0],
         )
     driver = await session.driver()
-    text = f"Navigated to {await driver.navigate(url)}"
+    text = f"Navigated to {session.shown_address(await driver.navigate(url))}"
     if session.config.browser.snapshot.after_navigation:
         text += "\n" + await _page(session, driver)
     return text
@@ -82,7 +83,7 @@ async def click(session: BrowserSession, args: ClickArgs) -> str:
     )
     text = f"Clicked {args.ref} ({outcome.target})"
     if outcome.navigated_to:
-        text += f"\nNavigated to {outcome.navigated_to}"
+        text += f"\nNavigated to {session.shown_address(outcome.navigated_to)}"
     if session.config.browser.snapshot.after_action:
         text += "\n" + await _page(session, driver)
     return text
@@ -95,7 +96,7 @@ async def type_text(session: BrowserSession, args: TypeArgs) -> str:
     )
     text = f"Typed {len(args.text)} characters into {args.ref or 'the focused element'} ({outcome.target})"
     if outcome.navigated_to:
-        text += f"\nNavigated to {outcome.navigated_to}"
+        text += f"\nNavigated to {session.shown_address(outcome.navigated_to)}"
     if session.config.browser.snapshot.after_action:
         text += "\n" + await _page(session, driver)
     return text

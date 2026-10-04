@@ -332,18 +332,25 @@
   };
 
   // Shared with the action operations added to this file.
-  globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES };
+  globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES };
 })();
 
 // Operations that prepare an element for an action. The driver then sends the real input events.
 (() => {
   if (globalThis.__bap.withActions) return;
-  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES } =
+  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES } =
     globalThis.__bapParts;
 
-  function describe(el, a) {
+  // What an element is and what it is called. What a field holds is what was typed into it, so a
+  // field with no label has no name: its content never stands in for one.
+  function identify(el, a) {
     const role = roleOf(el) || el.tagName.toLowerCase();
-    const name = nameOf(el, role, a) || textOf(el, a.maxName, a);
+    const holdsTypedText = VALUE_ROLES.has(role) || role === 'combobox' || el.isContentEditable;
+    return { role, name: nameOf(el, role, a) || (holdsTypedText ? '' : textOf(el, a.maxName, a)) };
+  }
+
+  function describe(el, a) {
+    const { role, name } = identify(el, a);
     return name ? `${role} ${quote(name)}` : role;
   }
 
@@ -465,10 +472,9 @@
   function locate(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
-    const role = roleOf(el) || el.tagName.toLowerCase();
     const point = target(el);
     const shown = point && point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight;
-    return { role, name: nameOf(el, role, a) || textOf(el, a.maxName, a), box: shown ? point.box.split(',').map(Number) : null };
+    return { ...identify(el, a), box: shown ? point.box.split(',').map(Number) : null };
   }
 
   operations.locate = locate;

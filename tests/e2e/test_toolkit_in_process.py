@@ -42,3 +42,34 @@ async def test_an_agent_in_the_same_process_fills_and_submits_the_form(
     ]
     assert [line["tool"] for line in lines][:2] == ["browser_navigate", "browser_type"]
     assert "Ada Lovelace" not in json.dumps(lines[1], ensure_ascii=False), "typed text reached the log"
+
+
+async def test_what_is_typed_stays_out_of_the_log_and_out_of_element_names(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    card, note = "4111 1111 1111 1111", "my pin is 9731"
+    async with open_session(make_config(tmp_path)) as session:
+        tools = Toolkit(session)
+        page = await tools.call("browser_navigate", {"url": f"{site}/richtext.html"})
+        await tools.call("browser_type", {"ref": ref_of(page.text, 'textbox "Card number"'), "text": card})
+        box = ref_of(page.text, "textbox")
+        await tools.call("browser_type", {"ref": box, "text": note})
+        again = await tools.call("browser_type", {"ref": box, "text": "second", "clear": False})
+        # The agent may see what a field holds; that is how it checks its own work.
+        filled = await tools.call("browser_snapshot", {})
+        assert f'value="{card}"' in filled.text
+    assert again.text.startswith(f"Typed 6 characters into {box} (textbox)\n"), again.text
+    log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+    assert card not in log and note not in log and "9731" not in log
+
+
+async def test_a_page_cannot_make_a_result_as_long_as_it_likes(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    async with open_session(make_config(tmp_path)) as session:
+        tools = Toolkit(session)
+        page = await tools.call("browser_navigate", {"url": f"{site}/long_address.html"})
+        clicked = await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Grow"')})
+        read = await tools.call("browser_snapshot", {"max_chars": 500})
+    assert len(clicked.text) < 1000, len(clicked.text)
+    assert len(read.text) < 1000, len(read.text)

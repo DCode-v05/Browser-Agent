@@ -6,6 +6,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from pydantic import ValidationError
@@ -15,12 +16,21 @@ from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
 from bap_browser.results import ToolResult
 from bap_browser.tools.browser_tools import TOOLS
-from bap_browser.tools.event_log import EventLog
+from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.observer import StepObserver
-from bap_browser.tools.registry import ToolDefinition, describe_problem
+from bap_browser.tools.registry import Args, ToolDefinition, describe_problem
 from bap_browser.tools.sentences import label_for, summary_for
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CannotRun:
+    """A call that names no tool, or whose arguments are wrong."""
+
+    text: str
+    reason: str
+    """The same in a few words, for the person watching."""
 
 
 class Toolkit:
@@ -34,7 +44,7 @@ class Toolkit:
         self._tools = {tool.name: tool for tool in tools}
         self._observer = observer
         self._turn = asyncio.Lock()
-        self._log = EventLog(session.config.logging, session.redact)
+        self._log = EventLog(session.config.logging)
         self._steps = 0
 
     def definitions(self) -> list[ToolDefinition]:
@@ -51,26 +61,35 @@ class Toolkit:
                 label = redact(label_for(name, arguments, target))
                 self._observer.step_started(step, name, label, target.box if target else None)
             started = time.perf_counter()
-            text, failure = await self._run(name, arguments)
+            checked = self._check(name, arguments)
+            if isinstance(checked, CannotRun):
+                text, failure, logged = checked.text, checked.reason, names_only(arguments)
+            else:
+                text, failure = await self._run(name, *checked)
+                logged = masked(arguments, redact)
             tabs = await self._tabs()
             result = ToolResult(redact(text + self._state_block(tabs)), failure is not None)
             ms = (time.perf_counter() - started) * 1000
-            self._log.write(name, arguments, result, ms)
+            self._log.write(name, logged, result, ms)
             if self._observer:
                 summary = redact(summary_for(name, arguments, target, failure))
                 self._observer.step_finished(step, failure is None, ms, len(result.text), summary, tabs)
         return result
 
-    async def _run(self, name: str, arguments: dict[str, Any]) -> tuple[str, str | None]:
-        """The result text and, when the call failed, why in a few words for the person watching."""
+    def _check(self, name: str, arguments: dict[str, Any]) -> tuple[ToolDefinition, Args] | CannotRun:
+        """The tool and its checked arguments, or what is wrong with the call."""
         tool = self._tools.get(name)
         if tool is None:
-            return f"Unknown tool '{name}'. Available: {', '.join(sorted(self._tools))}.", "unknown tool"
+            available = ", ".join(sorted(self._tools))
+            return CannotRun(f"Unknown tool '{name}'. Available: {available}.", "unknown tool")
         try:
-            args = tool.args.model_validate(arguments)
+            return tool, tool.args.model_validate(arguments)
         except ValidationError as exc:
             problem = describe_problem(exc)
-            return f"{name}: {problem}", problem
+            return CannotRun(f"{name}: {problem}", problem)
+
+    async def _run(self, name: str, tool: ToolDefinition, args: Args) -> tuple[str, str | None]:
+        """The result text and, when the call failed, why in a few words for the person watching."""
         try:
             return await tool.handler(self._session, args), None
         except PolicyBlocked as exc:
@@ -102,9 +121,10 @@ class Toolkit:
         if driver is None:
             return []
         try:
-            return await driver.tabs()
+            tabs = await driver.tabs()
         except BapError:
             return []
+        return [replace(tab, url=self._session.shown_address(tab.url)) for tab in tabs]
 
     @staticmethod
     def _state_block(tabs: Sequence[TabInfo]) -> str:

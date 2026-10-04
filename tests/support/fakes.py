@@ -22,6 +22,8 @@ class FakeDriver:
         self.running = 0
         self.most_at_once = 0
         self.fail_with: Exception | None = None
+        self.next_address: str | None = None
+        """Where the next navigation ends up, when that is not where it was sent."""
 
     async def start(self) -> None:
         self.started += 1
@@ -47,8 +49,8 @@ class FakeDriver:
 
     async def navigate(self, url: str) -> str:
         self.calls.append(("navigate", url))
-        self.url = url
-        return url
+        self.url = self.next_address or url
+        return self.url
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         self.calls.append(

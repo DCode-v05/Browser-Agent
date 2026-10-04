@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from bap_browser.config import Config
 from bap_browser.driver.base import Driver
 from bap_browser.driver.playwright_driver import PlaywrightDriver
+from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
 
@@ -19,6 +20,12 @@ class BrowserSession:
         self.redact = Redactor(config.safety.redact_patterns)
         self._driver: Driver = driver if driver is not None else PlaywrightDriver(config)
         self._started = False
+
+    def shown_address(self, url: str) -> str:
+        """An address as it may appear in a result, an event or the log: no name and password, and capped,
+        because a page can make its own address as long as it likes."""
+        url, limit = without_credentials(url), self.config.browser.snapshot.max_text_chars
+        return url if len(url) <= limit else url[:limit] + "…"
 
     @property
     def started_driver(self) -> Driver | None:
