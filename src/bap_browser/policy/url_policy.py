@@ -84,7 +84,8 @@ class UrlPolicy:
             url = canonical_address(url)
             parts = urlsplit(url)
         except ValueError as exc:
-            return replace(blocked(str(exc) or NOT_VALID), url=url)
+            # The text is not repeated anywhere: it may hold a name and password.
+            return replace(blocked(str(exc) or NOT_VALID), url="")
         return replace(await self._judge(parts.scheme, parts.netloc.rpartition("@")[2]), url=url)
 
     async def _judge(self, scheme: str, host_and_port: str) -> Decision:

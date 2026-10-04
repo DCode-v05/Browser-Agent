@@ -12,6 +12,8 @@ from bap_browser.errors import PolicyBlocked
 from bap_browser.tools.registry import REF_PATTERN, Args, ToolDefinition
 
 Modifier = Literal["Alt", "Control", "Meta", "Shift"]
+# What a person is shown in place of an address that could not be read.
+UNREADABLE = "That address"
 
 
 class NavigateArgs(Args):
@@ -58,10 +60,12 @@ async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
     # Only the address the policy judged is handed to the browser, never the text as it was given.
     url = decision.url
     if not decision.allowed:
-        shown = session.shown_address(url)
+        shown = session.shown_address(url) if url else ""
         raise PolicyBlocked(
-            f"navigation to {shown} blocked: {decision.reason}",
-            url=shown,
+            f"navigation to {shown} blocked: {decision.reason}"
+            if shown
+            else f"navigation blocked: {decision.reason}",
+            url=shown or UNREADABLE,
             # The setting's name is for whoever runs the deployment, not for the person watching.
             reason=decision.reason.split(" (")[0],
         )

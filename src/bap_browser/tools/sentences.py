@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from bap_browser.driver.base import Located
+from bap_browser.policy.address import presentable_address
 from bap_browser.tools.registry import REF_PATTERN
 
 # A row is under 60 characters.
@@ -69,12 +70,11 @@ def _address(arguments: Mapping[str, Any]) -> str:
     """The site and the path, the way a person says an address. A name and password before the site,
     and the query, can hold secrets and are left out."""
     url = arguments.get("url")
-    if not isinstance(url, str) or not url:
+    shown = presentable_address(url) if isinstance(url, str) else None
+    if shown is None:
         return "a page"
-    parts = urlsplit(url if "://" in url or url.startswith(("about:", "data:", "blob:")) else f"//{url}")
-    if not parts.netloc:
-        return f"{parts.scheme}:{parts.path}" if parts.scheme else url
-    return parts.netloc.rpartition("@")[2] + parts.path.rstrip("/")
+    parts = urlsplit(shown)
+    return parts.netloc + parts.path.rstrip("/") if parts.netloc else shown
 
 
 def _element(arguments: Mapping[str, Any], target: Located | None) -> str:

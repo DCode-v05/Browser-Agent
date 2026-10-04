@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -19,7 +20,7 @@ from bap_browser.tools.browser_tools import TOOLS
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
 from bap_browser.tools.observer import StepObserver
-from bap_browser.tools.registry import Args, ToolDefinition, describe_problem
+from bap_browser.tools.registry import REF_PATTERN, Args, ToolDefinition, describe_problem
 from bap_browser.tools.sentences import label_for, summary_for
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class Toolkit:
                 return held
             self._steps += 1
             step = self._steps
-            target = await self._locate(arguments) if self._observer else None
+            target = await self._locate(name, arguments) if self._observer else None
             if self._observer:
                 label = redact(label_for(name, arguments, target))
                 self._observer.step_started(step, name, label, target.box if target else None)
@@ -117,10 +118,16 @@ class Toolkit:
                 "something went wrong",
             )
 
-    async def _locate(self, arguments: Mapping[str, Any]) -> Located | None:
+    async def _locate(self, name: str, arguments: Mapping[str, Any]) -> Located | None:
         """The element a call names, for the sentence and the outline a person sees."""
         driver, ref = self._session.started_driver, arguments.get("ref")
-        if driver is None or not isinstance(ref, str):
+        # The arguments are not checked yet. Only what is a ref, for a tool that exists, goes to the page.
+        if (
+            driver is None
+            or name not in self._tools
+            or not isinstance(ref, str)
+            or not re.fullmatch(REF_PATTERN, ref)
+        ):
             return None
         try:
             return await driver.locate(ref)

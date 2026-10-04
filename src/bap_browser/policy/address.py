@@ -65,6 +65,15 @@ def without_credentials(url: str) -> str:
     return AUTHORITY.sub(lambda found: found.group(1) + found.group(2).rpartition("@")[2], url, count=1)
 
 
+def presentable_address(text: str) -> str | None:
+    """An address as it may be logged or shown to a person: read the way a browser reads it, and without
+    the name and password it may carry. None when no browser would open it; such text is shown nowhere."""
+    try:
+        return without_credentials(canonical_address(text))
+    except ValueError:
+        return None
+
+
 def canonical_host(text: str) -> str:
     """One spelling for a host: lower case, an IP address in its usual form, an international name as xn--."""
     text = text.removesuffix(":")
@@ -107,9 +116,34 @@ def parse_ip(host: str) -> IPAddress | None:
         ip: IPAddress | None = ipaddress.ip_address(host.removeprefix("[").removesuffix("]"))
     except ValueError:
         ip = legacy_ipv4(host)
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        return ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        return _carried_ipv4(ip) or ip
     return ip
+
+
+NAT64 = ipaddress.ip_network("64:ff9b::/96")
+NAT64_LOCAL = ipaddress.ip_network("64:ff9b:1::/48")
+IPV4_COMPATIBLE = ipaddress.ip_network("::/96")
+
+
+def _carried_ipv4(ip: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """The IPv4 address an IPv6 address stands for, when it is one of the forms that carry one. A
+    gateway or the machine itself sends such traffic to that IPv4 address, so that is what is judged."""
+    if ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped
+    if ip.sixtofour is not None:
+        return ip.sixtofour
+    if ip.teredo is not None:
+        return ip.teredo[1]
+    number = int(ip)
+    if ip in NAT64:
+        return ipaddress.IPv4Address(number & 0xFFFFFFFF)
+    if ip in NAT64_LOCAL:
+        # RFC 6052 with a 48-bit prefix: 16 bits of the address, 8 unused bits, then the other 16.
+        return ipaddress.IPv4Address((((number >> 64) & 0xFFFF) << 16) | ((number >> 40) & 0xFFFF))
+    if ip in IPV4_COMPATIBLE and number > 1:
+        return ipaddress.IPv4Address(number)
+    return None
 
 
 def legacy_ipv4(host: str) -> ipaddress.IPv4Address | None:

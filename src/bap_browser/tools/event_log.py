@@ -9,10 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from bap_browser.config import Logging
-from bap_browser.policy.address import without_credentials
+from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
 TYPED_ARGUMENTS = frozenset({"text"})
+ADDRESS_ARGUMENTS = frozenset({"url"})
 
 
 def masked(arguments: Mapping[str, Any], redact: Callable[[str], str]) -> dict[str, Any]:
@@ -20,8 +21,10 @@ def masked(arguments: Mapping[str, Any], redact: Callable[[str], str]) -> dict[s
     for name, value in arguments.items():
         if name in TYPED_ARGUMENTS and isinstance(value, str):
             out[name] = f"<{len(value)} characters>"
+        elif name in ADDRESS_ARGUMENTS and isinstance(value, str):
+            out[name] = redact(presentable_address(value) or "<not a valid address>")
         elif isinstance(value, str):
-            out[name] = redact(without_credentials(value))
+            out[name] = redact(value)
         else:
             out[name] = value
     return out
