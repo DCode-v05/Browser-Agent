@@ -22,6 +22,11 @@ export interface SocketOptions {
   createSocket?: (url: string) => SocketLike;
   /** How long to wait before each new attempt after the connection is lost. The last delay repeats. */
   reconnectMs?: number[];
+  /**
+   * How long a live picture's address is kept after a newer picture replaced it. The page may still
+   * be loading the older one, and releasing its address at once would fail that load.
+   */
+  releaseAfterMs?: number;
 }
 
 const OPEN = 1;
@@ -29,10 +34,12 @@ const FRAME = 1;
 /** The close code the service uses for a token it does not accept. */
 const REFUSED = 4401;
 const DEFAULT_RECONNECT_MS = [500, 1000, 2000, 5000];
+const DEFAULT_RELEASE_AFTER_MS = 1000;
 
 export class SocketConnection implements Connection {
   private readonly createSocket: (url: string) => SocketLike;
   private readonly reconnectMs: number[];
+  private readonly releaseAfterMs: number;
   private handlers: ConnectionHandlers | undefined;
   private socket: SocketLike | undefined;
   private retry: ReturnType<typeof setTimeout> | undefined;
@@ -45,12 +52,15 @@ export class SocketConnection implements Connection {
   private session: string | undefined;
   private lastFrame: Blob | undefined;
   private live: string | undefined;
+  /** Live pictures that were replaced and are waiting to be released. */
+  private readonly leaving = new Map<string, ReturnType<typeof setTimeout>>();
   /** Each finished step's picture, by step number. They outlive the live picture and a lost connection. */
   private readonly kept = new Map<number, string>();
 
   constructor(private readonly options: SocketOptions) {
     this.createSocket = options.createSocket ?? ((url) => new WebSocket(url) as unknown as SocketLike);
     this.reconnectMs = options.reconnectMs ?? DEFAULT_RECONNECT_MS;
+    this.releaseAfterMs = options.releaseAfterMs ?? DEFAULT_RELEASE_AFTER_MS;
   }
 
   start(handlers: ConnectionHandlers): void {
@@ -73,6 +83,11 @@ export class SocketConnection implements Connection {
     this.closed = true;
     clearTimeout(this.retry);
     this.socket?.close();
+    for (const [url, timer] of this.leaving) {
+      clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    }
+    this.leaving.clear();
     if (this.live) URL.revokeObjectURL(this.live);
     this.live = undefined;
     this.lastFrame = undefined;
@@ -138,7 +153,15 @@ export class SocketConnection implements Connection {
     this.lastFrame = frame;
     this.live = URL.createObjectURL(frame);
     this.handlers?.onFrame(this.live, this.now());
-    if (replaced) URL.revokeObjectURL(replaced);
+    if (replaced) {
+      this.leaving.set(
+        replaced,
+        setTimeout(() => {
+          this.leaving.delete(replaced);
+          URL.revokeObjectURL(replaced);
+        }, this.releaseAfterMs),
+      );
+    }
   }
 
   /** A step that finishes now keeps its own copy of the picture. A replayed step keeps the one it had. */

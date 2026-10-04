@@ -55,6 +55,7 @@ function connect() {
     token: 'secret-token',
     createSocket: (url) => new FakeSocket(url),
     reconnectMs: [500, 2000],
+    releaseAfterMs: 1000,
   });
   connection.start({
     onEvent: (event, picture) => {
@@ -144,13 +145,26 @@ describe('events', () => {
 });
 
 describe('pictures', () => {
-  it('a frame becomes a picture, and the picture it replaces is released', () => {
+  it('a frame becomes a picture, and the picture it replaces is released once the page has had time to draw it', () => {
     const { frames, socket } = connect();
     socket().open();
     socket().frame([255, 216, 1]);
     socket().frame([255, 216, 2]);
     expect(frames).toEqual(['blob:picture-1', 'blob:picture-2']);
+    // The page may still be loading the first picture. Releasing it now would fail that load.
+    expect(revoked).toEqual([]);
+    vi.advanceTimersByTime(999);
+    expect(revoked).toEqual([]);
+    vi.advanceTimersByTime(1);
     expect(revoked).toEqual(['blob:picture-1']);
+  });
+
+  it('the picture on screen is never released while it is the newest', () => {
+    const { socket } = connect();
+    socket().open();
+    socket().frame([255, 216, 1]);
+    vi.advanceTimersByTime(60_000);
+    expect(revoked).toEqual([]);
   });
 
   it('a finished step comes with its own copy of the picture on screen at that moment', () => {
@@ -164,6 +178,7 @@ describe('pictures', () => {
     // picture-2 is the step's copy. Live pictures come and go around it; it stays.
     expect(pictures).toEqual({ 1: 'blob:picture-2' });
     expect(frames).toEqual(['blob:picture-1', 'blob:picture-3', 'blob:picture-4']);
+    vi.advanceTimersByTime(1000);
     expect(revoked).toEqual(['blob:picture-1', 'blob:picture-3']);
   });
 
@@ -285,12 +300,15 @@ describe('a lost connection', () => {
     socket().text({ type: 'caught_up', ts: 50 });
     socket().frame([255, 216, 1]);
     socket().text(finished(1));
+    socket().frame([255, 216, 3]);
     connection.close();
+    // Everything goes at once, each address once: the one still waiting, the one on screen, the step's.
+    expect([...revoked].sort()).toEqual(['blob:picture-1', 'blob:picture-2', 'blob:picture-3']);
     expect(socket().readyState).toBe(3);
     socket().onclose?.({ code: 1000 });
     vi.advanceTimersByTime(60_000);
     expect(FakeSocket.all).toHaveLength(1);
     expect(statuses.at(-1)).toBe('connected');
-    expect(revoked).toEqual(['blob:picture-1', 'blob:picture-2']);
+    expect(revoked).toHaveLength(3);
   });
 });
