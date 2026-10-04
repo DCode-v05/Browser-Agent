@@ -274,6 +274,24 @@ def test_the_configuration_holds_no_secret() -> None:
     assert "password" not in dumped
 
 
+@pytest.mark.parametrize(
+    "entry", ["https://evil.example/", "evil.example/", "*", "evil.example:8443", "", "a b"]
+)
+@pytest.mark.parametrize("key", ["blocked_domains", "allowed_domains"])
+def test_a_site_list_entry_that_could_never_match_is_refused(tmp_path: Path, key: str, entry: str) -> None:
+    with pytest.raises(
+        ConfigError,
+        match=rf"bad value for 'safety\.{key}' \(from config.json\): .*entry 1 .*write a site as a host name",
+    ):
+        load_config(write(tmp_path / "config.json", {"safety": {key: [entry]}}), env={})
+
+
+def test_site_list_entries_are_kept_as_written(tmp_path: Path) -> None:
+    sites = ["example.com", "*.Example.org", "127.0.0.1", "::1", "bücher.example"]
+    config = load_config(write(tmp_path / "config.json", {"safety": {"blocked_domains": sites}}), env={})
+    assert config.safety.blocked_domains == sites
+
+
 def test_the_scripted_model_can_be_chosen(tmp_path: Path) -> None:
     config = load_config(write(tmp_path / "config.json", {"agent": {"provider": "scripted"}}), env={})
     assert config.agent.provider == "scripted"

@@ -54,8 +54,9 @@ async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | No
 
 
 async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
-    url = session.policy.normalise(args.url)
-    decision = await session.policy.check(url)
+    decision = await session.policy.check(args.url)
+    # Only the address the policy judged is handed to the browser, never the text as it was given.
+    url = decision.url
     if not decision.allowed:
         raise PolicyBlocked(
             f"navigation to {url} blocked: {decision.reason}",

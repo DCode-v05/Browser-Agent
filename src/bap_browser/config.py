@@ -12,9 +12,10 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from bap_browser.errors import ConfigError
+from bap_browser.policy.address import site_pattern
 
 ENV_PREFIX = "BAP_BROWSER__"
 CONFIG_PATH_ENV = "BAP_BROWSER_CONFIG"
@@ -226,6 +227,17 @@ class Safety(Section):
         "risky", "`every_action` also makes every tool that acts on a page `confirm`"
     )
     redact_patterns: list[str] = setting([], "Regular expressions scrubbed from every result")
+
+    @field_validator("allowed_domains", "blocked_domains", mode="after")
+    @classmethod
+    def _sites_that_can_match(cls, sites: list[str]) -> list[str]:
+        """An entry that could never match would leave a site unblocked without anyone noticing."""
+        for index, entry in enumerate(sites):
+            try:
+                site_pattern(entry)
+            except ValueError as exc:
+                raise ValueError(f"entry {index + 1} ({entry!r}): {exc}") from None
+        return sites
 
 
 class Control(Section):

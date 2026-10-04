@@ -1,5 +1,8 @@
 """Which addresses the agent may open.
 
+Every address is first rewritten the way a browser reads it (see address.py); that form is what
+is judged and what the browser is handed.
+
 Order of checks: local files, scheme, cloud metadata, block list, allow list, private addresses
 and names, then name resolution. The browser resolves names separately; a guard that connects to
 the checked address is a later item.
@@ -9,15 +12,14 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
-import re
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
 from bap_browser.config import Safety
+from bap_browser.policy.address import NOT_VALID, canonical_address, parse_ip, site_identity, site_pattern
 
-IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 Resolver = Callable[[str], Awaitable[list[str]]]
 
 METADATA_HOSTS = frozenset({"metadata.google.internal", "metadata.goog"})
@@ -27,15 +29,14 @@ METADATA_ADDRESSES = frozenset(
 )
 PRIVATE_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home.arpa")
 SCHEMES_WITHOUT_A_HOST = frozenset({"about", "data", "blob"})
-SCHEMES_WRITTEN_WITHOUT_SLASHES = ("about:", "data:", "blob:", "file:", "javascript:", "mailto:", "tel:")
-HAS_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
-IPV4_PART = re.compile(r"0[xX][0-9a-fA-F]*|[0-9]+")
 
 
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
     reason: str = ""
+    url: str = ""
+    """The address as the browser will read it. This, and nothing else, is what may be opened."""
 
 
 ALLOWED = Decision(True)
@@ -45,44 +46,8 @@ def blocked(reason: str) -> Decision:
     return Decision(False, reason)
 
 
-def parse_ip(host: str) -> IPAddress | None:
-    """The address a browser would connect to for this host text, or None when it is a name."""
-    try:
-        ip: IPAddress | None = ipaddress.ip_address(host)
-    except ValueError:
-        ip = _legacy_ipv4(host)
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        return ip.ipv4_mapped
-    return ip
-
-
-def _legacy_ipv4(host: str) -> ipaddress.IPv4Address | None:
-    """Browsers also accept 2130706433, 0x7f.1 and 0177.0.0.1 as IPv4 addresses."""
-    parts = host.split(".")
-    if not 1 <= len(parts) <= 4 or not all(IPV4_PART.fullmatch(part) for part in parts):
-        return None
-    numbers: list[int] = []
-    for part in parts:
-        if part[:2].lower() == "0x":
-            numbers.append(int(part[2:] or "0", 16))
-        elif len(part) > 1 and part.startswith("0"):
-            if not part.isdecimal() or any(digit in "89" for digit in part):
-                return None
-            numbers.append(int(part, 8))
-        else:
-            numbers.append(int(part, 10))
-    *leading, last = numbers
-    if any(number > 255 for number in leading) or last >= 256 ** (4 - len(leading)):
-        return None
-    value = last
-    for index, number in enumerate(leading):
-        value += number << (8 * (3 - index))
-    return ipaddress.IPv4Address(value)
-
-
 def host_matches(host: str, pattern: str) -> bool:
     """`example.com` matches the host and its subdomains; `*.example.com` only subdomains."""
-    pattern = pattern.lower().rstrip(".")
     if pattern.startswith("*."):
         return host.endswith(pattern[1:])
     return host == pattern or host.endswith("." + pattern)
@@ -102,26 +67,28 @@ class UrlPolicy:
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._safety = safety
+        self._blocked = [site_pattern(entry) for entry in safety.blocked_domains]
+        self._allowed = [site_pattern(entry) for entry in safety.allowed_domains]
         self._resolve = resolve or _system_resolve
         self._clock = clock
         self._cache: dict[str, tuple[float, Decision]] = {}
 
     @staticmethod
     def normalise(url: str) -> str:
-        """An address with no scheme gets https://."""
-        url = url.strip()
-        if HAS_SCHEME.match(url) or url.lower().startswith(SCHEMES_WRITTEN_WITHOUT_SLASHES):
-            return url
-        return "https://" + url
+        """The address as a browser reads it; with no scheme it gets https://. Raises ValueError."""
+        return canonical_address(url)
 
     async def check(self, url: str) -> Decision:
-        safety = self._safety
+        """Whether the address may be opened. The decision carries the address to hand to the browser."""
         try:
+            url = canonical_address(url)
             parts = urlsplit(url)
-            host = (parts.hostname or "").rstrip(".").lower()
-        except ValueError:
-            return blocked("not a valid address")
-        scheme = parts.scheme.lower()
+        except ValueError as exc:
+            return replace(blocked(str(exc) or NOT_VALID), url=url)
+        return replace(await self._judge(parts.scheme, parts.netloc.rpartition("@")[2]), url=url)
+
+    async def _judge(self, scheme: str, host_and_port: str) -> Decision:
+        safety = self._safety
         if scheme == "file":
             return (
                 ALLOWED if safety.allow_file_urls else blocked("local files are off (safety.allow_file_urls)")
@@ -130,8 +97,7 @@ class UrlPolicy:
             return blocked(f"scheme '{scheme}' is not allowed (safety.allowed_schemes)")
         if scheme in SCHEMES_WITHOUT_A_HOST:
             return ALLOWED
-        if not host:
-            return blocked("the address has no host")
+        host = urlsplit(f"//{host_and_port}").hostname or ""
 
         now = self._clock()
         cached = self._cache.get(host)
@@ -147,9 +113,10 @@ class UrlPolicy:
         ip = parse_ip(host)
         if safety.block_cloud_metadata and (host in METADATA_HOSTS or ip in METADATA_ADDRESSES):
             return blocked("cloud metadata address (safety.block_cloud_metadata)")
-        if any(host_matches(host, pattern) for pattern in safety.blocked_domains):
+        site = site_identity(host)
+        if any(host_matches(site, pattern) for pattern in self._blocked):
             return blocked("blocked site (safety.blocked_domains)")
-        if safety.allowed_domains and not any(host_matches(host, p) for p in safety.allowed_domains):
+        if self._allowed and not any(host_matches(site, pattern) for pattern in self._allowed):
             return blocked("not in the allowed sites (safety.allowed_domains)")
         guard_private = safety.block_private_networks
         if ip is not None:

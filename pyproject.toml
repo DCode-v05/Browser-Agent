@@ -46,6 +46,9 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # Tests read small files directly inside async test functions.
 "tests/**" = ["ASYNC"]
+# These tests are about addresses written with look-alike characters.
+"tests/unit/test_url_policy.py" = ["ASYNC", "RUF001"]
+"tests/e2e/test_address_policy.py" = ["ASYNC", "RUF001"]
 
 [tool.pyright]
 include = ["src", "tests"]

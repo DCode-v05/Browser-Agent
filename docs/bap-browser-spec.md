@@ -847,13 +847,19 @@ deployments.
 Checked for every navigation the agent asks for and enforced again at the network layer, so redirects,
 link clicks, pop-ups and frames cannot slip past it.
 
+Before anything is judged, the address is rewritten the way a browser reads it: `\` becomes `/`, a
+percent-encoded host is decoded, an international name becomes its `xn--` form, and every spelling of
+an IP address (`2130706433`, `0x7f.1`, full-width digits) becomes the address itself. That one form is
+what the policy judges and what the browser is handed, so the two can never read an address
+differently. An address a browser would not open is refused as "not a valid address".
+
 Order of checks: local files (off unless `allow_file_urls`), scheme allowlist, cloud metadata addresses,
 block list, allow list, private addresses and names, then name resolution to a private address.
 
 | Rule | Default |
 |---|---|
 | Schemes | `http`, `https`, `about`, `data`, `blob` |
-| Domain lists | Empty allow list means every domain. `example.com` matches the host and its subdomains; `*.example.com` only subdomains. A block always wins |
+| Domain lists | Empty allow list means every domain. `example.com` matches the host and its subdomains; `*.example.com` only subdomains. A block always wins. An entry is a host name or an IP address; one with a scheme, a port or a path could never match and stops start-up with a message |
 | Cloud metadata addresses | Always blocked |
 | Private networks (loopback, LAN, link-local) | Allowed locally; set `block_private_networks` for cloud |
 | Sub-resources (images, scripts, requests) | Not checked unless `enforce_on_subresources` is on |
