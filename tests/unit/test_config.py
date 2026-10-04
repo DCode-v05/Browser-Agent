@@ -100,6 +100,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "server.port": 8765,
     "server.token_env": "BAP_BROWSER_TOKEN",
     "server.state_file": ".bap-browser/service.json",
+    "server.auth_wait_s": 10,
     "mcp.server_name": "bap-browser",
     "mcp.http_path": "/mcp",
     "viewer.quality": "standard",

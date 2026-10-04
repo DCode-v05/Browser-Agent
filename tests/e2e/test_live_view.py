@@ -95,8 +95,10 @@ async def test_the_rate_is_limited(live: PlaywrightDriver, site: str) -> None:
     started, first = time.monotonic(), len(frames)
     await until(lambda: time.monotonic() - started >= 1.5, "a second and a half passed")
     arrived = len(frames) - first
-    # The page moves on every frame of the browser, which is many more than four a second.
-    assert 3 <= arrived <= 8, f"{arrived} pictures in 1.5 s at 4 a second"
+    # The page moves on every frame of the browser, dozens of times a second. The browser keeps at
+    # most two pictures on their way, and each acknowledgement lets one more out: 1.5 s at four a
+    # second is seven acknowledgements at most, so nine pictures at most.
+    assert 3 <= arrived <= 9, f"{arrived} pictures in 1.5 s at 4 a second"
 
 
 async def test_pictures_stop_when_they_are_stopped(live: PlaywrightDriver, site: str) -> None:

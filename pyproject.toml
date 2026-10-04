@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.13,<3",
     "starlette>=1.7,<2",
     "uvicorn>=0.54,<1",
+    "websockets>=15,<17",
 ]
 
 [project.scripts]

@@ -1562,6 +1562,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `server.public_url` | none | The address clients use to reach the service in the micro VM. None on a developer's machine |
 | `server.port` | 8765 | `bap-browser mcp` uses a free port instead |
 | `server.token_env` | `BAP_BROWSER_TOKEN` | If unset, a token is generated at start |
+| `server.auth_wait_s` | 10 | How long a new viewer connection may take to send its token |
 | `server.state_file` | `.bap-browser/service.json` | Holds the viewer address for the local user |
 | `mcp.server_name` | `bap-browser` | |
 | `mcp.http_path` | `/mcp` | |
