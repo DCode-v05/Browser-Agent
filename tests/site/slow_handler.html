@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slow handler</title>
+</head>
+<body>
+<button id="slow">Think</button>
+<p><label for="note">Note</label> <input id="note"></p>
+<script>
+// The click itself keeps the page busy: the page does not answer until its handler has finished.
+document.getElementById('slow').addEventListener('click', () => {
+  const end = performance.now() + 4000;
+  while (performance.now() < end) {}
+});
+</script>
+</body>
+</html>

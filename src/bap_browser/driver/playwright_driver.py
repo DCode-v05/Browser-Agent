@@ -6,7 +6,7 @@ import asyncio
 import base64
 import contextlib
 import os
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from typing import Any
 
 from playwright.async_api import Browser, CDPSession, Frame, Page, Request, async_playwright
@@ -26,6 +26,7 @@ from bap_browser.driver.base import (
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.snapshot import snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
+from bap_browser.policy.address import without_credentials
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
@@ -197,7 +198,11 @@ class PlaywrightDriver:
                 # The browser shows its own error page for an address it could not load. A
                 # navigation started before that page arrives would be interrupted by it.
                 await self._wait_for_commit(commits, self._config.browser.timeouts.settle_ms)
-            raise BrowserError(f"Could not open {url}: {first_line(exc)}", reason=load_failure(exc)) from exc
+            # The browser's own words repeat the address, which may hold a name and password.
+            shown = without_credentials(url)
+            raise BrowserError(
+                f"Could not open {shown}: {first_line(exc).replace(url, shown)}", reason=load_failure(exc)
+            ) from exc
         finally:
             self.page_script.forget_document()
         await self._wait_for_load()
@@ -245,18 +250,26 @@ class PlaywrightDriver:
         self._raise_for(point, ref)
         navigations, commits = self._navigations, self._commits
         keyboard = self.page.keyboard
-        try:
+
+        async def press() -> None:
             for key in modifiers:
                 await keyboard.down(key)
-            try:
-                await self.page.mouse.click(point["x"], point["y"], button=button, click_count=click_count)
-            finally:
-                for key in reversed(modifiers):
-                    await keyboard.up(key)
+            await self.page.mouse.click(point["x"], point["y"], button=button, click_count=click_count)
+
+        async def release() -> None:
+            for key in reversed(modifiers):
+                await keyboard.up(key)
+
+        try:
+            await self._input(press(), "the click")
         except PlaywrightError as exc:
             raise BrowserError(
                 f"Could not click {ref}: {first_line(exc)}", reason="the browser did not respond"
             ) from exc
+        finally:
+            if modifiers:
+                with contextlib.suppress(BrowserError, PlaywrightError):
+                    await self._input(release(), "the click")
         return ActionOutcome(point["describe"], await self._settle(navigations, commits))
 
     async def type_text(
@@ -270,7 +283,8 @@ class PlaywrightDriver:
         navigations, commits = self._navigations, self._commits
         keyboard = self.page.keyboard
         delay = browser.input.slow_type_delay_ms if slowly else browser.input.type_delay_ms
-        try:
+
+        async def enter() -> None:
             if text == "":
                 if clear and field["hadText"]:
                     await keyboard.press("Delete")
@@ -280,6 +294,10 @@ class PlaywrightDriver:
                 await keyboard.insert_text(text)
             if submit:
                 await keyboard.press("Enter")
+
+        try:
+            # Typing with a pause between keys takes that long on top of the time the page may take.
+            await self._input(enter(), "the typing", extra_ms=delay * len(text))
         except PlaywrightError as exc:
             raise BrowserError(
                 f"Could not type into {ref or 'the focused element'}: {first_line(exc)}",
@@ -338,36 +356,64 @@ class PlaywrightDriver:
 
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton = "left") -> None:
         mouse = self.page.mouse
-        try:
+
+        async def act() -> None:
             await mouse.move(x, y)
             if action == "down":
                 await mouse.down(button=button)
             elif action == "up":
                 await mouse.up(button=button)
+
+        try:
+            await self._input(act(), "the pointer moved")
         except PlaywrightError as exc:
             raise BrowserError(f"The pointer could not be moved: {first_line(exc)}") from exc
 
     async def key(self, action: KeyAction, key: str) -> None:
         keyboard = self.page.keyboard
+
+        async def act() -> None:
+            try:
+                if action == "down":
+                    await keyboard.down(key)
+                else:
+                    await keyboard.up(key)
+            except PlaywrightError as exc:
+                if "Unknown key" not in str(exc):
+                    raise
+                # A character that is on no key of the keyboard Playwright knows, such as é, is put in
+                # as text. A name that is no key and no character, such as "Dead", is left out.
+                if action == "down" and len(key) == 1:
+                    await keyboard.insert_text(key)
+
         try:
-            if action == "down":
-                await keyboard.down(key)
-            else:
-                await keyboard.up(key)
+            await self._input(act(), "the key")
         except PlaywrightError as exc:
-            if "Unknown key" not in str(exc):
-                raise BrowserError(f"The key could not be pressed: {first_line(exc)}") from exc
-            # A character that is on no key of the keyboard Playwright knows, such as é, is put in as
-            # text. A name that is no key and no character, such as "Dead", is left out.
-            if action == "down" and len(key) == 1:
-                await keyboard.insert_text(key)
+            raise BrowserError(f"The key could not be pressed: {first_line(exc)}") from exc
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
-        try:
+        async def act() -> None:
             await self.page.mouse.move(x, y)
             await self.page.mouse.wheel(dx, dy)
+
+        try:
+            await self._input(act(), "the wheel turned")
         except PlaywrightError as exc:
             raise BrowserError(f"The page could not be scrolled: {first_line(exc)}") from exc
+
+    async def _input(self, work: Coroutine[Any, Any, None], what: str, *, extra_ms: float = 0) -> None:
+        """Sends mouse or keyboard input. The browser answers only once the page has handled it, and a
+        page can take as long as it likes: past the action limit, the call fails instead of waiting."""
+        limit = self._config.browser.timeouts.action_ms / 1000
+        try:
+            async with asyncio.timeout(limit + extra_ms / 1000):
+                await work
+        except TimeoutError:
+            raise BrowserError(
+                f"The page did not answer within {limit:g} s after {what}. It may still be working on it. "
+                "Take a new snapshot before you act again.",
+                reason="the page is not answering",
+            ) from None
 
     @staticmethod
     def _raise_for(result: dict[str, Any], ref: str | None) -> None:

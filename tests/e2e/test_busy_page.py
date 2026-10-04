@@ -36,3 +36,20 @@ async def test_a_page_too_busy_to_answer_fails_the_call_instead_of_holding_it(
         # Once the page answers again, so do the tools.
         await (await session.driver()).page.wait_for_function("true", timeout=10000)  # type: ignore[attr-defined]
         assert not (await tools.call("browser_snapshot", {})).is_error
+
+
+async def test_a_click_whose_handler_keeps_the_page_busy_is_answered_within_the_action_limit(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    config = make_config(tmp_path, browser={"timeouts": {"action_ms": 800, "page_reply_ms": 400}})
+    async with open_session(config) as session:
+        tools = Toolkit(session)
+        page = await tools.call("browser_navigate", {"url": f"{site}/slow_handler.html"})
+        started = time.perf_counter()
+        clicked = await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Think"')})
+        elapsed = time.perf_counter() - started
+        assert clicked.is_error
+        assert clicked.text.startswith("The page did not answer within 0.8 s after the click.")
+        assert elapsed < 3, f"the click took {elapsed:.1f} s while the page was busy for 4 s"
+        await (await session.driver()).page.wait_for_function("true", timeout=10000)  # type: ignore[attr-defined]
+        assert not (await tools.call("browser_snapshot", {})).is_error
