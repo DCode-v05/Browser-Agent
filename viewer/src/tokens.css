@@ -1,43 +1,69 @@
-/* The design tokens (spec 9.5). Colour, type, spacing, radius, shadow and motion come only from here. */
+/* The design tokens (spec 9.5). Colour, type, spacing, radius, shadow and motion come only from here.
+   The look is the BAP product's: warm neutrals, ink for the main action, hairlines, pills, Hanken Grotesk. */
+
+/* Hanken Grotesk, every weight in one file. It ships with the viewer; its licence is fonts/OFL.txt. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/hanken-grotesk-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/hanken-grotesk-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 :root {
   color-scheme: light;
 
   /* Colour: light */
-  --bg: #F5F6F8;
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
-  --surface-2: #EEF0F3;
-  --border: #D5D9E0;
-  --border-strong: #7C8696;
-  --text: #14171C;
-  --text-muted: #5A6270;
-  --focus: #1D4ED8;
-  --agent: #4338CA;
-  --agent-tint: #EEF2FF;
-  --person: #0F766E;
-  --person-tint: #E6F7F5;
-  --waiting: #A14C08;
-  --waiting-tint: #FFF4E0;
-  --danger: #B91C1C;
-  --danger-tint: #FDECEC;
-  --success: #15703A;
-  --success-tint: #E8F7EE;
-  --scrim: rgb(20 23 28 / 0.45);
-  --frame-dim: rgb(245 246 248 / 0.72);
+  --surface-2: #F5F4F2;
+  --surface-3: #ECEAE7;
+  --border: rgb(17 17 17 / 0.12);
+  --border-strong: #8D8881;
+  --text: #1A1714;
+  --text-muted: #56524D;
+  --ink: #09090B;
+  --on-ink: #FFFFFF;
+  --focus: #1A1714;
+  --agent: #6E3B83;
+  --agent-tint: #F6EFF9;
+  --person: #1D4ED8;
+  --person-tint: #EAF2FF;
+  --waiting: #8A5200;
+  --waiting-tint: #FFF4DB;
+  --danger: #BF2B37;
+  --danger-tint: #FFF2F3;
+  --success: #137A43;
+  --success-tint: #EAF8F0;
+  --brand-gradient: linear-gradient(90deg, #EC3B4B, #BE3B5F, #A03B6C, #6E3B83);
+  --scrim: rgb(0 0 0 / 0.4);
+  --frame-dim: rgb(255 255 255 / 0.72);
 
   /* Type */
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace;
   --text-caption: 12px;
   --text-secondary: 13px;
   --text-body: 14px;
   --text-title: 16px;
-  --text-heading: 20px;
+  --text-heading: 18px;
   --weight-regular: 400;
+  --weight-medium: 500;
   --weight-emphasis: 600;
   --line: 1.45;
-  --line-tight: 1.25;
+  --line-tight: 1.3;
   --tracking-caps: 0.06em;
+  --tracking-title: -0.01em;
 
   /* Space */
   --space-1: 4px;
@@ -48,31 +74,32 @@
   --space-6: 32px;
 
   /* Shape */
-  --radius-control: 6px;
-  --radius-card: 10px;
-  --radius-panel: 14px;
+  --radius-small: 4px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-pill: 999px;
   --border-width: 1px;
   --control-border-width: 3px;
 
-  /* Depth */
-  --shadow-card: 0 1px 2px rgb(20 23 28 / 0.06), 0 1px 3px rgb(20 23 28 / 0.08);
-  --shadow-overlay: 0 16px 40px rgb(20 23 28 / 0.22);
+  /* Depth: surfaces are flat. Only what floats has a shadow. */
+  --shadow-float: 0 4px 20px rgb(0 0 0 / 0.04);
 
   /* Motion */
-  --duration-state: 120ms;
+  --duration-state: 150ms;
   --duration-enter: 200ms;
   --duration-live: 1s;
-  --ease: ease-out;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Focus and targets */
   --focus-width: 2px;
   --focus-offset: 2px;
+  --control-height: 36px;
   --target-min: 32px;
-  --target-floor: 24px;
 
   /* Layout */
-  --top-bar-height: 48px;
-  --activity-width: 392px;
+  --top-bar-height: 56px;
+  --activity-width: 400px;
   --settings-groups-width: 184px;
   --dialog-width: 760px;
   --settings-height: 600px;
@@ -82,11 +109,12 @@
   --icon: 16px;
   --icon-large: 20px;
   --dot: 8px;
-  --status-icon: 36px;
+  --brand-mark: 24px;
+  --status-icon: 40px;
   --row-number-width: 28px;
-  --switch-width: 40px;
-  --switch-height: 22px;
-  --switch-knob: 16px;
+  --switch-width: 44px;
+  --switch-height: 26px;
+  --switch-knob: 20px;
   --list-height: 84px;
   --hairline: 1px;
 }
@@ -94,53 +122,59 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0E1014;
-    --surface: #161920;
-    --surface-2: #1E222B;
-    --border: #2C323D;
-    --border-strong: #6B7585;
-    --text: #E9EBEF;
-    --text-muted: #9AA3B2;
-    --focus: #93C5FD;
-    --agent: #A5B4FC;
-    --agent-tint: #1E2147;
-    --person: #5EEAD4;
-    --person-tint: #0F2F2C;
+    --bg: #151515;
+    --surface: #242424;
+    --surface-2: #1E1E1E;
+    --surface-3: #2C2C2C;
+    --border: rgb(233 235 223 / 0.12);
+    --border-strong: #94958E;
+    --text: #E9EBDF;
+    --text-muted: #CBCCC4;
+    --ink: #EBEBEB;
+    --on-ink: #111111;
+    --focus: #E9EBDF;
+    --agent: #D4B4E6;
+    --agent-tint: #392F3E;
+    --person: #93C5FD;
+    --person-tint: #2B333E;
     --waiting: #FCD34D;
-    --waiting-tint: #3A2C0A;
+    --waiting-tint: #3E3724;
     --danger: #FCA5A5;
-    --danger-tint: #3B1414;
+    --danger-tint: #3D2D2D;
     --success: #86EFAC;
-    --success-tint: #0F2E1B;
+    --success-tint: #293A2F;
+    --brand-gradient: linear-gradient(90deg, #FF5A64, #E0567E, #C25792, #9A63B4);
     --scrim: rgb(0 0 0 / 0.6);
-    --frame-dim: rgb(14 16 20 / 0.72);
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
-    --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+    --frame-dim: rgb(21 21 21 / 0.72);
+    --shadow-float: 0 4px 20px rgb(0 0 0 / 0.4);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0E1014;
-  --surface: #161920;
-  --surface-2: #1E222B;
-  --border: #2C323D;
-  --border-strong: #6B7585;
-  --text: #E9EBEF;
-  --text-muted: #9AA3B2;
-  --focus: #93C5FD;
-  --agent: #A5B4FC;
-  --agent-tint: #1E2147;
-  --person: #5EEAD4;
-  --person-tint: #0F2F2C;
+  --bg: #151515;
+  --surface: #242424;
+  --surface-2: #1E1E1E;
+  --surface-3: #2C2C2C;
+  --border: rgb(233 235 223 / 0.12);
+  --border-strong: #94958E;
+  --text: #E9EBDF;
+  --text-muted: #CBCCC4;
+  --ink: #EBEBEB;
+  --on-ink: #111111;
+  --focus: #E9EBDF;
+  --agent: #D4B4E6;
+  --agent-tint: #392F3E;
+  --person: #93C5FD;
+  --person-tint: #2B333E;
   --waiting: #FCD34D;
-  --waiting-tint: #3A2C0A;
+  --waiting-tint: #3E3724;
   --danger: #FCA5A5;
-  --danger-tint: #3B1414;
+  --danger-tint: #3D2D2D;
   --success: #86EFAC;
-  --success-tint: #0F2E1B;
+  --success-tint: #293A2F;
+  --brand-gradient: linear-gradient(90deg, #FF5A64, #E0567E, #C25792, #9A63B4);
   --scrim: rgb(0 0 0 / 0.6);
-  --frame-dim: rgb(14 16 20 / 0.72);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
-  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+  --frame-dim: rgb(21 21 21 / 0.72);
+  --shadow-float: 0 4px 20px rgb(0 0 0 / 0.4);
 }

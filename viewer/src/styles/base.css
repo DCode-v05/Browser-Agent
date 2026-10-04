@@ -78,22 +78,22 @@ textarea {
   height: var(--icon-large);
 }
 
-/* Buttons */
+/* Buttons. The plain one is an outline; the main action is filled with ink. */
 
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: var(--target-min);
-  min-width: var(--target-min);
+  min-height: var(--control-height);
+  min-width: var(--control-height);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-size: var(--text-secondary);
-  font-weight: var(--weight-emphasis);
+  font-weight: var(--weight-medium);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
@@ -109,9 +109,9 @@ textarea {
 }
 
 .button[data-kind='primary'] {
-  background: var(--agent);
-  border-color: var(--agent);
-  color: var(--surface);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
 }
 
 .button[data-kind='person'] {
@@ -141,15 +141,17 @@ textarea {
   opacity: 0.9;
 }
 
+/* A button of one icon is a circle; with words it is a pill. */
 .button[data-kind='quiet'] {
   border-color: transparent;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   padding: 0 var(--space-2);
 }
 
 .button[data-kind='quiet']:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
   color: var(--text);
 }
 

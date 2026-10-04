@@ -7,7 +7,7 @@
   min-width: 0;
 }
 
-/* Top bar */
+/* Top bar. It has no edge of its own: it is part of the page. */
 
 .top-bar {
   flex: none;
@@ -16,37 +16,39 @@
   gap: var(--space-2);
   height: var(--top-bar-height);
   padding: 0 var(--space-4);
-  background: var(--surface);
-  border-bottom: var(--border-width) solid var(--border);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 var(--space-2) 0 0;
+  margin: 0 var(--space-3) 0 0;
   line-height: var(--line-tight);
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-title);
   white-space: nowrap;
 }
 
+/* One of the two places the brand's gradient appears. */
 .brand-mark {
-  width: var(--icon-large);
-  height: var(--icon-large);
+  width: var(--brand-mark);
+  height: var(--brand-mark);
   border-radius: var(--radius-control);
-  background: var(--agent);
+  background: var(--brand-gradient);
 }
 
 .chip {
+  flex-shrink: 1;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
   font-size: var(--text-secondary);
+  font-weight: var(--weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -55,10 +57,7 @@
 .chip .icon,
 .chip-name {
   color: var(--text-muted);
-}
-
-.chip {
-  flex-shrink: 1;
+  font-weight: var(--weight-regular);
 }
 
 .top-bar-space {
@@ -98,14 +97,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--activity-width);
   gap: var(--space-4);
-  padding: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
 }
 
 .app[data-view='full'] .workspace {
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Browser column */
+/* Browser column: one card. Tabs and address are pills; under them a warm stage holds the picture. */
 
 .browser {
   display: flex;
@@ -115,7 +114,6 @@
   background: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -123,9 +121,7 @@
   flex: none;
   display: flex;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-2) 0;
-  background: var(--surface-2);
-  border-bottom: var(--border-width) solid var(--border);
+  padding: var(--space-3) var(--space-3) 0;
   overflow-x: auto;
 }
 
@@ -135,22 +131,28 @@
   gap: var(--space-2);
   max-width: calc(var(--activity-width) / 2);
   min-height: var(--target-min);
-  margin-bottom: calc(-1 * var(--border-width));
   padding: 0 var(--space-3);
-  border: var(--border-width) solid transparent;
-  border-bottom: 0;
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  border: 0;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   font-size: var(--text-secondary);
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 
+.tab:hover {
+  background: var(--surface-2);
+}
+
 .tab[aria-selected='true'] {
-  background: var(--surface);
-  border-color: var(--border);
+  background: var(--surface-3);
   color: var(--text);
-  font-weight: var(--weight-emphasis);
+}
+
+/* The strip scrolls sideways, which would cut a ring drawn outside the tab. */
+.tab:focus-visible {
+  outline-offset: calc(-1 * var(--focus-width));
 }
 
 .tab-title {
@@ -168,20 +170,27 @@
 }
 
 .address {
+  position: relative;
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: var(--border-width) solid var(--border);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   color: var(--text-muted);
+}
+
+/* The lock or the globe sits inside the pill, before the address. */
+.address > .icon {
+  position: absolute;
+  left: calc(var(--space-3) + var(--space-3));
 }
 
 .address-url {
   flex: 1;
   min-width: 0;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-control);
+  padding: calc(var(--space-2) - var(--space-1) / 2) var(--space-4) calc(var(--space-2) - var(--space-1) / 2)
+    calc(var(--space-3) + var(--icon) + var(--space-2));
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--text);
   font-family: var(--font-mono);
@@ -205,19 +214,25 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
   color: var(--text-muted);
   font-size: var(--text-caption);
-  font-weight: var(--weight-emphasis);
+  font-weight: var(--weight-medium);
   white-space: nowrap;
 }
 
 .badge[data-kind='live'] {
+  background: var(--success-tint);
   color: var(--success);
+  font-weight: var(--weight-emphasis);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
 .badge[data-kind='stale'] {
+  background: var(--waiting-tint);
   color: var(--waiting);
 }
 
@@ -229,16 +244,23 @@
   animation: live var(--duration-live) var(--ease) infinite;
 }
 
-/* Live picture */
+/* Live picture, on its stage */
 
 .frame-area {
   flex: 1;
   min-height: 0;
   display: grid;
   place-items: center;
+  margin: 0 var(--space-3) var(--space-3);
   padding: var(--space-4);
+  border-radius: var(--radius-card);
   background: var(--surface-2);
   container-type: size;
+}
+
+/* Before a session there are no tabs and no address above the stage. */
+.frame-area:first-child {
+  margin-top: var(--space-3);
 }
 
 .frame {
@@ -247,9 +269,9 @@
   width: min(100cqw, calc(100cqh * var(--frame-w) / var(--frame-h)));
   aspect-ratio: var(--frame-w) / var(--frame-h);
   border: var(--control-border-width) solid var(--border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-float);
   overflow: hidden;
 }
 
@@ -297,11 +319,11 @@
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--border-strong);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--surface);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-float);
   font-size: var(--text-secondary);
-  font-weight: var(--weight-emphasis);
+  font-weight: var(--weight-medium);
   animation: arrive var(--duration-enter) var(--ease);
 }
 
@@ -333,9 +355,9 @@
   position: absolute;
   right: var(--space-3);
   bottom: var(--space-3);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
   border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-muted);
   font-size: var(--text-caption);
@@ -347,7 +369,7 @@
   position: absolute;
   outline: var(--focus-width) solid var(--agent);
   outline-offset: var(--space-1);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--agent) 14%, transparent);
   pointer-events: none;
   animation: arrive var(--duration-enter) var(--ease);
@@ -383,7 +405,9 @@
   justify-items: center;
   gap: var(--space-2);
   padding: var(--space-5);
-  border-style: dashed;
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  background: transparent;
   box-shadow: none;
   color: var(--text-muted);
   text-align: center;
@@ -394,13 +418,14 @@
   color: var(--text);
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-title);
 }
 
 .placeholder-hint {
   max-width: var(--placeholder-width);
 }
 
-/* Activity column */
+/* Activity column: one warm panel, with white cards inside it. */
 
 .activity {
   position: relative;
@@ -409,6 +434,9 @@
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--surface-2);
 }
 
 .status {
@@ -420,8 +448,7 @@
   padding: var(--space-4);
   background: var(--surface);
   border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
 }
 
 .status-icon {
@@ -429,7 +456,7 @@
   place-items: center;
   width: var(--status-icon);
   height: var(--status-icon);
-  border-radius: var(--radius-card);
+  border-radius: 50%;
   background: var(--surface-2);
   color: var(--text-muted);
 }
@@ -463,6 +490,7 @@
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
   line-height: var(--line-tight);
+  letter-spacing: var(--tracking-title);
 }
 
 .status-detail {
@@ -498,12 +526,16 @@
   margin-left: auto;
 }
 
+/* In full view the status and the controls are a bar above the browser. */
+
+.control-bar {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-3);
+}
+
 .status[data-layout='bar'] {
   grid-template-columns: auto minmax(0, 1fr) auto auto;
-  padding: var(--space-2) var(--space-4);
-  border-width: 0 0 var(--border-width);
-  border-radius: 0;
-  box-shadow: none;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
 }
 
 .status[data-layout='bar'] .status-controls {
@@ -523,11 +555,12 @@
 /* In full view, whatever needs a person sits between the controls and the browser. */
 
 .attention {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) 0;
+  padding: 0 var(--space-4) var(--space-3);
 }
 
 .attention > .card {
@@ -542,12 +575,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   background: var(--surface);
   border: var(--border-width) solid var(--border);
-  border-left-width: var(--control-border-width);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
   animation: arrive var(--duration-enter) var(--ease);
 }
 
@@ -625,14 +656,13 @@
   flex-direction: column;
   background: var(--surface);
   border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-card);
   overflow: hidden;
 }
 
 .panel-title {
   flex: none;
-  padding: var(--space-3) var(--space-4) var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-weight: var(--weight-emphasis);
@@ -770,7 +800,7 @@
   background: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--shadow-float);
   overflow: hidden;
   animation: arrive var(--duration-enter) var(--ease);
 }
@@ -787,6 +817,7 @@
 .drawer-title {
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-title);
 }
 
 .drawer-tool {
@@ -865,9 +896,10 @@
   gap: var(--space-2);
   width: min(100%, var(--confirm-width));
   padding: var(--space-5);
+  border: var(--border-width) solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--shadow-float);
   animation: arrive var(--duration-enter) var(--ease);
 }
 
@@ -875,6 +907,7 @@
   font-size: var(--text-heading);
   font-weight: var(--weight-emphasis);
   line-height: var(--line-tight);
+  letter-spacing: var(--tracking-title);
 }
 
 .confirm-consequence {
@@ -908,9 +941,9 @@
   gap: var(--space-3);
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
   border-radius: var(--radius-card);
-  background: var(--text);
-  color: var(--bg);
-  box-shadow: var(--shadow-overlay);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-float);
   pointer-events: auto;
   animation: arrive var(--duration-enter) var(--ease);
 }
@@ -922,7 +955,7 @@
 .toast .button,
 .toast .button:hover {
   background: transparent;
-  color: var(--bg);
+  color: var(--on-ink);
 }
 
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
@@ -989,6 +1022,7 @@
   }
 
   .frame-area {
+    margin: 0 var(--space-2) var(--space-2);
     padding: var(--space-2);
   }
 

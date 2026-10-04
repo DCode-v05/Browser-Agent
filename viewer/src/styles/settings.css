@@ -5,9 +5,10 @@
   flex-direction: column;
   width: min(100%, var(--dialog-width));
   height: min(100%, var(--settings-height));
+  border: var(--border-width) solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
-  box-shadow: var(--shadow-overlay);
+  box-shadow: var(--shadow-float);
   overflow: hidden;
   animation: arrive var(--duration-enter) var(--ease);
 }
@@ -25,6 +26,7 @@
   font-size: var(--text-heading);
   font-weight: var(--weight-emphasis);
   line-height: var(--line-tight);
+  letter-spacing: var(--tracking-title);
 }
 
 .settings-message {
@@ -45,7 +47,7 @@
   gap: var(--space-1);
   padding: var(--space-3);
   border-right: var(--border-width) solid var(--border);
-  background: var(--bg);
+  background: var(--surface-2);
   overflow-y: auto;
 }
 
@@ -59,6 +61,7 @@
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
+  font-weight: var(--weight-medium);
   text-align: left;
   cursor: pointer;
 }
@@ -68,14 +71,9 @@
   color: var(--text-muted);
 }
 
-.settings-group:hover {
-  background: var(--surface-2);
-}
-
+.settings-group:hover,
 .settings-group[aria-selected='true'] {
-  background: var(--agent-tint);
-  color: var(--agent);
-  font-weight: var(--weight-emphasis);
+  background: var(--surface-3);
 }
 
 .settings-panel {
@@ -92,6 +90,7 @@
 .settings-group-title {
   font-size: var(--text-title);
   font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-title);
 }
 
 .settings-panel-head {
@@ -159,9 +158,9 @@
 }
 
 .choice:has(input:checked) {
-  border-color: var(--agent);
-  background: var(--agent-tint);
-  box-shadow: inset 0 0 0 var(--border-width) var(--agent);
+  border-color: var(--text);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 var(--border-width) var(--text);
 }
 
 .choice[data-disabled='true'] {
@@ -174,7 +173,7 @@
   width: var(--icon);
   height: var(--icon);
   margin: calc(var(--space-1) / 2) 0 0;
-  accent-color: var(--agent);
+  accent-color: var(--ink);
 }
 
 .choice-text {
@@ -219,9 +218,10 @@
   transition: transform var(--duration-state) var(--ease);
 }
 
+/* One of the two places the brand's gradient appears. It runs under the edge too, so no seam shows. */
 .switch[aria-checked='true']::before {
-  border-color: var(--agent);
-  background: var(--agent);
+  border-color: transparent;
+  background: var(--brand-gradient) border-box;
 }
 
 .switch[aria-checked='true'] .switch-knob {
@@ -267,8 +267,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -384,8 +384,6 @@
 
   .settings-group[aria-selected='true'] {
     background: transparent;
-    color: var(--text);
-    font-weight: var(--weight-regular);
   }
 
   .settings-panel {
