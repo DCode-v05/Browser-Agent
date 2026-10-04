@@ -35,6 +35,14 @@ const tabStorage = {
 };
 const token = recorded ? null : takeToken(location, tabStorage, (address) => history.replaceState(null, '', address));
 
+// A link opened in a tab that already shows the viewer changes only what follows the #, and the
+// browser does not load the page again by itself. Loading it again takes the new token in.
+if (!recorded) {
+  window.addEventListener('hashchange', () => {
+    if (new URLSearchParams(location.hash.slice(1)).get('token')) location.reload();
+  });
+}
+
 function createConnection(): Connection {
   if (recorded) return new DemoConnection(recording, { pace, heartbeatMs: HEARTBEAT_MS });
   if (token) return new SocketConnection({ url: socketAddress(location.href, query.get('session') ?? 'default'), token });

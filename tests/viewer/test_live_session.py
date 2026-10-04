@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import Callable
 from pathlib import Path
 
+from fakes import FakeDriver
 from playwright.async_api import Browser
 
 from bap_browser.agent.demo import TASK, demo_script
@@ -109,6 +110,27 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
         # The service ends the viewer's connection before the page goes. A page that is closed first
         # cuts its connection, and on Windows Python's asyncio can then leave that socket open behind
         # the test (its transport raises ConnectionResetError before it closes the socket).
+        await service.stop()
+        await page.close()
+        await session.close()
+
+
+async def test_a_new_link_opened_in_a_tab_that_already_shows_the_viewer_is_taken(
+    browser: Browser, make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    session = ServiceSession(make_config(tmp_path), FakeDriver(), agent="Reference agent")
+    await session.start()
+    service = Service(make_config(tmp_path), {session.name: session}, port=0)
+    await service.start()
+    page = await browser.new_page()
+    try:
+        await page.goto(f"{service.address}/#token=not-the-token")
+        await page.get_by_role("heading", name="This link can't open the session").wait_for()
+        # The right link differs only after the #, so the browser does not load the page again by itself.
+        await page.goto(service.viewer_address)
+        await page.get_by_text("Reference agent").wait_for()
+        assert page.url == f"{service.address}/"
+    finally:
         await service.stop()
         await page.close()
         await session.close()

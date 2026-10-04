@@ -345,6 +345,21 @@ describe('keyboard (spec 9.8)', () => {
     expect(sent[0]).toMatchObject({ type: 'key', action: 'down', key: 'p' });
   });
 
+  it('a key still held when the picture loses the focus is let go in the page', async () => {
+    const { sent, user } = show('person_unasked');
+    const picture = screen.getByRole('img', { name: /Live browser view/ });
+    picture.focus();
+    await user.keyboard('{Shift>}a');
+    sent.length = 0;
+    // The person switches to another window: the key comes up where the viewer cannot see it.
+    act(() => picture.blur());
+    expect(sent).toEqual([{ type: 'key', action: 'up', key: 'Shift', code: 'ShiftLeft' }]);
+    // Leaving again lets go of nothing twice.
+    act(() => picture.focus());
+    act(() => picture.blur());
+    expect(sent).toHaveLength(1);
+  });
+
   it('the release chord leaves the picture and focuses Hand back', async () => {
     const { user } = show('person_unasked');
     screen.getByRole('img', { name: /Live browser view/ }).focus();

@@ -294,6 +294,15 @@ describe('a lost connection', () => {
     expect(FakeSocket.all).toHaveLength(1);
   });
 
+  it('a session that does not exist is reported the same way, and is not tried again', () => {
+    const { statuses, socket } = connect();
+    socket().open();
+    socket().drop(4404);
+    expect(statuses.at(-1)).toBe('refused');
+    vi.advanceTimersByTime(60_000);
+    expect(FakeSocket.all).toHaveLength(1);
+  });
+
   it('closing stops it for good and releases its pictures', () => {
     const { connection, statuses, socket } = connect();
     socket().open();

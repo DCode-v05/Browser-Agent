@@ -31,8 +31,9 @@ export interface SocketOptions {
 
 const OPEN = 1;
 const FRAME = 1;
-/** The close code the service uses for a token it does not accept. */
-const REFUSED = 4401;
+/** The close codes after which trying again changes nothing: a token the service does not accept,
+ * and a session it does not have. */
+const FINAL = [4401, 4404];
 const DEFAULT_RECONNECT_MS = [500, 1000, 2000, 5000];
 const DEFAULT_RELEASE_AFTER_MS = 1000;
 
@@ -109,7 +110,7 @@ export class SocketConnection implements Connection {
     socket.onmessage = (message) => this.receive(message.data);
     socket.onclose = (event) => {
       if (this.closed) return;
-      if (event.code === REFUSED) {
+      if (event.code !== undefined && FINAL.includes(event.code)) {
         this.handlers?.onStatus('refused');
         return;
       }

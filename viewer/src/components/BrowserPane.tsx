@@ -106,6 +106,8 @@ type FrameProps = Omit<Props, 'now'>;
 
 function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: FrameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** The keys the person is holding down in the page: where each is on the keyboard, and its name. */
+  const held = useRef(new Map<string, string>());
   const size = state.session?.viewport ?? { width: 1280, height: 800 };
   const src = state.frame?.src;
   const driving = view.key === 'person';
@@ -148,7 +150,7 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
   const pointer = (action: 'move' | 'down' | 'up') => (event: PointerEvent<HTMLCanvasElement>) => {
     onCommand({ type: 'pointer', action, button: event.button, ...pagePoint(event) });
   };
-  const key = (action: 'down' | 'up') => (event: KeyboardEvent<HTMLCanvasElement>) => {
+  const key = (action: 'down' | 'up', event: KeyboardEvent<HTMLCanvasElement>) => {
     event.stopPropagation();
     if (matchesChord(event, options.releaseChord)) {
       event.preventDefault();
@@ -158,7 +160,15 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
     // Tab still moves focus, so a person is never stuck in the picture.
     if (event.key === 'Tab') return;
     event.preventDefault();
+    if (action === 'down') held.current.set(event.code, event.key);
+    else held.current.delete(event.code);
     onCommand({ type: 'key', action, key: event.key, code: event.code });
+  };
+  // A key that comes up while the picture does not have the focus is never seen here, and would
+  // stay down in the page.
+  const letGo = () => {
+    for (const [code, name] of held.current) onCommand({ type: 'key', action: 'up', key: name, code });
+    held.current.clear();
   };
   const wheel = (event: WheelEvent<HTMLCanvasElement>) => {
     onCommand({ type: 'wheel', dx: event.deltaX, dy: event.deltaY, ...pagePoint(event) });
@@ -187,8 +197,9 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
               onPointerMove: pointer('move'),
               onPointerUp: pointer('up'),
               onWheel: wheel,
-              onKeyDown: key('down'),
-              onKeyUp: key('up'),
+              onKeyDown: (event: KeyboardEvent<HTMLCanvasElement>) => key('down', event),
+              onKeyUp: (event: KeyboardEvent<HTMLCanvasElement>) => key('up', event),
+              onBlur: letGo,
             }
           : {})}
       />

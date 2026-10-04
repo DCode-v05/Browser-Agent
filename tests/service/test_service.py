@@ -3,6 +3,7 @@
 import asyncio
 import http.client
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -102,6 +103,16 @@ async def test_the_viewer_is_served_and_may_not_be_shown_inside_another_site(run
     assert headers["content-security-policy"] == "frame-ancestors 'self'"
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "no-referrer"
+
+
+async def test_the_viewer_brings_its_own_icon(running: Running) -> None:
+    """A browser asks for /favicon.ico when a page names no icon, and that is not there."""
+    service, _, _ = await running()
+    _, _, page = await get(f"{service.address}/")
+    named = re.search(rb'<link rel="icon"[^>]*href="\./([^"]+)"', page)
+    assert named, "the page names no icon"
+    status, headers, body = await get(f"{service.address}/{named.group(1).decode()}")
+    assert status == 200 and headers["content-type"].startswith("image/svg+xml") and b"<svg" in body
 
 
 async def test_a_listed_origin_may_show_the_viewer_inside_itself(running: Running) -> None:
