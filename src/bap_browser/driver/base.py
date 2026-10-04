@@ -41,6 +41,8 @@ class Located:
     name: str
     box: Box | None
     """Where the element is. None when it is outside what the browser shows."""
+    secret: bool = False
+    """A password field. Nothing about what it holds, not even its length, is told to anyone."""
 
 
 @dataclass(frozen=True)

@@ -126,3 +126,13 @@ def test_only_a_real_ref_is_shown_as_one() -> None:
         "Could not click: bad value for 'ref'"
     )
     assert label_for("browser_click", {"ref": "f2e7"}, None) == "Clicking f2e7"
+
+
+def test_a_password_is_named_as_one_and_its_length_is_not_given() -> None:
+    field = Located("textbox", "Password", None, secret=True)
+    arguments = {"ref": "e4", "text": "correct horse battery"}
+    assert label_for("browser_type", arguments, field) == 'Typing a password into "Password"'
+    assert summary_for("browser_type", arguments, field, None) == 'Typed a password into "Password"'
+    assert summary_for("browser_type", arguments, field, "it is disabled") == (
+        'Could not type into "Password": it is disabled'
+    )

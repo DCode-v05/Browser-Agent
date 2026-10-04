@@ -209,7 +209,8 @@ class PlaywrightDriver:
         )
         if found.get("error") == "stale":
             raise StaleRef(ref)
-        return Located(found["role"], found["name"], Box(*found["box"]) if found["box"] else None)
+        box = Box(*found["box"]) if found["box"] else None
+        return Located(found["role"], found["name"], box, found["secret"])
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         arguments = snapshot_arguments(

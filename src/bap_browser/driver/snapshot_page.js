@@ -487,7 +487,8 @@
     if (!el) return { error: 'stale' };
     const point = target(el);
     const shown = point && point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight;
-    return { ...identify(el, a), box: shown ? point.box.split(',').map(Number) : null };
+    const secret = el.tagName === 'INPUT' && inputType(el) === 'password';
+    return { ...identify(el, a), secret, box: shown ? point.box.split(',').map(Number) : null };
   }
 
   operations.locate = locate;

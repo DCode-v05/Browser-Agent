@@ -59,7 +59,7 @@ async def test_the_scripted_agent_signs_up_and_a_viewer_is_told_every_step(
         f"Opened {host}/signup.html",
         'Typed 12 characters into "Full name"',
         'Typed 15 characters into "Email"',
-        'Typed 21 characters into "Password"',
+        'Typed a password into "Password"',
         'Clicked "I accept the terms" (checkbox)',
         'Clicked "Create account" (button)',
         "Read the page",

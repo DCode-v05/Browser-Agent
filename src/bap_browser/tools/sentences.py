@@ -31,7 +31,7 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
         case "browser_click":
             return _row("Clicking ", _element(arguments, target), "")
         case "browser_type":
-            return _row(f"Typing {_count(arguments)}", _into(arguments, target), "")
+            return _row(f"Typing {_count(arguments, target)}", _into(arguments, target), "")
     return _fit(tool)
 
 
@@ -48,7 +48,7 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
             kind = f" ({target.role})" if target is not None and target.name else ""
             return _row("Clicked ", _element(arguments, target), kind)
         case "browser_type":
-            return _row(f"Typed {_count(arguments)}", _into(arguments, target), "")
+            return _row(f"Typed {_count(arguments, target)}", _into(arguments, target), "")
     return _fit(tool)
 
 
@@ -90,7 +90,9 @@ def _into(arguments: Mapping[str, Any], target: Located | None) -> str:
     return f" into {element}" if element else ""
 
 
-def _count(arguments: Mapping[str, Any]) -> str:
+def _count(arguments: Mapping[str, Any], target: Located | None) -> str:
+    if target is not None and target.secret:
+        return "a password"
     text = arguments.get("text")
     if not isinstance(text, str):
         return ""

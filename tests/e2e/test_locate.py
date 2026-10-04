@@ -45,3 +45,10 @@ async def test_an_element_that_is_gone_is_stale(driver: PlaywrightDriver, site: 
     await driver.navigate(f"{site}/welcome.html")
     with pytest.raises(StaleRef):
         await driver.locate(button)
+
+
+async def test_a_password_field_is_known_as_one(driver: PlaywrightDriver, site: str) -> None:
+    await driver.navigate(f"{site}/form.html")
+    page = await read(driver)
+    assert (await driver.locate(ref_of(page, 'textbox "Password"'))).secret is True
+    assert (await driver.locate(ref_of(page, 'textbox "Full name"'))).secret is False
