@@ -15,7 +15,7 @@ from typing import Any
 from bap_browser import __version__
 from bap_browser.config import defaults, load_config, load_config_with_sources
 from bap_browser.config_doc import reference_markdown
-from bap_browser.env_file import environment
+from bap_browser.env_file import apply_env_file
 from bap_browser.errors import ConfigError
 
 STARTER: dict[str, Any] = {
@@ -27,7 +27,7 @@ STARTER: dict[str, Any] = {
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     # Settings and secrets come from the environment, and from a .env file in the folder the command is run in.
-    args.env = environment(Path(".env"), os.environ)
+    apply_env_file(Path(".env"))
     try:
         return args.run(args)
     except ConfigError as exc:
@@ -94,7 +94,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _config_show(args: argparse.Namespace) -> int:
-    config, sources = load_config_with_sources(args.config, env=args.env)
+    config, sources = load_config_with_sources(args.config)
     data = config.model_dump()
     if not args.sources:
         print(json.dumps(data, indent=2))
@@ -126,7 +126,7 @@ def _config_doc(args: argparse.Namespace) -> int:
 
 
 def _mcp(args: argparse.Namespace) -> int:
-    config = load_config(args.config, env=args.env)
+    config = load_config(args.config)
     # Standard output carries the protocol, so everything else goes to the error stream.
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     # Imported here so that the config commands start without loading the browser and MCP libraries.
@@ -137,7 +137,7 @@ def _mcp(args: argparse.Namespace) -> int:
 
 
 def _agent(args: argparse.Namespace) -> int:
-    config = load_config(args.config, env=args.env)
+    config = load_config(args.config)
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
     from bap_browser.agent.loop import Unfinished
@@ -161,7 +161,7 @@ def _agent(args: argparse.Namespace) -> int:
                 "the scripted model only plays the demonstration. Run: bap-browser agent --demo"
             )
         name = config.agent.api_key_env
-        key = args.env.get(name, "").strip()
+        key = os.environ.get(name, "").strip()
         if not key:
             raise ConfigError(
                 f"{name} is not set. Put a line {name}=... in a file named .env in this folder, or set it "
@@ -179,7 +179,6 @@ def _agent(args: argparse.Namespace) -> int:
                 config,
                 task,
                 model_for,
-                token=args.env.get(config.server.token_env) or None,
                 exit_when_done=args.exit_when_done,
                 wait_for_viewer=args.wait_for_viewer,
                 open_viewer=args.open,

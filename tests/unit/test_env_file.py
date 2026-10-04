@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from bap_browser.env_file import environment
+from bap_browser.env_file import apply_env_file, environment
 
 
 def test_values_in_the_file_are_added_to_the_environment(tmp_path: Path) -> None:
@@ -56,3 +56,12 @@ def test_a_file_saved_with_a_byte_order_mark_is_read(tmp_path: Path) -> None:
     file = tmp_path / ".env"
     file.write_bytes(b"\xef\xbb\xbfOPENAI_API_KEY=sk-with-a-mark\r\nOTHER=1\r\n")
     assert environment(file, {}) == {"OPENAI_API_KEY": "sk-with-a-mark", "OTHER": "1"}
+
+
+def test_the_files_settings_become_part_of_the_environment_every_part_of_the_program_reads(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".env").write_text("BAP_BROWSER_PROXY_USERNAME=ada\nPATH=overwritten\n", encoding="utf-8")
+    environ = {"PATH": "/bin"}
+    apply_env_file(tmp_path / ".env", environ)
+    assert environ == {"PATH": "/bin", "BAP_BROWSER_PROXY_USERNAME": "ada"}

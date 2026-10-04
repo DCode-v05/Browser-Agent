@@ -30,7 +30,6 @@ async def run_with_viewer(
     task: str,
     model_for: Callable[[Service], Model],
     *,
-    token: str | None = None,
     exit_when_done: bool,
     wait_for_viewer: bool,
     open_viewer: bool,
@@ -41,7 +40,7 @@ async def run_with_viewer(
     answer, and Interrupted when the service was stopped first.
     """
     session = ServiceSession(config, agent=AGENT_NAME)
-    service = Service(config, {session.name: session}, token=token, port=0)
+    service = Service(config, {session.name: session}, port=0)
     await session.start()
     try:
         await service.start()

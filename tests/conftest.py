@@ -23,6 +23,15 @@ class QuietHandler(SimpleHTTPRequestHandler):
         """The test site writes nothing to the test output."""
 
 
+@pytest.fixture(autouse=True)
+def the_environment_is_left_as_it_was() -> Iterator[None]:
+    """The command adds a .env file's settings to the process's environment. No test may leave any behind."""
+    before = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(before)
+
+
 @pytest.fixture(scope="session")
 def site() -> Iterator[str]:
     server = ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(QuietHandler, directory=str(SITE)))

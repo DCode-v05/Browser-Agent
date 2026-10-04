@@ -5,15 +5,21 @@ The file is never required and never committed. What the environment already hol
 
 from __future__ import annotations
 
+import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 
 SETTING = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 
 
+def apply_env_file(file: Path, environ: MutableMapping[str, str] = os.environ) -> None:
+    """Adds the file's settings to the environment, so that every part of the program reads them."""
+    environ.update(environment(file, environ))
+
+
 def environment(file: Path, given: Mapping[str, str]) -> dict[str, str]:
-    """The environment with the file's settings added. Nothing is written back to the process's own."""
+    """The environment with the file's settings added."""
     env = dict(given)
     if not file.is_file():
         return env
