@@ -1832,6 +1832,11 @@ deployments.</p>
 <h3 id="81-address-policy">8.1 Address policy</h3>
 <p>Checked for every navigation the agent asks for and enforced again at the network layer, so redirects,
 link clicks, pop-ups and frames cannot slip past it.</p>
+<p>Before anything is judged, the address is rewritten the way a browser reads it: <code>\</code> becomes <code>/</code>, a
+percent-encoded host is decoded, an international name becomes its <code>xn--</code> form, and every spelling of
+an IP address (<code>2130706433</code>, <code>0x7f.1</code>, full-width digits) becomes the address itself. That one form is
+what the policy judges and what the browser is handed, so the two can never read an address
+differently. An address a browser would not open is refused as "not a valid address".</p>
 <p>Order of checks: local files (off unless <code>allow_file_urls</code>), scheme allowlist, cloud metadata addresses,
 block list, allow list, private addresses and names, then name resolution to a private address.</p>
 <div class="tw"><table>
@@ -1848,7 +1853,7 @@ block list, allow list, private addresses and names, then name resolution to a p
 </tr>
 <tr>
 <td>Domain lists</td>
-<td>Empty allow list means every domain. <code>example.com</code> matches the host and its subdomains; <code>*.example.com</code> only subdomains. A block always wins</td>
+<td>Empty allow list means every domain. <code>example.com</code> matches the host and its subdomains; <code>*.example.com</code> only subdomains. A block always wins. An entry is a host name or an IP address; one with a scheme, a port or a path could never match and stops start-up with a message</td>
 </tr>
 <tr>
 <td>Cloud metadata addresses</td>
@@ -1897,10 +1902,15 @@ deployment requires.</p>
 <ul>
 <li>Text that is not rendered on the page.</li>
 <li>Password values, in snapshots, results, events and logs.</li>
+<li>A name and password written into an address, in results, events and logs.</li>
 <li>Anything typed while a person is in control, and any snapshot or screenshot from that period.</li>
 <li>The service token and the viewer address.</li>
 <li>Anything matching <code>safety.redact_patterns</code>, replaced by <code>[REDACTED]</code> in every result.</li>
 </ul>
+<p>What a field holds (other than a password) is shown to the model in a snapshot, because that is how
+it checks its own work. It goes no further: typed text and field values never reach the event log or
+the viewer's events. The log keeps what was done, not what the page holds, and a field with no label
+is never named after its content.</p>
 <h3 id="84-human-checks">8.4 Human checks</h3>
 <p>CAPTCHAs, sign-in walls, two-factor prompts, passkeys and certificate warnings are done by a person.
 The agent calls <code>browser_request_human</code>; the viewer shows the request; the person takes over, does the
@@ -2114,7 +2124,7 @@ column is unchanged.</p>
 </tr>
 <tr>
 <td>Ended</td>
-<td>"Session ended" and why</td>
+<td>"Session ended" and why. It stays when the connection is lost afterwards: there is nothing live left to lose</td>
 <td>None; last picture dimmed</td>
 <td>Summary card</td>
 <td>Politely</td>
@@ -2670,6 +2680,7 @@ duration and opens the step drawer.</p>
 <li>The live frame has a text alternative that is kept current: "Live browser view: " and the page title and address.</li>
 <li>The timeline is a log region. New rows are announced as they arrive without moving focus.</li>
 <li>An arriving approval does not steal focus. It is announced, and <code>A</code> moves to it.</li>
+<li>A dialog keeps Tab inside it, and Tab reaches only what is shown. When what held the focus goes away (an answered approval, a confirmed stop, a pane that changed on a narrow screen), the focus moves to something visible that says what happened, never to nowhere.</li>
 <li>Every state has an icon and a label as well as a colour.</li>
 <li>Text can be zoomed to 200% and the layout reflows to one column without loss.</li>
 <li>This list covers the viewer. The accessibility of pages the agent visits is outside its control.</li>
@@ -2686,7 +2697,7 @@ duration and opens the step drawer.</p>
 <li>State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.</li>
 <li><strong>Recorded sessions.</strong> <code>viewer/src/demo/</code> holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. <code>?demo=&lt;name&gt;</code> plays one with no service, at real pace or stepped by hand, and <code>?state=&lt;name&gt;</code> opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.</li>
 <li>The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.</li>
-<li>In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away.</li>
+<li>In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away. Whatever needs a person (an approval, a request for help, a page dialog, a blocked page, the summary) sits between that bar and the browser, so nothing has to be answered blind.</li>
 <li>During takeover, pointer positions are scaled from the canvas to page pixels and sent as <code>pointer</code>, <code>wheel</code> and <code>key</code> commands.</li>
 <li><code>npm run build</code> writes the viewer into <code>src/bap_browser/viewer_dist/</code>, which the service serves.</li>
 </ul>
@@ -2793,6 +2804,7 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <li>The screen is drawn from the settings API. The viewer holds no list of settings of its own.</li>
 <li>A change is saved as soon as it is made. There is no Save button. The row shows "Saved" for a moment, or "Saved. Applies to the next session."</li>
 <li>A locked setting is shown with its value, disabled, and the words "Set by your organisation". It is never hidden, so a person can see why something is not possible.</li>
+<li>A site list is saved when the focus leaves it and when the screen is closed. An entry that is refused keeps the screen open, so nobody leaves believing a site is blocked when it is not.</li>
 <li>A refused change puts the control back and says why in the row. A site list is the exception: it keeps what was typed, so the entry can be corrected instead of typed again.</li>
 <li>Entries of a site list that the deployment set are shown above the box, marked as set by the organisation, and cannot be removed.</li>
 <li>A site list takes one site per line. <code>example.com</code> covers the site and its subdomains. A bad entry is refused with the reason, in the row.</li>
@@ -3332,6 +3344,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>action_ms</code></td>
 <td>10000</td>
 <td>One action, including waiting for the element</td>
+</tr>
+<tr>
+<td><code>page_reply_ms</code></td>
+<td>5000</td>
+<td>Longest wait for the page to answer. A page too busy to answer fails the call</td>
 </tr>
 <tr>
 <td><code>load_wait_ms</code></td>
@@ -4029,12 +4046,12 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <tr>
 <td><code>logging.log_tool_args</code></td>
 <td><code>true</code></td>
-<td>Arguments are logged with typed text and form values replaced by their length</td>
+<td>Arguments are logged with typed text replaced by its length and without a name and password in an address. A call that could not run is logged with the names of its arguments only</td>
 </tr>
 <tr>
 <td><code>logging.max_result_chars</code></td>
 <td>2000</td>
-<td>Result excerpt kept per line</td>
+<td>The first line of the result, which says what was done, cut to this length. The page's content is never logged</td>
 </tr>
 <tr>
 <td><code>bench.runs</code> / <code>bench.warmup</code></td>

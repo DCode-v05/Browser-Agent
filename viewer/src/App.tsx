@@ -80,6 +80,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const stopButton = useRef<HTMLButtonElement>(null);
   const primaryButton = useRef<HTMLButtonElement>(null);
   const approvalButton = useRef<HTMLButtonElement>(null);
+  const statusTitle = useRef<HTMLHeadingElement>(null);
   const helpCard = useRef<HTMLDivElement>(null);
   const rowBeforeDrawer = useRef<HTMLElement | null>(null);
   /** Where the focus goes once the settings screen has closed. */
@@ -223,7 +224,33 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       primaryRef={primaryButton}
       stopRef={stopButton}
       onShowSplit={full && !driving ? () => setWantsFull(false) : undefined}
+      titleRef={statusTitle}
     />
+  );
+  const blocked = view.key === 'blocked' ? state.blocked : null;
+  const needsAttention = Boolean(state.approval || state.help || state.dialog || blocked || unwatched || state.ended);
+  // What needs a person's answer or attention. It is on screen in both views.
+  const cards = (
+    <>
+      {state.approval && (
+        <ApprovalCard
+          approval={state.approval}
+          now={now}
+          firstRef={approvalButton}
+          onAnswer={(answer) => {
+            const id = state.approval?.id ?? '';
+            send(answer === 'deny' ? { type: 'deny', id } : { type: 'approve', id, scope: answer });
+            // The card is about to go, and the focus with it.
+            statusTitle.current?.focus();
+          }}
+        />
+      )}
+      {state.help && <HelpCard help={state.help} now={now} cardRef={helpCard} />}
+      {state.dialog && <DialogCard dialog={state.dialog} />}
+      {blocked && <BlockedNotice url={blocked.url} reason={blocked.reason} />}
+      {unwatched && <UnwatchedNotice onDismiss={() => dismiss(`notice-${unwatched.id}`)} />}
+      <SummaryCard state={state} />
+    </>
   );
   const selectedStep = selected === null ? undefined : state.steps.find((step) => step.n === selected);
 
@@ -278,6 +305,11 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           {status}
         </section>
       )}
+      {full && needsAttention && (
+        <section className="attention" aria-label={W.topBar.attention}>
+          {cards}
+        </section>
+      )}
 
       <main className="workspace">
         <BrowserPane
@@ -292,22 +324,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         {!full && (
           <section className="activity" aria-label="Activity">
             {status}
-            {state.approval && (
-              <ApprovalCard
-                approval={state.approval}
-                now={now}
-                firstRef={approvalButton}
-                onAnswer={(answer) => {
-                  const id = state.approval?.id ?? '';
-                  send(answer === 'deny' ? { type: 'deny', id } : { type: 'approve', id, scope: answer });
-                }}
-              />
-            )}
-            {state.help && <HelpCard help={state.help} now={now} cardRef={helpCard} />}
-            {state.dialog && <DialogCard dialog={state.dialog} />}
-            {view.key === 'blocked' && state.blocked && <BlockedNotice url={state.blocked.url} reason={state.blocked.reason} />}
-            {unwatched && <UnwatchedNotice onDismiss={() => dismiss(`notice-${unwatched.id}`)} />}
-            <SummaryCard state={state} />
+            {cards}
             <Timeline state={state} now={now} options={options} selected={selected} onOpen={openStep} />
             {selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}
           </section>
@@ -345,6 +362,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           onConfirm={() => {
             setConfirmingStop(false);
             send({ type: 'stop' });
+            statusTitle.current?.focus();
           }}
           onCancel={() => {
             setConfirmingStop(false);

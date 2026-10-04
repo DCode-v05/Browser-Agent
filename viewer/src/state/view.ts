@@ -65,12 +65,10 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
   if (state.connection === 'refused') {
     return finish({ key: 'refused', status: W.status.refused, detail: W.refused, tone: 'none', label: W.label.disconnected, controls: [], urgency: 'assertive' });
   }
-  if (state.connection !== 'connected' && state.session) {
-    return finish({ key: 'disconnected', status: W.status.disconnected, detail: '', tone: 'none', label: W.label.disconnected, controls: [], urgency: 'assertive' });
-  }
   if (!state.session) {
     return finish({ key: 'no_agent', status: W.status.no_agent, detail: '', tone: 'none', label: '', controls: [], urgency: 'polite' });
   }
+  // Once a session has ended there is nothing live to lose, so its summary stays whatever the connection does.
   if (state.ended) {
     return finish({
       key: 'ended',
@@ -81,6 +79,9 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
       controls: [],
       urgency: 'polite',
     });
+  }
+  if (state.connection !== 'connected') {
+    return finish({ key: 'disconnected', status: W.status.disconnected, detail: '', tone: 'none', label: W.label.disconnected, controls: [], urgency: 'assertive' });
   }
 
   switch (state.control) {

@@ -520,6 +520,21 @@
   align-self: center;
 }
 
+/* In full view, whatever needs a person sits between the controls and the browser. */
+
+.attention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.attention > .card {
+  flex: 0 1 var(--activity-width);
+  min-width: 0;
+}
+
 /* Cards */
 
 .card {

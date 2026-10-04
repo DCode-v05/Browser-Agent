@@ -8,7 +8,7 @@ import type { ConfigAnswer, Setting, SettingsAnswer, SettingsSource, SettingValu
 import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button, Confirm } from './StatusPanel';
-import { trapTab } from './focus';
+import { isShown, trapTab } from './focus';
 
 interface Props {
   source: SettingsSource;
@@ -31,6 +31,10 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   const [status, setStatus] = useState<RowStatus | null>(null);
   const [asking, setAsking] = useState<Setting | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const backButton = useRef<HTMLButtonElement>(null);
+  const lastSave = useRef<Promise<boolean> | null>(null);
+  /** A person chose the pane, so the focus must follow it. */
+  const paneChosen = useRef(false);
 
   useEffect(() => {
     let current = true;
@@ -51,7 +55,12 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
     if (loaded) dialog.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
   }, [loaded]);
 
-  async function save(setting: Setting, value: SettingValue) {
+  function save(setting: Setting, value: SettingValue): Promise<boolean> {
+    lastSave.current = change(setting, value);
+    return lastSave.current;
+  }
+
+  async function change(setting: Setting, value: SettingValue) {
     const result = await source.change(surface, { [setting.id]: value });
     if (result.ok) {
       setAnswer(result.answer);
@@ -69,6 +78,37 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
     if (setting.id === 'clear_browsing_data') onToast(W.settings.clear.done);
   }
 
+  // A site list saves when the focus leaves it. Closing the screen must save it too, and an entry
+  // that is refused must be seen: otherwise a person believes a site is blocked when it is not.
+  async function close() {
+    const active = document.activeElement;
+    if (active instanceof HTMLTextAreaElement && dialog.current?.contains(active)) {
+      lastSave.current = null;
+      active.blur();
+      const saved: Promise<boolean> | null = lastSave.current;
+      if (saved && !(await saved)) {
+        active.focus();
+        return;
+      }
+    }
+    onClose();
+  }
+
+  // On a narrow screen the groups and one group's settings take turns, and the focus goes with them.
+  function showPane(next: 'groups' | 'settings') {
+    paneChosen.current = true;
+    setPane(next);
+  }
+
+  useEffect(() => {
+    if (!paneChosen.current) return;
+    paneChosen.current = false;
+    const target = pane === 'settings' ? backButton.current : dialog.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    const active = document.activeElement;
+    const stillShown = active instanceof HTMLElement && dialog.current?.contains(active) && isShown(active);
+    if (target && isShown(target) && !stillShown) target.focus();
+  }, [pane]);
+
   const moveTab = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!answer || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) return;
     event.preventDefault();
@@ -80,7 +120,7 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   };
 
   return (
-    <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && void close()}>
       <div
         className="settings"
         role="dialog"
@@ -91,14 +131,14 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
         onKeyDown={(event) => {
           if (event.key === 'Escape' && !asking) {
             event.stopPropagation();
-            onClose();
+            void close();
           }
           trapTab(event);
         }}
       >
         <div className="settings-head">
           <h2 className="settings-title">{W.settings.title}</h2>
-          <Button kind="quiet" icon="close" onClick={onClose} label={W.buttons.close}>
+          <Button kind="quiet" icon="close" onClick={() => void close()} label={W.buttons.close}>
             {null}
           </Button>
         </div>
@@ -120,7 +160,7 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
                   tabIndex={item.id === group.id ? 0 : -1}
                   onClick={() => {
                     setGroupId(item.id);
-                    setPane('settings');
+                    showPane('settings');
                     setStatus(null);
                   }}
                 >
@@ -131,7 +171,7 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
             </div>
             <div className="settings-panel" role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${group.id}`}>
               <div className="settings-panel-head">
-                <Button kind="quiet" icon="chevronLeft" onClick={() => setPane('groups')}>
+                <Button kind="quiet" icon="chevronLeft" onClick={() => showPane('groups')} ref={backButton}>
                   {W.buttons.back}
                 </Button>
                 <h3 className="settings-group-title">{group.title}</h3>

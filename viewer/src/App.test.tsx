@@ -551,3 +551,131 @@ describe('a link that the service refuses', () => {
     expect(screen.queryByText('Steps appear here as the agent works.')).not.toBeInTheDocument();
   });
 });
+
+describe('full view keeps what needs a person on screen', () => {
+  const fullView = () => expect(document.querySelector('.app')).toHaveAttribute('data-view', 'full');
+
+  it('an approval can be reached with A and answered without leaving full view', async () => {
+    const { sent, user } = show('waiting_approval');
+    await user.keyboard('f');
+    fullView();
+    expect(screen.getByRole('group', { name: 'Approval needed' })).toBeInTheDocument();
+    await user.keyboard('a');
+    expect(button('Allow once')).toHaveFocus();
+    await user.click(button('Deny'));
+    expect(sent).toEqual([{ type: 'deny', id: 'a1' }]);
+    fullView();
+  });
+
+  it('an approval that arrives while the browser is shown full width appears there', async () => {
+    let handlers: ConnectionHandlers | undefined;
+    const connection: Connection = {
+      start: (given) => {
+        handlers = given;
+        given.onStatus('connected');
+        given.onEvent({ type: 'session_started', session: 'default', agent: 'Agent', backend: 'remote_headless', browser: 'Chromium', viewport: { width: 1280, height: 800 }, ts: 1000 });
+        given.onCaughtUp?.();
+      },
+      send: () => undefined,
+      now: () => 1001,
+      close: () => undefined,
+    };
+    const createConnection = () => connection;
+    const user = userEvent.setup();
+    render(<App createConnection={createConnection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
+    await user.keyboard('f');
+    fullView();
+    act(() => {
+      handlers!.onEvent({ type: 'approval_requested', id: 'a9', tool: 'browser_upload_file', summary: 'Upload cv.pdf to example.com', site: 'example.com', expires_in_s: 180, ts: 1001 });
+      handlers!.onEvent({ type: 'control_changed', state: 'waiting_approval', since: 1001 });
+    });
+    expect(button('Allow once')).toBeInTheDocument();
+    expect(button('Deny')).toBeInTheDocument();
+  });
+
+  it('during a takeover that answers a request for help, the request stays on screen', async () => {
+    const { user } = show('person_requested');
+    await user.click(button('Take over'));
+    fullView();
+    expect(screen.getByText('enter the 6-digit code sent to ada@example.com')).toBeInTheDocument();
+  });
+
+  it('a page dialog is shown in full view too, because the picture cannot show it', async () => {
+    const { user } = show('dialog');
+    await user.keyboard('f');
+    fullView();
+    expect(screen.getByRole('group', { name: 'The page opened a dialog' })).toBeInTheDocument();
+  });
+
+  it('the summary of an ended session is shown in full view too', async () => {
+    const { user } = show('agent');
+    await user.keyboard('f');
+    await user.click(button('Stop session'));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Stop session' }));
+    expect(screen.getByRole('group', { name: 'Session ended' })).toBeInTheDocument();
+  });
+});
+
+describe('focus is never left nowhere', () => {
+  it('the Stop confirmation keeps Tab inside it', async () => {
+    const { user } = show('agent');
+    await user.click(button('Stop session'));
+    const confirm = screen.getByRole('alertdialog');
+    const keep = within(confirm).getByRole('button', { name: 'Keep running' });
+    const stop = within(confirm).getByRole('button', { name: 'Stop session' });
+    expect(keep).toHaveFocus();
+    await user.tab();
+    expect(stop).toHaveFocus();
+    await user.tab();
+    expect(keep).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(stop).toHaveFocus();
+  });
+
+  it('after an approval is answered from the keyboard, focus goes to what the session is doing now', async () => {
+    const { user } = show('waiting_approval');
+    await user.keyboard('a');
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('heading', { name: 'Agent is working' })).toHaveFocus();
+  });
+
+  it('after Stop is confirmed from the keyboard, focus goes to the ended session', async () => {
+    const { user } = show('agent');
+    await user.click(button('Stop session'));
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('heading', { name: 'Session ended' })).toHaveFocus();
+  });
+});
+
+describe('a site list is not lost by closing the screen', () => {
+  async function openSites() {
+    const shown = show('agent');
+    await shown.user.click(button('Open settings'));
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' });
+    await shown.user.click(await within(dialog).findByRole('tab', { name: 'Sites' }));
+    return { ...shown, dialog };
+  }
+
+  it('Escape saves what was typed before it closes', async () => {
+    const { user, dialog } = await openSites();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Blocked sites' }), 'evil.example');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument());
+    await user.click(button('Open settings'));
+    const again = await screen.findByRole('dialog', { name: 'Settings' });
+    await user.click(await within(again).findByRole('tab', { name: 'Sites' }));
+    expect(within(again).getByRole('textbox', { name: 'Blocked sites' })).toHaveValue('evil.example');
+  });
+
+  it('Escape does not close the screen over an entry that was refused', async () => {
+    const { user, dialog } = await openSites();
+    const list = within(dialog).getByRole('textbox', { name: 'Blocked sites' });
+    await user.type(list, 'not a site');
+    await user.keyboard('{Escape}');
+    expect(await within(dialog).findByText("That doesn't look like a site. Use a name such as example.com.")).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(list).toHaveValue('not a site');
+    expect(list).toHaveFocus();
+  });
+});

@@ -1045,7 +1045,7 @@ column is unchanged.
 | Person | "You're in control" | Person colour, "You're in control" | Answering a request for help: Done, Couldn't do it, Stop. After taking over unasked: Hand back, Stop | Immediately |
 | Paused | "Paused" | Neutral, "Paused" | Resume, Take over, Stop | Politely |
 | Blocked | "Blocked: " and the reason | Danger colour, "Blocked" | Take over, Stop | Immediately |
-| Ended | "Session ended" and why | None; last picture dimmed | Summary card | Politely |
+| Ended | "Session ended" and why. It stays when the connection is lost afterwards: there is nothing live left to lose | None; last picture dimmed | Summary card | Politely |
 | Disconnected | "Connection lost. Reconnecting…" | Picture dimmed, "Not live" | None until reconnected | Immediately |
 | Link refused | "This link can't open the session", then "Open it again from where you started the session." | Picture dimmed, "Not live"; with nothing shown yet, "No session to show" | None | Immediately |
 | Stale picture | "Live" becomes "No new picture for 5 s" | Unchanged | Unchanged | Not announced |
@@ -1207,6 +1207,7 @@ Target: WCAG 2.2 level AA.
 - The live frame has a text alternative that is kept current: "Live browser view: " and the page title and address.
 - The timeline is a log region. New rows are announced as they arrive without moving focus.
 - An arriving approval does not steal focus. It is announced, and `A` moves to it.
+- A dialog keeps Tab inside it, and Tab reaches only what is shown. When what held the focus goes away (an answered approval, a confirmed stop, a pane that changed on a narrow screen), the focus moves to something visible that says what happened, never to nowhere.
 - Every state has an icon and a label as well as a colour.
 - Text can be zoomed to 200% and the layout reflows to one column without loss.
 - This list covers the viewer. The accessibility of pages the agent visits is outside its control.
@@ -1223,7 +1224,7 @@ Target: WCAG 2.2 level AA.
 - State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.
 - **Recorded sessions.** `viewer/src/demo/` holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. `?demo=<name>` plays one with no service, at real pace or stepped by hand, and `?state=<name>` opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.
 - The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.
-- In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away.
+- In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away. Whatever needs a person (an approval, a request for help, a page dialog, a blocked page, the summary) sits between that bar and the browser, so nothing has to be answered blind.
 - During takeover, pointer positions are scaled from the canvas to page pixels and sent as `pointer`, `wheel` and `key` commands.
 - `npm run build` writes the viewer into `src/bap_browser/viewer_dist/`, which the service serves.
 
@@ -1271,6 +1272,7 @@ Rules:
 - The screen is drawn from the settings API. The viewer holds no list of settings of its own.
 - A change is saved as soon as it is made. There is no Save button. The row shows "Saved" for a moment, or "Saved. Applies to the next session."
 - A locked setting is shown with its value, disabled, and the words "Set by your organisation". It is never hidden, so a person can see why something is not possible.
+- A site list is saved when the focus leaves it and when the screen is closed. An entry that is refused keeps the screen open, so nobody leaves believing a site is blocked when it is not.
 - A refused change puts the control back and says why in the row. A site list is the exception: it keeps what was typed, so the entry can be corrected instead of typed again.
 - Entries of a site list that the deployment set are shown above the box, marked as set by the organisation, and cannot be removed.
 - A site list takes one site per line. `example.com` covers the site and its subdomains. A bad entry is refused with the reason, in the row.

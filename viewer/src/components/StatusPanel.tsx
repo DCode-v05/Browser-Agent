@@ -9,6 +9,7 @@ import { formatElapsed } from '../state/timeline';
 import type { ControlName, StateKey, StateView } from '../state/view';
 import { W } from '../wording';
 import { Icon, type IconName } from './Icon';
+import { trapTab } from './focus';
 
 const STATE_ICON: Record<StateKey, IconName> = {
   no_agent: 'plug',
@@ -55,9 +56,11 @@ interface Props {
   stopRef: Ref<HTMLButtonElement>;
   /** In full view, the way back to the split view. */
   onShowSplit?(): void;
+  /** Where the focus goes when what held it is gone: an answered card, a closed question. */
+  titleRef?: Ref<HTMLHeadingElement>;
 }
 
-export function StatusPanel({ view, now, layout, options, onCommand, onStop, onHandBack, primaryRef, stopRef, onShowSplit }: Props) {
+export function StatusPanel({ view, now, layout, options, onCommand, onStop, onHandBack, primaryRef, stopRef, onShowSplit, titleRef }: Props) {
   const driving = view.key === 'person';
   const title = driving && layout === 'bar' ? W.takeover.bar : view.status;
   // The reason a session ended is told once, in the summary.
@@ -116,7 +119,9 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
         <Icon name={STATE_ICON[view.key]} size="large" />
       </span>
       <div className="status-text">
-        <h2 className="status-title">{title}</h2>
+        <h2 className="status-title" tabIndex={-1} ref={titleRef}>
+          {title}
+        </h2>
         {detail && <p className="status-detail">{detail}</p>}
       </div>
       {view.since > 0 && view.key !== 'ended' && view.key !== 'disconnected' && view.key !== 'refused' && (
@@ -163,6 +168,7 @@ export function Confirm({ question, consequence, confirm, cancel, onConfirm, onC
         onKeyDown={(event) => {
           event.stopPropagation();
           if (event.key === 'Escape') onCancel();
+          trapTab(event);
         }}
       >
         <h2 id="confirm-question" className="confirm-question">

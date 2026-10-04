@@ -186,3 +186,41 @@ async def test_only_opacity_and_transform_are_animated(open_view: OpenView) -> N
         "() => [...new Set([...document.querySelectorAll('*')].map((el) => getComputedStyle(el).transitionProperty))]"
     )
     assert set(transitions) <= {"all", "none", "transform", "opacity"}, transitions
+
+
+async def test_on_a_narrow_screen_the_keyboard_never_falls_out_of_settings(open_view: OpenView) -> None:
+    view = await open_view("state=agent", "phone")
+    page = view.page
+    await page.get_by_role("button", name="Open settings").focus()
+    await page.keyboard.press("Enter")
+    dialog = page.get_by_role("dialog", name="Settings")
+    await dialog.get_by_role("tab", name="Browser").wait_for()
+    inside = "document.querySelector('.settings').contains(document.activeElement)"
+    seen = "document.activeElement.checkVisibility()"
+    # Choosing a group replaces the list of groups with that group's settings.
+    await page.keyboard.press("Enter")
+    await dialog.get_by_role("button", name="Back").wait_for()
+    # The focus follows the screen: it is neither left on the hidden list nor dropped onto the page.
+    await page.wait_for_function(f"{inside} && {seen}", timeout=2000)
+    for _ in range(14):
+        await page.keyboard.press("Tab")
+        assert await page.evaluate(inside), "Tab left the settings screen"
+        assert await page.evaluate(seen), "Tab reached something that is not shown"
+    await dialog.get_by_role("button", name="Back").click()
+    await dialog.get_by_role("tab", name="Browser").wait_for()
+    await page.wait_for_function(f"{inside} && {seen}", timeout=2000)
+    assert view.errors == []
+
+
+async def test_in_full_view_an_approval_fits_and_can_be_answered(open_view: OpenView) -> None:
+    view = await open_view("state=waiting_approval")
+    page = view.page
+    await page.keyboard.press("f")
+    await page.locator('.app[data-view="full"]').wait_for()
+    await page.get_by_role("button", name="Allow once").wait_for()
+    assert await view.sideways_overflow() <= 0
+    assert await view.accessibility_violations() == []
+    await view.shot("full-view-approval")
+    await page.get_by_role("button", name="Allow once").click()
+    await page.get_by_text("Allowed once").wait_for()
+    assert view.errors == []

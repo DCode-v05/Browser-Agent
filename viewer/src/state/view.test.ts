@@ -164,9 +164,10 @@ describe('what each state looks like (spec 9.3)', () => {
     });
   });
 
-  it('a lost connection is shown even after the session ended', () => {
+  it('an ended session keeps its summary when the connection goes', () => {
     const ended = after(started, { type: 'session_ended', reason: 'agent', ts: T0 + 60 });
-    expect(describeState(reduce(ended, { type: 'connection', status: 'reconnecting' }), T0 + 61, STALE_AFTER).key).toBe('disconnected');
+    // Once a session has ended there is nothing live to lose: the summary stays, whatever the connection does.
+    expect(describeState(reduce(ended, { type: 'connection', status: 'reconnecting' }), T0 + 61, STALE_AFTER).key).toBe('ended');
   });
 });
 
