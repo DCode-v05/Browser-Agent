@@ -17,6 +17,7 @@ from bap_browser.errors import BapError, PolicyBlocked
 from bap_browser.results import ToolResult
 from bap_browser.tools.browser_tools import TOOLS
 from bap_browser.tools.event_log import EventLog, masked, names_only
+from bap_browser.tools.gate import Gate, always_open
 from bap_browser.tools.observer import StepObserver
 from bap_browser.tools.registry import Args, ToolDefinition, describe_problem
 from bap_browser.tools.sentences import label_for, summary_for
@@ -39,10 +40,12 @@ class Toolkit:
         session: BrowserSession,
         tools: Sequence[ToolDefinition] = TOOLS,
         observer: StepObserver | None = None,
+        gate: Gate = always_open,
     ) -> None:
         self._session = session
         self._tools = {tool.name: tool for tool in tools}
         self._observer = observer
+        self._gate = gate
         self._turn = asyncio.Lock()
         self._log = EventLog(session.config.logging)
         self._steps = 0
@@ -53,9 +56,17 @@ class Toolkit:
     async def call(self, name: str, arguments: Mapping[str, Any] | None = None) -> ToolResult:
         """Runs one tool. Calls run one at a time, in order. Every failure comes back as a result."""
         arguments = dict(arguments or {})
-        async with self._turn:
+        redact = self._session.redact
+        waiting_since = time.perf_counter()
+        async with self._turn, self._gate() as admission:
+            if admission.refused is not None:
+                held = ToolResult(redact(admission.refused))
+                self._log.write(
+                    name, names_only(arguments), held, (time.perf_counter() - waiting_since) * 1000
+                )
+                return held
             self._steps += 1
-            step, redact = self._steps, self._session.redact
+            step = self._steps
             target = await self._locate(arguments) if self._observer else None
             if self._observer:
                 label = redact(label_for(name, arguments, target))
@@ -67,8 +78,8 @@ class Toolkit:
             else:
                 text, failure = await self._run(name, *checked)
                 logged = masked(arguments, redact)
-            tabs = await self._tabs()
-            result = ToolResult(redact(text + self._state_block(tabs)), failure is not None)
+            tabs = await self.tabs()
+            result = ToolResult(redact(admission.note + text + self._state_block(tabs)), failure is not None)
             ms = (time.perf_counter() - started) * 1000
             self._log.write(name, logged, result, ms)
             if self._observer:
@@ -116,7 +127,8 @@ class Toolkit:
         except BapError:
             return None
 
-    async def _tabs(self) -> list[TabInfo]:
+    async def tabs(self) -> list[TabInfo]:
+        """The open tabs, with their addresses as they may be shown. None before the browser has started."""
         driver = self._session.started_driver
         if driver is None:
             return []

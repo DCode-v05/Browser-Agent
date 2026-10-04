@@ -23,6 +23,9 @@ class FakeDriver:
         self.most_at_once = 0
         self.fail_with: Exception | None = None
         self.next_address: str | None = None
+        self.title = "Fake"
+        self.hold: asyncio.Event | None = None
+        """When set, a click waits for it: an action in progress, for as long as a test needs."""
         self.alive = True
         """Where the next navigation ends up, when that is not where it was sent."""
 
@@ -40,7 +43,10 @@ class FakeDriver:
         return "Fake 1.0"
 
     async def tabs(self) -> list[TabInfo]:
-        return [TabInfo("t1", self.url, "Fake", True)]
+        return [TabInfo("t1", self.url, self.title, True)]
+
+    async def viewport(self) -> tuple[int, int]:
+        return 1280, 800
 
     async def locate(self, ref: str) -> Located:
         if ref == "e9":
@@ -66,6 +72,8 @@ class FakeDriver:
         self.running += 1
         self.most_at_once = max(self.most_at_once, self.running)
         await asyncio.sleep(0)
+        if self.hold is not None:
+            await self.hold.wait()
         self.running -= 1
         if self.fail_with is not None:
             raise self.fail_with

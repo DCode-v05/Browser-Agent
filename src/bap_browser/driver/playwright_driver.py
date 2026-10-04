@@ -162,6 +162,13 @@ class PlaywrightDriver:
             title = ""
         return [TabInfo(TAB_ID, self.page.url, title, True)]
 
+    async def viewport(self) -> tuple[int, int]:
+        size = self.page.viewport_size
+        if size is None:
+            # No fixed size was asked for: the page is as large as its window.
+            size = await self.page.evaluate("({ width: innerWidth, height: innerHeight })")
+        return size["width"], size["height"]
+
     async def navigate(self, url: str) -> str:
         navigations, commits = self._navigations, self._commits
         try:
