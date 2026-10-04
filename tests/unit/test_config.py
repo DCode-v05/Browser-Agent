@@ -116,9 +116,11 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "viewer.theme": "system",
     "viewer.embed_origins": [],
     "viewer.show_agent_pointer": True,
-    "agent.provider": "anthropic",
-    "agent.model": "claude-opus-5-5",
-    "agent.api_key_env": "ANTHROPIC_API_KEY",
+    "agent.provider": "openai",
+    "agent.model": "gpt-5.6-luna",
+    "agent.api_key_env": "OPENAI_API_KEY",
+    "agent.base_url": "https://api.openai.com/v1",
+    "agent.request_timeout_s": 120,
     "agent.max_steps": 40,
     "agent.max_tokens": 4096,
     "settings.file": ".bap-browser/settings.json",
@@ -303,3 +305,9 @@ def test_the_scripted_model_can_be_chosen(tmp_path: Path) -> None:
 def test_a_model_provider_that_does_not_exist_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ConfigError, match=r"bad value for 'agent.provider' \(from config.json\)"):
         load_config(write(tmp_path / "config.json", {"agent": {"provider": "somebody"}}), env={})
+
+
+@pytest.mark.parametrize("address", ["file:///etc/passwd", "ftp://example.com/v1", "api.openai.com/v1", ""])
+def test_the_models_address_must_be_a_web_address(tmp_path: Path, address: str) -> None:
+    with pytest.raises(ConfigError, match=r"bad value for 'agent.base_url' .*https://"):
+        load_config(write(tmp_path / "config.json", {"agent": {"base_url": address}}), env={})

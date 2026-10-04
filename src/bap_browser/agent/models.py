@@ -43,6 +43,10 @@ class ToolOutput:
 Message = Said | ToolOutput
 
 
+class ModelError(Exception):
+    """The model could not answer. The message is written for the person who ran the command."""
+
+
 class Model(Protocol):
     async def complete(
         self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]

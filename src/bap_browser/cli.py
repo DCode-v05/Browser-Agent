@@ -6,14 +6,16 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 from bap_browser import __version__
 from bap_browser.config import defaults, load_config, load_config_with_sources
 from bap_browser.config_doc import reference_markdown
+from bap_browser.env_file import environment
 from bap_browser.errors import ConfigError
 
 STARTER: dict[str, Any] = {
@@ -24,6 +26,8 @@ STARTER: dict[str, Any] = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    # Settings and secrets come from the environment, and from a .env file in the folder the command is run in.
+    args.env = environment(Path(".env"), os.environ)
     try:
         return args.run(args)
     except ConfigError as exc:
@@ -90,7 +94,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _config_show(args: argparse.Namespace) -> int:
-    config, sources = load_config_with_sources(args.config)
+    config, sources = load_config_with_sources(args.config, env=args.env)
     data = config.model_dump()
     if not args.sources:
         print(json.dumps(data, indent=2))
@@ -122,7 +126,7 @@ def _config_doc(args: argparse.Namespace) -> int:
 
 
 def _mcp(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = load_config(args.config, env=args.env)
     # Standard output carries the protocol, so everything else goes to the error stream.
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     # Imported here so that the config commands start without loading the browser and MCP libraries.
@@ -133,8 +137,20 @@ def _mcp(args: argparse.Namespace) -> int:
 
 
 def _agent(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
-    if not args.demo:
+    config = load_config(args.config, env=args.env)
+    # Imported here so that the config commands start without loading the browser and the web server.
+    from bap_browser.agent.command import Interrupted, run_with_viewer
+    from bap_browser.agent.loop import Unfinished
+    from bap_browser.agent.models import Model, ModelError
+    from bap_browser.service.server import Service
+
+    model_for: Callable[[Service], Model]
+    if args.demo:
+        from bap_browser.agent.demo import TASK, demo_script
+
+        task = args.task or TASK
+        model_for = lambda service: demo_script(f"{service.address}/demo-site", args.pace)  # noqa: E731
+    else:
         if not args.task:
             raise ConfigError(
                 'say what the agent should do, for example: bap-browser agent "Find the opening hours", '
@@ -144,21 +160,26 @@ def _agent(args: argparse.Namespace) -> int:
             raise ConfigError(
                 "the scripted model only plays the demonstration. Run: bap-browser agent --demo"
             )
-        raise ConfigError(
-            f"agent.provider is '{config.agent.provider}', and the hosted model is not part of this build "
-            "yet. Run the demonstration instead: bap-browser agent --demo"
-        )
-    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
-    # Imported here so that the config commands start without loading the browser and the web server.
-    from bap_browser.agent.command import Interrupted, run_with_viewer
-    from bap_browser.agent.demo import TASK, demo_script
+        name = config.agent.api_key_env
+        key = args.env.get(name, "").strip()
+        if not key:
+            raise ConfigError(
+                f"{name} is not set. Put a line {name}=... in a file named .env in this folder, or set it "
+                "in the environment. To try without a model: bap-browser agent --demo"
+            )
+        from bap_browser.agent.openai_model import OpenAIModel
 
+        task = args.task
+        model_for = lambda service: OpenAIModel(config.agent, key)  # noqa: E731
+
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     try:
-        answer = asyncio.run(
+        asyncio.run(
             run_with_viewer(
                 config,
-                args.task or TASK,
-                lambda service: demo_script(f"{service.address}/demo-site", args.pace),
+                task,
+                model_for,
+                token=args.env.get(config.server.token_env) or None,
                 exit_when_done=args.exit_when_done,
                 wait_for_viewer=args.wait_for_viewer,
                 open_viewer=args.open,
@@ -166,7 +187,9 @@ def _agent(args: argparse.Namespace) -> int:
         )
     except (Interrupted, KeyboardInterrupt):
         return 130
-    print(answer)
+    except (ModelError, Unfinished) as stopped:
+        print(f"error: {stopped}", file=sys.stderr)
+        return 1
     return 0
 
 

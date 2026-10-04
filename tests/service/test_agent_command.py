@@ -5,10 +5,11 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
+from model_stand_in import ModelStandIn, called, response, said
 
 from bap_browser.cli import main
 from bap_browser.config import Config
@@ -25,8 +26,34 @@ def run(folder: Path, *arguments: str, timeout: float = 120) -> subprocess.Compl
         encoding="utf-8",
         timeout=timeout,
         cwd=folder,
-        env={name: value for name, value in os.environ.items() if name != "BAP_BROWSER_TOKEN"},
+        env={
+            name: value
+            for name, value in os.environ.items()
+            if name not in ("BAP_BROWSER_TOKEN", "OPENAI_API_KEY")
+        },
     )
+
+
+@pytest.fixture(autouse=True)
+def nothing_from_the_developers_own_setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The command reads a .env file in the folder it is run from, and the key from the environment.
+    A test must never pick up the developer's real key and call the real provider with it."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+
+@pytest.fixture
+def provider() -> Iterator[Callable[..., ModelStandIn]]:
+    started: list[ModelStandIn] = []
+
+    def start(*replies: object) -> ModelStandIn:
+        stand_in = ModelStandIn(*replies)  # type: ignore[arg-type]
+        started.append(stand_in)
+        return stand_in
+
+    yield start
+    for stand_in in started:
+        stand_in.close()
 
 
 def test_the_demonstration_runs_from_one_command_and_leaves_its_steps_in_the_log(
@@ -64,15 +91,56 @@ def test_the_demonstration_runs_from_one_command_and_leaves_its_steps_in_the_log
     assert not (tmp_path / ".bap-browser" / "service.json").exists()
 
 
-def test_without_a_model_it_says_how_to_run_the_demonstration(
+def test_without_a_key_it_says_where_to_put_one(
     make_config: Callable[..., Config], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     make_config(tmp_path)
     assert main(["agent", "Book a table", "--config", str(tmp_path / "config.json")]) == 2
     assert capsys.readouterr().err.strip() == (
-        "error: agent.provider is 'anthropic', and the hosted model is not part of this build yet. "
-        "Run the demonstration instead: bap-browser agent --demo"
+        "error: OPENAI_API_KEY is not set. Put a line OPENAI_API_KEY=... in a file named .env in this "
+        "folder, or set it in the environment. To try without a model: bap-browser agent --demo"
     )
+
+
+def test_the_key_comes_from_dot_env_and_the_model_does_the_task(
+    make_config: Callable[..., Config], tmp_path: Path, provider
+) -> None:
+    key = "sk-test-from-the-dot-env-file"
+    stand_in = provider(
+        response(said("I will read the page."), called("call_1", "browser_snapshot", "{}")),
+        response(said("The page is blank.")),
+    )
+    make_config(tmp_path, agent={"base_url": stand_in.base_url})
+    (tmp_path / ".env").write_text(f"OPENAI_API_KEY={key}\n", encoding="utf-8")
+    done = run(tmp_path, "What is on the page?", "--exit-when-done")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "The page is blank."
+    assert "I will read the page." in done.stderr
+
+    first, second = stand_in.requests
+    assert first["authorization"] == f"Bearer {key}"
+    assert first["body"]["model"] == "gpt-5.6-luna"
+    assert first["body"]["input"] == [{"role": "user", "content": "What is on the page?"}]
+    assert second["body"]["input"][-1]["type"] == "function_call_output"
+    assert second["body"]["input"][-1]["output"].startswith("Page: ")
+    # The key is in the request to the provider and nowhere else.
+    log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+    assert key not in done.stdout and key not in done.stderr and key not in log
+
+
+def test_a_key_the_provider_refuses_ends_the_run_with_the_reason(
+    make_config: Callable[..., Config], tmp_path: Path, provider
+) -> None:
+    stand_in = provider((401, {"error": {"message": "Incorrect API key provided: sk-wrong***"}}))
+    make_config(tmp_path, agent={"base_url": stand_in.base_url})
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-wrong-key\n", encoding="utf-8")
+    done = run(tmp_path, "What is on the page?", "--exit-when-done")
+    assert done.returncode == 1
+    assert done.stdout == ""
+    assert done.stderr.strip().splitlines()[-1] == (
+        "error: The model provider did not accept the key (HTTP 401). Check OPENAI_API_KEY in your .env file."
+    )
+    assert "sk-wrong" not in done.stderr
 
 
 def test_the_scripted_model_plays_only_the_demonstration(

@@ -10,3 +10,4 @@ node_modules/
 viewer/dist/
 src/bap_browser/viewer_dist/
 dist/
+.playwright-mcp/

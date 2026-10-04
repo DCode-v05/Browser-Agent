@@ -318,16 +318,28 @@ class Viewer(Section):
 
 
 class Agent(Section):
-    provider: Literal["anthropic", "scripted"] = setting(
-        "anthropic", "Whose model the loop calls. `scripted` replays fixed replies and needs no key"
+    provider: Literal["openai", "scripted"] = setting(
+        "openai", "Whose model the loop calls. `scripted` replays fixed replies and needs no key"
     )
-    model: str = setting("claude-opus-5-5", "The model's name at that provider")
+    model: str = setting("gpt-5.6-luna", "The model's name at that provider")
     api_key_env: str = setting(
-        "ANTHROPIC_API_KEY",
-        "The environment variable that holds the key. The key is never in `config.json`",
+        "OPENAI_API_KEY",
+        "The variable, in the environment or in `.env`, that holds the key. The key is never in `config.json`",
     )
+    base_url: str = setting(
+        "https://api.openai.com/v1",
+        "Where the provider's API is. Change it for a proxy or a compatible service",
+    )
+    request_timeout_s: int = setting(120, "Longest wait for one reply from the model")
     max_steps: int = setting(40, "Tool calls after which the loop stops")
     max_tokens: int = setting(4096, "The most a single reply may be")
+
+    @field_validator("base_url", mode="after")
+    @classmethod
+    def _a_web_address(cls, address: str) -> str:
+        if not address.startswith(("https://", "http://")):
+            raise ValueError("write the address with https:// in front")
+        return address
 
 
 class Settings(Section):

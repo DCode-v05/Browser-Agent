@@ -4,9 +4,10 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fakes import SNAPSHOT, FakeDriver
 
-from bap_browser.agent.loop import run_agent
+from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Reply, Said, ScriptedModel, ToolCall, ToolOutput, ref_of
 from bap_browser.config import Agent, Config
 from bap_browser.driver import BrowserSession
@@ -61,7 +62,8 @@ async def test_the_loop_runs_tool_calls_until_the_model_answers_without_one(
     answer = await run_agent("Click Go", tools, model, SETTINGS, on_text=said.append)
     assert answer == "Done: the button was clicked."
     assert [call[0] for call in driver.calls] == ["navigate", "snapshot", "click"]
-    assert said == ["I will open the page.", "Done: the button was clicked."]
+    # What the model says while it works is passed on as it comes; the answer is returned.
+    assert said == ["I will open the page."]
 
 
 async def test_the_model_is_shown_the_task_the_tools_and_every_result(make_config, tmp_path: Path) -> None:
@@ -98,8 +100,8 @@ async def test_a_failed_call_goes_back_to_the_model_as_a_result_and_the_loop_goe
 async def test_the_loop_stops_at_the_step_limit_and_says_so(make_config, tmp_path: Path) -> None:
     tools, driver = kit(make_config, tmp_path)
     forever = [Reply("", (ToolCall(str(n), "browser_snapshot", {}),)) for n in range(10)]
-    answer = await run_agent("Read", tools, Recording(forever), Agent(provider="scripted", max_steps=3))
-    assert answer == "Stopped after 3 tool calls without finishing the task."
+    with pytest.raises(Unfinished, match=r"^Stopped after 3 tool calls without finishing the task\.$"):
+        await run_agent("Read", tools, Recording(forever), Agent(provider="scripted", max_steps=3))
     assert len(driver.calls) == 3
 
 
@@ -108,10 +110,10 @@ async def test_several_calls_in_one_reply_run_in_order_and_count_towards_the_lim
 ) -> None:
     tools, driver = kit(make_config, tmp_path)
     three = tuple(ToolCall(str(n), "browser_click", {"ref": "e1"}) for n in range(3))
-    answer = await run_agent(
-        "Click", tools, Recording([Reply("", three)]), Agent(provider="scripted", max_steps=2)
-    )
-    assert answer == "Stopped after 2 tool calls without finishing the task."
+    with pytest.raises(Unfinished, match=r"^Stopped after 2 tool calls"):
+        await run_agent(
+            "Click", tools, Recording([Reply("", three)]), Agent(provider="scripted", max_steps=2)
+        )
     assert len(driver.calls) == 2
 
 
@@ -125,8 +127,8 @@ async def test_the_loop_ends_when_the_session_has_been_ended(make_config, tmp_pa
         return Reply("", (ToolCall("b", "browser_click", {"ref": "e1"}),))
 
     model = ScriptedModel([calls("browser_snapshot"), end, says("never reached")])
-    answer = await run_agent("Read", tools, model, SETTINGS, ended=lambda: ended)
-    assert answer == "The session was ended before the task was finished."
+    with pytest.raises(Unfinished, match=r"^The session was ended before the task was finished\.$"):
+        await run_agent("Read", tools, model, SETTINGS, ended=lambda: ended)
     assert [call[0] for call in driver.calls] == ["snapshot"]
 
 

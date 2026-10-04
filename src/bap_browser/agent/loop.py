@@ -23,6 +23,10 @@ SYSTEM = (
 SESSION_ENDED = "The session was ended before the task was finished."
 
 
+class Unfinished(Exception):
+    """The run stopped before the model gave its answer: the step limit, or the session was ended."""
+
+
 async def run_agent(
     task: str,
     toolkit: Toolkit,
@@ -32,21 +36,24 @@ async def run_agent(
     on_text: Callable[[str], None] | None = None,
     ended: Callable[[], bool] = lambda: False,
 ) -> str:
-    """Runs the task until the model answers without a tool call, the step limit, or the session's end."""
+    """Runs the task until the model answers without a tool call, and returns that answer.
+
+    Raises Unfinished at the step limit and when the session is ended first.
+    """
     messages: list[Message] = [Said("user", task)]
     calls = 0
     while True:
         reply = await model.complete(SYSTEM, messages, toolkit.definitions())
         messages.append(Said("assistant", reply.text, reply.tool_calls))
-        if reply.text and on_text is not None:
-            on_text(reply.text)
         if not reply.tool_calls:
             return reply.text
+        if reply.text and on_text is not None:
+            on_text(reply.text)
         for call in reply.tool_calls:
             if ended():
-                return SESSION_ENDED
+                raise Unfinished(SESSION_ENDED)
             if calls == settings.max_steps:
-                return f"Stopped after {calls} tool calls without finishing the task."
+                raise Unfinished(f"Stopped after {calls} tool calls without finishing the task.")
             result = await toolkit.call(call.name, call.arguments)
             calls += 1
             messages.append(ToolOutput(call, result.text, result.is_error))

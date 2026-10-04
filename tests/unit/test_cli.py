@@ -8,9 +8,11 @@ from bap_browser.cli import main
 
 
 @pytest.fixture(autouse=True)
-def no_settings_from_the_test_run(monkeypatch: pytest.MonkeyPatch) -> None:
+def no_settings_from_the_test_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for name in [name for name in os.environ if name.startswith("BAP_BROWSER")]:
         monkeypatch.delenv(name)
+    # The command reads a .env file in the folder it is run from. The developer's own must not be read.
+    monkeypatch.chdir(tmp_path)
 
 
 def write(path: Path, data: object) -> Path:
@@ -91,3 +93,12 @@ def test_version_is_printed(capsys: pytest.CaptureFixture[str]) -> None:
         main(["--version"])
     assert stop.value.code == 0
     assert capsys.readouterr().out.strip() == "bap-browser 0.1.0"
+
+
+def test_settings_in_a_dot_env_file_beside_the_command_are_used(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / ".env").write_text("BAP_BROWSER__BROWSER__HEADLESS=false\n", encoding="utf-8")
+    file = write(tmp_path / "config.json", {})
+    assert main(["config", "show", "--config", str(file), "--sources"]) == 0
+    assert capsys.readouterr().out.strip() == "browser.headless = false  (environment)"
