@@ -16,6 +16,7 @@ npm --prefix viewer run build      # the viewer, which the service serves
 
 ```bash
 uv run bap-browser agent --demo --open    # watch a scripted agent sign up on the built-in demo site
+uv run bap-browser agent "Find the price of ..." --open   # a real task, done by GPT-5.6 Luna
 uv run bap-browser mcp                    # an MCP server over stdio, for an agent to start
 uv run bap-browser config show --sources  # the effective configuration
 uv run bap-browser config init            # write a starter config.json
@@ -28,6 +29,10 @@ prints the viewer's address, and runs a fixed script through the same tools a re
 In the viewer you can pause it, take over the browser, hand it back, and stop it. `--open` opens
 the viewer in your browser and waits for it; `--exit-when-done` ends the process after the run;
 `--pace 0.5` changes how long each step waits.
+
+A real task needs a model key. Copy `.env.example` to `.env` and put your key on the
+`OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
+`agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
 ## Test
 

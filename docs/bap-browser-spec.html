@@ -2050,6 +2050,11 @@ losing control mid-run, takeover that is cramped or fails, and approval fatigue.
 </code></pre>
 <p>Below 980 px wide the two columns stack: browser first, activity under it. The page never scrolls
 sideways. The side gutter is 16 px.</p>
+<p><strong>How it is laid out to the eye</strong> (the tokens are in 9.5). The page is white and the top bar has no
+edge of its own: the brand mark, then the session, the agent and the browser as pills. The browser
+column is one card: the tabs and the address are pills, and under them a warm stage holds the live
+picture. The activity column is one warm panel with rounded corners, and the status, whatever needs
+a person, and the timeline are white cards inside it.</p>
 <p><strong>Inside a UI client.</strong> The viewer is one page. It works on its own in a browser tab, and it works
 inside the web, mobile and desktop clients, which show it in a frame. The client tells it which
 surface it is on (<code>?surface=web</code>, <code>mobile</code> or <code>desktop</code>; web when not told), and that decides the
@@ -2296,9 +2301,15 @@ into the visited page, so the page cannot detect or be slowed by it.</p>
 <h3 id="95-design-tokens">9.5 Design tokens</h3>
 <p>Only these values may be used for colour, type, spacing, radius, shadow and motion. They live in
 <code>viewer/src/tokens.css</code> as CSS variables.</p>
-<p><strong>Colour.</strong> Contrast was computed for every pair on 2026-10-03. Text pairs are at least 4.5:1 and control
-pairs at least 3:1 in both themes. The lowest text pair is the person colour on its tint in the light
-theme, at 4.95:1.</p>
+<p><strong>The look is the BAP product's.</strong> Warm, paper-like neutrals; a near-black "ink" for the main action;
+flat surfaces edged by a hairline; large radii and pills; the Hanken Grotesk typeface; and the brand's
+red-to-violet gradient, used sparingly. The colours, the typeface and the shapes were read on
+2026-10-04 from the product's own tokens (the <code>--sc-*</code> variables in <code>bap-web/bap-frontend/app/globals.css</code>).
+The viewer takes the look, not the product's screens: it has no sidebar, because it has nowhere to
+navigate to. A value marked "ours" has no counterpart in the product and was derived from one that has.</p>
+<p><strong>Colour.</strong> Contrast was computed for every pair on 2026-10-04. Text pairs are at least 4.5:1 and control
+pairs at least 3:1 in both themes. The lowest text pair is the success colour on the warm surface in the
+light theme, at 4.91:1.</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -2311,85 +2322,113 @@ theme, at 4.95:1.</p>
 <tbody>
 <tr>
 <td><code>--bg</code></td>
-<td>#F5F6F8</td>
-<td>#0E1014</td>
+<td>#FFFFFF</td>
+<td>#151515</td>
 <td>Page background</td>
 </tr>
 <tr>
 <td><code>--surface</code></td>
 <td>#FFFFFF</td>
-<td>#161920</td>
-<td>Cards and panels</td>
+<td>#242424</td>
+<td>Cards</td>
 </tr>
 <tr>
 <td><code>--surface-2</code></td>
-<td>#EEF0F3</td>
-<td>#1E222B</td>
-<td>Inputs, hover, code</td>
+<td>#F5F4F2</td>
+<td>#1E1E1E</td>
+<td>The activity panel, the stage behind the live picture, inputs, hover, code</td>
+</tr>
+<tr>
+<td><code>--surface-3</code></td>
+<td>#ECEAE7</td>
+<td>#2C2C2C</td>
+<td>What is selected: a tab, a settings group. Hover on the warm surface</td>
 </tr>
 <tr>
 <td><code>--border</code></td>
-<td>#D5D9E0</td>
-<td>#2C323D</td>
-<td>Dividers (decoration only)</td>
+<td>#111111 at 12%</td>
+<td>#E9EBDF at 12%</td>
+<td>Hairline edges and dividers (decoration only)</td>
 </tr>
 <tr>
 <td><code>--border-strong</code></td>
-<td>#7C8696</td>
-<td>#6B7585</td>
+<td>#8D8881</td>
+<td>#94958E</td>
 <td>Edges of controls</td>
 </tr>
 <tr>
 <td><code>--text</code></td>
-<td>#14171C</td>
-<td>#E9EBEF</td>
+<td>#1A1714</td>
+<td>#E9EBDF</td>
 <td>Main text</td>
 </tr>
 <tr>
 <td><code>--text-muted</code></td>
-<td>#5A6270</td>
-<td>#9AA3B2</td>
+<td>#56524D</td>
+<td>#CBCCC4</td>
 <td>Secondary text</td>
 </tr>
 <tr>
+<td><code>--ink</code> / <code>--on-ink</code></td>
+<td>#09090B / #FFFFFF</td>
+<td>#EBEBEB / #111111</td>
+<td>The fill of the main action, and its label</td>
+</tr>
+<tr>
 <td><code>--focus</code></td>
-<td>#1D4ED8</td>
-<td>#93C5FD</td>
-<td>Focus ring</td>
+<td>#1A1714</td>
+<td>#E9EBDF</td>
+<td>Focus ring (ours: the text colour)</td>
 </tr>
 <tr>
 <td><code>--agent</code> / <code>--agent-tint</code></td>
-<td>#4338CA / #EEF2FF</td>
-<td>#A5B4FC / #1E2147</td>
-<td>The agent is driving</td>
+<td>#6E3B83 / #F6EFF9</td>
+<td>#D4B4E6 / #392F3E</td>
+<td>The agent is driving. The violet end of the brand gradient; the tints and the dark value are ours</td>
 </tr>
 <tr>
 <td><code>--person</code> / <code>--person-tint</code></td>
-<td>#0F766E / #E6F7F5</td>
-<td>#5EEAD4 / #0F2F2C</td>
+<td>#1D4ED8 / #EAF2FF</td>
+<td>#93C5FD / #2B333E</td>
 <td>A person is driving</td>
 </tr>
 <tr>
 <td><code>--waiting</code> / <code>--waiting-tint</code></td>
-<td>#A14C08 / #FFF4E0</td>
-<td>#FCD34D / #3A2C0A</td>
+<td>#8A5200 / #FFF4DB</td>
+<td>#FCD34D / #3E3724</td>
 <td>Approval or help needed</td>
 </tr>
 <tr>
 <td><code>--danger</code> / <code>--danger-tint</code></td>
-<td>#B91C1C / #FDECEC</td>
-<td>#FCA5A5 / #3B1414</td>
+<td>#BF2B37 / #FFF2F3</td>
+<td>#FCA5A5 / #3D2D2D</td>
 <td>Blocked, failed, Stop</td>
 </tr>
 <tr>
 <td><code>--success</code> / <code>--success-tint</code></td>
-<td>#15703A / #E8F7EE</td>
-<td>#86EFAC / #0F2E1B</td>
-<td>Step succeeded, done</td>
+<td>#137A43 / #EAF8F0</td>
+<td>#86EFAC / #293A2F</td>
+<td>Step succeeded, done, live</td>
+</tr>
+<tr>
+<td><code>--brand-gradient</code></td>
+<td>#EC3B4B, #BE3B5F, #A03B6C, #6E3B83</td>
+<td>#FF5A64, #E0567E, #C25792, #9A63B4</td>
+<td>The brand mark, and a switch that is on. Nowhere else</td>
 </tr>
 </tbody>
 </table></div>
-<p>Red means only "blocked", "failed" or "stop". The theme follows the system and can be set to light or dark.</p>
+<p>Three places differ from the product, each for a reason:</p>
+<ul>
+<li>The product's muted text colour (#8D8881, 3.52:1 on white) is too faint to read as text. It is used
+  here only as the edge of controls, and secondary text uses the product's next darker colour.</li>
+<li>The product's focus ring is its brand red at 28% opacity. That is hard to see, and red here means
+  something went wrong. The ring is the text colour.</li>
+<li>The product writes a dark tint as its status colour at 12% over the surface. Here each is written as
+  the colour that results on <code>--surface</code>, so that its contrast can be checked.</li>
+</ul>
+<p>Red text or a red fill means only "blocked", "failed" or "stop". The theme follows the system and can be
+set to light or dark.</p>
 <p><strong>Type</strong></p>
 <div class="tw"><table>
 <thead>
@@ -2401,7 +2440,7 @@ theme, at 4.95:1.</p>
 <tbody>
 <tr>
 <td><code>--font-ui</code></td>
-<td>The system interface font (<code>system-ui</code>, Segoe UI, Roboto, sans-serif)</td>
+<td>Hanken Grotesk, then the system interface font. The font ships with the viewer as two files (Latin, and Latin extended; every weight in one file), so nothing is fetched from another site. Licence: SIL Open Font License 1.1, in <code>viewer/src/fonts/OFL.txt</code></td>
 </tr>
 <tr>
 <td><code>--font-mono</code></td>
@@ -2409,15 +2448,15 @@ theme, at 4.95:1.</p>
 </tr>
 <tr>
 <td>Sizes</td>
-<td>12 px caption, 13 px secondary, 14 px body, 16 px title, 20 px heading</td>
+<td>12 px caption, 13 px secondary, 14 px body, 16 px title, 18 px heading</td>
 </tr>
 <tr>
 <td>Weights</td>
-<td>400 regular, 600 emphasis</td>
+<td>400 regular, 500 medium (buttons, tabs, labels), 600 emphasis (titles)</td>
 </tr>
 <tr>
 <td>Line height</td>
-<td>1.45</td>
+<td>1.45; 1.3 for titles</td>
 </tr>
 </tbody>
 </table></div>
@@ -2436,7 +2475,7 @@ theme, at 4.95:1.</p>
 </tr>
 <tr>
 <td>Radius</td>
-<td>6 px controls, 10 px cards, 14 px panels</td>
+<td>4 px for the outline of the agent's target, 10 px controls, 16 px cards, 20 px panels and dialogs, full for pills (tabs, the address, chips, badges, the label on the picture, icon buttons)</td>
 </tr>
 <tr>
 <td>Border width</td>
@@ -2444,23 +2483,23 @@ theme, at 4.95:1.</p>
 </tr>
 <tr>
 <td>Shadow</td>
-<td>None on flat surfaces; one soft shadow on cards; one stronger on overlays</td>
+<td>None on cards and panels: a hairline edges them. One soft shadow under what floats: the live picture, the step drawer, a dialog, a toast</td>
 </tr>
 <tr>
 <td>Duration</td>
-<td>120 ms for a state change, 200 ms for something entering</td>
+<td>150 ms for a state change, 200 ms for something entering</td>
 </tr>
 <tr>
 <td>Easing</td>
-<td>ease-out</td>
+<td>cubic-bezier(0.22, 1, 0.36, 1)</td>
 </tr>
 <tr>
 <td>Focus ring</td>
 <td>2 px solid <code>--focus</code>, 2 px offset</td>
 </tr>
 <tr>
-<td>Smallest target</td>
-<td>32 × 32 px for buttons; never under 24 × 24 px</td>
+<td>Targets</td>
+<td>Buttons are 36 px high. Nothing a person presses is under 32 × 32 px</td>
 </tr>
 </tbody>
 </table></div>
@@ -2838,7 +2877,7 @@ tunable number is written anywhere else in the code.</p>
 </li>
 <li>Per-session options come from the service when a session is created and are limited to: <code>backend.kind</code>, <code>browser.channel</code>, <code>browser.headless</code>, <code>browser.viewport</code>, <code>browser.user_data_dir</code>, <code>browser.cdp_url</code>. A session can never loosen a safety setting.</li>
 <li>An unknown key stops start-up with a message naming it.</li>
-<li>Secrets (the service token, proxy passwords) come only from the environment or <code>.env</code>, never from <code>config.json</code> and never from user settings.</li>
+<li>Secrets (the service token, proxy passwords, the model's key) come only from the environment or <code>.env</code>, never from <code>config.json</code> and never from user settings. A <code>.env</code> file in the folder the command is run from is read at start; a variable already set in the environment wins over it.</li>
 <li><code>bap-browser config show</code> prints the effective configuration; <code>--sources</code> prints where each overridden value came from.</li>
 <li><code>bap-browser config init [--full]</code> writes a starter <code>config.json</code>.</li>
 <li><code>bap-browser config doc</code> generates the reference tables below from the code, so this reference cannot drift.</li>
@@ -3802,6 +3841,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>How long stopping waits for open connections to finish</td>
 </tr>
 <tr>
+<td><code>server.command_backlog</code></td>
+<td>256</td>
+<td>How many of a viewer's commands may wait their turn. More than that are dropped</td>
+</tr>
+<tr>
 <td><code>server.state_file</code></td>
 <td><code>.bap-browser/service.json</code></td>
 <td>Holds the viewer address for the local user</td>
@@ -4008,18 +4052,28 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <tbody>
 <tr>
 <td><code>provider</code></td>
-<td><code>anthropic</code></td>
+<td><code>openai</code></td>
 <td>Whose model the loop calls. <code>scripted</code> replays fixed replies and needs no key</td>
 </tr>
 <tr>
 <td><code>model</code></td>
-<td><code>claude-opus-5-5</code></td>
+<td><code>gpt-5.6-luna</code></td>
 <td>The model's name at that provider</td>
 </tr>
 <tr>
 <td><code>api_key_env</code></td>
-<td><code>ANTHROPIC_API_KEY</code></td>
-<td>The environment variable that holds the key. The key is never in <code>config.json</code></td>
+<td><code>OPENAI_API_KEY</code></td>
+<td>The variable, in the environment or in <code>.env</code>, that holds the key. The key is never in <code>config.json</code></td>
+</tr>
+<tr>
+<td><code>base_url</code></td>
+<td><code>https://api.openai.com/v1</code></td>
+<td>Where the provider's API is. Change it for a proxy or a compatible service</td>
+</tr>
+<tr>
+<td><code>request_timeout_s</code></td>
+<td>120</td>
+<td>Longest wait for one reply from the model</td>
 </tr>
 <tr>
 <td><code>max_steps</code></td>
@@ -8100,8 +8154,14 @@ reached, or a person stops the session. The answer is the only thing written to 
 </tr>
 </tbody>
 </table></div>
-<p>In this build only the scripted model exists, so the command runs with <code>--demo</code>. The hosted model is
-added when its provider has been chosen.</p>
+<p>Without <code>--demo</code> the loop calls the hosted model: OpenAI's <code>gpt-5.6-luna</code>, over the Responses API,
+with the key read from <code>OPENAI_API_KEY</code>. Put <code>OPENAI_API_KEY=...</code> in a file named <code>.env</code> in the
+folder the command is run from. With no key, the command says so and says how to set one. The
+conversation is not stored at the provider (<code>store</code> is off); the model's own reasoning is passed
+back to it encrypted on each turn.</p>
+<p>The command ends with 0 when the task was answered, 1 when the model failed or the task was not
+finished (the step limit was reached, or a person stopped the session), 2 when the command or the
+configuration was wrong, and 130 on Ctrl+C.</p>
 <p>The loop:</p>
 <ol>
 <li>Send the task, the tool definitions and the conversation so far to the model.</li>

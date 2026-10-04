@@ -1020,6 +1020,12 @@ Full view, used during takeover so the person has room to work:
 Below 980 px wide the two columns stack: browser first, activity under it. The page never scrolls
 sideways. The side gutter is 16 px.
 
+**How it is laid out to the eye** (the tokens are in 9.5). The page is white and the top bar has no
+edge of its own: the brand mark, then the session, the agent and the browser as pills. The browser
+column is one card: the tabs and the address are pills, and under them a warm stage holds the live
+picture. The activity column is one warm panel with rounded corners, and the status, whatever needs
+a person, and the timeline are white cards inside it.
+
 **Inside a UI client.** The viewer is one page. It works on its own in a browser tab, and it works
 inside the web, mobile and desktop clients, which show it in a frame. The client tells it which
 surface it is on (`?surface=web`, `mobile` or `desktop`; web when not told), and that decides the
@@ -1088,50 +1094,70 @@ into the visited page, so the page cannot detect or be slowed by it.
 Only these values may be used for colour, type, spacing, radius, shadow and motion. They live in
 `viewer/src/tokens.css` as CSS variables.
 
-**Colour.** Contrast was computed for every pair on 2026-10-03. Text pairs are at least 4.5:1 and control
-pairs at least 3:1 in both themes. The lowest text pair is the person colour on its tint in the light
-theme, at 4.95:1.
+**The look is the BAP product's.** Warm, paper-like neutrals; a near-black "ink" for the main action;
+flat surfaces edged by a hairline; large radii and pills; the Hanken Grotesk typeface; and the brand's
+red-to-violet gradient, used sparingly. The colours, the typeface and the shapes were read on
+2026-10-04 from the product's own tokens (the `--sc-*` variables in `bap-web/bap-frontend/app/globals.css`).
+The viewer takes the look, not the product's screens: it has no sidebar, because it has nowhere to
+navigate to. A value marked "ours" has no counterpart in the product and was derived from one that has.
+
+**Colour.** Contrast was computed for every pair on 2026-10-04. Text pairs are at least 4.5:1 and control
+pairs at least 3:1 in both themes. The lowest text pair is the success colour on the warm surface in the
+light theme, at 4.91:1.
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
-| `--bg` | #F5F6F8 | #0E1014 | Page background |
-| `--surface` | #FFFFFF | #161920 | Cards and panels |
-| `--surface-2` | #EEF0F3 | #1E222B | Inputs, hover, code |
-| `--border` | #D5D9E0 | #2C323D | Dividers (decoration only) |
-| `--border-strong` | #7C8696 | #6B7585 | Edges of controls |
-| `--text` | #14171C | #E9EBEF | Main text |
-| `--text-muted` | #5A6270 | #9AA3B2 | Secondary text |
-| `--focus` | #1D4ED8 | #93C5FD | Focus ring |
-| `--agent` / `--agent-tint` | #4338CA / #EEF2FF | #A5B4FC / #1E2147 | The agent is driving |
-| `--person` / `--person-tint` | #0F766E / #E6F7F5 | #5EEAD4 / #0F2F2C | A person is driving |
-| `--waiting` / `--waiting-tint` | #A14C08 / #FFF4E0 | #FCD34D / #3A2C0A | Approval or help needed |
-| `--danger` / `--danger-tint` | #B91C1C / #FDECEC | #FCA5A5 / #3B1414 | Blocked, failed, Stop |
-| `--success` / `--success-tint` | #15703A / #E8F7EE | #86EFAC / #0F2E1B | Step succeeded, done |
+| `--bg` | #FFFFFF | #151515 | Page background |
+| `--surface` | #FFFFFF | #242424 | Cards |
+| `--surface-2` | #F5F4F2 | #1E1E1E | The activity panel, the stage behind the live picture, inputs, hover, code |
+| `--surface-3` | #ECEAE7 | #2C2C2C | What is selected: a tab, a settings group. Hover on the warm surface |
+| `--border` | #111111 at 12% | #E9EBDF at 12% | Hairline edges and dividers (decoration only) |
+| `--border-strong` | #8D8881 | #94958E | Edges of controls |
+| `--text` | #1A1714 | #E9EBDF | Main text |
+| `--text-muted` | #56524D | #CBCCC4 | Secondary text |
+| `--ink` / `--on-ink` | #09090B / #FFFFFF | #EBEBEB / #111111 | The fill of the main action, and its label |
+| `--focus` | #1A1714 | #E9EBDF | Focus ring (ours: the text colour) |
+| `--agent` / `--agent-tint` | #6E3B83 / #F6EFF9 | #D4B4E6 / #392F3E | The agent is driving. The violet end of the brand gradient; the tints and the dark value are ours |
+| `--person` / `--person-tint` | #1D4ED8 / #EAF2FF | #93C5FD / #2B333E | A person is driving |
+| `--waiting` / `--waiting-tint` | #8A5200 / #FFF4DB | #FCD34D / #3E3724 | Approval or help needed |
+| `--danger` / `--danger-tint` | #BF2B37 / #FFF2F3 | #FCA5A5 / #3D2D2D | Blocked, failed, Stop |
+| `--success` / `--success-tint` | #137A43 / #EAF8F0 | #86EFAC / #293A2F | Step succeeded, done, live |
+| `--brand-gradient` | #EC3B4B, #BE3B5F, #A03B6C, #6E3B83 | #FF5A64, #E0567E, #C25792, #9A63B4 | The brand mark, and a switch that is on. Nowhere else |
 
-Red means only "blocked", "failed" or "stop". The theme follows the system and can be set to light or dark.
+Three places differ from the product, each for a reason:
+
+- The product's muted text colour (#8D8881, 3.52:1 on white) is too faint to read as text. It is used
+  here only as the edge of controls, and secondary text uses the product's next darker colour.
+- The product's focus ring is its brand red at 28% opacity. That is hard to see, and red here means
+  something went wrong. The ring is the text colour.
+- The product writes a dark tint as its status colour at 12% over the surface. Here each is written as
+  the colour that results on `--surface`, so that its contrast can be checked.
+
+Red text or a red fill means only "blocked", "failed" or "stop". The theme follows the system and can be
+set to light or dark.
 
 **Type**
 
 | Token | Value |
 |---|---|
-| `--font-ui` | The system interface font (`system-ui`, Segoe UI, Roboto, sans-serif) |
+| `--font-ui` | Hanken Grotesk, then the system interface font. The font ships with the viewer as two files (Latin, and Latin extended; every weight in one file), so nothing is fetched from another site. Licence: SIL Open Font License 1.1, in `viewer/src/fonts/OFL.txt` |
 | `--font-mono` | The system monospace font; for refs, addresses and raw results |
-| Sizes | 12 px caption, 13 px secondary, 14 px body, 16 px title, 20 px heading |
-| Weights | 400 regular, 600 emphasis |
-| Line height | 1.45 |
+| Sizes | 12 px caption, 13 px secondary, 14 px body, 16 px title, 18 px heading |
+| Weights | 400 regular, 500 medium (buttons, tabs, labels), 600 emphasis (titles) |
+| Line height | 1.45; 1.3 for titles |
 
 **Space, shape, depth, motion**
 
 | Token | Value |
 |---|---|
 | Spacing scale | 4, 8, 12, 16, 24, 32 px |
-| Radius | 6 px controls, 10 px cards, 14 px panels |
+| Radius | 4 px for the outline of the agent's target, 10 px controls, 16 px cards, 20 px panels and dialogs, full for pills (tabs, the address, chips, badges, the label on the picture, icon buttons) |
 | Border width | 1 px; the control border around the live frame is 3 px |
-| Shadow | None on flat surfaces; one soft shadow on cards; one stronger on overlays |
-| Duration | 120 ms for a state change, 200 ms for something entering |
-| Easing | ease-out |
+| Shadow | None on cards and panels: a hairline edges them. One soft shadow under what floats: the live picture, the step drawer, a dialog, a toast |
+| Duration | 150 ms for a state change, 200 ms for something entering |
+| Easing | cubic-bezier(0.22, 1, 0.36, 1) |
 | Focus ring | 2 px solid `--focus`, 2 px offset |
-| Smallest target | 32 × 32 px for buttons; never under 24 × 24 px |
+| Targets | Buttons are 36 px high. Nothing a person presses is under 32 × 32 px |
 
 ### 9.6 Wording
 
@@ -1312,7 +1338,7 @@ defaults in config.py  <  config.json  <  environment variables  <  user setting
     3. A setting that does not belong to the surface in use is neither shown nor accepted.
 - Per-session options come from the service when a session is created and are limited to: `backend.kind`, `browser.channel`, `browser.headless`, `browser.viewport`, `browser.user_data_dir`, `browser.cdp_url`. A session can never loosen a safety setting.
 - An unknown key stops start-up with a message naming it.
-- Secrets (the service token, proxy passwords) come only from the environment or `.env`, never from `config.json` and never from user settings.
+- Secrets (the service token, proxy passwords, the model's key) come only from the environment or `.env`, never from `config.json` and never from user settings. A `.env` file in the folder the command is run from is read at start; a variable already set in the environment wins over it.
 - `bap-browser config show` prints the effective configuration; `--sources` prints where each overridden value came from.
 - `bap-browser config init [--full]` writes a starter `config.json`.
 - `bap-browser config doc` generates the reference tables below from the code, so this reference cannot drift.
@@ -1619,9 +1645,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 
 | Key | Default | Meaning |
 |---|---|---|
-| `provider` | `anthropic` | Whose model the loop calls. `scripted` replays fixed replies and needs no key |
-| `model` | `claude-opus-5-5` | The model's name at that provider |
-| `api_key_env` | `ANTHROPIC_API_KEY` | The environment variable that holds the key. The key is never in `config.json` |
+| `provider` | `openai` | Whose model the loop calls. `scripted` replays fixed replies and needs no key |
+| `model` | `gpt-5.6-luna` | The model's name at that provider |
+| `api_key_env` | `OPENAI_API_KEY` | The variable, in the environment or in `.env`, that holds the key. The key is never in `config.json` |
+| `base_url` | `https://api.openai.com/v1` | Where the provider's API is. Change it for a proxy or a compatible service |
+| `request_timeout_s` | 120 | Longest wait for one reply from the model |
 | `max_steps` | 40 | Tool calls after which the loop stops |
 | `max_tokens` | 4096 | The most a single reply may be |
 
@@ -2756,8 +2784,15 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
 
-In this build only the scripted model exists, so the command runs with `--demo`. The hosted model is
-added when its provider has been chosen.
+Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,
+with the key read from `OPENAI_API_KEY`. Put `OPENAI_API_KEY=...` in a file named `.env` in the
+folder the command is run from. With no key, the command says so and says how to set one. The
+conversation is not stored at the provider (`store` is off); the model's own reasoning is passed
+back to it encrypted on each turn.
+
+The command ends with 0 when the task was answered, 1 when the model failed or the task was not
+finished (the step limit was reached, or a person stopped the session), 2 when the command or the
+configuration was wrong, and 130 on Ctrl+C.
 
 The loop:
 
