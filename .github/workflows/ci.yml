@@ -20,6 +20,12 @@ jobs:
       - run: npm --prefix viewer run test
       - run: npm --prefix viewer run build
 
+      # The desktop app's shell and the part of its main process that can be tested without a window.
+      - run: npm --prefix desktop ci
+      - run: npm --prefix desktop run typecheck
+      - run: npm --prefix desktop run test
+      - run: npm --prefix desktop run build
+
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run ruff format --check .

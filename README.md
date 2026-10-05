@@ -37,6 +37,17 @@ A real task needs a model key. Copy `.env.example` to `.env` and put your key on
 `OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
 `agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
+## Desktop app
+
+```bash
+npm --prefix desktop install
+npm --prefix desktop start      # one window: the agent's browser on the left, the chat on the right
+```
+
+The app is Electron with a shadcn/ui shell. Its own Chromium is the agent's browser; it starts the
+agent's core itself, so the model's key must be in `.env`. Checks: `npm --prefix desktop run typecheck`,
+`run test`, `run build`.
+
 ## In a container
 
 ```bash

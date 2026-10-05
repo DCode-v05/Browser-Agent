@@ -2295,6 +2295,23 @@ Built as thin slices, each working end to end and tested before the next begins.
 The desktop app itself (its window, the pane that shows the Chromium, packaging and updates) belongs to
 the desktop client. This milestone delivers what that app runs.
 
+**A first desktop app, built to be shown** (`desktop/`). It is not the milestone: it runs from the
+repository, is not packaged, and keeps the core on the same machine.
+
+| Part | What it is |
+|---|---|
+| The app | Electron, which ships its own Chromium: that Chromium is the agent's browser. One window: a rail at the left, the agent's browser in the middle, the chat at the right, with a divider that can be dragged |
+| The shell | React with shadcn/ui components (sidebar, button, badge, resizable panels) in the colours and typeface of section 9.5. It draws the window's frame only; the browser and the chat are views of the app laid over it |
+| The agent's browser | A view of its own, with a kept profile apart from the rest of the app, so a sign-in made there is still there next time. A page that asks the machine for anything (camera, location, notifications) is refused |
+| The core | Started by the app as a process of its own (`bap-browser agent --chat`). It attaches to the app's browser through the app's debugging port (`browser.cdp_url`) and drives the view whose address carries a mark (`browser.cdp_target`). Every tool, the safety policy and the approvals are the core's, as everywhere |
+| The chat | The session's viewer, shown as the conversation of section 9.14 |
+| Rail | Opens the start page or one of the demo sites in the agent's browser, and shows whether the core is running. When the core stops, the chat's place says why in the core's own words, and offers to start it again |
+| Run | `npm --prefix desktop install`, then `npm --prefix desktop start`, with the model's key in `.env` |
+
+Known limits of this first app: the debugging port is open to every program on the same machine while
+the app runs; the core is found through `uv` in the repository, so the app does not run outside it;
+and the page shows no glow or pointer of the agent, which the extension has (section 9.15).
+
 ### 14.4 Milestone 4: the code tool
 
 `browser_run` as section 7 describes it: the checker, the worker process, the `browser` object and its
