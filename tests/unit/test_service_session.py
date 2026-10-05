@@ -426,3 +426,17 @@ async def test_a_wheel_turn_larger_than_the_page_is_cut_to_one_screen(
     await session.handle({"type": "take_over"})
     await session.handle({"type": "wheel", "x": 5, "y": 5, "dx": -99999, "dy": 99999})
     assert driver.calls == [("wheel", (5, 5, -1280, 800))]
+
+
+@pytest.mark.parametrize(("headless", "told"), [(True, None), (False, True)])
+async def test_viewers_are_told_when_the_browser_is_a_window_on_the_persons_own_screen(
+    make_config, tmp_path: Path, headless: bool, told: bool | None
+) -> None:
+    session = ServiceSession(make_config(tmp_path, browser={"headless": headless}), FakeDriver())
+    await session.start()
+    try:
+        first = sent(session)[0]
+        assert first["type"] == "session_started"
+        assert first.get("on_screen") is told
+    finally:
+        await session.close()

@@ -103,6 +103,7 @@ async def chat_with_viewer(
         tell(f"Viewer: {service.viewer_address}")
         if open_viewer:
             webbrowser.open(service.viewer_address)
+        tell(f"Demo site: {service.address}/demo-site/checkin.html")
         tell("Type a task in the viewer's chat. Press Ctrl+C to end.")
         if first_task:
             session.give_task(first_task)

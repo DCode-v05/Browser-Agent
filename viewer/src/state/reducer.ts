@@ -88,6 +88,8 @@ export interface SessionInfo {
   backend: Backend;
   browser: string;
   viewport: { width: number; height: number };
+  /** The browser is a window on the person's own screen, so there is no picture of it to show. */
+  onScreen: boolean;
   startedAt: number;
 }
 
@@ -188,6 +190,7 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
           backend: event.backend,
           browser: event.browser,
           viewport: event.viewport,
+          onScreen: event.on_screen === true,
           startedAt: event.ts,
         },
         control: 'agent',

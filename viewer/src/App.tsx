@@ -115,8 +115,10 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
   const driving = view.key === 'person';
+  // The browser is a window on the person's own screen: this page is the chat beside it.
+  const beside = state.session?.onScreen === true;
   // A person who takes over gets the whole width to work in.
-  const full = driving || wantsFull;
+  const full = !beside && (driving || wantsFull);
   const send = useCallback((command: ClientCommand) => connection.send(command), [connection]);
 
   const toast = useCallback((text: string) => {
@@ -256,7 +258,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const selectedStep = selected === null ? undefined : state.steps.find((step) => step.n === selected);
 
   return (
-    <div className="app" data-view={full ? 'full' : 'split'} data-state={view.key} data-embedded={embedded}>
+    <div className="app" data-view={full ? 'full' : 'split'} data-state={view.key} data-embedded={embedded} data-beside={beside || undefined}>
       <header className="top-bar">
         {embedded ? (
           <h1 className="sr-only">{W.topBar.embeddedTitle}</h1>
@@ -289,7 +291,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           <span className="connection-dot" aria-hidden="true" />
           {W.connection[state.connection]}
         </span>
-        {!full && state.session && (
+        {!full && !beside && state.session && (
           <span className="wide-only">
             <Button kind="quiet" icon="expand" onClick={() => setWantsFull(true)} label={W.buttons.showFull}>
               {null}
@@ -313,15 +315,17 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       )}
 
       <main className="workspace">
-        <BrowserPane
-          state={state}
-          view={view}
-          now={now}
-          showPointer={preferences.showAgentPointer}
-          options={options}
-          onCommand={send}
-          onRelease={() => (primaryButton.current ?? stopButton.current)?.focus()}
-        />
+        {!beside && (
+          <BrowserPane
+            state={state}
+            view={view}
+            now={now}
+            showPointer={preferences.showAgentPointer}
+            options={options}
+            onCommand={send}
+            onRelease={() => (primaryButton.current ?? stopButton.current)?.focus()}
+          />
+        )}
         {!full && (
           <section className="activity" aria-label="Activity">
             {status}

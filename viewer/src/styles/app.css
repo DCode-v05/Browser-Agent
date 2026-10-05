@@ -1207,6 +1207,30 @@
   color: var(--text-muted);
 }
 
+/* Beside a browser that is a window on the person's own screen, the page is the chat: one
+   column as tall as the window, in which the conversation takes the room. */
+
+.app[data-beside] {
+  height: 100%;
+  min-height: 0;
+}
+
+.app[data-beside] .workspace {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app[data-beside] .timeline {
+  flex: 0 1 auto;
+  max-height: 30%;
+}
+
+.app[data-beside] .rows-scroll {
+  max-height: none;
+}
+
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
 
 @media (max-width: 979px) {

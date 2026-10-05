@@ -38,6 +38,8 @@ export type ServerEvent =
       viewport: { width: number; height: number };
       /** The agent takes its tasks from the chat in the viewer. */
       chat?: boolean;
+      /** The browser is a window on the person's own screen. */
+      on_screen?: boolean;
       ts: number;
     }
   | { type: 'control_changed'; state: ControlState; since: number }

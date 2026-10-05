@@ -146,6 +146,17 @@ const TAKEOVER_CHROME_START: Beat = {
   event: { ...(SESSION_STARTED.event as Extract<EventDraft, { type: 'session_started' }>), backend: 'takeover_chrome', browser: 'Chrome 154' },
 };
 
+/** A chat session whose browser is a window on the person's own screen. */
+const BESIDE: Beat[] = [
+  { after: 0, event: { ...(SESSION_STARTED.event as Extract<EventDraft, { type: 'session_started' }>), chat: true, on_screen: true } },
+  tab('Online check-in', 'https://example.com/checkin'),
+  { after: 0, event: { type: 'message', id: 1, role: 'person', text: 'Check in for booking SK4821, last name Lovelace. Choose a window seat.' } },
+  { after: 0, event: { type: 'task_changed', working: true } },
+  ...step(1, 'browser_navigate', 'Opening example.com/checkin', 'Opened example.com/checkin', { url: 'https://example.com/checkin' }),
+  ...step(2, 'browser_type', 'Typing 6 characters into "Booking reference"', 'Typed 6 characters into "Booking reference"', { url: 'https://example.com/checkin' }),
+  start(3, 'browser_click', 'Clicking "Find booking" (button)'),
+];
+
 /** One recording per state of spec 9.3 (and a few more), each stopping in that state. */
 export const STATES: Record<string, RecordedSession> = {
   no_agent: { name: 'no_agent', beats: [] },
@@ -172,6 +183,7 @@ export const STATES: Record<string, RecordedSession> = {
   disconnected: { name: 'disconnected', beats: [...OPENING, CHOOSING_COUNTRY], afterwards: 'reconnecting' },
   // Eight quiet seconds after the last picture: longer than `viewer.stale_after_s`.
   stale: { name: 'stale', beats: [...OPENING, CHOOSING_COUNTRY, { after: 8000 }], stalls: true },
+  beside: { name: 'beside', beats: BESIDE },
   own_browser: {
     name: 'own_browser',
     beats: [TAKEOVER_CHROME_START, tab('Sign up', SIGNUP), ...OPENING.slice(2).map((beat) => ({ ...beat, frame: undefined })), CHOOSING_COUNTRY],

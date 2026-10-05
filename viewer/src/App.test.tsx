@@ -694,3 +694,24 @@ describe('a site list is not lost by closing the screen', () => {
     expect(list).toHaveFocus();
   });
 });
+
+describe("beside a browser that is a window on the person's own screen", () => {
+  it('shows no picture of the browser: the page is the chat, with the controls', () => {
+    show('beside');
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Chat' })).toBeInTheDocument();
+    expect(button('Pause')).toBeEnabled();
+    expect(button('Stop session')).toBeEnabled();
+    // There is no picture to show full width.
+    noButton('Show the browser full width');
+  });
+
+  it('taking over keeps the chat and the way back on screen', async () => {
+    const { sent, user } = show('beside');
+    await user.click(button('Take over'));
+    expect(types(sent)).toEqual(['take_over']);
+    expect(screen.getByRole('heading', { name: "You're in control" })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Chat' })).toBeInTheDocument();
+    expect(button('Hand back')).toBeEnabled();
+  });
+});

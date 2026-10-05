@@ -25,6 +25,7 @@ STATES = [
     "disconnected",
     "stale",
     "own_browser",
+    "beside",
 ]
 THEMES = ["light", "dark"]
 

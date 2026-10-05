@@ -222,6 +222,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#911-viewer-build">9.11 Viewer build</a></li>
 <li><a href="#912-settings-screen">9.12 Settings screen</a></li>
 <li><a href="#913-later-in-the-viewer">9.13 Later in the viewer</a></li>
+<li><a href="#914-chat">9.14 Chat</a></li>
 </ul>
 </li>
 <li class="s"><a href="#10-configuration-and-settings">10. Configuration and settings</a>
@@ -956,11 +957,11 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 <tbody>
 <tr>
 <td>Service to viewer</td>
-<td><code>session_started</code>, <code>control_changed</code>, <code>step_started</code>, <code>step_finished</code>, <code>tab_changed</code>, <code>approval_requested</code>, <code>approval_closed</code>, <code>help_requested</code>, <code>help_closed</code>, <code>dialog_opened</code>, <code>dialog_closed</code>, <code>download_saved</code>, <code>picture_current</code>, <code>caught_up</code>, <code>navigation_blocked</code>, <code>settings_changed</code>, <code>bridge_changed</code> (milestone 2), <code>session_ended</code>, frame</td>
+<td><code>session_started</code>, <code>control_changed</code>, <code>step_started</code>, <code>step_finished</code>, <code>tab_changed</code>, <code>approval_requested</code>, <code>approval_closed</code>, <code>help_requested</code>, <code>help_closed</code>, <code>dialog_opened</code>, <code>dialog_closed</code>, <code>download_saved</code>, <code>picture_current</code>, <code>caught_up</code>, <code>navigation_blocked</code>, <code>settings_changed</code>, <code>message</code>, <code>task_changed</code>, <code>bridge_changed</code> (milestone 2), <code>session_ended</code>, frame</td>
 </tr>
 <tr>
 <td>Viewer to service</td>
-<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code></td>
+<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code>, <code>task</code></td>
 </tr>
 </tbody>
 </table></div>
@@ -987,7 +988,7 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 <tbody>
 <tr>
 <td><code>session_started</code></td>
-<td><code>session</code>, <code>agent</code>, <code>backend</code>, <code>browser</code>, <code>viewport</code> (<code>width</code>, <code>height</code>), <code>ts</code></td>
+<td><code>session</code>, <code>agent</code>, <code>backend</code>, <code>browser</code>, <code>viewport</code> (<code>width</code>, <code>height</code>), <code>chat</code> (true when the agent takes its tasks from the viewer's chat), <code>on_screen</code> (true when the browser is a window on the person's own screen), <code>ts</code></td>
 </tr>
 <tr>
 <td><code>control_changed</code></td>
@@ -1040,6 +1041,14 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 <tr>
 <td><code>settings_changed</code></td>
 <td><code>changes</code></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>id</code>, <code>role</code> (<code>person</code>, <code>agent</code>), <code>text</code>, <code>failed</code> (true when the agent could not do the task), <code>ts</code></td>
+</tr>
+<tr>
+<td><code>task_changed</code></td>
+<td><code>working</code> (true while the agent is on a task), <code>ts</code></td>
 </tr>
 <tr>
 <td><code>picture_current</code></td>
@@ -1476,12 +1485,12 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_go_forward</code></td>
 <td>none</td>
-<td>The snapshot</td>
+<td>The snapshot, or "No next page in history."</td>
 </tr>
 <tr>
 <td><code>browser_reload</code></td>
 <td>none</td>
-<td>The snapshot</td>
+<td>"Reloaded …" and the snapshot</td>
 </tr>
 </tbody>
 </table></div>
@@ -1508,7 +1517,7 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_find</code></td>
 <td><code>query</code>, <code>limit</code> (10, at most 50)</td>
-<td>Matching snapshot lines with refs, best first</td>
+<td>Matching snapshot lines with refs, best first. A line that holds the whole phrase comes before one that holds some of its words. A line of text has no ref of its own and is given with the ref of the element it is in: <code>(in e7)</code></td>
 </tr>
 <tr>
 <td><code>browser_screenshot</code></td>
@@ -1540,7 +1549,7 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_hover</code></td>
 <td><code>ref</code>, or <code>x</code> and <code>y</code></td>
-<td>"Hovering over …"</td>
+<td>"Hovering over …". A point is in page pixels from the top left of what the browser shows; a point outside it is refused</td>
 </tr>
 <tr>
 <td><code>browser_drag</code></td>
@@ -1572,17 +1581,17 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_select_option</code></td>
 <td><code>ref</code>, <code>values</code></td>
-<td>The selected values</td>
+<td>"Selected "India" in e6 (combobox "Country")". A value matches an option's value or label, exactly or without regard to case. An option that does not exist is refused with the list of options</td>
 </tr>
 <tr>
 <td><code>browser_set_checked</code></td>
 <td><code>ref</code>, <code>checked</code></td>
-<td>"e5 is now checked."</td>
+<td>"e5 is now checked.", or "e5 was already checked." It clicks the element as a person would and then reads the state back; a radio button cannot be cleared</td>
 </tr>
 <tr>
 <td><code>browser_press_key</code></td>
 <td><code>keys</code>; <code>repeat</code> (1, up to 100); <code>ref</code></td>
-<td>"Pressed Control+a"</td>
+<td>"Pressed Control+a". Key names are taken in any common form (<code>ctrl+a</code>, <code>esc</code>, <code>down</code>). A key that types a character is typed text: the result says "Pressed a character key" and the log keeps a count</td>
 </tr>
 </tbody>
 </table></div>
@@ -1599,7 +1608,7 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_scroll</code></td>
 <td><code>direction</code>; <code>amount</code> (1 step, up to 20); <code>ref</code>, or <code>x</code> and <code>y</code></td>
-<td>"Scrolled down 1. Position 400px of 3200px."</td>
+<td>"Scrolled down 1. Position 400px of 3200px.", or "Nothing scrolled down. …" at the end. With a ref the wheel turns over the box that element scrolls in, and the position is that box's: "Scrolled down 1 inside e42. …"</td>
 </tr>
 <tr>
 <td><code>browser_scroll_to</code></td>
@@ -1609,7 +1618,7 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_wait</code></td>
 <td>one of <code>text</code>, <code>text_gone</code>, <code>load_state</code>, <code>seconds</code>; <code>timeout_s</code></td>
-<td>What was reached. Capped by <code>browser.timeouts.wait_max_s</code></td>
+<td>What was reached. Capped by <code>browser.timeouts.wait_max_s</code>. A wait that runs out is a failed result. A wait for text goes on in a page that replaces this one</td>
 </tr>
 </tbody>
 </table></div>
@@ -1697,10 +1706,16 @@ never crashes on a bad call.</p>
 <tr>
 <td><code>browser_request_human</code></td>
 <td><code>reason</code> (up to 300 characters); <code>kind</code> (<code>login</code>, <code>verification</code>, <code>payment</code>, <code>other</code>); <code>timeout_s</code></td>
-<td><code>done</code>, <code>could_not</code> or <code>timed_out</code>, an optional note from the person, then the change note</td>
+<td><code>done</code>, <code>could_not</code> or <code>timed_out</code>, then the change note: whether the address changed, and that a new snapshot is needed. The wait is at most <code>control.handoff_timeout_s</code>. In a session nobody can watch, the call fails and says so. The person's own note is a later item</td>
 </tr>
 </tbody>
 </table></div>
+<p>A click or a hover on a ref moves the pointer to the element first and then checks that the element is
+still under it: a menu that was open under the pointer closes when the pointer leaves, and what follows it
+shifts. If the element moved, it is found again before the press. A key press that fails part-way releases
+the modifiers it had pressed.</p>
+<p><code>browser_fill_form</code> fills each field the way its kind is filled and stops at the first field that fails;
+the result then says which fields were filled before it.</p>
 <p>That is 28 tools: 25 always present and 3 that depend on configuration (<code>browser_evaluate</code> is off by
 default). <code>browser_fill_form</code> already covers the most common multi-step case, filling a form, in one call.</p>
 <h3 id="63-milestone-4-tool">6.3 Milestone 4 tool</h3>
@@ -2221,8 +2236,8 @@ column is unchanged.</p>
 </tr>
 <tr>
 <td>Target highlight and pointer</td>
-<td>Where the agent is about to act; drawn over the picture by the viewer, never inside the page</td>
-<td>targeting, acted</td>
+<td>Where the agent is about to act and where it has just acted; drawn over the picture by the viewer, never inside the page</td>
+<td>targeting, acted, failed</td>
 </tr>
 <tr>
 <td>Status line</td>
@@ -2736,6 +2751,7 @@ duration and opens the step drawer.</p>
 <li>State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.</li>
 <li><strong>Recorded sessions.</strong> <code>viewer/src/demo/</code> holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. <code>?demo=&lt;name&gt;</code> plays one with no service, at real pace or stepped by hand, and <code>?state=&lt;name&gt;</code> opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.</li>
 <li>The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.</li>
+<li>The agent's pointer stays on the picture where the agent last acted. When a step names an element, the pointer moves there from where it was (a transform, 200 ms). The element is outlined while the step runs and for <code>viewer.pointer_hold_ms</code> after it, in the danger colour when the step failed. A click leaves a dot at the point for the same time, and one ring spreads from it once the pointer has arrived. With reduced motion the pointer jumps, and the outline and the dot stay until the next step. The pointer and the click mark are hidden while the session is paused or waits for a person, and are never shown while a person drives.</li>
 <li>In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away. Whatever needs a person (an approval, a request for help, a page dialog, a blocked page, the summary) sits between that bar and the browser, so nothing has to be answered blind.</li>
 <li>During takeover, pointer positions are scaled from the canvas to page pixels and sent as <code>pointer</code>, <code>wheel</code> and <code>key</code> commands.</li>
 <li><code>npm run build</code> writes the viewer into <code>src/bap_browser/viewer_dist/</code>, which the service serves.</li>
@@ -2856,6 +2872,39 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <p>Next: sign-in form, replay player, notifications, a note to the agent, typing with a phone's on-screen
 keyboard during takeover. Later: a plan card to approve before a run.</p>
 
+<h3 id="914-chat">9.14 Chat</h3>
+<p><strong>Beside a browser on the person's own screen.</strong> When <code>session_started</code> carries <code>on_screen: true</code>,
+the person watches the browser itself, so the viewer shows no picture of it. The page is one
+column as tall as its window: the status with its controls, the chat, which takes the room, and
+the steps under it. A person places that window to the right of the browser. Taking over
+needs no picture either: the person works in the browser window, and the agent's calls wait.</p>
+<p>When the agent takes its tasks from the viewer (<code>session_started</code> carries <code>chat: true</code>), the activity
+column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,
+and a box to write the next task in.</p>
+<ul>
+<li>Enter sends the task; Shift+Enter starts a new line. A task is at most <code>agent.max_task_chars</code> characters.
+  Anything else the viewer sends as a task is dropped.</li>
+<li>The viewer sends <code>task</code>; the service answers with a <code>message</code> of role <code>person</code>, so every viewer shows the
+  same conversation and a viewer that connects later is sent it again.</li>
+<li>While the agent is on a task the chat says so and the status reads "Agent is working". Between tasks the
+  status reads "Ready for your task". A task sent while the agent is working waits its turn.</li>
+<li>What the agent says while it works, and its answer, are <code>message</code>s of role <code>agent</code>. A task that could not
+  be done (the model could not be reached, the step limit) is answered with a <code>message</code> marked <code>failed</code>, and
+  the session goes on.</li>
+<li>The conversation continues from one task to the next. The pages a finished task read are dropped from it,
+  so the next task reads the page as it is then and pays for none of the old ones.</li>
+<li>The session ends only when a person stops it. After that the box is disabled.</li>
+<li>The top of the chat says what the agent is doing in one word, with a dot and a colour: Working, Ready,
+  Paused, You're in control, Waiting for you, Stopped, Not connected. While it works, the line under the
+  messages names the step under way.</li>
+<li>While the agent works, the edge of the live picture glows in the agent's colour and breathes slowly
+  (<code>--duration-breathe</code>); between tasks the picture's border is neutral. With reduced motion the glow is
+  still. This and the live dot are the only things that loop.</li>
+<li>An answer is shown the way the model meant it: <code>**bold**</code>, <code>`code`</code>, <code>[named](links)</code> and bare web
+  addresses, which open in a new tab. Nothing else is interpreted, only <code>http</code> and <code>https</code> addresses become
+  links, and HTML in an answer is shown as text. What the person wrote is shown as written.</li>
+<li>Messages pass through the same redaction as everything else a viewer is sent.</li>
+</ul>
 <h2 id="10-configuration-and-settings">10. Configuration and settings</h2>
 <p>Two words are used with care. <strong>Configuration</strong> is everything a deployment can set: every key in
 <code>config.py</code>. <strong>Settings</strong> are the part of it that a person may change in the settings screen.</p>
@@ -3928,6 +3977,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>Pages allowed to show the viewer inside themselves, and to open its WebSocket</td>
 </tr>
 <tr>
+<td><code>pointer_hold_ms</code></td>
+<td>600</td>
+<td>How long the outline and the click mark stay after the agent has acted</td>
+</tr>
+<tr>
 <td><code>show_agent_pointer</code></td>
 <td><code>true</code></td>
 <td>Draw the target highlight and the agent's pointer over the live picture</td>
@@ -4084,6 +4138,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>max_tokens</code></td>
 <td>4096</td>
 <td>The most a single reply may be</td>
+</tr>
+<tr>
+<td><code>max_task_chars</code></td>
+<td>4000</td>
+<td>Longest task a person may send from the viewer's chat</td>
 </tr>
 </tbody>
 </table></div>
@@ -8151,6 +8210,14 @@ reached, or a person stops the session. The answer is the only thing written to 
 <tr>
 <td><code>--exit-when-done</code></td>
 <td>Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C</td>
+</tr>
+<tr>
+<td><code>--chat</code></td>
+<td>Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with <code>--demo</code></td>
+</tr>
+<tr>
+<td><code>--show-browser</code></td>
+<td>Runs the browser in a window on this screen (<code>browser.headless</code> off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14)</td>
 </tr>
 </tbody>
 </table></div>

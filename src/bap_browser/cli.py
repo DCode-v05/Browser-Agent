@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from bap_browser import __version__
-from bap_browser.config import defaults, load_config, load_config_with_sources
+from bap_browser.config import Config, defaults, load_config, load_config_with_sources
 from bap_browser.config_doc import reference_markdown
 from bap_browser.env_file import apply_env_file
 from bap_browser.errors import ConfigError
@@ -94,8 +94,20 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="keep the session open and take tasks from the chat in the viewer, one after another",
     )
+    agent.add_argument(
+        "--show-browser",
+        action="store_true",
+        help="run the browser in a window on this screen, so the agent is seen working in it",
+    )
     agent.set_defaults(run=_agent)
     return parser
+
+
+def with_visible_browser(config: Config) -> Config:
+    """The same configuration with the browser in a window a person can watch, the page as large as
+    that window."""
+    browser = config.browser.model_copy(update={"headless": False, "viewport": None})
+    return config.model_copy(update={"browser": browser})
 
 
 def _config_show(args: argparse.Namespace) -> int:
@@ -143,6 +155,8 @@ def _mcp(args: argparse.Namespace) -> int:
 
 def _agent(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    if args.show_browser:
+        config = with_visible_browser(config)
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
     from bap_browser.agent.loop import Unfinished

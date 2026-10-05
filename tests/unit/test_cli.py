@@ -102,3 +102,17 @@ def test_settings_in_a_dot_env_file_beside_the_command_are_used(
     file = write(tmp_path / "config.json", {})
     assert main(["config", "show", "--config", str(file), "--sources"]) == 0
     assert capsys.readouterr().out.strip() == "browser.headless = false  (environment)"
+
+
+def test_the_agent_command_can_show_its_browser(make_config, tmp_path: Path) -> None:
+    from bap_browser.cli import _parser, with_visible_browser  # pyright: ignore[reportPrivateUsage]
+
+    assert _parser().parse_args(["agent", "--show-browser", "--chat"]).show_browser is True
+    assert _parser().parse_args(["agent", "Read the page"]).show_browser is False
+    config = make_config(tmp_path, browser={"channel": "chrome"})
+    assert config.browser.headless is True and config.browser.viewport is not None
+    shown = with_visible_browser(config)
+    # A window a person watches: it is on screen, and the page is as large as the window.
+    assert shown.browser.headless is False and shown.browser.viewport is None
+    assert shown.browser.channel == "chrome", "nothing else about the browser changes"
+    assert config.browser.headless is True, "the configuration it was made from is left as it was"

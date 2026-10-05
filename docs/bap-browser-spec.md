@@ -381,7 +381,7 @@ Fields of each event. Times are in seconds on the service's clock.
 
 | Event | Fields |
 |---|---|
-| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `ts` |
+| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `on_screen` (true when the browser is a window on the person's own screen), `ts` |
 | `control_changed` | `state` (`agent`, `waiting_approval`, `person_requested`, `person`, `paused`, `ended`), `since` |
 | `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
 | `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
@@ -1326,6 +1326,12 @@ keyboard during takeover. Later: a plan card to approve before a run.
 ---
 
 ### 9.14 Chat
+
+**Beside a browser on the person's own screen.** When `session_started` carries `on_screen: true`,
+the person watches the browser itself, so the viewer shows no picture of it. The page is one
+column as tall as its window: the status with its controls, the chat, which takes the room, and
+the steps under it. A person places that window to the right of the browser. Taking over
+needs no picture either: the person works in the browser window, and the agent's calls wait.
 
 When the agent takes its tasks from the viewer (`session_started` carries `chat: true`), the activity
 column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,
@@ -2826,6 +2832,7 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
 | `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
+| `--show-browser` | Runs the browser in a window on this screen (`browser.headless` off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |
 
 Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,
 with the key read from `OPENAI_API_KEY`. Put `OPENAI_API_KEY=...` in a file named `.env` in the

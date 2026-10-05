@@ -41,10 +41,15 @@ describe('session', () => {
       backend: 'remote_headless',
       browser: 'Chromium 153',
       viewport: { width: 1280, height: 800 },
+      onScreen: false,
       startedAt: T0,
     });
     expect(state.control).toBe('agent');
     expect(state.controlSince).toBe(T0);
+  });
+
+  it("a browser that is a window on the person's own screen is known as that", () => {
+    expect(play([{ ...started, on_screen: true }]).session?.onScreen).toBe(true);
   });
 
   it('a new session forgets the previous one', () => {
