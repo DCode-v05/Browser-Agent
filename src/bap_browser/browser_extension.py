@@ -44,16 +44,28 @@ def with_extension(config: Config, folder: Path) -> Config:
             ],
         }
     )
+    return may_show_viewer(config.model_copy(update={"browser": browser}))
+
+
+def may_show_viewer(config: Config) -> Config:
+    """The same configuration with the extension allowed to show the viewer inside its side panel."""
     viewer = config.viewer.model_copy(update={"embed_origins": [*config.viewer.embed_origins, ORIGIN]})
-    return config.model_copy(update={"browser": browser, "viewer": viewer})
+    return config.model_copy(update={"viewer": viewer})
 
 
-def announce(folder: Path, viewer_address: str) -> None:
-    """Tells the extension where the session's viewer is. The address carries the session's token,
-    so the file is removed again when the session ends."""
-    # Inside the side panel the viewer is a guest: it drops its own product name.
-    address = viewer_address.replace("/#", "/?embed=1#", 1)
-    (folder / SESSION_FILE).write_text(json.dumps({"viewer": address}), encoding="utf-8")
+def announce(
+    folder: Path, viewer_address: str | None = None, *, bridge: str | None = None, token: str | None = None
+) -> None:
+    """Tells the extension where the session's viewer is and, for take-over Chrome, where it dials in
+    as the bridge and with which token. The file carries the session's token, so it is removed again
+    when the session ends."""
+    told: dict[str, str] = {}
+    if viewer_address is not None:
+        # Inside the side panel the viewer is a guest: it drops its own product name.
+        told["viewer"] = viewer_address.replace("/#", "/?embed=1#", 1)
+    if bridge is not None and token is not None:
+        told["bridge"], told["token"] = bridge, token
+    (folder / SESSION_FILE).write_text(json.dumps(told), encoding="utf-8")
 
 
 def forget(folder: Path) -> None:

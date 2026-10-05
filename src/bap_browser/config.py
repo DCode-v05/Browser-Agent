@@ -304,6 +304,11 @@ class Server(Section):
     )
 
 
+class Bridge(Section):
+    op_timeout_ms: int = setting(15000, "One driver operation")
+    max_message_mb: int = setting(16, "Largest message accepted on the channel")
+
+
 class Mcp(Section):
     server_name: str = setting("bap-browser", "The name agents see")
     http_path: str = setting("/mcp", "Where MCP over HTTP is served")
@@ -410,6 +415,7 @@ class Config(Section):
     safety: Safety = Safety()
     control: Control = Control()
     permissions: Permissions = Permissions()
+    bridge: Bridge = Bridge()
     sessions: Sessions = Sessions()
     server: Server = Server()
     mcp: Mcp = Mcp()

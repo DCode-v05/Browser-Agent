@@ -45,6 +45,7 @@ class ServiceSession:
         agent: str = "Agent",
         clock: Callable[[], float] = time.time,
         on_task: Callable[[str], None] | None = None,
+        pictures: bool = True,
     ) -> None:
         self.config = config
         self.name = name
@@ -63,6 +64,8 @@ class ServiceSession:
         self._helps = 0
         self.control: ControlState = "agent"
         self._on_task = on_task
+        # Whether viewers are sent live pictures of the browser. Not when each one would cross a bridge.
+        self._pictures = pictures
         """Given each task a person sends from the viewer's chat. None when the agent takes no tasks there."""
         self._messages = 0
         # Whether the agent is on a task from the chat, and whether a person has stopped that task.
@@ -105,7 +108,8 @@ class ServiceSession:
         self.hub.publish(started)
         self._publish_tabs(await self.toolkit.tabs())
         viewer = self.config.viewer
-        await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
+        if self._pictures:
+            await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
         self._heartbeat = asyncio.create_task(self._keep_viewers_current())
 
     async def close(self, reason: EndReason = "agent", detail: str | None = None) -> None:

@@ -122,6 +122,8 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "server.auth_wait_s": 10,
     "server.shutdown_wait_s": 3,
     "server.command_backlog": 256,
+    "bridge.op_timeout_ms": 15000,
+    "bridge.max_message_mb": 16,
     "mcp.server_name": "bap-browser",
     "mcp.http_path": "/mcp",
     "viewer.quality": "standard",

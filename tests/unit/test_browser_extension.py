@@ -15,8 +15,11 @@ def test_the_extension_is_copied_to_where_a_browser_loads_it(tmp_path: Path) -> 
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 3
     assert manifest["side_panel"] == {"default_path": "panel.html"}
-    # It asks for nothing but the side panel: it drives no page and reads none.
-    assert manifest["permissions"] == ["sidePanel"]
+    # The side panel for the chat; the debugger, the tabs and their groups for take-over Chrome,
+    # where the extension attaches to the one tab it opened for the agent. No site is named:
+    # it reads no page by itself.
+    assert manifest["permissions"] == ["sidePanel", "debugger", "tabs", "tabGroups"]
+    assert "host_permissions" not in manifest
     named = [
         manifest["background"]["service_worker"],
         manifest["side_panel"]["default_path"],
@@ -75,6 +78,13 @@ def test_a_session_is_made_known_to_the_extension_and_forgotten_again(tmp_path: 
     browser_extension.forget(folder)
     assert not (folder / "session.json").exists()
     browser_extension.forget(folder)
+
+    # For take-over Chrome it is also told where to dial in, and with which token.
+    browser_extension.announce(folder, bridge="ws://127.0.0.1:8123/bridge", token="abc")
+    assert json.loads((folder / "session.json").read_text(encoding="utf-8")) == {
+        "bridge": "ws://127.0.0.1:8123/bridge",
+        "token": "abc",
+    }
 
     # Installing again never leaves an old session's address behind.
     browser_extension.announce(folder, "http://127.0.0.1:8123/#token=abc")

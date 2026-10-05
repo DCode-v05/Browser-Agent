@@ -8,8 +8,8 @@
   html, body { height: 100%; margin: 0; }
   body { font: 14px/1.45 system-ui, "Segoe UI", sans-serif; background: #ffffff; color: #1a1714; }
   iframe { display: block; width: 100%; height: 100%; border: 0; }
-  #waiting { display: grid; place-content: center; gap: 8px; height: 100%; padding: 24px; text-align: center; }
-  #waiting b { font-size: 16px; }
+  #waiting, #connecting { display: grid; place-content: center; gap: 8px; height: 100%; padding: 24px; text-align: center; }
+  #waiting b, #connecting b { font-size: 16px; }
   #waiting code { display: inline-block; padding: 6px 10px; border-radius: 10px; background: #f5f4f2; font: 13px ui-monospace, Consolas, monospace; }
   [hidden] { display: none !important; }
   @media (prefers-color-scheme: dark) {
@@ -23,6 +23,10 @@
   <b>The agent is not running</b>
   <span>Start it from the project folder, and this panel connects by itself:</span>
   <code>uv run bap-browser agent --chat --extension</code>
+</div>
+<div id="connecting" hidden>
+  <b>Connecting to the agent…</b>
+  <span>It opens a tab of its own in this window. Keep this panel open while it works.</span>
 </div>
 <iframe id="viewer" title="The agent's chat" hidden></iframe>
 <script src="panel.js"></script>

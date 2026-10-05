@@ -19,6 +19,7 @@ uv run bap-browser agent --demo --open    # watch a scripted agent sign up on th
 uv run bap-browser agent "Find the price of ..." --open   # a real task, done by GPT-5.6 Luna
 uv run bap-browser agent --chat --show-browser --open     # the agent works in a browser window you watch; you talk to it in the chat
 uv run bap-browser agent --chat --extension               # the same, with the chat in the browser's own side panel
+uv run bap-browser agent --chat --takeover                # the agent works in a tab of your own Chrome (load the extension it names, once)
 uv run bap-browser mcp                    # an MCP server over stdio, for an agent to start
 uv run bap-browser serve                  # the same tools over MCP on HTTP (port 8765), with the viewer, for an agent elsewhere
 uv run bap-browser config show --sources  # the effective configuration

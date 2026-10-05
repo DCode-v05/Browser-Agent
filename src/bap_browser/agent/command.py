@@ -12,6 +12,7 @@ from bap_browser import browser_extension
 from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
 from bap_browser.config import Config
+from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 
@@ -118,21 +119,80 @@ async def chat_with_viewer(
             await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
             tell("In the browser that opened, click the BAP icon in the toolbar (or press Ctrl+Shift+Y).")
         tell("Type a task in the viewer's chat. Press Ctrl+C to end.")
-        if first_task:
-            session.give_task(first_task)
-        model = model_for(service)
-        history: list[Message] = []
-        while True:
-            task = await _unless_stopped(_next_task(tasks, session), service)
-            if task is None:
-                break
-            await _unless_stopped(_do(task, session, model, config, history), service)
-        tell(SESSION_OVER)
-        await service.wait()
+        await _converse(tasks, session, service, model_for(service), config, first_task)
     finally:
         if extension is not None:
             browser_extension.forget(extension)
         await session.close()
+        await service.stop()
+
+
+async def _converse(
+    tasks: asyncio.Queue[str],
+    session: ServiceSession,
+    service: Service,
+    model: Model,
+    config: Config,
+    first_task: str | None,
+) -> None:
+    """Does the tasks a person sends, one at a time, until the session ends; then keeps the viewer
+    open until the service is stopped."""
+    if first_task:
+        session.give_task(first_task)
+    history: list[Message] = []
+    while True:
+        task = await _unless_stopped(_next_task(tasks, session), service)
+        if task is None:
+            break
+        await _unless_stopped(_do(task, session, model, config, history), service)
+    tell(SESSION_OVER)
+    await service.wait()
+
+
+async def chat_in_own_chrome(
+    config: Config, model_for: Callable[[Service], Model], *, first_task: str | None, extension: Path
+) -> None:
+    """The chat, with the agent driving a tab of the person's own Chrome through the extension
+    (spec 4.9). The extension dials in to this process; nothing here reaches into the browser.
+
+    `extension` is the folder the extension was put in, which the person loads into their Chrome.
+    Raises Interrupted when the service was stopped (Ctrl+C).
+    """
+    # The side panel shows the chat, which is this service's viewer inside the extension's page.
+    config = browser_extension.may_show_viewer(config)
+    tasks: asyncio.Queue[str] = asyncio.Queue()
+    sessions: dict[str, ServiceSession] = {}
+    service = Service(config, sessions, port=0, bridge=True)
+    session: ServiceSession | None = None
+    await service.start()
+    try:
+        assert service.bridge is not None
+        browser_extension.announce(extension, bridge=service.bridge_address, token=service.token)
+        tell(
+            "Load the extension into your Chrome, once: open chrome://extensions, switch on Developer "
+            f"mode, press Load unpacked and choose {extension}"
+        )
+        tell("Then open its side panel with the BAP icon in the toolbar, and keep it open.")
+        await _unless_stopped(service.bridge.wait_connected(), service)
+        tell("The extension has connected. Opening the agent's tab.")
+        # The driver attaches to the tab through this process's own end of the bridge.
+        browser = config.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
+        attached = config.model_copy(update={"browser": browser})
+        driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
+        # The person looks at their own browser: no picture of it is sent across the bridge.
+        session = ServiceSession(attached, driver, agent=AGENT_NAME, on_task=tasks.put_nowait, pictures=False)
+        await _unless_stopped(session.start(), service)
+        sessions[session.name] = session
+        browser_extension.announce(
+            extension, service.viewer_address, bridge=service.bridge_address, token=service.token
+        )
+        await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
+        tell("Type a task in the side panel's chat. Press Ctrl+C to end.")
+        await _converse(tasks, session, service, model_for(service), attached, first_task)
+    finally:
+        browser_extension.forget(extension)
+        if session is not None:
+            await session.close()
         await service.stop()
 
 

@@ -16,11 +16,9 @@ from mcp.server import Server as McpServer
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from bap_browser.config import Config
-from bap_browser.service.app import create_app
+from bap_browser.service.app import LARGEST_VIEWER_MESSAGE, create_app
+from bap_browser.service.bridge import Bridge
 from bap_browser.service.session import ServiceSession
-
-# A person's command is a few dozen bytes. Nothing larger is read from a viewer.
-LARGEST_VIEWER_MESSAGE = 64 * 1024
 
 
 class Service:
@@ -32,17 +30,24 @@ class Service:
         token: str | None = None,
         port: int | None = None,
         mcp: McpServer[Any] | None = None,
+        bridge: bool = False,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
-        server: with it, the service also offers them over HTTP at `mcp.http_path`."""
+        server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
+        the place where the extension in a person's own Chrome dials in (spec 4.9)."""
         self._config = config
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
         self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
         self._mcp_running: asyncio.Task[None] | None = None
         self._mcp_over = asyncio.Event()
+        self.bridge = Bridge(config.bridge.op_timeout_ms / 1000) if bridge else None
         self._app = create_app(
-            config, sessions, self.token, self._mcp.handle_request if self._mcp is not None else None
+            config,
+            sessions,
+            self.token,
+            self._mcp.handle_request if self._mcp is not None else None,
+            self.bridge,
         )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s
@@ -53,6 +58,16 @@ class Service:
     @property
     def address(self) -> str:
         return f"http://{self._config.server.host}:{self.port}"
+
+    @property
+    def bridge_address(self) -> str:
+        """Where the extension dials in. It is on this machine, like the service."""
+        return f"ws://{self._config.server.host}:{self.port}/bridge"
+
+    @property
+    def bridge_cdp_address(self) -> str:
+        """Where this process's own driver reaches the tab the extension is attached to."""
+        return f"{self.bridge_address}/cdp"
 
     @property
     def public_address(self) -> str:
@@ -97,7 +112,13 @@ class Service:
                 access_log=False,
                 server_header=False,
                 lifespan="off",
-                ws_max_size=LARGEST_VIEWER_MESSAGE,
+                # A page read through the bridge is far larger than anything a viewer sends. A
+                # viewer's own messages are held to their limit where they are read.
+                ws_max_size=(
+                    self._config.bridge.max_message_mb * 1024 * 1024
+                    if self.bridge is not None
+                    else LARGEST_VIEWER_MESSAGE
+                ),
                 # Without a limit, stopping can wait for ever: on Windows asyncio never counts a
                 # connection that the other side cut as closed.
                 timeout_graceful_shutdown=self.shutdown_wait_s,

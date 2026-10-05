@@ -116,8 +116,11 @@ def load_failure(error: Exception) -> str:
 
 
 class PlaywrightDriver:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, *, cdp_headers: Mapping[str, str] | None = None) -> None:
+        """`cdp_headers` go with the request that attaches to a running browser (`browser.cdp_url`),
+        for one that asks who is attaching."""
         self._config = config
+        self._cdp_headers = dict(cdp_headers or {})
         self._stack = contextlib.AsyncExitStack()
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -157,7 +160,9 @@ class PlaywrightDriver:
             if attach:
                 # A browser that is already running, started by someone else. It is driven, and on
                 # close it is let go of, not ended: the page stays where the agent left it.
-                browser = await playwright.chromium.connect_over_cdp(attach, timeout=timeouts.launch_ms)
+                browser = await playwright.chromium.connect_over_cdp(
+                    attach, timeout=timeouts.launch_ms, headers=self._cdp_headers or None
+                )
                 self._stack.push_async_callback(browser.close)
                 context, page = self._page_to_drive(browser)
             elif profile:

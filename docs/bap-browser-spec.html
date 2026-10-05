@@ -1105,6 +1105,55 @@ person's machine.</p>
 <li>The app passes each one to the driver host, <code>bap-browser driver-host</code>, a child process it talks to over stdio. The driver host drives the bundled Chromium with the same Playwright driver the micro VM uses, against sign-ins kept inside the app.</li>
 <li>Results return up the channel. Same contract, same messages; only the bridge and the Chromium differ.</li>
 </ol>
+<p><strong>Take-over Chrome as it is built now</strong> (<code>bap-browser agent --chat --takeover</code>). It works, on one
+machine, and it is the first cut of the design above, not all of it.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>How it is now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The bridge</td>
+<td>The extension's side panel. It dials out to <code>/bridge</code> on the core, which is on the same machine, sends the token as its first message, and is let in only if it is this product's extension (its origin is checked). The panel must stay open while the agent works: closing it ends the bridge</td>
+</tr>
+<tr>
+<td>The agent's tab</td>
+<td>The extension opens one new tab, in a tab group named "BAP agent", and attaches Chrome's debugger to it. The agent can reach that tab and nothing else in the browser. Chrome shows its own "started debugging this browser" bar, which is left in place</td>
+</tr>
+<tr>
+<td>What crosses the channel</td>
+<td>DevTools Protocol commands for that tab and its events, as they are. The core's own driver attaches at <code>/bridge/cdp</code> as if it were a browser's debugging port, so the driver, the page script and every tool are the same code as on every other backend. That end takes only a connection from this machine with the token</td>
+</tr>
+<tr>
+<td>What the core answers itself</td>
+<td>What a driver asks of a browser as a whole (its version, attaching to targets): there is no whole browser on the channel, only the tab</td>
+</tr>
+<tr>
+<td>When the tab goes</td>
+<td>The person closes the tab or tells Chrome to stop the debugging: the extension says so, the driver's end is closed, and the agent's next call is told "The browser closed". A navigation opens a new agent tab</td>
+</tr>
+<tr>
+<td>Pictures</td>
+<td>None are sent: the person is looking at the browser. The viewer is the chat in the side panel (section 9.14), and the page shows who is driving (section 9.15)</td>
+</tr>
+<tr>
+<td>Safety</td>
+<td>The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere</td>
+</tr>
+<tr>
+<td>Loading it</td>
+<td>By hand, once: <code>chrome://extensions</code>, Developer mode, Load unpacked, the folder the command names</td>
+</tr>
+</tbody>
+</table></div>
+<p>Not built yet, from the design above and from section 8.8: the pairing token and its expiry (the
+session's own token is used), the heartbeat and reconnecting by itself, one message per driver
+operation (the channel carries the driver's many small commands, which is slow across the internet
+and fine on one machine), site permissions and previews enforced by the extension, more than one tab,
+and a core in a micro VM.</p>
 <p><strong>Messages.</strong> JSON text; screenshots and frames are binary. One message per driver operation
 (section 5.1).</p>
 <pre><code class="language-json">{&quot;type&quot;:&quot;hello&quot;,&quot;protocol&quot;:1,&quot;bridge&quot;:&quot;extension&quot;,&quot;version&quot;:&quot;0.1.0&quot;,&quot;browser&quot;:&quot;Chrome 154&quot;,
@@ -2931,7 +2980,7 @@ browser through the driver of the core, so every tool works as it does anywhere 
 </tr>
 <tr>
 <td>Permissions</td>
-<td><code>sidePanel</code> only. The extension reads no page and drives none</td>
+<td><code>sidePanel</code> for the chat; <code>debugger</code>, <code>tabs</code> and <code>tabGroups</code> for take-over Chrome (section 4.9), where it attaches to the one tab it opened for the agent. It names no site, and in the mode of this section it reads no page and drives none</td>
 </tr>
 <tr>
 <td>How it is loaded</td>
@@ -2943,8 +2992,9 @@ browser through the driver of the core, so every tool works as it does anywhere 
 </tr>
 </tbody>
 </table></div>
-<p>Not in it, and built with take-over Chrome proper: driving the person's own everyday Chrome and its
-tabs, the bridge channel, site permission prompts and previews.</p>
+<p>This section is the extension inside a browser the command starts (<code>--extension</code>). The same
+extension, loaded into the person's own Chrome, is the bridge of take-over Chrome (<code>--takeover</code>,
+section 4.9): the side panel and the look on the page are the same there.</p>
 <h3 id="914-chat">9.14 Chat</h3>
 <p><strong>Beside a browser on the person's own screen.</strong> When <code>session_started</code> carries <code>on_screen: true</code>,
 the person watches the browser itself, so the viewer shows no picture of it. With a chat, the page is
@@ -8383,6 +8433,10 @@ reached, or a person stops the session. The answer is the only thing written to 
 <tr>
 <td><code>--chat</code></td>
 <td>Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with <code>--demo</code></td>
+</tr>
+<tr>
+<td><code>--takeover</code></td>
+<td>With <code>--chat</code>: the agent works in a tab of the person's own Chrome, through the extension loaded there by hand (section 4.9). The command says where the extension's folder is, and waits for it to connect</td>
 </tr>
 <tr>
 <td><code>--extension</code></td>

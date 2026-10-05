@@ -446,6 +446,26 @@ person's machine.
 4. The app passes each one to the driver host, `bap-browser driver-host`, a child process it talks to over stdio. The driver host drives the bundled Chromium with the same Playwright driver the micro VM uses, against sign-ins kept inside the app.
 5. Results return up the channel. Same contract, same messages; only the bridge and the Chromium differ.
 
+**Take-over Chrome as it is built now** (`bap-browser agent --chat --takeover`). It works, on one
+machine, and it is the first cut of the design above, not all of it.
+
+| Part | How it is now |
+|---|---|
+| The bridge | The extension's side panel. It dials out to `/bridge` on the core, which is on the same machine, sends the token as its first message, and is let in only if it is this product's extension (its origin is checked). The panel must stay open while the agent works: closing it ends the bridge |
+| The agent's tab | The extension opens one new tab, in a tab group named "BAP agent", and attaches Chrome's debugger to it. The agent can reach that tab and nothing else in the browser. Chrome shows its own "started debugging this browser" bar, which is left in place |
+| What crosses the channel | DevTools Protocol commands for that tab and its events, as they are. The core's own driver attaches at `/bridge/cdp` as if it were a browser's debugging port, so the driver, the page script and every tool are the same code as on every other backend. That end takes only a connection from this machine with the token |
+| What the core answers itself | What a driver asks of a browser as a whole (its version, attaching to targets): there is no whole browser on the channel, only the tab |
+| When the tab goes | The person closes the tab or tells Chrome to stop the debugging: the extension says so, the driver's end is closed, and the agent's next call is told "The browser closed". A navigation opens a new agent tab |
+| Pictures | None are sent: the person is looking at the browser. The viewer is the chat in the side panel (section 9.14), and the page shows who is driving (section 9.15) |
+| Safety | The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere |
+| Loading it | By hand, once: `chrome://extensions`, Developer mode, Load unpacked, the folder the command names |
+
+Not built yet, from the design above and from section 8.8: the pairing token and its expiry (the
+session's own token is used), the heartbeat and reconnecting by itself, one message per driver
+operation (the channel carries the driver's many small commands, which is slow across the internet
+and fine on one machine), site permissions and previews enforced by the extension, more than one tab,
+and a core in a micro VM.
+
 **Messages.** JSON text; screenshots and frames are binary. One message per driver operation
 (section 5.1).
 
@@ -1369,12 +1389,13 @@ browser through the driver of the core, so every tool works as it does anywhere 
 | The page | While the agent works, a soft glow in the agent's colour runs around the edge of the page and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing |
 | Who decides | The viewer. It tells the side panel what the pages are to show, with the colours of its own theme, and the panel passes that on to the pages of its window once a second. A page that hears nothing for 3 s shows nothing. The page's script holds no words and no colours of its own |
 | What a page can see | The look is drawn inside a closed shadow root on one element that takes no clicks. The agent's reading of the page does not include it, and a click reaches the page under it. This is the one place where something is put into a visited page: a page can find that element, though not what is in it |
-| Permissions | `sidePanel` only. The extension reads no page and drives none |
+| Permissions | `sidePanel` for the chat; `debugger`, `tabs` and `tabGroups` for take-over Chrome (section 4.9), where it attaches to the one tab it opened for the agent. It names no site, and in the mode of this section it reads no page and drives none |
 | How it is loaded | `bap-browser agent --chat --extension` copies the extension beside the state file (`extension/`), starts the browser with it in a profile that is kept (`browser.user_data_dir`, or else `browser.kept_profile_dir`), and writes `extension/session.json` with the viewer's address. That file holds the session's token; it is removed when the session ends. The same folder can be loaded by hand into any Chrome with "Load unpacked" |
 | Its id | Fixed by the key in its manifest, so the service can name it as a page allowed to show the viewer (`viewer.embed_origins`) |
 
-Not in it, and built with take-over Chrome proper: driving the person's own everyday Chrome and its
-tabs, the bridge channel, site permission prompts and previews.
+This section is the extension inside a browser the command starts (`--extension`). The same
+extension, loaded into the person's own Chrome, is the bridge of take-over Chrome (`--takeover`,
+section 4.9): the side panel and the look on the page are the same there.
 
 ### 9.14 Chat
 
@@ -2919,6 +2940,7 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
 | `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
+| `--takeover` | With `--chat`: the agent works in a tab of the person's own Chrome, through the extension loaded there by hand (section 4.9). The command says where the extension's folder is, and waits for it to connect |
 | `--extension` | With `--chat`: as `--show-browser`, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat |
 | `--show-browser` | Runs the browser in a window on this screen (`browser.headless` off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |
 

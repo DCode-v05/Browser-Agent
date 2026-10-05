@@ -27,8 +27,10 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from bap_browser import browser_extension
 from bap_browser.config import Config
 from bap_browser.errors import ConfigError
+from bap_browser.service.bridge import Bridge
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
 
@@ -40,14 +42,22 @@ NO_SUCH_SESSION = 4404
 START_OVER = 1013
 NOT_THE_VIEWERS_ORIGIN = 1008
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
+LOCAL_CLIENTS = ("127.0.0.1", "::1")
+# A person's command is a few dozen bytes. Nothing larger is taken from a viewer.
+LARGEST_VIEWER_MESSAGE = 64 * 1024
 # A request that is refused is read no further than this before it is answered.
 LARGEST_REFUSED_REQUEST = 64 * 1024
 
 
 def create_app(
-    config: Config, sessions: Mapping[str, ServiceSession], token: str, mcp: ASGIApp | None = None
+    config: Config,
+    sessions: Mapping[str, ServiceSession],
+    token: str,
+    mcp: ASGIApp | None = None,
+    bridge: Bridge | None = None,
 ) -> Starlette:
-    """`mcp` is what answers MCP over HTTP. Without it the service has no such endpoint."""
+    """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
+    Chrome dials in. Without them the service has no such endpoints."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -103,12 +113,47 @@ def create_app(
         finally:
             session.hub.unsubscribe(subscriber)
 
+    async def extension_socket(socket: WebSocket) -> None:
+        """The extension dials in (spec 4.9). Only this product's extension may, and only with the token."""
+        assert bridge is not None
+        if socket.headers.get("origin") != browser_extension.ORIGIN:
+            await socket.close(NOT_THE_VIEWERS_ORIGIN)
+            return
+        await socket.accept()
+        try:
+            async with asyncio.timeout(config.server.auth_wait_s):
+                first = _command(await socket.receive())
+        except (TimeoutError, WebSocketDisconnect):
+            first = None
+        if not first or first.get("type") != "auth" or not signed_in(first.get("token")):
+            await socket.close(REFUSED)
+            return
+        await bridge.serve_extension(socket)
+
+    async def driver_socket(socket: WebSocket) -> None:
+        """The driver's end of the bridge. It is this process's own driver: it comes from this
+        machine, with the token."""
+        assert bridge is not None
+        scheme, _, given = socket.headers.get("authorization", "").partition(" ")
+        local = socket.client is not None and socket.client.host in LOCAL_CLIENTS
+        if not local or scheme.lower() != "bearer" or not signed_in(given):
+            await socket.close(REFUSED)
+            return
+        await socket.accept()
+        await bridge.serve_driver(socket)
+
+    bridged = (
+        [WebSocketRoute("/bridge", extension_socket), WebSocketRoute("/bridge/cdp", driver_socket)]
+        if bridge is not None
+        else []
+    )
     return Starlette(
         routes=[
             Route("/healthz", healthz),
             Route("/api/sessions", list_sessions),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
+            *bridged,
             Mount("/demo-site", StaticFiles(directory=package / "demo_site", html=True)),
             Mount("/", StaticFiles(directory=viewer, html=True)),
         ],
@@ -174,7 +219,7 @@ def _command(message: Message) -> dict[str, Any] | None:
     if message["type"] == "websocket.disconnect":
         raise WebSocketDisconnect(message.get("code", 1000))
     text = message.get("text")
-    if not isinstance(text, str):
+    if not isinstance(text, str) or len(text) > LARGEST_VIEWER_MESSAGE:
         return None
     try:
         command = json.loads(text)

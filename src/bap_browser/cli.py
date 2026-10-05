@@ -117,6 +117,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --chat: show the browser with the BAP extension in it, the chat in its side panel",
     )
+    agent.add_argument(
+        "--takeover",
+        action="store_true",
+        help="with --chat: the agent works in a tab of your own Chrome, through the BAP extension",
+    )
     agent.set_defaults(run=_agent)
     return parser
 
@@ -188,7 +193,16 @@ def _serve(args: argparse.Namespace) -> int:
 def _agent(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     extension: Path | None = None
-    if args.extension:
+    if args.takeover:
+        if not args.chat or args.extension or args.show_browser:
+            raise ConfigError(
+                "taking over your own Chrome goes with the chat, and with no browser of the agent's own. "
+                "Use: bap-browser agent --chat --takeover"
+            )
+        from bap_browser import browser_extension
+
+        extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+    elif args.extension:
         if not args.chat:
             raise ConfigError("the extension shows the chat. Use --extension together with --chat")
         from bap_browser import browser_extension
@@ -239,6 +253,11 @@ def _agent(args: argparse.Namespace) -> int:
                 raise ConfigError("the demonstration plays one fixed task. Use --chat without --demo")
             from bap_browser.agent.command import chat_with_viewer
 
+            if args.takeover and extension is not None:
+                from bap_browser.agent.command import chat_in_own_chrome
+
+                asyncio.run(chat_in_own_chrome(config, model_for, first_task=task, extension=extension))
+                return 0
             asyncio.run(
                 chat_with_viewer(
                     config, model_for, first_task=task, open_viewer=args.open, extension=extension
