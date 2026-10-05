@@ -10,13 +10,14 @@ import asyncio
 import hmac
 import json
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from starlette.applications import Starlette
+from starlette.datastructures import Headers
 from starlette.middleware import Middleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
@@ -39,9 +40,14 @@ NO_SUCH_SESSION = 4404
 START_OVER = 1013
 NOT_THE_VIEWERS_ORIGIN = 1008
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
+# A request that is refused is read no further than this before it is answered.
+LARGEST_REFUSED_REQUEST = 64 * 1024
 
 
-def create_app(config: Config, sessions: Mapping[str, ServiceSession], token: str) -> Starlette:
+def create_app(
+    config: Config, sessions: Mapping[str, ServiceSession], token: str, mcp: ASGIApp | None = None
+) -> Starlette:
+    """`mcp` is what answers MCP over HTTP. Without it the service has no such endpoint."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -101,6 +107,7 @@ def create_app(config: Config, sessions: Mapping[str, ServiceSession], token: st
         routes=[
             Route("/healthz", healthz),
             Route("/api/sessions", list_sessions),
+            *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             Mount("/demo-site", StaticFiles(directory=package / "demo_site", html=True)),
             Mount("/", StaticFiles(directory=viewer, html=True)),
@@ -174,6 +181,31 @@ def _command(message: Message) -> dict[str, Any] | None:
     except ValueError:
         return None
     return command if isinstance(command, dict) else None
+
+
+class _McpEndpoint:
+    """The tools over MCP, for an agent in another process. It is let in by the service's token,
+    sent as a bearer token, like the API."""
+
+    def __init__(self, handle: ASGIApp, signed_in: Callable[[Any], bool]) -> None:
+        self._handle = handle
+        self._signed_in = signed_in
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scheme, _, given = Headers(scope=scope).get("authorization", "").partition(" ")
+        if scheme.lower() != "bearer" or not self._signed_in(given):
+            # What was sent is read first. An answer that closes the connection over a request still
+            # unread reaches the sender as a broken connection, not as a refusal.
+            read = 0
+            while read < LARGEST_REFUSED_REQUEST:
+                message = await receive()
+                read += len(message.get("body", b""))
+                if message["type"] != "http.request" or not message.get("more_body"):
+                    break
+            refusal = Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+            await refusal(scope, receive, send)
+            return
+        await self._handle(scope, receive, send)
 
 
 class _ResponseHeaders:

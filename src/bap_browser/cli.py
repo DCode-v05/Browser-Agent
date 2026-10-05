@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -61,6 +62,18 @@ def _parser() -> argparse.ArgumentParser:
     mcp = commands.add_parser("mcp", help="serve the browser tools over MCP on stdio, for an agent to start")
     mcp.add_argument("--config", help="path of config.json")
     mcp.set_defaults(run=_mcp)
+
+    serve = commands.add_parser(
+        "serve", help="serve the browser tools over MCP on HTTP, with the viewer, for an agent elsewhere"
+    )
+    serve.add_argument("--config", help="path of config.json")
+    serve.add_argument("--open", action="store_true", help="open the viewer in your browser")
+    serve.add_argument(
+        "--show-browser",
+        action="store_true",
+        help="run the browser in a window on this screen, so the agent is seen working in it",
+    )
+    serve.set_defaults(run=_serve)
 
     agent = commands.add_parser(
         "agent", help="run the reference agent on a task, with the viewer to watch and control it"
@@ -156,6 +169,20 @@ def _mcp(args: argparse.Namespace) -> int:
 
     asyncio.run(run_stdio(config))
     return 0
+
+
+def _serve(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if args.show_browser:
+        config = with_visible_browser(config)
+    # Imported here so that the config commands start without loading the browser and the web server.
+    from bap_browser.mcp.server import run_http
+
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(run_http(config, open_viewer=args.open))
+    # It runs until it is interrupted, so that is how it always ends.
+    return 130
 
 
 def _agent(args: argparse.Namespace) -> int:

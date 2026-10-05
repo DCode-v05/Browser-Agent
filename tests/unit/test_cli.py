@@ -126,3 +126,11 @@ def test_the_extension_goes_with_the_chat(capsys: pytest.CaptureFixture[str], tm
     os.chdir(tmp_path)
     assert main(["agent", "--extension", "Read the page"]) == 2
     assert "Use --extension together with --chat" in capsys.readouterr().err
+
+
+def test_serve_is_a_command_with_the_browser_shown_or_not() -> None:
+    from bap_browser.cli import _parser  # pyright: ignore[reportPrivateUsage]
+
+    args = _parser().parse_args(["serve", "--show-browser", "--open"])
+    assert (args.command, args.show_browser, args.open) == ("serve", True, True)
+    assert _parser().parse_args(["serve"]).show_browser is False

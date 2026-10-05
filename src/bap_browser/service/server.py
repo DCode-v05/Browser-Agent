@@ -9,8 +9,11 @@ import secrets
 import socket
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import uvicorn
+from mcp.server import Server as McpServer
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from bap_browser.config import Config
 from bap_browser.service.app import create_app
@@ -28,11 +31,19 @@ class Service:
         *,
         token: str | None = None,
         port: int | None = None,
+        mcp: McpServer[Any] | None = None,
     ) -> None:
-        """`port` 0 means any free port; None means the configured one."""
+        """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
+        server: with it, the service also offers them over HTTP at `mcp.http_path`."""
         self._config = config
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
-        self._app = create_app(config, sessions, self.token)
+        # Each request stands by itself: an agent keeps no connection that could be lost.
+        self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
+        self._mcp_running: asyncio.Task[None] | None = None
+        self._mcp_over = asyncio.Event()
+        self._app = create_app(
+            config, sessions, self.token, self._mcp.handle_request if self._mcp is not None else None
+        )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s
         self.port = 0
@@ -44,11 +55,31 @@ class Service:
         return f"http://{self._config.server.host}:{self.port}"
 
     @property
+    def mcp_address(self) -> str:
+        """Where an agent reaches the tools over MCP. It sends the token as a bearer token."""
+        return f"{self.address}{self._config.mcp.http_path}"
+
+    @property
     def viewer_address(self) -> str:
         """Where a person opens the viewer. The token is in the fragment, which no server is sent."""
         return f"{self.address}/#token={self.token}"
 
+    async def _run_mcp(self, ready: asyncio.Event) -> None:
+        """Keeps the MCP endpoint's own tasks alive. It is entered and left in one task, as it must be."""
+        assert self._mcp is not None
+        async with self._mcp.run():
+            ready.set()
+            await self._mcp_over.wait()
+
     async def start(self) -> None:
+        if self._mcp is not None:
+            ready = asyncio.Event()
+            self._mcp_running = asyncio.create_task(self._run_mcp(ready))
+            waiting = asyncio.create_task(ready.wait())
+            await asyncio.wait({self._mcp_running, waiting}, return_when=asyncio.FIRST_COMPLETED)
+            waiting.cancel()
+            if self._mcp_running.done():
+                await self._mcp_running
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((self._config.server.host, self._wanted_port))
@@ -85,6 +116,10 @@ class Service:
         self._server.should_exit = True
         await self._serving
         self._server = self._serving = None
+        if self._mcp_running is not None:
+            self._mcp_over.set()
+            await self._mcp_running
+            self._mcp_running = None
         await asyncio.to_thread(self._remove_state)
 
     def _remove_state(self) -> None:

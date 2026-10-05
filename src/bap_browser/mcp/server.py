@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sys
+import webbrowser
+
 from mcp.server import Server, ServerRequestContext
 from mcp.server.stdio import stdio_server
 from mcp.types import (
@@ -16,6 +19,8 @@ from mcp.types import (
 from bap_browser import __version__
 from bap_browser.config import Config
 from bap_browser.driver import open_session
+from bap_browser.service.server import Service
+from bap_browser.service.session import ServiceSession
 from bap_browser.tools import Toolkit
 
 INSTRUCTIONS = (
@@ -54,3 +59,32 @@ async def run_stdio(config: Config) -> None:
         server = build_server(Toolkit(session), config.mcp.server_name)
         async with stdio_server() as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())
+
+
+# How the agent is named to a person watching, when it comes in over HTTP.
+AGENT_OVER_HTTP = "Agent over MCP"
+
+
+async def run_http(config: Config, *, open_viewer: bool) -> None:
+    """Serves one session until the service is stopped: the tools over MCP on HTTP for an agent in
+    another process, and the viewer for a person to watch and control what it does."""
+    session = ServiceSession(config, agent=AGENT_OVER_HTTP)
+    service = Service(
+        config, {session.name: session}, mcp=build_server(session.toolkit, config.mcp.server_name)
+    )
+    await session.start()
+    try:
+        await service.start()
+        print(f"Viewer: {service.viewer_address}", file=sys.stderr)
+        print(f"MCP: {service.mcp_address}", file=sys.stderr)
+        print(
+            "An agent sends the token as a bearer token. It is what follows #token= in the viewer's "
+            "address. Press Ctrl+C to end.",
+            file=sys.stderr,
+        )
+        if open_viewer:
+            webbrowser.open(service.viewer_address)
+        await service.wait()
+    finally:
+        await session.close()
+        await service.stop()

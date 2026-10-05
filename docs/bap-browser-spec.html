@@ -790,6 +790,14 @@ with a scripted client, the viewer against a recorded event stream.</p>
 </tr>
 </tbody>
 </table></div>
+<p><strong><code>serve</code> in this build.</strong> One session, named <code>default</code>. The tools are offered over MCP at
+<code>mcp.http_path</code> to whoever sends the service's token as a bearer token, and the viewer shows that
+session, so a person watches and controls what the outside agent does. Each MCP request stands by
+itself and no MCP session is kept: an agent that loses its connection simply asks again. A request
+without the token is answered 401. <code>--show-browser</code> runs the browser in a window on this screen and
+<code>--open</code> opens the viewer. The bridge endpoint, several sessions and <code>POST /api/sessions</code> come with
+take-over Chrome. This is also how the BAP product connects a tool: as one MCP server over HTTP
+(<code>docs/research/bap-product-fit.md</code>).</p>
 <p>The browser starts on the first tool call, not when the agent connects. The Playwright driver process
 starts once per service, not once per session.</p>
 <h3 id="45-who-is-driving">4.5 Who is driving</h3>

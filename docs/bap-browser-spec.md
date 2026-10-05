@@ -284,6 +284,15 @@ The same tools through three transports.
 | `bap-browser mcp` | An agent that starts its tools as child processes (MCP over stdio) | The whole core in that process, with one default session. The viewer address is printed to the error stream and written to the state file |
 | `bap-browser serve` | An agent core in another process or another language; several agents; the UI clients | The core on its own, offering MCP over HTTP at `/mcp`, the viewer at `/` and the bridge endpoint at `/bridge`. Several agents, several sessions |
 
+**`serve` in this build.** One session, named `default`. The tools are offered over MCP at
+`mcp.http_path` to whoever sends the service's token as a bearer token, and the viewer shows that
+session, so a person watches and controls what the outside agent does. Each MCP request stands by
+itself and no MCP session is kept: an agent that loses its connection simply asks again. A request
+without the token is answered 401. `--show-browser` runs the browser in a window on this screen and
+`--open` opens the viewer. The bridge endpoint, several sessions and `POST /api/sessions` come with
+take-over Chrome. This is also how the BAP product connects a tool: as one MCP server over HTTP
+(`docs/research/bap-product-fit.md`).
+
 The browser starts on the first tool call, not when the agent connects. The Playwright driver process
 starts once per service, not once per session.
 
