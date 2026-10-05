@@ -749,7 +749,7 @@ never crashes on a bad call.
 
 | Tool | Arguments (default) | Returns |
 |---|---|---|
-| `browser_request_human` | `reason` (up to 300 characters); `kind` (`login`, `verification`, `payment`, `other`); `timeout_s` | `done`, `could_not` or `timed_out`, an optional note from the person, then the change note |
+| `browser_request_human` | `reason` (up to 300 characters); `kind` (`login`, `verification`, `payment`, `other`); `timeout_s` | `done`, `could_not` or `timed_out`, then the change note: whether the address changed, and that a new snapshot is needed. The wait is at most `control.handoff_timeout_s`. In a session nobody can watch, the call fails and says so. The person's own note is a later item |
 
 A click or a hover on a ref moves the pointer to the element first and then checks that the element is
 still under it: a menu that was open under the pointer closes when the pointer leaves, and what follows it

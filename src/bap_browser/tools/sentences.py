@@ -62,6 +62,8 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
             return _row("Scrolling to ", _element(arguments, target), "")
         case "browser_wait":
             return f"Waiting{_awaited(arguments)}"
+        case "browser_request_human":
+            return _row("Asking for help: ", _reason(arguments), "")
     return _fit(tool)
 
 
@@ -104,6 +106,8 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
             return _row("Scrolled to ", _element(arguments, target), "")
         case "browser_wait":
             return f"Waited{_awaited(arguments)}"
+        case "browser_request_human":
+            return _row("Asked for help: ", _reason(arguments), "")
     return _fit(tool)
 
 
@@ -143,7 +147,14 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
             return f"scroll to {element}" if element else "scroll"
         case "browser_wait":
             return f"wait{_awaited(arguments)}" if _awaited(arguments) else "finish waiting"
+        case "browser_request_human":
+            return "get help"
     return f"run {tool}"
+
+
+def _reason(arguments: Mapping[str, Any]) -> str:
+    reason = arguments.get("reason")
+    return f'"{" ".join(reason.split())}"' if isinstance(reason, str) and reason.strip() else "a person"
 
 
 def _query(arguments: Mapping[str, Any]) -> str:

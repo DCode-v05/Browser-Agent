@@ -407,6 +407,29 @@ async def wait(session: BrowserSession, args: WaitArgs) -> str:
     )
 
 
+class RequestHumanArgs(Args):
+    reason: str = Field(min_length=1, max_length=300)
+    kind: Literal["login", "verification", "payment", "other"] = "other"
+    timeout_s: float | None = Field(default=None, gt=0)
+
+
+async def request_human(session: BrowserSession, args: RequestHumanArgs) -> str:
+    if session.ask_person is None:
+        raise BrowserError(
+            "No person can be asked in this session: it has no viewer. Say in your answer what is needed.",
+            reason="nobody is watching",
+        )
+    most = session.config.control.handoff_timeout_s
+    outcome, change = await session.ask_person(args.reason, args.kind, min(args.timeout_s or most, most))
+    said = {
+        "done": "done: the person did the step.",
+        "could_not": "could_not: the person could not do the step. Do not ask again for the same thing; "
+        "go on another way or say what is needed.",
+        "timed_out": "timed_out: nobody answered in time.",
+    }[outcome]
+    return f"{said}\n{change}"
+
+
 TOOLS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         "browser_navigate",
@@ -495,5 +518,12 @@ TOOLS: tuple[ToolDefinition, ...] = (
         "Wait for one of: text to appear, text_gone to disappear, a load_state, or seconds.",
         WaitArgs,
         wait,
+    ),
+    ToolDefinition(
+        "browser_request_human",
+        "Ask the person watching to do a step you must not do: a sign-in, a CAPTCHA or other human "
+        "check, a code, a payment. Waits until they answer. Never try to solve such a step yourself.",
+        RequestHumanArgs,
+        request_human,
     ),
 )

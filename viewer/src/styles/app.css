@@ -1161,6 +1161,15 @@
   font-size: var(--text-secondary);
 }
 
+.chat-working:not([data-status='working']) {
+  color: var(--waiting);
+}
+
+.chat-working:not([data-status='working']) .chat-working-dot {
+  background: var(--waiting);
+  animation: none;
+}
+
 .chat-working-dot {
   width: var(--dot);
   height: var(--dot);

@@ -26,6 +26,7 @@ def test_the_tools_of_this_stage() -> None:
         "browser_scroll",
         "browser_scroll_to",
         "browser_wait",
+        "browser_request_human",
     ]
 
 

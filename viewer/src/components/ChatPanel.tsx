@@ -89,9 +89,9 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
             </div>
           ))}
           {chat.working && (
-            <p className="chat-working" data-testid="chat-working">
+            <p className="chat-working" data-status={status} data-testid="chat-working">
               <span className="chat-working-dot" aria-hidden="true" />
-              {doing || W.chat.working}
+              {status === 'working' ? doing || W.chat.working : W.chat.status[status]}
             </p>
           )}
           <div ref={end} />
