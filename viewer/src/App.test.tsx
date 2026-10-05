@@ -696,22 +696,58 @@ describe('a site list is not lost by closing the screen', () => {
 });
 
 describe("beside a browser that is a window on the person's own screen", () => {
-  it('shows no picture of the browser: the page is the chat, with the controls', () => {
+  it('is one conversation: no picture of the browser, the task as it was asked, and the steps it led to', () => {
     show('beside');
     expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Chat' })).toBeInTheDocument();
-    expect(button('Pause')).toBeEnabled();
-    expect(button('Stop session')).toBeEnabled();
-    // There is no picture to show full width.
+    const talk = screen.getByRole('region', { name: 'Chat' });
+    const log = within(talk).getByRole('log', { name: 'Messages' });
+    expect(within(log).getByText('Check in for booking SK4821, last name Lovelace. Choose a window seat.')).toBeInTheDocument();
+    // The steps of the work under way are open, under the task that led to them.
+    expect(log.firstElementChild).toHaveTextContent('Check in for booking SK4821');
+    expect(within(log).getByRole('button', { name: '3 steps', expanded: true })).toBeInTheDocument();
+    expect(within(log).getByText('Opened example.com/checkin')).toBeInTheDocument();
+    expect(within(log).getAllByText('Clicking "Find booking" (button)').length).toBeGreaterThan(0);
+    expect(within(talk).getByTestId('agent-status')).toHaveTextContent('Working');
+    // There is no picture to show full width, and no second list of the steps.
     noButton('Show the browser full width');
+    expect(screen.queryByRole('heading', { name: 'Activity' })).not.toBeInTheDocument();
   });
 
-  it('taking over keeps the chat and the way back on screen', async () => {
+  it('the box to write in holds the controls: stop the task while it runs, send once something is typed', async () => {
+    const { sent, user } = show('beside');
+    await user.click(button('Stop this task'));
+    await user.click(button('Pause'));
+    expect(types(sent)).toEqual(['stop_task', 'pause']);
+    await user.type(screen.getByRole('textbox', { name: 'Your task' }), 'Then pick a vegetarian meal');
+    noButton('Stop this task');
+    await user.click(button('Send the task'));
+    expect(sent.at(-1)).toEqual({ type: 'task', text: 'Then pick a vegetarian meal' });
+  });
+
+  it('a group of steps folds away and opens again, and a step opens its evidence', async () => {
+    const { user } = show('beside');
+    await user.click(button('3 steps'));
+    expect(screen.queryByText('Opened example.com/checkin')).not.toBeInTheDocument();
+    await user.click(button('3 steps'));
+    await user.click(screen.getByRole('button', { name: /Opened example\.com\/checkin/ }));
+    expect(screen.getByRole('dialog', { name: 'Step 1' })).toBeInTheDocument();
+  });
+
+  it('taking over keeps the conversation and the way back on screen', async () => {
     const { sent, user } = show('beside');
     await user.click(button('Take over'));
     expect(types(sent)).toEqual(['take_over']);
-    expect(screen.getByRole('heading', { name: "You're in control" })).toBeInTheDocument();
+    expect(screen.getByTestId('agent-status')).toHaveTextContent("You're in control");
     expect(screen.getByRole('region', { name: 'Chat' })).toBeInTheDocument();
     expect(button('Hand back')).toBeEnabled();
+  });
+
+  it('ending the whole session is apart from the rest, and still asks first', async () => {
+    const { sent, user } = show('beside');
+    await user.click(button('Stop session'));
+    expect(sent).toEqual([]);
+    const question = screen.getByRole('alertdialog');
+    await user.click(within(question).getByRole('button', { name: 'Stop session' }));
+    expect(types(sent)).toEqual(['stop']);
   });
 });

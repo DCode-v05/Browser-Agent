@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { BrowserPane } from './components/BrowserPane';
+import { Conversation } from './components/Conversation';
 import { agentStatus, ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
 import { Icon } from './components/Icon';
@@ -120,6 +121,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const beside = state.session?.onScreen === true;
   // A person who takes over gets the whole width to work in.
   const full = !beside && (driving || wantsFull);
+  // Beside the browser, a session with a chat is one conversation and nothing else.
+  const talking = beside && state.chat.enabled;
   // Shown in a frame beside the browser, which is the extension's side panel: the browser's pages
   // are told who is driving, so that they can show it (spec 9.15).
   const look = beside && window.parent !== window ? JSON.stringify(lookOf(state, view, preferences.showAgentPointer)) : '';
@@ -266,6 +269,25 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
 
   return (
     <div className="app" data-view={full ? 'full' : 'split'} data-state={view.key} data-embedded={embedded} data-beside={beside || undefined}>
+      {talking ? (
+        <Conversation
+          state={state}
+          view={view}
+          maxChars={options.maxTaskChars}
+          selected={selected}
+          cards={cards}
+          drawer={selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}
+          onCommand={send}
+          onOpenStep={openStep}
+          onHandBack={handBack}
+          onStopSession={() => setConfirmingStop(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          titleRef={statusTitle}
+          settingsRef={settingsButton}
+          stopRef={stopButton}
+        />
+      ) : (
+        <>
       <header className="top-bar">
         {embedded ? (
           <h1 className="sr-only">{W.topBar.embeddedTitle}</h1>
@@ -352,6 +374,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           </section>
         )}
       </main>
+        </>
+      )}
 
       <div className="toasts" role="status">
         {toasts.map((item) => (

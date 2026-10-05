@@ -90,6 +90,7 @@
   --duration-enter: 200ms;
   --duration-live: 1s;
   --duration-breathe: 2s;
+  --spinner-line: 2px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Focus and targets */

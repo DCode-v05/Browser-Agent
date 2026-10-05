@@ -48,7 +48,7 @@ async def test_the_panel_shows_the_chat_and_the_page_shows_who_is_driving(
         chat = panel.frame_locator("#viewer")
         await chat.get_by_role("region", name="Chat").wait_for()
         assert await chat.get_by_role("region", name="Browser").count() == 0, "no picture of the browser"
-        assert await chat.get_by_text("Ready for your task").count() > 0
+        assert await chat.get_by_test_id("agent-status").text_content() == "Ready"
 
         # While the agent waits for a task, the page is at rest.
         assert await page.locator(f"{LOOK}[data-tone]").count() == 0

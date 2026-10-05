@@ -360,7 +360,7 @@ again: it says the link cannot open the session and what to do (section 9.3).
 | Direction | Messages |
 |---|---|
 | Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `message`, `task_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
-| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task` |
+| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task`, `stop_task` |
 
 Examples:
 
@@ -980,7 +980,7 @@ viewer.
 3. **Stop, pause and take over are one action away**, always visible.
 4. **Show evidence.** Every step has a picture and its result.
 5. **Ask rarely and clearly.** An approval states what, where and why; no answer means no.
-6. **Stay calm.** No looping animation, no glow. Motion only marks a change.
+6. **Stay calm.** Motion marks a change, or shows that work is going on. Nothing else moves.
 7. **Keyboard and screen reader are first-class.**
 8. **Be honest about state.** A stale picture, a lost connection and a blocked page each look different from "working".
 
@@ -1252,9 +1252,11 @@ Target: WCAG 2.2 level AA.
 ### 9.10 Motion
 
 - Transitions use only opacity and transform, for at most 200 ms.
-- The only repeating motion is the small "live" dot, fading once a second.
-- No animated shadows or glows.
-- When the system asks for reduced motion, nothing animates and the "live" dot is steady.
+- Three things repeat, and each means that something is going on now: the small "live" dot, fading
+  once a second; the mark beside a step that is running or an agent that is thinking; and the glow at
+  the edge of the browser while the agent works (section 9.14).
+- Nothing else loops, and nothing moves to draw the eye.
+- When the system asks for reduced motion, nothing animates: the dot, the mark and the glow are still.
 
 ### 9.11 Viewer build
 
@@ -1335,7 +1337,7 @@ browser through the driver of the core, so every tool works as it does anywhere 
 | Part | What it does |
 |---|---|
 | Side panel | Opened with the extension's icon or Ctrl+Shift+Y. It shows the session's viewer in a frame, which is the chat of section 9.14 beside the browser: status and controls, chat, steps. With no session running it says how to start one |
-| The page | While the agent works, the edge of the page glows in the agent's colour and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing |
+| The page | While the agent works, a soft glow in the agent's colour runs around the edge of the page and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing |
 | Who decides | The viewer. It tells the side panel what the pages are to show, with the colours of its own theme, and the panel passes that on to the pages of its window once a second. A page that hears nothing for 3 s shows nothing. The page's script holds no words and no colours of its own |
 | What a page can see | The look is drawn inside a closed shadow root on one element that takes no clicks. The agent's reading of the page does not include it, and a click reaches the page under it. This is the one place where something is put into a visited page: a page can find that element, though not what is in it |
 | Permissions | `sidePanel` only. The extension reads no page and drives none |
@@ -1348,10 +1350,27 @@ tabs, the bridge channel, site permission prompts and previews.
 ### 9.14 Chat
 
 **Beside a browser on the person's own screen.** When `session_started` carries `on_screen: true`,
-the person watches the browser itself, so the viewer shows no picture of it. The page is one
-column as tall as its window: the status with its controls, the chat, which takes the room, and
-the steps under it. A person places that window to the right of the browser. Taking over
-needs no picture either: the person works in the browser window, and the agent's calls wait.
+the person watches the browser itself, so the viewer shows no picture of it. With a chat, the page is
+then one conversation and nothing else, as tall as its window. The pattern is the side panel of
+Claude's Chrome extension, looked at on 2026-10-05 (`docs/research/claude-in-chrome.md`); the colours,
+the type and the shapes stay those of section 9.5.
+
+| Part | What it is |
+|---|---|
+| Head | The brand mark and the product's name; what the agent is doing in one word (Working, Ready, Paused, You're in control, Waiting for you, Stopped, Not connected); settings; and, apart from the rest, the button that ends the whole session, which asks first |
+| What the person asked | A bubble on the person's side |
+| The steps | Under the task that led to them, as one group: "6 steps". The group of the work under way is open, each step a row with a tick, a failure mark or the running mark, and how long it took; a row opens the step's evidence. When the work is over the group folds to its count, and opens again when pressed |
+| What the agent says | Plain text on the agent's side, with no bubble. A task that could not be done is said in the danger colour, with its mark |
+| Work going on | A running step carries the turning mark. Between steps, one line says the agent is working |
+| What needs a person | An approval, a request for help, a blocked page: cards just above the box to write in |
+| The box to write in | One rounded box at the bottom. Under the text: Pause or Resume, Take over or Hand back (Done and Couldn't do it while a request for help is open). At its right, one button: it stops the task under way while nothing is typed, and sends the task once something is |
+
+Stopping a task (`stop_task`) ends the task and nothing else. The loop stops before its next call, a
+call that was waiting for a person is let go, an open request for help is closed, and the chat says
+"Stopped before the task was finished." The session, the browser and who is driving stay as they are.
+
+Taking over needs no picture: the person works in the browser window, and the agent's calls wait.
+Without a chat, the page is the status and the steps in one column.
 
 When the agent takes its tasks from the viewer (`session_started` carries `chat: true`), the activity
 column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,

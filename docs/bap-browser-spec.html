@@ -962,7 +962,7 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 </tr>
 <tr>
 <td>Viewer to service</td>
-<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code>, <code>task</code></td>
+<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code>, <code>task</code>, <code>stop_task</code></td>
 </tr>
 </tbody>
 </table></div>
@@ -2025,7 +2025,7 @@ viewer.</p>
 <li><strong>Stop, pause and take over are one action away</strong>, always visible.</li>
 <li><strong>Show evidence.</strong> Every step has a picture and its result.</li>
 <li><strong>Ask rarely and clearly.</strong> An approval states what, where and why; no answer means no.</li>
-<li><strong>Stay calm.</strong> No looping animation, no glow. Motion only marks a change.</li>
+<li><strong>Stay calm.</strong> Motion marks a change, or shows that work is going on. Nothing else moves.</li>
 <li><strong>Keyboard and screen reader are first-class.</strong></li>
 <li><strong>Be honest about state.</strong> A stale picture, a lost connection and a blocked page each look different from "working".</li>
 </ol>
@@ -2744,9 +2744,11 @@ duration and opens the step drawer.</p>
 <h3 id="910-motion">9.10 Motion</h3>
 <ul>
 <li>Transitions use only opacity and transform, for at most 200 ms.</li>
-<li>The only repeating motion is the small "live" dot, fading once a second.</li>
-<li>No animated shadows or glows.</li>
-<li>When the system asks for reduced motion, nothing animates and the "live" dot is steady.</li>
+<li>Three things repeat, and each means that something is going on now: the small "live" dot, fading
+  once a second; the mark beside a step that is running or an agent that is thinking; and the glow at
+  the edge of the browser while the agent works (section 9.14).</li>
+<li>Nothing else loops, and nothing moves to draw the eye.</li>
+<li>When the system asks for reduced motion, nothing animates: the dot, the mark and the glow are still.</li>
 </ul>
 <h3 id="911-viewer-build">9.11 Viewer build</h3>
 <ul>
@@ -2892,7 +2894,7 @@ browser through the driver of the core, so every tool works as it does anywhere 
 </tr>
 <tr>
 <td>The page</td>
-<td>While the agent works, the edge of the page glows in the agent's colour and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing</td>
+<td>While the agent works, a soft glow in the agent's colour runs around the edge of the page and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing</td>
 </tr>
 <tr>
 <td>Who decides</td>
@@ -2920,10 +2922,53 @@ browser through the driver of the core, so every tool works as it does anywhere 
 tabs, the bridge channel, site permission prompts and previews.</p>
 <h3 id="914-chat">9.14 Chat</h3>
 <p><strong>Beside a browser on the person's own screen.</strong> When <code>session_started</code> carries <code>on_screen: true</code>,
-the person watches the browser itself, so the viewer shows no picture of it. The page is one
-column as tall as its window: the status with its controls, the chat, which takes the room, and
-the steps under it. A person places that window to the right of the browser. Taking over
-needs no picture either: the person works in the browser window, and the agent's calls wait.</p>
+the person watches the browser itself, so the viewer shows no picture of it. With a chat, the page is
+then one conversation and nothing else, as tall as its window. The pattern is the side panel of
+Claude's Chrome extension, looked at on 2026-10-05 (<code>docs/research/claude-in-chrome.md</code>); the colours,
+the type and the shapes stay those of section 9.5.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Head</td>
+<td>The brand mark and the product's name; what the agent is doing in one word (Working, Ready, Paused, You're in control, Waiting for you, Stopped, Not connected); settings; and, apart from the rest, the button that ends the whole session, which asks first</td>
+</tr>
+<tr>
+<td>What the person asked</td>
+<td>A bubble on the person's side</td>
+</tr>
+<tr>
+<td>The steps</td>
+<td>Under the task that led to them, as one group: "6 steps". The group of the work under way is open, each step a row with a tick, a failure mark or the running mark, and how long it took; a row opens the step's evidence. When the work is over the group folds to its count, and opens again when pressed</td>
+</tr>
+<tr>
+<td>What the agent says</td>
+<td>Plain text on the agent's side, with no bubble. A task that could not be done is said in the danger colour, with its mark</td>
+</tr>
+<tr>
+<td>Work going on</td>
+<td>A running step carries the turning mark. Between steps, one line says the agent is working</td>
+</tr>
+<tr>
+<td>What needs a person</td>
+<td>An approval, a request for help, a blocked page: cards just above the box to write in</td>
+</tr>
+<tr>
+<td>The box to write in</td>
+<td>One rounded box at the bottom. Under the text: Pause or Resume, Take over or Hand back (Done and Couldn't do it while a request for help is open). At its right, one button: it stops the task under way while nothing is typed, and sends the task once something is</td>
+</tr>
+</tbody>
+</table></div>
+<p>Stopping a task (<code>stop_task</code>) ends the task and nothing else. The loop stops before its next call, a
+call that was waiting for a person is let go, an open request for help is closed, and the chat says
+"Stopped before the task was finished." The session, the browser and who is driving stay as they are.</p>
+<p>Taking over needs no picture: the person works in the browser window, and the agent's calls wait.
+Without a chat, the page is the status and the steps in one column.</p>
 <p>When the agent takes its tasks from the viewer (<code>session_started</code> carries <code>chat: true</code>), the activity
 column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,
 and a box to write the next task in.</p>

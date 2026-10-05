@@ -45,6 +45,8 @@ export interface DemoOptions {
 
 const TIMED = new Set<ServerEvent['type']>([
   'session_started',
+  'message',
+  'task_changed',
   'step_started',
   'approval_requested',
   'help_requested',

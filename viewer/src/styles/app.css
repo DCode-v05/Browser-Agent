@@ -1231,6 +1231,257 @@
   max-height: none;
 }
 
+/* The conversation: the whole page when the browser is on the person's own screen (spec 9.14).
+   No cards one under another: what was asked, the steps taken, the answer, and one box to write in. */
+
+.talk {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.talk-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+}
+
+.talk-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+
+.talk-title {
+  font-size: var(--text-title);
+  font-weight: var(--weight-emphasis);
+  line-height: var(--line-tight);
+  letter-spacing: var(--tracking-title);
+  white-space: nowrap;
+}
+
+.talk-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.talk-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.talk-empty {
+  margin-top: var(--space-6);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* What the person asked is a bubble on their side. What the agent says is plain text. */
+.talk-person {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-3);
+  white-space: pre-wrap;
+}
+
+.talk-agent {
+  display: flex;
+  gap: var(--space-2);
+  white-space: pre-wrap;
+}
+
+.talk-agent[data-failed] {
+  color: var(--danger);
+}
+
+.talk-agent .icon {
+  margin-top: calc(var(--space-1) / 2);
+}
+
+.talk-agent a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.talk-agent code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+}
+
+.talk-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.talk-steps-head {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.talk-steps-head:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.talk-steps-failed {
+  color: var(--danger);
+}
+
+.talk-rows {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.talk-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--target-min);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-size: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.talk-row:hover,
+.talk-row[aria-expanded='true'] {
+  background: var(--surface-2);
+}
+
+.talk-row:focus-visible {
+  outline-offset: calc(-1 * var(--focus-width));
+}
+
+.talk-row .icon,
+.talk-row .spinner {
+  align-self: center;
+  color: var(--success);
+}
+
+.talk-row[data-status='running'] .spinner {
+  color: var(--agent);
+}
+
+.talk-row[data-status='failed'] .icon,
+.talk-row[data-status='failed'] .talk-row-text {
+  color: var(--danger);
+}
+
+.talk-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.talk-row-time {
+  flex: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.talk-working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.talk-working .spinner {
+  color: var(--agent);
+}
+
+.talk-cards {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+.talk-cards:empty {
+  display: none;
+}
+
+.talk-compose {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+/* The box is one thing to the eye, so the ring goes around all of it. */
+.talk-compose:has(.talk-input:focus-visible) {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.talk-input {
+  width: 100%;
+  padding: var(--space-1);
+  border: 0;
+  background: transparent;
+  line-height: var(--line);
+  resize: none;
+}
+
+.talk-input:focus-visible {
+  outline: none;
+}
+
+.talk-input::placeholder {
+  color: var(--text-muted);
+}
+
+.talk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
 
 @media (max-width: 979px) {

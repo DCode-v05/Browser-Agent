@@ -15,8 +15,9 @@
   const STYLE = `
     :host { all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; }
     * { box-sizing: border-box; }
-    .edge { position: fixed; inset: 0; border: 3px solid var(--tone); opacity: 0;
-      box-shadow: inset 0 0 28px 2px color-mix(in srgb, var(--tone) 55%, transparent); transition: opacity 200ms ease-out; }
+    .edge { position: fixed; inset: 0; opacity: 0; transition: opacity 200ms ease-out;
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 70%, transparent),
+        inset 0 0 72px 8px color-mix(in srgb, var(--tone) 42%, transparent); }
     .pill { position: fixed; left: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 8px;
       max-width: min(70vw, 560px); padding: 7px 14px; border-radius: 999px; background: var(--tone); color: var(--on-tone);
       font: 500 13px/1.3 system-ui, "Segoe UI", Roboto, sans-serif; box-shadow: 0 4px 20px rgb(0 0 0 / 0.18);

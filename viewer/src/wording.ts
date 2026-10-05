@@ -150,6 +150,8 @@ export const W = {
     placeholderWorking: 'Add the next task',
     closed: 'The session has ended',
     send: 'Send the task',
+    stopTask: 'Stop this task',
+    stepsFailed: (count: number) => (count === 1 ? '1 failed' : `${count} failed`),
   },
 
   timeline: {

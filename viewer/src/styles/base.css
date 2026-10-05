@@ -184,6 +184,22 @@ textarea {
   }
 }
 
+/* The mark beside work that is going on. */
+@keyframes turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.spinner {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  border: var(--spinner-line) dotted currentColor;
+  border-radius: 50%;
+  animation: turn var(--duration-breathe) linear infinite;
+}
+
 @keyframes live {
   50% {
     opacity: 0.35;
