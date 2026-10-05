@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tools</title>
+<style>
+  body { margin: 0; }
+  #menu { display: none; }
+  #opener:hover + #menu { display: block; }
+  #tall { height: 3000px; }
+  #panel { height: 100px; width: 300px; overflow: auto; border: 1px solid; }
+  #panel div { height: 60px; }
+</style>
+</head>
+<body>
+<h1>Tools</h1>
+<p>The price is 42 dollars.</p>
+<button id="opener">Products</button>
+<div id="menu"><a href="welcome.html">Price list</a></div>
+
+<label>Search <input id="search"></label>
+<p id="keys"></p>
+
+<label><input type="checkbox" id="news"> Send me news</label>
+<button id="dark" role="switch" aria-checked="false">Dark mode</button>
+<label><input type="checkbox" id="locked" onclick="return false"> Locked</label>
+
+<label>Colour
+  <select id="colour">
+    <option value="">--</option>
+    <option value="r">Red</option>
+    <option value="g">Green</option>
+    <option value="b" disabled>Blue</option>
+  </select>
+</label>
+<label>Toppings
+  <select id="toppings" multiple>
+    <option>Cheese</option>
+    <option>Olives</option>
+    <option>Onion</option>
+  </select>
+</label>
+<p id="chosen"></p>
+
+<button id="later">Load results</button>
+<p id="results"></p>
+<button id="spot" style="position: absolute; left: 600px; top: 40px; width: 100px; height: 40px">Spot</button>
+<p id="spotted"></p>
+
+<div id="panel"><div>Line 1</div><div>Line 2</div><div>Line 3</div><div>Line 4</div><div>Line 5</div><button>Deep in the panel</button></div>
+<div id="tall"></div>
+<button id="bottom">At the bottom</button>
+
+<script>
+const keys = [];
+document.addEventListener('keydown', (event) => {
+  const held = ['ctrlKey', 'altKey', 'shiftKey', 'metaKey'].filter((name) => event[name]).map((name) => name.replace('Key', ''));
+  keys.push([...held, event.key].join('+'));
+  document.getElementById('keys').textContent = 'Keys: ' + keys.join(' ');
+});
+document.getElementById('dark').addEventListener('click', (event) => {
+  const on = event.currentTarget.getAttribute('aria-checked') === 'true';
+  event.currentTarget.setAttribute('aria-checked', String(!on));
+});
+for (const id of ['colour', 'toppings']) {
+  document.getElementById(id).addEventListener('change', (event) => {
+    const picked = Array.from(event.target.selectedOptions).map((option) => option.text);
+    document.getElementById('chosen').textContent = id + ': ' + picked.join(', ');
+  });
+}
+document.getElementById('later').addEventListener('click', () => {
+  document.getElementById('results').textContent = 'Loading';
+  setTimeout(() => { document.getElementById('results').textContent = 'Three results found'; }, 300);
+});
+document.getElementById('spot').addEventListener('click', (event) => {
+  document.getElementById('spotted').textContent = 'Spotted with ' + event.detail + ' click';
+});
+</script>
+</body>
+</html>

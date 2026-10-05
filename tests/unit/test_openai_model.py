@@ -51,16 +51,12 @@ async def test_the_request_is_what_the_provider_documents(provider) -> None:
     # Nothing is kept on the provider's side, so what the model thought has to come back sealed.
     assert body["store"] is False
     assert body["include"] == ["reasoning.encrypted_content"]
-    assert [tool["name"] for tool in body["tools"]] == [
-        "browser_navigate",
-        "browser_snapshot",
-        "browser_click",
-        "browser_type",
-    ]
-    click = body["tools"][2]
+    assert [tool["name"] for tool in body["tools"]] == [tool.name for tool in TOOLS]
+    click = next(tool for tool in body["tools"] if tool["name"] == "browser_click")
+    ours = next(tool for tool in TOOLS if tool.name == "browser_click")
     assert click["type"] == "function" and click["strict"] is False
-    assert click["description"] == TOOLS[2].description
-    assert click["parameters"] == TOOLS[2].input_schema
+    assert click["description"] == ours.description
+    assert click["parameters"] == ours.input_schema
 
 
 async def test_text_and_tool_calls_are_read_from_the_reply(provider) -> None:

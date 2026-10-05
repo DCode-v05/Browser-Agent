@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from bap_browser.config import Config
@@ -15,6 +15,10 @@ from bap_browser.policy.url_policy import UrlPolicy
 
 SESSION_ENDED = "The session has ended."
 
+AskPerson = Callable[[str, str, float], Awaitable[tuple[str, str]]]
+"""Asks a person to do a step in the browser: the reason, the kind of step and the longest wait in
+seconds go in; the outcome (`done`, `could_not`, `timed_out`) and what changed meanwhile come out."""
+
 
 class BrowserSession:
     def __init__(self, config: Config, driver: Driver | None = None) -> None:
@@ -24,6 +28,8 @@ class BrowserSession:
         self._driver: Driver = driver if driver is not None else PlaywrightDriver(config)
         self._started = False
         self._lost = False
+        self.ask_person: AskPerson | None = None
+        """Set by whoever can reach a person. None when nobody is watching this session."""
         self._closed = False
 
     def shown_address(self, url: str) -> str:

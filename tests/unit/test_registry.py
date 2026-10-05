@@ -7,12 +7,26 @@ def by_name() -> dict[str, dict]:
     return {tool.name: tool.input_schema for tool in TOOLS}
 
 
-def test_the_four_tools_of_this_stage() -> None:
+def test_the_tools_of_this_stage() -> None:
     assert [tool.name for tool in TOOLS] == [
         "browser_navigate",
+        "browser_go_back",
+        "browser_go_forward",
+        "browser_reload",
         "browser_snapshot",
+        "browser_get_text",
+        "browser_find",
         "browser_click",
+        "browser_hover",
         "browser_type",
+        "browser_fill_form",
+        "browser_select_option",
+        "browser_set_checked",
+        "browser_press_key",
+        "browser_scroll",
+        "browser_scroll_to",
+        "browser_wait",
+        "browser_request_human",
     ]
 
 
@@ -27,9 +41,10 @@ def test_the_click_schema() -> None:
     assert by_name()["browser_click"] == {
         "type": "object",
         "additionalProperties": False,
-        "required": ["ref"],
         "properties": {
             "ref": {"type": "string", "pattern": "^(f\\d+)?e\\d+$"},
+            "x": {"type": "number", "minimum": 0},
+            "y": {"type": "number", "minimum": 0},
             "button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left"},
             "click_count": {"type": "integer", "minimum": 1, "maximum": 3, "default": 1},
             "modifiers": {
@@ -49,9 +64,9 @@ def test_optional_arguments_are_plain_types() -> None:
 
 
 def test_the_definitions_stay_small() -> None:
-    """The budget is 3,500 tokens for 28 tools (spec 11.6), counted as characters / 4: 500 per four tools."""
+    """The budget is 3,500 tokens for 28 tools (spec 11.6), counted as characters / 4: 125 a tool."""
     sent = json.dumps(
         [{"name": t.name, "description": t.description, "inputSchema": t.input_schema} for t in TOOLS],
         separators=(",", ":"),
     )
-    assert len(sent) / 4 <= 500
+    assert len(sent) / 4 <= 3500 / 28 * len(TOOLS)

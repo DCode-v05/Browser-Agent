@@ -94,11 +94,13 @@ async def test_type_reports_a_count_and_never_the_text(make_config, tmp_path: Pa
 async def test_bad_calls_are_results_not_crashes(make_config, tmp_path: Path) -> None:
     tools, driver = kit(make_config, tmp_path)
     cases = {
-        (
-            "browser_fly",
-            (),
-        ): "Unknown tool 'browser_fly'. Available: browser_click, browser_navigate, browser_snapshot, browser_type.",
-        ("browser_click", (("reff", "e1"),)): "browser_click: missing argument 'ref'",
+        ("browser_fly", ()): "Unknown tool 'browser_fly'. Available: browser_click, browser_fill_form, ",
+        ("browser_click", (("reff", "e1"),)): "browser_click: unknown argument 'reff'",
+        ("browser_click", ()): "browser_click: give ref, or both x and y",
+        ("browser_click", (("x", 5),)): "browser_click: give either ref, or both x and y",
+        ("browser_click", (("ref", "e1"), ("x", 5), ("y", 5))): "browser_click: give either ref, or both",
+        ("browser_wait", ()): "browser_wait: give exactly one of text, text_gone, load_state, seconds",
+        ("browser_fill_form", (("fields", ()),)): "browser_fill_form: bad value for 'fields'",
         ("browser_click", (("ref", "e1"), ("speed", 2))): "browser_click: unknown argument 'speed'",
         ("browser_click", (("ref", "button 3"),)): "browser_click: bad value for 'ref'",
         ("browser_click", (("ref", "e1"), ("click_count", 9))): "browser_click: bad value for 'click_count'",
@@ -268,7 +270,7 @@ async def test_a_call_that_cannot_run_is_still_a_step(make_config, tmp_path: Pat
         ("started", 1, "browser_fly", "browser_fly", None),
         ("finished", 1, False, "Could not run browser_fly: unknown tool", []),
         ("started", 2, "browser_click", "Clicking", None),
-        ("finished", 2, False, "Could not click: missing argument 'ref'", []),
+        ("finished", 2, False, "Could not click: unknown argument 'reff'", []),
     ]
     assert driver.started == 0
 

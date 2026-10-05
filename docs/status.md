@@ -298,6 +298,27 @@ None of these was fixed. They are listed so that you can choose.
 8. **Settings in a live session.** The settings screen of a live session still offers only colour mode
    and "show where the agent is acting". The rest waits for the settings API.
 
+## Since this page was measured
+
+Added on 2026-10-05, on branch `feature/agent-cursor`. The table at the top was not measured again.
+
+- **The agent's pointer in the viewer.** It stays on the picture, moves from one target to the next, and a
+  click leaves a mark (spec 9.11).
+- **13 more tools, 17 of 28 in all:** `browser_go_back`, `browser_go_forward`, `browser_reload`,
+  `browser_get_text`, `browser_find`, `browser_hover`, `browser_fill_form`, `browser_select_option`,
+  `browser_set_checked`, `browser_press_key`, `browser_scroll`, `browser_scroll_to`, `browser_wait`; and
+  `browser_click` takes a point (`x`, `y`) as well as a ref.
+- **A chat in the viewer** (`bap-browser agent --chat --open`): a person gives tasks one after another and
+  reads the answers; the chat says what the agent is doing, and the browser's edge glows while it works.
+- **`browser_request_human`** (18 of 28 tools): the agent asks a person to do a sign-in, a CAPTCHA or a
+  code; the person takes over, does it and answers Done. Run once for real against Google's reCAPTCHA demo
+  page: the agent asked instead of trying, and went on after Done.
+- Measured on 2026-10-05 on macOS with Python 3.12.5: `uv run pytest -q`: 772 passed, 2 failed. The two
+  failures were there before this work: `test_a_persons_commands_act_on_the_session` (a pointer press sent
+  just before Stop is dropped) and `test_the_step_drawer_shows_the_evidence` (it does not wait for the
+  picture to load). The 17 tool definitions come to 1,511 tokens, counted as characters / 4, against a
+  budget of 125 a tool.
+
 ## Documents
 
 | File | What it is |
@@ -315,7 +336,9 @@ None of these was fixed. They are listed so that you can choose.
 ## Next, in order
 
 1. Your test through the viewer with a real key, and whatever it shows.
-2. The remaining 24 tools (frames, tabs, screenshots, forms, scrolling, files, waiting, finding).
+2. The remaining 10 tools: screenshots and zoom, tabs and pop-ups, dialogs, the console and network logs,
+   drag, files (upload, downloads), `browser_evaluate`. Frames in the snapshot go
+   with them. (17 of the 28 exist since 2026-10-05: see "Since this page was measured".)
 3. Approvals for real: tools marked "confirm" wait for the person's answer in the viewer.
 4. The settings API, so the settings screen acts on a live session.
 5. The address policy at the network layer, so redirects and link clicks are checked too.

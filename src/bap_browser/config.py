@@ -315,6 +315,9 @@ class Viewer(Section):
     embed_origins: list[str] = setting(
         [], "Pages allowed to show the viewer inside themselves, and to open its WebSocket"
     )
+    pointer_hold_ms: int = setting(
+        600, "How long the outline and the click mark stay after the agent has acted, in milliseconds"
+    )
     show_agent_pointer: bool = setting(
         True, "Draw the target highlight and the agent's pointer over the live picture"
     )
@@ -336,6 +339,7 @@ class Agent(Section):
     request_timeout_s: int = setting(120, "Longest wait for one reply from the model")
     max_steps: int = setting(40, "Tool calls after which the loop stops")
     max_tokens: int = setting(4096, "The most a single reply may be")
+    max_task_chars: int = setting(4000, "Longest task a person may send from the viewer's chat")
 
     @field_validator("base_url", mode="after")
     @classmethod

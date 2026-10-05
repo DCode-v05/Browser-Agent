@@ -66,6 +66,22 @@ export type Notice = { id: number } & (
 
 type NewNotice = Notice extends infer N ? (N extends { id: number } ? Omit<N, 'id'> : never) : never;
 
+export interface ChatMessage {
+  id: number;
+  role: 'person' | 'agent';
+  text: string;
+  failed: boolean;
+  at: number;
+}
+
+/** The conversation in which a person gives the agent its tasks. */
+export interface Chat {
+  /** False when this session's agent takes no tasks from the viewer: there is then no chat to show. */
+  enabled: boolean;
+  working: boolean;
+  messages: ChatMessage[];
+}
+
 export interface SessionInfo {
   id: string;
   agent: string;
@@ -84,6 +100,7 @@ export interface ViewerState {
   tabs: TabInfo[];
   url: string;
   steps: Step[];
+  chat: Chat;
   /** Characters returned to the agent so far: what the session has cost in tokens, roughly. */
   chars: number;
   approval: Approval | null;
@@ -111,6 +128,7 @@ export const initialState: ViewerState = {
   tabs: [],
   url: '',
   steps: [],
+  chat: { enabled: false, working: false, messages: [] },
   chars: 0,
   approval: null,
   help: null,
@@ -174,6 +192,7 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
         },
         control: 'agent',
         controlSince: event.ts,
+        chat: { ...initialState.chat, enabled: event.chat === true },
       };
 
     case 'control_changed':
@@ -256,6 +275,16 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
     case 'settings_changed':
       return { ...state, settingsVersion: state.settingsVersion + 1 };
 
+    case 'message': {
+      // A connection that comes back replays the chat. A message already here is not added twice.
+      if (state.chat.messages.some((message) => message.id === event.id)) return state;
+      const message: ChatMessage = { id: event.id, role: event.role, text: event.text, failed: event.failed === true, at: event.ts };
+      return { ...state, chat: { ...state.chat, messages: [...state.chat.messages, message] } };
+    }
+
+    case 'task_changed':
+      return { ...state, chat: { ...state.chat, working: event.working } };
+
     case 'picture_current':
       return state.frame ? { ...state, frame: { src: state.frame.src, at: event.ts } } : state;
 
@@ -267,7 +296,12 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
         approval: null,
         help: null,
         dialog: null,
+        chat: { ...state.chat, working: false },
         ended: { reason: event.reason, detail: event.detail, at: event.ts },
       };
+
+    default:
+      // An event from a newer service than this viewer knows. It changes nothing here.
+      return state;
   }
 }

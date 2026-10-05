@@ -8,19 +8,40 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from bap_browser import keys
 from bap_browser.config import Logging
 from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
 TYPED_ARGUMENTS = frozenset({"text"})
 ADDRESS_ARGUMENTS = frozenset({"url"})
+# A key press that types a character is typed text. A named key, such as Enter, is not.
+KEYS_ARGUMENT = "keys"
+# The fields of a form: what goes into each is typed text.
+FIELDS_ARGUMENT = "fields"
+
+
+def _is_typed(name: str, value: str) -> bool:
+    return name in TYPED_ARGUMENTS or (name == KEYS_ARGUMENT and keys.is_typed_text(value))
+
+
+def _field(field: Any) -> Any:
+    if not isinstance(field, Mapping):
+        return f"<{type(field).__name__}>"
+    value = field.get("value")
+    kept = (
+        value if isinstance(value, bool) else f"<{len(value)} characters>" if isinstance(value, str) else None
+    )
+    return {"ref": field.get("ref"), "value": kept}
 
 
 def masked(arguments: Mapping[str, Any], redact: Callable[[str], str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for name, value in arguments.items():
-        if name in TYPED_ARGUMENTS and isinstance(value, str):
+        if isinstance(value, str) and _is_typed(name, value):
             out[name] = f"<{len(value)} characters>"
+        elif name == FIELDS_ARGUMENT and isinstance(value, list):
+            out[name] = [_field(field) for field in value]
         elif name in ADDRESS_ARGUMENTS and isinstance(value, str):
             out[name] = redact(presentable_address(value) or "<not a valid address>")
         elif isinstance(value, str):

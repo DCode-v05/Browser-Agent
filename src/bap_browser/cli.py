@@ -89,6 +89,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="end when the task is finished, instead of keeping the viewer open",
     )
+    agent.add_argument(
+        "--chat",
+        action="store_true",
+        help="keep the session open and take tasks from the chat in the viewer, one after another",
+    )
     agent.set_defaults(run=_agent)
     return parser
 
@@ -151,7 +156,7 @@ def _agent(args: argparse.Namespace) -> int:
         task = args.task or TASK
         model_for = lambda service: demo_script(f"{service.address}/demo-site", args.pace)  # noqa: E731
     else:
-        if not args.task:
+        if not args.task and not args.chat:
             raise ConfigError(
                 'say what the agent should do, for example: bap-browser agent "Find the opening hours", '
                 "or run the demonstration: bap-browser agent --demo"
@@ -174,6 +179,13 @@ def _agent(args: argparse.Namespace) -> int:
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     try:
+        if args.chat:
+            if args.demo:
+                raise ConfigError("the demonstration plays one fixed task. Use --chat without --demo")
+            from bap_browser.agent.command import chat_with_viewer
+
+            asyncio.run(chat_with_viewer(config, model_for, first_task=task, open_viewer=args.open))
+            return 0
         asyncio.run(
             run_with_viewer(
                 config,

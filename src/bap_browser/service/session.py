@@ -18,7 +18,8 @@ from bap_browser.service.events import EventHub
 from bap_browser.tools.gate import Admission
 from bap_browser.tools.toolkit import Toolkit
 
-ControlState = Literal["agent", "paused", "person", "ended"]
+ControlState = Literal["agent", "paused", "person_requested", "person", "ended"]
+HelpOutcome = Literal["done", "could_not", "timed_out"]
 EndReason = Literal["person", "agent", "timeout", "failed"]
 
 # What an agent's call is told when it could not run (spec 4.5). None of these is an error.
@@ -42,13 +43,22 @@ class ServiceSession:
         name: str = "default",
         agent: str = "Agent",
         clock: Callable[[], float] = time.time,
+        on_task: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config
         self.name = name
         self.hub = EventHub(config.viewer.history_events)
         self.browser = BrowserSession(config, driver)
+        self.browser.ask_person = self._ask_person
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
+        # The request for a person that is open now, and how it was answered.
+        self._help: str | None = None
+        self._help_outcome: HelpOutcome | None = None
+        self._helps = 0
         self.control: ControlState = "agent"
+        self._on_task = on_task
+        """Given each task a person sends from the viewer's chat. None when the agent takes no tasks there."""
+        self._messages = 0
         self._agent = agent
         self._clock = clock
         self._ended_by: EndReason | None = None
@@ -69,17 +79,18 @@ class ServiceSession:
         """Starts the browser and tells viewers what this session is."""
         driver = await self.browser.driver()
         self._size = width, height = await driver.viewport()
-        self.hub.publish(
-            {
-                "type": "session_started",
-                "session": self.name,
-                "agent": self._agent,
-                "backend": self.config.backend.kind,
-                "browser": driver.description(),
-                "viewport": {"width": width, "height": height},
-                "ts": self._clock(),
-            }
-        )
+        started: dict[str, Any] = {
+            "type": "session_started",
+            "session": self.name,
+            "agent": self._agent,
+            "backend": self.config.backend.kind,
+            "browser": driver.description(),
+            "viewport": {"width": width, "height": height},
+            "ts": self._clock(),
+        }
+        if self._on_task is not None:
+            started["chat"] = True
+        self.hub.publish(started)
         self._publish_tabs(await self.toolkit.tabs())
         viewer = self.config.viewer
         await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
@@ -108,15 +119,54 @@ class ServiceSession:
         if kind == "pause":
             await self._take("paused", ("agent",))
         elif kind == "take_over":
-            await self._take("person", ("agent", "paused"))
+            await self._take("person", ("agent", "paused", "person_requested"))
+        elif kind in ("done", "could_not") and self._help is not None:
+            await self._answer_help(kind)
         elif kind == "resume" and self.control == "paused":
             await self._set_control("agent")
-        elif kind == "hand_back" and self.control == "person":
+        elif kind == "hand_back" and self.control == "person" and self._help is None:
             await self._hand_back()
         elif kind == "stop":
             await self.close("person")
         elif kind in ("pointer", "key", "wheel") and self.control == "person":
             await self._input(kind, command)
+        elif kind == "task":
+            self.give_task(command.get("text"))
+
+    # The chat: a person gives the agent its tasks, and reads its answers (spec 9.14).
+
+    def give_task(self, text: Any) -> bool:
+        """Hands a person's task to the agent. False when it cannot be taken."""
+        if self._on_task is None or self.control == "ended" or not isinstance(text, str):
+            return False
+        task = text.strip()
+        if not task or len(task) > self.config.agent.max_task_chars:
+            return False
+        self.said("person", task)
+        self._on_task(task)
+        return True
+
+    def said(self, role: Literal["person", "agent"], text: str, *, failed: bool = False) -> None:
+        """Adds a message to the chat every viewer sees."""
+        self._messages += 1
+        message: dict[str, Any] = {
+            "type": "message",
+            "id": self._messages,
+            "role": role,
+            "text": self.browser.redact(text),
+            "ts": self._clock(),
+        }
+        if failed:
+            message["failed"] = True
+        self.hub.publish(message)
+
+    def working(self, on_a_task: bool) -> None:
+        """Tells viewers whether the agent is on a task or waits for one."""
+        self.hub.publish({"type": "task_changed", "working": on_a_task, "ts": self._clock()})
+
+    async def wait_until_ended(self) -> None:
+        async with self._changed:
+            await self._changed.wait_for(lambda: self.control == "ended")
 
     # A person's mouse and keyboard. None of it is logged, and none of it is told to viewers or the agent.
 
@@ -272,17 +322,70 @@ class ServiceSession:
             # The session was stopped, or another viewer handed it back, while the tabs were being read.
             return
         self._publish_tabs(tabs)
+        self._note = (
+            f"[A person was in control of the browser and has handed it back. {self._change(tabs)} "
+            "Refs from before may be out of date: take a new snapshot before you act.]\n"
+        )
+        await self._set_control("agent")
+
+    def _change(self, tabs: Sequence[TabInfo]) -> str:
+        """What a person changed while they had the browser, as far as the agent is told: the address."""
         before, after = self._address_at_takeover, self._active_address(tabs)
-        change = (
+        return (
             f"The address is still {after}."
             if after == before
             else f"The address was {before} and is now {after}."
         )
-        self._note = (
-            f"[A person was in control of the browser and has handed it back. {change} "
-            "Refs from before may be out of date: take a new snapshot before you act.]\n"
+
+    # The agent asks a person to do a step (spec 8.4): a sign-in, a CAPTCHA, a code.
+
+    async def _ask_person(self, reason: str, kind: str, timeout_s: float) -> tuple[str, str]:
+        """Runs inside the agent's call. The call holds the browser; it is let go while the person
+        works, so that they can take over, and taken again before the call goes on."""
+        self._helps += 1
+        self._help, self._help_outcome = f"h{self._helps}", None
+        self._address_at_takeover = self._active_address(await self.toolkit.tabs())
+        self.hub.publish(
+            {
+                "type": "help_requested",
+                "id": self._help,
+                "reason": self.browser.redact(reason),
+                "kind": kind,
+                "expires_in_s": round(timeout_s),
+                "ts": self._clock(),
+            }
         )
+        if self._on_task is not None:
+            self.said("agent", f"I need your help: {reason}")
+        await self._set_control("person_requested")
+        self._acting.release()
+        try:
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(timeout_s), self._changed:
+                    await self._changed.wait_for(
+                        lambda: self._help_outcome is not None or self.control == "ended"
+                    )
+        finally:
+            await self._acting.acquire()
+        outcome: HelpOutcome = self._help_outcome or "timed_out"
+        self.hub.publish({"type": "help_closed", "id": self._help, "outcome": outcome})
+        self._help = None
+        if self.control == "ended":
+            raise BapError(
+                ENDED_BY_A_PERSON if self._ended_by == "person" else ENDED, reason="the session ended"
+            )
+        await self._let_go()
+        tabs = await self.toolkit.tabs()
+        self._publish_tabs(tabs)
         await self._set_control("agent")
+        return outcome, (
+            f"{self._change(tabs)} Refs from before may be out of date: take a new snapshot before you act."
+        )
+
+    async def _answer_help(self, outcome: HelpOutcome) -> None:
+        if self._help_outcome is None:
+            self._help_outcome = outcome
+            await self._announce()
 
     async def _set_control(self, state: ControlState) -> None:
         if self.control == "ended":

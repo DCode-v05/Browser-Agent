@@ -359,8 +359,8 @@ again: it says the link cannot open the session and what to do (section 9.3).
 
 | Direction | Messages |
 |---|---|
-| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
-| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab` |
+| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `message`, `task_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
+| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task` |
 
 Examples:
 
@@ -381,7 +381,7 @@ Fields of each event. Times are in seconds on the service's clock.
 
 | Event | Fields |
 |---|---|
-| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `ts` |
+| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `ts` |
 | `control_changed` | `state` (`agent`, `waiting_approval`, `person_requested`, `person`, `paused`, `ended`), `since` |
 | `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
 | `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
@@ -395,6 +395,8 @@ Fields of each event. Times are in seconds on the service's clock.
 | `download_saved` | `name`, `size`, `ts` |
 | `navigation_blocked` | `url`, `reason`, `ts` |
 | `settings_changed` | `changes` |
+| `message` | `id`, `role` (`person`, `agent`), `text`, `failed` (true when the agent could not do the task), `ts` |
+| `task_changed` | `working` (true while the agent is on a task), `ts` |
 | `picture_current` | `ts` |
 | `caught_up` | `ts` (the service's clock now, which the viewer sets its own by) |
 | `session_ended` | `reason` (`person`, `agent`, `timeout`, `failed`), `detail`, `ts` |
@@ -682,8 +684,8 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_navigate` | `url` | "Navigated to …" and the snapshot. An address with no scheme gets `https://` |
 | `browser_go_back` | none | The snapshot, or "No previous page in history." |
-| `browser_go_forward` | none | The snapshot |
-| `browser_reload` | none | The snapshot |
+| `browser_go_forward` | none | The snapshot, or "No next page in history." |
+| `browser_reload` | none | "Reloaded …" and the snapshot |
 
 **Reading**
 
@@ -691,7 +693,7 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_snapshot` | `mode` (`interactive`), `ref`, `max_chars` (20,000), `include_bboxes` (false) | The page, or a subtree, as text with refs |
 | `browser_get_text` | `ref`, `max_chars` (20,000) | Visible text of the page or element |
-| `browser_find` | `query`, `limit` (10, at most 50) | Matching snapshot lines with refs, best first |
+| `browser_find` | `query`, `limit` (10, at most 50) | Matching snapshot lines with refs, best first. A line that holds the whole phrase comes before one that holds some of its words. A line of text has no ref of its own and is given with the ref of the element it is in: `(in e7)` |
 | `browser_screenshot` | `full_page` (false), `annotate` (false) | One image and a one-line note |
 | `browser_zoom` | `region` `[x0, y0, x1, y1]` | One image of that region at full resolution |
 
@@ -700,7 +702,7 @@ never crashes on a bad call.
 | Tool | Arguments (default) | Returns |
 |---|---|---|
 | `browser_click` | `ref`, or `x` and `y`; `button` (`left`); `click_count` (1, up to 3); `modifiers` | "Clicked e7 (button "Create account")", and where the page navigated if it did |
-| `browser_hover` | `ref`, or `x` and `y` | "Hovering over …" |
+| `browser_hover` | `ref`, or `x` and `y` | "Hovering over …". A point is in page pixels from the top left of what the browser shows; a point outside it is refused |
 | `browser_drag` | `from_ref` or `from_xy`; `to_ref` or `to_xy` | "Dragged from … to …" |
 
 **Keyboard and forms**
@@ -709,17 +711,17 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_type` | `text`; `ref`; `clear` (true); `submit` (false); `slowly` (false) | "Typed 17 characters into e3 (textbox "Email")". With no ref it types into the focused element |
 | `browser_fill_form` | `fields`: list of `{ref, value}` | "Filled: e2, e3, e5=checked, e6=India". Checkboxes take true or false; dropdowns take a label or value |
-| `browser_select_option` | `ref`, `values` | The selected values |
-| `browser_set_checked` | `ref`, `checked` | "e5 is now checked." |
-| `browser_press_key` | `keys`; `repeat` (1, up to 100); `ref` | "Pressed Control+a" |
+| `browser_select_option` | `ref`, `values` | "Selected "India" in e6 (combobox "Country")". A value matches an option's value or label, exactly or without regard to case. An option that does not exist is refused with the list of options |
+| `browser_set_checked` | `ref`, `checked` | "e5 is now checked.", or "e5 was already checked." It clicks the element as a person would and then reads the state back; a radio button cannot be cleared |
+| `browser_press_key` | `keys`; `repeat` (1, up to 100); `ref` | "Pressed Control+a". Key names are taken in any common form (`ctrl+a`, `esc`, `down`). A key that types a character is typed text: the result says "Pressed a character key" and the log keeps a count |
 
 **Scrolling and waiting**
 
 | Tool | Arguments (default) | Returns |
 |---|---|---|
-| `browser_scroll` | `direction`; `amount` (1 step, up to 20); `ref`, or `x` and `y` | "Scrolled down 1. Position 400px of 3200px." |
+| `browser_scroll` | `direction`; `amount` (1 step, up to 20); `ref`, or `x` and `y` | "Scrolled down 1. Position 400px of 3200px.", or "Nothing scrolled down. …" at the end. With a ref the wheel turns over the box that element scrolls in, and the position is that box's: "Scrolled down 1 inside e42. …" |
 | `browser_scroll_to` | `ref` | "Scrolled e42 into view." |
-| `browser_wait` | one of `text`, `text_gone`, `load_state`, `seconds`; `timeout_s` | What was reached. Capped by `browser.timeouts.wait_max_s` |
+| `browser_wait` | one of `text`, `text_gone`, `load_state`, `seconds`; `timeout_s` | What was reached. Capped by `browser.timeouts.wait_max_s`. A wait that runs out is a failed result. A wait for text goes on in a page that replaces this one |
 
 **Dialogs and tabs**
 
@@ -747,7 +749,15 @@ never crashes on a bad call.
 
 | Tool | Arguments (default) | Returns |
 |---|---|---|
-| `browser_request_human` | `reason` (up to 300 characters); `kind` (`login`, `verification`, `payment`, `other`); `timeout_s` | `done`, `could_not` or `timed_out`, an optional note from the person, then the change note |
+| `browser_request_human` | `reason` (up to 300 characters); `kind` (`login`, `verification`, `payment`, `other`); `timeout_s` | `done`, `could_not` or `timed_out`, then the change note: whether the address changed, and that a new snapshot is needed. The wait is at most `control.handoff_timeout_s`. In a session nobody can watch, the call fails and says so. The person's own note is a later item |
+
+A click or a hover on a ref moves the pointer to the element first and then checks that the element is
+still under it: a menu that was open under the pointer closes when the pointer leaves, and what follows it
+shifts. If the element moved, it is found again before the press. A key press that fails part-way releases
+the modifiers it had pressed.
+
+`browser_fill_form` fills each field the way its kind is filled and stops at the first field that fails;
+the result then says which fields were filled before it.
 
 That is 28 tools: 25 always present and 3 that depend on configuration (`browser_evaluate` is off by
 default). `browser_fill_form` already covers the most common multi-step case, filling a form, in one call.
@@ -1070,7 +1080,7 @@ column is unchanged.
 | Address bar | Where the browser is; read-only | loading, loaded, blocked |
 | Live frame | The picture of the browser, drawn on a canvas | connecting, live, stale, paused, person in control, ended, disconnected |
 | Control border and label | Who is driving | agent, person, waiting, paused, blocked, none |
-| Target highlight and pointer | Where the agent is about to act; drawn over the picture by the viewer, never inside the page | targeting, acted |
+| Target highlight and pointer | Where the agent is about to act and where it has just acted; drawn over the picture by the viewer, never inside the page | targeting, acted, failed |
 | Status line | State, current action, elapsed time | one per state in 9.3 |
 | Control buttons | Pause or Resume, Take over or Hand back, Stop | enabled, disabled, working |
 | Approval card | One pending approval, pinned above the timeline | pending, allowed, denied, expired |
@@ -1250,6 +1260,7 @@ Target: WCAG 2.2 level AA.
 - State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.
 - **Recorded sessions.** `viewer/src/demo/` holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. `?demo=<name>` plays one with no service, at real pace or stepped by hand, and `?state=<name>` opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.
 - The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.
+- The agent's pointer stays on the picture where the agent last acted. When a step names an element, the pointer moves there from where it was (a transform, 200 ms). The element is outlined while the step runs and for `viewer.pointer_hold_ms` after it, in the danger colour when the step failed. A click leaves a dot at the point for the same time, and one ring spreads from it once the pointer has arrived. With reduced motion the pointer jumps, and the outline and the dot stay until the next step. The pointer and the click mark are hidden while the session is paused or waits for a person, and are never shown while a person drives.
 - In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away. Whatever needs a person (an approval, a request for help, a page dialog, a blocked page, the summary) sits between that bar and the browser, so nothing has to be answered blind.
 - During takeover, pointer positions are scaled from the canvas to page pixels and sent as `pointer`, `wheel` and `key` commands.
 - `npm run build` writes the viewer into `src/bap_browser/viewer_dist/`, which the service serves.
@@ -1313,6 +1324,35 @@ Next: sign-in form, replay player, notifications, a note to the agent, typing wi
 keyboard during takeover. Later: a plan card to approve before a run.
 
 ---
+
+### 9.14 Chat
+
+When the agent takes its tasks from the viewer (`session_started` carries `chat: true`), the activity
+column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,
+and a box to write the next task in.
+
+- Enter sends the task; Shift+Enter starts a new line. A task is at most `agent.max_task_chars` characters.
+  Anything else the viewer sends as a task is dropped.
+- The viewer sends `task`; the service answers with a `message` of role `person`, so every viewer shows the
+  same conversation and a viewer that connects later is sent it again.
+- While the agent is on a task the chat says so and the status reads "Agent is working". Between tasks the
+  status reads "Ready for your task". A task sent while the agent is working waits its turn.
+- What the agent says while it works, and its answer, are `message`s of role `agent`. A task that could not
+  be done (the model could not be reached, the step limit) is answered with a `message` marked `failed`, and
+  the session goes on.
+- The conversation continues from one task to the next. The pages a finished task read are dropped from it,
+  so the next task reads the page as it is then and pays for none of the old ones.
+- The session ends only when a person stops it. After that the box is disabled.
+- The top of the chat says what the agent is doing in one word, with a dot and a colour: Working, Ready,
+  Paused, You're in control, Waiting for you, Stopped, Not connected. While it works, the line under the
+  messages names the step under way.
+- While the agent works, the edge of the live picture glows in the agent's colour and breathes slowly
+  (`--duration-breathe`); between tasks the picture's border is neutral. With reduced motion the glow is
+  still. This and the live dot are the only things that loop.
+- An answer is shown the way the model meant it: `**bold**`, `` `code` ``, `[named](links)` and bare web
+  addresses, which open in a new tab. Nothing else is interpreted, only `http` and `https` addresses become
+  links, and HTML in an answer is shown as text. What the person wrote is shown as written.
+- Messages pass through the same redaction as everything else a viewer is sent.
 
 ## 10. Configuration and settings
 
@@ -1610,6 +1650,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `takeover.release_chord` | `Ctrl+Alt+Enter` | Keys that leave the live frame |
 | `theme` | `system` | Or `light`, `dark` |
 | `embed_origins` | `[]` | Pages allowed to show the viewer inside themselves, and to open its WebSocket |
+| `pointer_hold_ms` | 600 | How long the outline and the click mark stay after the agent has acted |
 | `show_agent_pointer` | `true` | Draw the target highlight and the agent's pointer over the live picture |
 
 **`settings`**
@@ -1652,6 +1693,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `request_timeout_s` | 120 | Longest wait for one reply from the model |
 | `max_steps` | 40 | Tool calls after which the loop stops |
 | `max_tokens` | 4096 | The most a single reply may be |
+| `max_task_chars` | 4000 | Longest task a person may send from the viewer's chat |
 
 **`logging`, `bench`**
 
@@ -2783,6 +2825,7 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--wait-for-viewer` | Starts once a viewer has connected, without opening one |
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
+| `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
 
 Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,
 with the key read from `OPENAI_API_KEY`. Put `OPENAI_API_KEY=...` in a file named `.env` in the

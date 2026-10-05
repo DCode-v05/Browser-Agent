@@ -89,6 +89,7 @@
   --duration-state: 150ms;
   --duration-enter: 200ms;
   --duration-live: 1s;
+  --duration-breathe: 2s;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Focus and targets */
@@ -116,6 +117,7 @@
   --switch-height: 26px;
   --switch-knob: 20px;
   --list-height: 84px;
+  --chat-min-height: 220px;
   --hairline: 1px;
 }
 

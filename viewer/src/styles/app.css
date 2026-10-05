@@ -295,6 +295,17 @@
   border-color: var(--border-strong);
 }
 
+/* While the agent works, the edge of the browser glows in its colour and breathes. It is drawn over
+   the picture and takes no clicks. */
+.frame-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 var(--space-5) var(--space-1) color-mix(in srgb, var(--agent) 60%, transparent);
+  pointer-events: none;
+  animation: live var(--duration-breathe) ease-in-out infinite;
+}
+
 .frame-picture {
   display: block;
   width: 100%;
@@ -363,7 +374,8 @@
   font-size: var(--text-caption);
 }
 
-/* Where the agent is about to act. Drawn by the viewer, never inside the page. */
+/* Where the agent is about to act, and where it has just acted. Drawn by the viewer, never
+   inside the page. */
 
 .target {
   position: absolute;
@@ -373,6 +385,17 @@
   background: color-mix(in srgb, var(--agent) 14%, transparent);
   pointer-events: none;
   animation: arrive var(--duration-enter) var(--ease);
+}
+
+/* After the action the outline stays for a moment, then leaves. */
+.target[data-state='acted'],
+.target[data-state='failed'] {
+  animation: leave var(--duration-enter) var(--ease) var(--pointer-hold) forwards;
+}
+
+.target[data-state='failed'] {
+  outline-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .target[data-tone='waiting'] {
@@ -386,15 +409,44 @@
 }
 
 .agent-pointer[data-tone='waiting'],
-.agent-pointer[data-tone='neutral'] {
+.agent-pointer[data-tone='neutral'],
+.click-mark[data-tone='waiting'],
+.click-mark[data-tone='neutral'] {
   display: none;
 }
 
+/* The agent's pointer. It covers the picture and is moved by a transform, so its top-left corner,
+   where the arrow's tip is, glides from the last place the agent acted to the next. */
 .agent-pointer {
   position: absolute;
+  inset: 0;
   color: var(--agent);
   pointer-events: none;
   filter: drop-shadow(0 var(--hairline) var(--hairline) var(--surface));
+  transition: transform var(--duration-enter) var(--ease);
+  animation: arrive var(--duration-enter) var(--ease);
+}
+
+/* Where the agent clicked: a dot that stays for a moment, and one ring that spreads from it once
+   the pointer has arrived. */
+.click-mark {
+  position: absolute;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: calc(var(--space-2) / -2);
+  border-radius: var(--radius-pill);
+  background: var(--agent);
+  pointer-events: none;
+  animation: leave var(--duration-enter) var(--ease) var(--pointer-hold) forwards;
+}
+
+.click-ring {
+  position: absolute;
+  inset: calc((var(--space-2) - var(--target-min)) / 2);
+  border: var(--focus-width) solid var(--agent);
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  animation: ring var(--duration-enter) var(--ease) var(--duration-enter);
 }
 
 .frame-placeholder {
@@ -956,6 +1008,203 @@
 .toast .button:hover {
   background: transparent;
   color: var(--on-ink);
+}
+
+/* Chat: the tasks a person gives and the agent's answers, oldest on top; the box to write in is under them. */
+
+.chat {
+  flex: 1;
+  min-height: var(--chat-min-height);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.chat-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-right: var(--space-4);
+}
+
+/* What the agent is doing, in a word: an icon-sized dot, a colour and the word itself. */
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+}
+
+.agent-status-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.agent-status[data-status='working'] {
+  background: var(--agent-tint);
+  color: var(--agent);
+}
+
+.agent-status[data-status='working'] .agent-status-dot {
+  animation: live var(--duration-live) var(--ease) infinite;
+}
+
+.agent-status[data-status='ready'] {
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.agent-status[data-status='person'] {
+  background: var(--person-tint);
+  color: var(--person);
+}
+
+.agent-status[data-status='waiting'] {
+  background: var(--waiting-tint);
+  color: var(--waiting);
+}
+
+.agent-status[data-status='stopped'] {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.chat-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.chat-text code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.chat-empty {
+  color: var(--text-muted);
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 92%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--agent-tint);
+  align-self: flex-start;
+}
+
+.chat-message[data-role='person'] {
+  align-self: flex-end;
+  background: var(--surface-2);
+}
+
+.chat-message[data-failed] {
+  background: var(--danger-tint);
+}
+
+.chat-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+}
+
+.chat-message[data-role='agent'] .chat-who {
+  color: var(--agent);
+}
+
+.chat-message[data-failed] .chat-who {
+  color: var(--danger);
+}
+
+.chat-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--agent);
+  font-size: var(--text-secondary);
+}
+
+.chat-working:not([data-status='working']) {
+  color: var(--waiting);
+}
+
+.chat-working:not([data-status='working']) .chat-working-dot {
+  background: var(--waiting);
+  animation: none;
+}
+
+.chat-working-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--radius-pill);
+  background: var(--agent);
+  animation: live var(--duration-live) var(--ease) infinite alternate;
+}
+
+.chat-compose {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: var(--border-width) solid var(--border);
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  line-height: var(--line);
+}
+
+.chat-input:disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.chat-input::placeholder {
+  color: var(--text-muted);
 }
 
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
