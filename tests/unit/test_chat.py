@@ -177,3 +177,82 @@ async def test_waiting_for_a_task_ends_when_the_session_does(make_config, tmp_pa
     assert not waiting.done()
     await session.handle({"type": "stop"})
     await asyncio.wait_for(waiting, 1)
+
+
+def messages(session: ServiceSession) -> list[dict[str, Any]]:
+    return [event for event in chat(session) if event["type"] == "message"]
+
+
+async def test_a_person_stops_the_task_and_the_session_goes_on(make_config, tmp_path: Path) -> None:
+    session, _ = await chat_session(make_config, tmp_path)
+    history: list[Message] = []
+
+    class StoppedWhileThinking(Replies):
+        async def complete(
+            self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
+        ) -> Reply:
+            reply = await super().complete(system, messages, tools)
+            if len(self.seen) == 1:
+                await session.handle({"type": "stop_task"})
+            return reply
+
+    model = StoppedWhileThinking(
+        Reply("", (ToolCall("a", "browser_snapshot", {}),)), Reply("The second one is done.")
+    )
+    try:
+        await _do("First task", session, model, session.config, history)
+        said = messages(session)[-1]
+        assert (said["role"], said["text"]) == ("agent", "Stopped before the task was finished.")
+        assert "failed" not in said, "a task a person stopped has not failed"
+        assert len(model.seen) == 1, "the model is not asked again"
+        assert not [call for call in session.browser.started_driver.calls if call[0] == "snapshot"]  # type: ignore[union-attr]
+        assert session.control == "agent"
+
+        await _do("Second task", session, model, session.config, history)
+        assert messages(session)[-1]["text"] == "The second one is done."
+    finally:
+        await session.close()
+
+
+async def test_stopping_does_nothing_when_no_task_is_being_done(make_config, tmp_path: Path) -> None:
+    session, _ = await chat_session(make_config, tmp_path)
+    try:
+        await session.handle({"type": "stop_task"})
+        assert session.task_stopped() is False
+        session.working(True)
+        await session.handle({"type": "stop_task"})
+        assert session.task_stopped() is True
+        session.working(True)
+        assert session.task_stopped() is False, "a new task starts clean"
+    finally:
+        await session.close()
+
+
+async def test_stopping_lets_go_of_a_call_that_was_waiting_for_a_person(make_config, tmp_path: Path) -> None:
+    session, _ = await chat_session(make_config, tmp_path)
+    try:
+        session.working(True)
+        await session.handle({"type": "pause"})
+        held = asyncio.create_task(session.toolkit.call("browser_snapshot", {}))
+        for _ in range(8):
+            await asyncio.sleep(0)
+        assert not held.done()
+        await session.handle({"type": "stop_task"})
+        result = await asyncio.wait_for(held, 1)
+        assert result.text == "A person stopped the task, so nothing was done."
+        assert session.control == "paused", "stopping a task changes nothing about who is driving"
+
+        # A request for a person's help that is open is closed with it.
+        await session.handle({"type": "resume"})
+        session.working(True)
+        asking = asyncio.create_task(
+            session.toolkit.call("browser_request_human", {"reason": "Sign in", "kind": "login"})
+        )
+        async with asyncio.timeout(1):
+            while session.control != "person_requested":
+                await asyncio.sleep(0)
+        await session.handle({"type": "stop_task"})
+        await asyncio.wait_for(asking, 1)
+        assert session.control == "agent"
+    finally:
+        await session.close()

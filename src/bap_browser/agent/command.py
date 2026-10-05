@@ -163,12 +163,14 @@ async def _do(
             config.agent,
             on_text=lambda text: session.said("agent", text),
             ended=lambda: session.control == "ended",
+            stopped=session.task_stopped,
             history=history,
         )
         session.said("agent", answer)
     except (ModelError, Unfinished) as stopped:
         if session.control != "ended":
-            session.said("agent", str(stopped), failed=True)
+            # A task a person stopped has not failed.
+            session.said("agent", str(stopped), failed=not session.task_stopped())
     finally:
         _tidy(history, begun)
         session.working(False)

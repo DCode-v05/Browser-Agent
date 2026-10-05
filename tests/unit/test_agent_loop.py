@@ -182,3 +182,20 @@ async def test_a_session_that_has_ended_is_noticed_before_the_model_is_asked_aga
         await run_agent("Read", tools, Counting(), SETTINGS, ended=lambda: True)
     # The second run was over before it began: a model that is paid for by the call is not called.
     assert asked == 1
+
+
+async def test_a_task_a_person_stopped_ends_before_the_next_call(make_config, tmp_path: Path) -> None:
+    tools, driver = kit(make_config, tmp_path)
+    stopped = False
+
+    class Stopping:
+        async def complete(
+            self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
+        ) -> Reply:
+            nonlocal stopped
+            stopped = True
+            return Reply("", (ToolCall("a", "browser_snapshot", {}),))
+
+    with pytest.raises(Unfinished, match=r"Stopped before the task was finished\."):
+        await run_agent("Read", tools, Stopping(), SETTINGS, stopped=lambda: stopped)
+    assert not [call for call in driver.calls if call[0] == "snapshot"]

@@ -28,6 +28,7 @@ HELD = {
     "person": "A person is in control of the browser, so nothing was done. Call again to keep waiting.",
 }
 ENDED_BY_A_PERSON = "The session was ended by a person."
+TASK_STOPPED = "A person stopped the task, so nothing was done."
 ENDED = "The session has ended."
 # Which button a pointer command names, as browsers number them.
 BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
@@ -59,6 +60,9 @@ class ServiceSession:
         self._on_task = on_task
         """Given each task a person sends from the viewer's chat. None when the agent takes no tasks there."""
         self._messages = 0
+        # Whether the agent is on a task from the chat, and whether a person has stopped that task.
+        self._on_a_task = False
+        self._task_stopped = False
         self._agent = agent
         self._clock = clock
         self._ended_by: EndReason | None = None
@@ -135,6 +139,8 @@ class ServiceSession:
             await self._input(kind, command)
         elif kind == "task":
             self.give_task(command.get("text"))
+        elif kind == "stop_task":
+            await self._stop_task()
 
     # The chat: a person gives the agent its tasks, and reads its answers (spec 9.14).
 
@@ -163,8 +169,24 @@ class ServiceSession:
             message["failed"] = True
         self.hub.publish(message)
 
+    def task_stopped(self) -> bool:
+        """Whether a person has stopped the task the agent is on."""
+        return self._task_stopped
+
+    async def _stop_task(self) -> None:
+        """Ends the task the agent is on, and nothing else: the session, the browser and who is
+        driving stay as they are. A call that is waiting for a person is let go."""
+        if not self._on_a_task:
+            return
+        self._task_stopped = True
+        if self._help is not None:
+            await self._answer_help("could_not")
+        await self._announce()
+
     def working(self, on_a_task: bool) -> None:
         """Tells viewers whether the agent is on a task or waits for one."""
+        self._on_a_task = on_a_task
+        self._task_stopped = False
         self.hub.publish({"type": "task_changed", "working": on_a_task, "ts": self._clock()})
 
     async def wait_until_ended(self) -> None:
@@ -288,11 +310,16 @@ class ServiceSession:
             if self.control == "ended":
                 yield Admission(refused=ENDED_BY_A_PERSON if self._ended_by == "person" else ENDED)
                 return
+            if self._task_stopped:
+                yield Admission(refused=TASK_STOPPED)
+                return
             if self.control != "agent":
                 remaining = deadline - asyncio.get_running_loop().time()
                 try:
                     async with asyncio.timeout(max(remaining, 0)), self._changed:
-                        await self._changed.wait_for(lambda: self.control in ("agent", "ended"))
+                        await self._changed.wait_for(
+                            lambda: self.control in ("agent", "ended") or self._task_stopped
+                        )
                 except TimeoutError:
                     yield Admission(refused=HELD.get(self.control, ENDED))
                     return

@@ -78,6 +78,8 @@ export type ClientCommand =
   | { type: 'key'; action: 'down' | 'up'; key: string; code: string }
   | { type: 'wheel'; x: number; y: number; dx: number; dy: number }
   | { type: 'select_tab'; id: string }
-  | { type: 'task'; text: string };
+  | { type: 'task'; text: string }
+  /** Ends the task the agent is on. The session goes on. */
+  | { type: 'stop_task' };
 
 export type CommandType = ClientCommand['type'];
