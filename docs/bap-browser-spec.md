@@ -682,8 +682,8 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_navigate` | `url` | "Navigated to …" and the snapshot. An address with no scheme gets `https://` |
 | `browser_go_back` | none | The snapshot, or "No previous page in history." |
-| `browser_go_forward` | none | The snapshot |
-| `browser_reload` | none | The snapshot |
+| `browser_go_forward` | none | The snapshot, or "No next page in history." |
+| `browser_reload` | none | "Reloaded …" and the snapshot |
 
 **Reading**
 
@@ -691,7 +691,7 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_snapshot` | `mode` (`interactive`), `ref`, `max_chars` (20,000), `include_bboxes` (false) | The page, or a subtree, as text with refs |
 | `browser_get_text` | `ref`, `max_chars` (20,000) | Visible text of the page or element |
-| `browser_find` | `query`, `limit` (10, at most 50) | Matching snapshot lines with refs, best first |
+| `browser_find` | `query`, `limit` (10, at most 50) | Matching snapshot lines with refs, best first. A line that holds the whole phrase comes before one that holds some of its words. A line of text has no ref of its own and is given with the ref of the element it is in: `(in e7)` |
 | `browser_screenshot` | `full_page` (false), `annotate` (false) | One image and a one-line note |
 | `browser_zoom` | `region` `[x0, y0, x1, y1]` | One image of that region at full resolution |
 
@@ -700,7 +700,7 @@ never crashes on a bad call.
 | Tool | Arguments (default) | Returns |
 |---|---|---|
 | `browser_click` | `ref`, or `x` and `y`; `button` (`left`); `click_count` (1, up to 3); `modifiers` | "Clicked e7 (button "Create account")", and where the page navigated if it did |
-| `browser_hover` | `ref`, or `x` and `y` | "Hovering over …" |
+| `browser_hover` | `ref`, or `x` and `y` | "Hovering over …". A point is in page pixels from the top left of what the browser shows; a point outside it is refused |
 | `browser_drag` | `from_ref` or `from_xy`; `to_ref` or `to_xy` | "Dragged from … to …" |
 
 **Keyboard and forms**
@@ -709,17 +709,17 @@ never crashes on a bad call.
 |---|---|---|
 | `browser_type` | `text`; `ref`; `clear` (true); `submit` (false); `slowly` (false) | "Typed 17 characters into e3 (textbox "Email")". With no ref it types into the focused element |
 | `browser_fill_form` | `fields`: list of `{ref, value}` | "Filled: e2, e3, e5=checked, e6=India". Checkboxes take true or false; dropdowns take a label or value |
-| `browser_select_option` | `ref`, `values` | The selected values |
-| `browser_set_checked` | `ref`, `checked` | "e5 is now checked." |
-| `browser_press_key` | `keys`; `repeat` (1, up to 100); `ref` | "Pressed Control+a" |
+| `browser_select_option` | `ref`, `values` | "Selected "India" in e6 (combobox "Country")". A value matches an option's value or label, exactly or without regard to case. An option that does not exist is refused with the list of options |
+| `browser_set_checked` | `ref`, `checked` | "e5 is now checked.", or "e5 was already checked." It clicks the element as a person would and then reads the state back; a radio button cannot be cleared |
+| `browser_press_key` | `keys`; `repeat` (1, up to 100); `ref` | "Pressed Control+a". Key names are taken in any common form (`ctrl+a`, `esc`, `down`). A key that types a character is typed text: the result says "Pressed a character key" and the log keeps a count |
 
 **Scrolling and waiting**
 
 | Tool | Arguments (default) | Returns |
 |---|---|---|
-| `browser_scroll` | `direction`; `amount` (1 step, up to 20); `ref`, or `x` and `y` | "Scrolled down 1. Position 400px of 3200px." |
+| `browser_scroll` | `direction`; `amount` (1 step, up to 20); `ref`, or `x` and `y` | "Scrolled down 1. Position 400px of 3200px.", or "Nothing scrolled down. …" at the end. With a ref the wheel turns over the box that element scrolls in, and the position is that box's: "Scrolled down 1 inside e42. …" |
 | `browser_scroll_to` | `ref` | "Scrolled e42 into view." |
-| `browser_wait` | one of `text`, `text_gone`, `load_state`, `seconds`; `timeout_s` | What was reached. Capped by `browser.timeouts.wait_max_s` |
+| `browser_wait` | one of `text`, `text_gone`, `load_state`, `seconds`; `timeout_s` | What was reached. Capped by `browser.timeouts.wait_max_s`. A wait that runs out is a failed result. A wait for text goes on in a page that replaces this one |
 
 **Dialogs and tabs**
 
@@ -748,6 +748,14 @@ never crashes on a bad call.
 | Tool | Arguments (default) | Returns |
 |---|---|---|
 | `browser_request_human` | `reason` (up to 300 characters); `kind` (`login`, `verification`, `payment`, `other`); `timeout_s` | `done`, `could_not` or `timed_out`, an optional note from the person, then the change note |
+
+A click or a hover on a ref moves the pointer to the element first and then checks that the element is
+still under it: a menu that was open under the pointer closes when the pointer leaves, and what follows it
+shifts. If the element moved, it is found again before the press. A key press that fails part-way releases
+the modifiers it had pressed.
+
+`browser_fill_form` fills each field the way its kind is filled and stops at the first field that fails;
+the result then says which fields were filled before it.
 
 That is 28 tools: 25 always present and 3 that depend on configuration (`browser_evaluate` is off by
 default). `browser_fill_form` already covers the most common multi-step case, filling a form, in one call.

@@ -332,13 +332,13 @@
   };
 
   // Shared with the action operations added to this file.
-  globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES };
+  globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
 })();
 
 // Operations that prepare an element for an action. The driver then sends the real input events.
 (() => {
   if (globalThis.__bap.withActions) return;
-  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES } =
+  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE } =
     globalThis.__bapParts;
 
   // What an element is and what it is called. What a field holds is what was typed into it, so a
@@ -431,6 +431,16 @@
     }
   }
 
+  // After the pointer has gone to the point it will press, the page may have moved: a menu that
+  // was open under the pointer closes, and what follows it shifts. True when the element is still there.
+  async function holds(a) {
+    await nextFrame(a.frameMs);
+    const el = resolve(a.ref);
+    if (!el) return false;
+    const hit = elementAt(a.x, a.y);
+    return Boolean(hit) && (within(hit, el) || labelOf(hit, el));
+  }
+
   function focused() {
     let el = document.activeElement;
     while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
@@ -488,11 +498,189 @@
     const point = target(el);
     const shown = point && point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight;
     const secret = el.tagName === 'INPUT' && inputType(el) === 'password';
-    return { ...identify(el, a), secret, box: shown ? point.box.split(',').map(Number) : null };
+    return { ...identify(el, a), secret, kind: kindOf(el), box: shown ? point.box.split(',').map(Number) : null };
   }
 
-  operations.locate = locate;
-  operations.prepare = prepare;
-  operations.focus = focus;
+  const isTextField = (el) =>
+    el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(inputType(el))) || el.isContentEditable;
+
+  const isNativeCheck = (el) => el.tagName === 'INPUT' && (inputType(el) === 'checkbox' || inputType(el) === 'radio');
+
+  // How a form field is filled: by typing, by ticking, or by choosing an option.
+  function kindOf(el) {
+    if (el.tagName === 'SELECT') return 'select';
+    if (isNativeCheck(el) || CHECKABLE.has(roleOf(el))) return 'check';
+    return isTextField(el) ? 'text' : 'other';
+  }
+
+  // The rendered text of the page or of one element. What a field holds is not part of it.
+  function text(a) {
+    const el = a.ref ? resolve(a.ref) : document.body;
+    if (a.ref && !el) return { error: 'stale' };
+    if (!el) return { text: '', more: 0 };
+    const all = (el.innerText ?? el.textContent ?? '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    const shown = Array.from(all).slice(0, a.maxChars).join('');
+    return { text: shown, more: all.length - shown.length };
+  }
+
+  // The snapshot lines that hold the words asked for, best first. A line that holds the whole
+  // phrase comes before one that holds only some of its words. A line of text has no ref of its
+  // own: it is given with the ref of the element it is in.
+  function find(a) {
+    const page = snapshot({ ...a.snapshot, mode: 'all', ref: null, maxChars: Infinity, bboxes: false });
+    const words = a.query.toLowerCase().split(/\s+/).filter(Boolean);
+    const phrase = words.join(' ');
+    const found = [];
+    const around = [];
+    page.text.split('\n').forEach((line, index) => {
+      const depth = line.search(/\S/);
+      if (!line.startsWith('-', depth)) return;
+      const ref = (line.match(/\[ref=([^\]]+)\]/) || [])[1];
+      around.length = depth;
+      around[depth] = ref;
+      // The ref is not part of what the element says: e250 is no match for "250".
+      const low = line.replace(/\[ref=[^\]]+\]/, '').toLowerCase();
+      let score = words.filter((word) => low.includes(word)).length;
+      if (!score) return;
+      if (low.includes(phrase)) score += words.length;
+      const parent = ref ? null : around.findLast((one) => one);
+      found.push({ score, index, line: line.trim() + (parent ? ` (in ${parent})` : '') });
+    });
+    found.sort((one, other) => other.score - one.score || one.index - other.index);
+    return { lines: found.slice(0, a.limit).map((entry) => entry.line), total: found.length, next: page.next };
+  }
+
+  // The nearest thing around an element that scrolls by itself: a list, a panel, a dialog.
+  function scroller(el) {
+    for (let node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement || (node.getRootNode() || {}).host) {
+      const style = getComputedStyle(node);
+      const scrolls = (value) => value === 'auto' || value === 'scroll';
+      if ((scrolls(style.overflowY) && node.scrollHeight > node.clientHeight) || (scrolls(style.overflowX) && node.scrollWidth > node.clientWidth)) return node;
+    }
+    return null;
+  }
+
+  // Where the page, or the box an element scrolls in, is scrolled to. It waits until the position
+  // has held still for two checks, or the time has run out.
+  async function scrolled(a) {
+    const el = a.ref ? resolve(a.ref) : null;
+    if (a.ref && !el) return { error: 'stale' };
+    const box = el && scroller(el);
+    const doc = document.documentElement;
+    const read = () => (box ? [box.scrollLeft, box.scrollTop] : [scrollX, scrollY]);
+    const deadline = performance.now() + a.timeoutMs;
+    let last = '';
+    for (;;) {
+      const now = read().join();
+      if (now === last || performance.now() >= deadline) break;
+      last = now;
+      await nextFrame(a.frameMs);
+    }
+    const [x, y] = read().map(Math.round);
+    return box
+      ? { x, y, width: box.scrollWidth, height: box.scrollHeight, inside: true }
+      : { x, y, width: doc.scrollWidth, height: doc.scrollHeight, inside: false };
+  }
+
+  // Where the wheel is turned to scroll at an element: the middle of the box it scrolls in, or
+  // its own middle when it is in no such box. It is brought into view first when it is outside
+  // what the browser shows.
+  function wheelPoint(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const described = describe(el, a);
+    const box = scroller(el) || el;
+    const outside = (at) => at.x < 0 || at.y < 0 || at.x >= innerWidth || at.y >= innerHeight;
+    let at = target(box);
+    if (at && outside(at)) {
+      box.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      at = target(box);
+    }
+    if (!at || outside(at)) return { error: 'not_ready', reason: 'it is not visible', describe: described };
+    return { x: at.x, y: at.y, describe: described };
+  }
+
+  // What is at a point of the page, as the snapshot names it.
+  function at(a) {
+    const hit = elementAt(a.x, a.y);
+    return { describe: hit ? describe(hit, a) : '' };
+  }
+
+  function reveal(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    return { describe: describe(el, a) };
+  }
+
+  // Gives an element the keyboard focus, whatever it is, so that a key press goes to it.
+  function focusOn(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const described = describe(el, a);
+    if (visibility(el) !== SHOWN) return { error: 'not_ready', reason: 'it is not visible', describe: described };
+    el.focus();
+    return { describe: described };
+  }
+
+  const optionLabel = (option) => (option.label || option.text || '').replace(/\s+/g, ' ').trim();
+
+  // Chooses options in a dropdown or a list, by value or by label, and tells the page as a person's
+  // choice would: an input event, then a change event.
+  function select(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const described = describe(el, a);
+    if (el.tagName !== 'SELECT') return { error: 'not_select', describe: described };
+    if (visibility(el) !== SHOWN) return { error: 'not_ready', reason: 'it is not visible', describe: described };
+    if (disabled(el)) return { error: 'not_ready', reason: 'it is disabled', describe: described };
+    if (a.values.length > 1 && !el.multiple) return { error: 'one_only', describe: described };
+    const options = Array.from(el.options);
+    const chosen = [];
+    for (const want of a.values) {
+      const low = want.trim().toLowerCase();
+      const option =
+        options.find((o) => o.value === want || optionLabel(o) === want.trim()) ||
+        options.find((o) => o.value.toLowerCase() === low || optionLabel(o).toLowerCase() === low);
+      if (!option) {
+        return { error: 'no_option', want: clean(want, a.maxName), options: options.slice(0, a.maxOptions).map(optionLabel), describe: described };
+      }
+      if (option.disabled) return { error: 'not_ready', reason: 'the option ' + quote(optionLabel(option)) + ' is disabled', describe: described };
+      chosen.push(option);
+    }
+    el.focus();
+    for (const option of options) option.selected = chosen.includes(option);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return { describe: described, selected: chosen.map(optionLabel) };
+  }
+
+  // Whether a checkbox, a radio button or a switch is on.
+  function checkable(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const described = describe(el, a);
+    const role = roleOf(el);
+    if (!isNativeCheck(el) && !CHECKABLE.has(role)) return { error: 'not_checkable', describe: described };
+    const checked = isNativeCheck(el) ? el.checked : el.getAttribute('aria-checked') === 'true';
+    return { describe: described, checked, radio: role === 'radio' || role === 'menuitemradio' };
+  }
+
+  // Waits until the rendered text of the page holds some words, or no longer holds them.
+  async function waitText(a) {
+    const want = a.text.replace(/\s+/g, ' ').trim().toLowerCase();
+    const deadline = performance.now() + a.timeoutMs;
+    for (;;) {
+      const page = ((document.body && document.body.innerText) || '').replace(/\s+/g, ' ').toLowerCase();
+      if (page.includes(want) !== a.gone) return { reached: true };
+      if (performance.now() >= deadline) return { reached: false };
+      await new Promise((done) => setTimeout(done, a.pollMs));
+    }
+  }
+
+  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText });
   globalThis.__bap.withActions = true;
 })();

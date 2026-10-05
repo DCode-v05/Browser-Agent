@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from bap_browser.driver.base import Located, TabInfo
+from bap_browser.driver.base import POINT, Box, Located, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
 from bap_browser.results import ToolResult
@@ -33,6 +33,23 @@ class CannotRun:
     text: str
     reason: str
     """The same in a few words, for the person watching."""
+
+
+# The tools whose x and y are where the pointer goes. For browser_scroll they are only where the wheel turns.
+POINTED = frozenset({"browser_click", "browser_hover"})
+
+
+def _point(arguments: Mapping[str, Any]) -> Located | None:
+    """The place a call names by x and y, so that the pointer a person sees goes there."""
+    x, y = arguments.get("x"), arguments.get("y")
+    if (
+        isinstance(x, bool)
+        or isinstance(y, bool)
+        or not isinstance(x, int | float)
+        or not isinstance(y, int | float)
+    ):
+        return None
+    return Located(POINT, "", Box(x, y, 0, 0))
 
 
 class Toolkit:
@@ -121,14 +138,11 @@ class Toolkit:
     async def _locate(self, name: str, arguments: Mapping[str, Any]) -> Located | None:
         """The element a call names, for the sentence and the outline a person sees."""
         driver, ref = self._session.started_driver, arguments.get("ref")
-        # The arguments are not checked yet. Only what is a ref, for a tool that exists, goes to the page.
-        if (
-            driver is None
-            or name not in self._tools
-            or not isinstance(ref, str)
-            or not re.fullmatch(REF_PATTERN, ref)
-        ):
+        if driver is None or name not in self._tools:
             return None
+        # The arguments are not checked yet. Only what is a ref, for a tool that exists, goes to the page.
+        if not isinstance(ref, str) or not re.fullmatch(REF_PATTERN, ref):
+            return _point(arguments) if ref is None and name in POINTED else None
         try:
             return await driver.locate(ref)
         except BapError:

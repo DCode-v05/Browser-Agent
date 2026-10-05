@@ -93,3 +93,38 @@ async def test_a_browser_that_went_away_is_said_to_be_gone_and_a_navigation_star
         # The new browser's elements get new refs: one from the browser that closed can never match.
         old = ref_of(page.text, 'button "Create account"')
         assert ref_of(again.text, 'button "Create account"') != old
+
+
+async def test_a_form_is_filled_in_one_call_and_submitted_with_a_key(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    async with open_session(make_config(tmp_path)) as session:
+        tools = Toolkit(session)
+        page = (await tools.call("browser_navigate", {"url": f"{site}/form.html"})).text
+        name = ref_of(page, 'textbox "Full name"')
+        fields = [
+            {"ref": name, "value": "Ada Lovelace"},
+            {"ref": ref_of(page, 'textbox "Password"'), "value": "hunter2-secret"},
+            {"ref": ref_of(page, 'combobox "Country"'), "value": "India"},
+            {"ref": ref_of(page, 'radio "Pro"'), "value": True},
+            {"ref": ref_of(page, 'checkbox "I accept the terms"'), "value": True},
+        ]
+        filled = await tools.call("browser_fill_form", {"fields": fields})
+        refs = [field["ref"] for field in fields]
+        assert filled.text.startswith(
+            f"Filled: {refs[0]}, {refs[1]}, {refs[2]}=India, {refs[3]}=checked, {refs[4]}=checked\n"
+        ), filled.text
+        found = await tools.call("browser_find", {"query": "country"})
+        assert 'combobox "Country"' in found.text and 'value="India"' in found.text
+        text = await tools.call("browser_get_text", {})
+        assert "hunter2-secret" not in text.text and "Sign up" in text.text
+        pressed = await tools.call("browser_press_key", {"keys": "enter", "ref": name})
+        assert pressed.text.startswith(
+            f'Pressed Enter on {name} (textbox "Full name")\nNavigated to {site}/welcome.html'
+        )
+        back = await tools.call("browser_go_back", {})
+        assert back.text.startswith(f"Navigated to {site}/form.html\nPage: Sign up\n")
+        gone = await tools.call("browser_wait", {"text": "Sign up", "timeout_s": 5})
+        assert gone.text.startswith("The text is on the page.")
+    log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
+    assert "hunter2-secret" not in log and "Ada Lovelace" not in log

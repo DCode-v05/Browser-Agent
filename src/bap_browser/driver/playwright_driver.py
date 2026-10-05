@@ -17,10 +17,15 @@ from bap_browser.config import Config, QualityLevel
 from bap_browser.driver.base import (
     ActionOutcome,
     Box,
+    Checked,
+    Found,
     KeyAction,
+    LoadState,
     Located,
     MouseButton,
     PointerAction,
+    ScrollPosition,
+    Selected,
     TabInfo,
 )
 from bap_browser.driver.page_script import PageScript
@@ -215,7 +220,7 @@ class PlaywrightDriver:
         if found.get("error") == "stale":
             raise StaleRef(ref)
         box = Box(*found["box"]) if found["box"] else None
-        return Located(found["role"], found["name"], box, found["secret"])
+        return Located(found["role"], found["name"], box, found["secret"], found["kind"])
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         arguments = snapshot_arguments(
@@ -236,6 +241,39 @@ class PlaywrightDriver:
     async def click(
         self, ref: str, *, button: MouseButton = "left", click_count: int = 1, modifiers: Sequence[str] = ()
     ) -> ActionOutcome:
+        point = await self._point_under_pointer(ref)
+        navigated_to = await self._click(point["x"], point["y"], ref, button, click_count, modifiers)
+        return ActionOutcome(point["describe"], navigated_to)
+
+    async def click_at(
+        self,
+        x: float,
+        y: float,
+        *,
+        button: MouseButton = "left",
+        click_count: int = 1,
+        modifiers: Sequence[str] = (),
+    ) -> ActionOutcome:
+        described = await self._describe_at(x, y)
+        navigated_to = await self._click(x, y, f"at ({x:g}, {y:g})", button, click_count, modifiers)
+        return ActionOutcome(described, navigated_to)
+
+    async def _point_under_pointer(self, ref: str) -> dict[str, Any]:
+        """Waits until an element can be pressed, and moves the pointer onto it."""
+        point = await self._prepare(ref)
+        await self._move_to(point["x"], point["y"])
+        frame_ms = self._config.browser.timeouts.frame_ms
+        still_there = await self.page_script.call(
+            "holds", {"ref": ref, "x": point["x"], "y": point["y"], "frameMs": frame_ms}, wait_ms=frame_ms
+        )
+        if not still_there:
+            # Moving the pointer changed the page: a menu it was over has closed, say. The element
+            # is found again where it is now.
+            point = await self._prepare(ref)
+            await self._move_to(point["x"], point["y"])
+        return point
+
+    async def _prepare(self, ref: str) -> dict[str, Any]:
         browser = self._config.browser
         point = await self.page_script.call(
             "prepare",
@@ -248,13 +286,19 @@ class PlaywrightDriver:
             wait_ms=browser.timeouts.action_ms,
         )
         self._raise_for(point, ref)
+        return point
+
+    async def _click(
+        self, x: float, y: float, where: str, button: MouseButton, click_count: int, modifiers: Sequence[str]
+    ) -> str | None:
+        """Presses the mouse at a point. Returns the address the page went to, if it went anywhere."""
         navigations, commits = self._navigations, self._commits
         keyboard = self.page.keyboard
 
         async def press() -> None:
             for key in modifiers:
                 await keyboard.down(key)
-            await self.page.mouse.click(point["x"], point["y"], button=button, click_count=click_count)
+            await self.page.mouse.click(x, y, button=button, click_count=click_count)
 
         async def release() -> None:
             for key in reversed(modifiers):
@@ -264,13 +308,26 @@ class PlaywrightDriver:
             await self._input(press(), "the click")
         except PlaywrightError as exc:
             raise BrowserError(
-                f"Could not click {ref}: {first_line(exc)}", reason="the browser did not respond"
+                f"Could not click {where}: {first_line(exc)}", reason="the browser did not respond"
             ) from exc
         finally:
             if modifiers:
                 with contextlib.suppress(BrowserError, PlaywrightError):
                     await self._input(release(), "the click")
-        return ActionOutcome(point["describe"], await self._settle(navigations, commits))
+        return await self._settle(navigations, commits)
+
+    async def _describe_at(self, x: float, y: float) -> str:
+        """What is at a point, as the snapshot names it. A point outside the page is refused."""
+        width, height = await self.viewport()
+        if not (0 <= x < width and 0 <= y < height):
+            raise BadInput(
+                f"({x:g}, {y:g}) is outside the page, which is {width} by {height} pixels.",
+                reason="the point is outside the page",
+            )
+        found = await self.page_script.call(
+            "at", {"x": x, "y": y, "maxName": self._config.browser.snapshot.max_name_chars}
+        )
+        return found["describe"]
 
     async def type_text(
         self, ref: str | None, text: str, *, clear: bool = True, submit: bool = False, slowly: bool = False
@@ -305,6 +362,251 @@ class PlaywrightDriver:
             ) from exc
         navigated_to = await self._settle(navigations, commits) if submit else None
         return ActionOutcome(field["describe"], navigated_to)
+
+    async def back(self) -> str | None:
+        return await self._through_history(self.page.go_back, "go back")
+
+    async def forward(self) -> str | None:
+        return await self._through_history(self.page.go_forward, "go forward")
+
+    async def reload(self) -> str:
+        address = await self._through_history(self.page.reload, "reload the page")
+        return address or self.page.url
+
+    async def _through_history(self, move: Callable[..., Coroutine[Any, Any, Any]], what: str) -> str | None:
+        commits = self._commits
+        try:
+            await move(wait_until="domcontentloaded")
+        except PlaywrightError as exc:
+            raise BrowserError(f"Could not {what}: {first_line(exc)}", reason=load_failure(exc)) from exc
+        finally:
+            self.page_script.forget_document()
+        if self._commits == commits:
+            # Nothing was loaded: there is no page that way.
+            return None
+        await self._wait_for_load()
+        return self.page.url
+
+    async def text(self, ref: str | None, max_chars: int) -> tuple[str, int]:
+        data = await self.page_script.call("text", {"ref": ref, "maxChars": max_chars})
+        if data.get("error") == "stale":
+            raise StaleRef(ref or "")
+        return data["text"], data["more"]
+
+    async def find(self, query: str, limit: int) -> Found:
+        settings = self._config.browser.snapshot
+        arguments = snapshot_arguments(
+            settings,
+            mode="all",
+            ref=None,
+            max_chars=settings.max_chars,
+            include_bboxes=False,
+            next_ref=self._next_ref,
+        )
+        data = await self.page_script.call("find", {"query": query, "limit": limit, "snapshot": arguments})
+        self._next_ref = data["next"]
+        return Found(data["lines"], data["total"])
+
+    async def hover(self, ref: str) -> ActionOutcome:
+        point = await self._point_under_pointer(ref)
+        await self.page_script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        return ActionOutcome(point["describe"])
+
+    async def hover_at(self, x: float, y: float) -> ActionOutcome:
+        described = await self._describe_at(x, y)
+        await self._move_to(x, y)
+        await self.page_script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        return ActionOutcome(described)
+
+    async def _move_to(self, x: float, y: float) -> None:
+        try:
+            await self._input(self.page.mouse.move(x, y), "the pointer moved")
+        except PlaywrightError as exc:
+            raise BrowserError(
+                f"The pointer could not be moved: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+
+    async def scroll(
+        self, dx: float, dy: float, *, ref: str | None = None, at: tuple[float, float] | None = None
+    ) -> ScrollPosition:
+        if ref is not None:
+            point = await self.page_script.call(
+                "wheelPoint", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+            )
+            self._raise_for(point, ref)
+            x, y = point["x"], point["y"]
+        elif at is not None:
+            x, y = at
+            await self._describe_at(x, y)
+        else:
+            width, height = await self.viewport()
+            x, y = width / 2, height / 2
+        before = await self._scrolled(ref, wait=False)
+        await self.wheel(x, y, dx, dy)
+        after = await self._scrolled(ref, wait=True)
+        moved = (after["x"], after["y"]) != (before["x"], before["y"])
+        return ScrollPosition(after["x"], after["y"], after["width"], after["height"], moved, after["inside"])
+
+    async def _scrolled(self, ref: str | None, *, wait: bool) -> dict[str, Any]:
+        timeouts = self._config.browser.timeouts
+        wait_ms = timeouts.settle_ms if wait else 0
+        position = await self.page_script.call(
+            "scrolled", {"ref": ref, "timeoutMs": wait_ms, "frameMs": timeouts.frame_ms}, wait_ms=wait_ms
+        )
+        self._raise_for(position, ref)
+        return position
+
+    async def scroll_to(self, ref: str) -> ActionOutcome:
+        found = await self.page_script.call(
+            "reveal", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        )
+        self._raise_for(found, ref)
+        await self._scrolled(None, wait=True)
+        return ActionOutcome(found["describe"])
+
+    async def press_key(self, keys: str, *, repeat: int = 1, ref: str | None = None) -> ActionOutcome:
+        described = ""
+        if ref is not None:
+            found = await self.page_script.call(
+                "focusOn", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+            )
+            self._raise_for(found, ref)
+            described = found["describe"]
+        navigations, commits = self._navigations, self._commits
+        keyboard = self.page.keyboard
+
+        async def press() -> None:
+            for _ in range(repeat):
+                try:
+                    await keyboard.press(keys)
+                except PlaywrightError as exc:
+                    if "Unknown key" not in str(exc) or len(keys) != 1:
+                        raise
+                    # A character that is on no key of the keyboard Playwright knows is put in as text.
+                    await keyboard.insert_text(keys)
+
+        async def release() -> None:
+            for modifier in reversed(keys.split("+")[:-1]):
+                await keyboard.up(modifier)
+
+        try:
+            await self._input(press(), "the key press")
+        except (PlaywrightError, BrowserError) as exc:
+            # A press that failed part-way leaves its modifiers held down, and every click after it
+            # would be a click with Control held.
+            with contextlib.suppress(BrowserError, PlaywrightError):
+                await self._input(release(), "the key press")
+            if isinstance(exc, BrowserError):
+                raise
+            if "Unknown key" in str(exc):
+                raise BadInput(
+                    "The browser has no key of that name. Use a name such as Enter, Escape, Tab or "
+                    "ArrowDown, or one character.",
+                    reason="the key name is not known",
+                ) from exc
+            raise BrowserError(
+                f"The key could not be pressed: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+        return ActionOutcome(described, await self._settle(navigations, commits))
+
+    async def select_option(self, ref: str, values: Sequence[str]) -> Selected:
+        settings = self._config.browser.snapshot
+        navigations, commits = self._navigations, self._commits
+        chosen = await self.page_script.call(
+            "select",
+            {
+                "ref": ref,
+                "values": list(values),
+                "maxName": settings.max_name_chars,
+                "maxOptions": settings.max_options,
+            },
+        )
+        error = chosen.get("error")
+        if error == "not_select":
+            raise BadInput(
+                f"{ref} ({chosen['describe']}) is not a dropdown. browser_select_option works on a "
+                "select element. For any other list, click it open and click the option.",
+                reason="it is not a dropdown",
+            )
+        if error == "one_only":
+            raise BadInput(
+                f"{ref} ({chosen['describe']}) takes one option, and {len(values)} were given.",
+                reason="it takes one option",
+            )
+        if error == "no_option":
+            options = ", ".join(f'"{option}"' for option in chosen["options"])
+            raise BadInput(
+                f'{ref} ({chosen["describe"]}) has no option "{chosen["want"]}". Its options: {options}.',
+                reason="there is no such option",
+            )
+        self._raise_for(chosen, ref)
+        # A page may load another one as soon as an option is chosen.
+        await self._settle(navigations, commits)
+        return Selected(chosen["describe"], chosen["selected"])
+
+    async def set_checked(self, ref: str, checked: bool) -> Checked:
+        before = await self._checkable(ref)
+        if before["checked"] == checked:
+            return Checked(before["describe"], checked, changed=False)
+        if before["radio"] and not checked:
+            raise BadInput(
+                f"{ref} ({before['describe']}) is a radio button. It is cleared by choosing another one "
+                "of its group.",
+                reason="a radio button cannot be cleared",
+            )
+        await self.click(ref)
+        after = await self._checkable(ref)
+        if after["checked"] != checked:
+            raise BrowserError(
+                f"Clicked {ref} ({before['describe']}), but it is still "
+                f"{'checked' if after['checked'] else 'not checked'}. The page may have refused the change.",
+                reason="the page did not accept the change",
+            )
+        return Checked(before["describe"], checked, changed=True)
+
+    async def _checkable(self, ref: str) -> dict[str, Any]:
+        state = await self.page_script.call(
+            "checkable", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        )
+        if state.get("error") == "not_checkable":
+            raise BadInput(
+                f"{ref} ({state['describe']}) is not a checkbox, a radio button or a switch.",
+                reason="it cannot be checked",
+            )
+        self._raise_for(state, ref)
+        return state
+
+    async def wait_for_text(self, text: str, *, gone: bool, timeout_s: float) -> bool:
+        timeouts = self._config.browser.timeouts
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        while True:
+            remaining_ms = max(0, round((deadline - loop.time()) * 1000))
+            try:
+                found = await self.page_script.call(
+                    "waitText",
+                    {"text": text, "gone": gone, "timeoutMs": remaining_ms, "pollMs": timeouts.frame_ms},
+                    wait_ms=remaining_ms,
+                )
+            except BrowserError:
+                # The page was replaced, or was too busy to answer. The wait goes on in what is there
+                # now, for as long as there is time.
+                if loop.time() >= deadline:
+                    return False
+                await asyncio.sleep(timeouts.frame_ms / 1000)
+                continue
+            return found["reached"]
+
+    async def wait_for_load(self, state: LoadState, timeout_s: float) -> bool:
+        try:
+            await self.page.wait_for_load_state(state, timeout=timeout_s * 1000)
+        except PlaywrightTimeoutError:
+            return False
+        except PlaywrightError as exc:
+            raise BrowserError(
+                f"Could not wait for the page: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+        return True
 
     async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         self._frames = (on_frame, level)

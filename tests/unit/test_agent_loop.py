@@ -12,7 +12,7 @@ from bap_browser.agent.models import Message, Reply, Said, ScriptedModel, ToolCa
 from bap_browser.config import Agent, Config
 from bap_browser.driver import BrowserSession
 from bap_browser.errors import StaleRef
-from bap_browser.tools import ToolDefinition, Toolkit
+from bap_browser.tools import TOOLS, ToolDefinition, Toolkit
 
 SETTINGS = Agent(provider="scripted")
 
@@ -74,7 +74,7 @@ async def test_the_model_is_shown_the_task_the_tools_and_every_result(make_confi
     system, opening, offered = model.seen[0]
     assert "untrusted" in system and "browser_snapshot" in system
     assert opening == [Said("user", "What is on the page?")]
-    assert offered == ["browser_navigate", "browser_snapshot", "browser_click", "browser_type"]
+    assert offered == [tool.name for tool in TOOLS]
     _, later, _ = model.seen[1]
     assert later == [
         Said("user", "What is on the page?"),

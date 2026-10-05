@@ -54,4 +54,7 @@ def describe_problem(error: ValidationError) -> str:
         return f"unknown argument '{name}'"
     if first["type"] == "missing":
         return f"missing argument '{name}'"
+    if not name:
+        # A rule about the arguments together, such as "give either ref, or both x and y".
+        return first["msg"].removeprefix("Value error, ")
     return f"bad value for '{name}': {first['msg']}"

@@ -10,9 +10,9 @@ from mcp import Client, StdioServerParameters
 from bap_browser.config import Config
 from bap_browser.driver import open_session
 from bap_browser.mcp.server import INSTRUCTIONS, build_server
-from bap_browser.tools import Toolkit
+from bap_browser.tools import TOOLS, Toolkit
 
-TOOL_NAMES = ["browser_navigate", "browser_snapshot", "browser_click", "browser_type"]
+TOOL_NAMES = [tool.name for tool in TOOLS]
 
 
 def ref_of(text: str, element: str) -> str:
@@ -42,7 +42,7 @@ async def test_tools_are_listed_and_a_bad_call_is_an_error_result(
         async with Client(build_server(Toolkit(session), "bap-browser")) as client:
             listed = await client.list_tools()
             assert [tool.name for tool in listed.tools] == TOOL_NAMES
-            assert listed.tools[2].input_schema["required"] == ["ref"]
+            assert listed.tools[0].input_schema["required"] == ["url"]
             bad = await client.call_tool("browser_click", {"ref": "not a ref"})
             assert bad.is_error
             assert text_of(bad).startswith("browser_click: bad value for 'ref'")
