@@ -164,6 +164,26 @@ textarea {
   }
 }
 
+/* What has done its job fades out once. */
+@keyframes leave {
+  to {
+    opacity: 0;
+  }
+}
+
+/* One ring spreading from a click. */
+@keyframes ring {
+  from {
+    opacity: 1;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
 @keyframes live {
   50% {
     opacity: 0.35;

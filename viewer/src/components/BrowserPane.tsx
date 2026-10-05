@@ -3,8 +3,8 @@
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react';
 
 import { matchesChord, type ViewerOptions } from '../options';
-import type { ClientCommand } from '../protocol';
-import type { ViewerState } from '../state/reducer';
+import type { Box, ClientCommand } from '../protocol';
+import type { Step, ViewerState } from '../state/reducer';
 import type { StateView, Tone } from '../state/view';
 import { W } from '../wording';
 import { Icon, type IconName } from './Icon';
@@ -102,6 +102,22 @@ function FrameBadge({ state, view, now }: { state: ViewerState; view: StateView;
   }
 }
 
+/** The tools that press a mouse button. */
+const CLICKS = new Set(['browser_click']);
+
+/** The element the agent acted on most recently. A step on something off screen has none. */
+function lastTarget(steps: readonly Step[]): Box | undefined {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const target = steps[index]?.target;
+    if (target) return target;
+  }
+  return undefined;
+}
+
+function centre(box: Box | undefined): { x: number; y: number } | undefined {
+  return box && { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+}
+
 type FrameProps = Omit<Props, 'now'>;
 
 function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: FrameProps) {
@@ -174,14 +190,20 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
     onCommand({ type: 'wheel', dx: event.deltaX, dy: event.deltaY, ...pagePoint(event) });
   };
 
-  const running = state.steps.at(-1);
+  const last = state.steps.at(-1);
   const acting = view.key === 'agent' || view.key === 'paused' || view.key === 'waiting_approval';
-  const target = showPointer && acting && running?.status === 'running' ? running.target : undefined;
+  const shown = showPointer && acting;
+  // The outline is on the element while the step runs, and stays a moment after it has finished.
+  const target = shown ? last?.target : undefined;
+  const acted = last?.status !== 'running';
+  // The agent's pointer stays where it last acted and moves from there to the next target.
+  const at = shown ? centre(lastTarget(state.steps)) : undefined;
+  const clicked = Boolean(target) && acted && last?.status === 'ok' && CLICKS.has(last.tool);
   const active = state.tabs.find((tab) => tab.active);
   const dimmed = view.frame === 'ended' || view.frame === 'disconnected' || view.frame === 'connecting';
 
   return (
-    <div className="frame" data-tone={view.tone} data-frame={view.frame} style={{ '--frame-w': size.width, '--frame-h': size.height } as CSSProperties}>
+    <div className="frame" data-tone={view.tone} data-frame={view.frame} style={{ '--frame-w': size.width, '--frame-h': size.height, '--pointer-hold': `${options.pointerHoldMs}ms` } as CSSProperties}>
       <canvas
         ref={canvasRef}
         className="frame-picture"
@@ -203,28 +225,37 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
             }
           : {})}
       />
-      {target && (
-        <>
-          <span
-            className="target"
-            data-tone={view.tone}
-            aria-hidden="true"
-            style={{
-              left: `${(target.x / size.width) * 100}%`,
-              top: `${(target.y / size.height) * 100}%`,
-              width: `${(target.w / size.width) * 100}%`,
-              height: `${(target.h / size.height) * 100}%`,
-            }}
-          />
-          <span
-            className="agent-pointer"
-            data-tone={view.tone}
-            aria-hidden="true"
-            style={{ left: `${((target.x + target.w / 2) / size.width) * 100}%`, top: `${((target.y + target.h / 2) / size.height) * 100}%` }}
-          >
-            <Icon name="pointer" size="large" />
-          </span>
-        </>
+      {target && last && (
+        <span
+          // A new step draws a new outline, so its fade starts again.
+          key={`target-${last.n}-${last.status}`}
+          className="target"
+          data-tone={view.tone}
+          data-state={acted ? (last.status === 'failed' ? 'failed' : 'acted') : 'targeting'}
+          aria-hidden="true"
+          style={{
+            left: `${(target.x / size.width) * 100}%`,
+            top: `${(target.y / size.height) * 100}%`,
+            width: `${(target.w / size.width) * 100}%`,
+            height: `${(target.h / size.height) * 100}%`,
+          }}
+        />
+      )}
+      {clicked && at && last && (
+        <span key={`click-${last.n}`} className="click-mark" data-tone={view.tone} aria-hidden="true" style={{ left: `${(at.x / size.width) * 100}%`, top: `${(at.y / size.height) * 100}%` }}>
+          <span className="click-ring" />
+        </span>
+      )}
+      {at && (
+        <span
+          className="agent-pointer"
+          data-tone={view.tone}
+          aria-hidden="true"
+          // Moved with a transform, so the pointer glides from where it was (spec 9.10).
+          style={{ transform: `translate(${(at.x / size.width) * 100}%, ${(at.y / size.height) * 100}%)` }}
+        >
+          <Icon name="pointer" size="large" />
+        </span>
       )}
       {dimmed && <div className="frame-veil">{view.frame === 'connecting' && <span>{W.frame.connecting}</span>}</div>}
       {view.label && <FrameLabel tone={view.tone} label={view.label} />}

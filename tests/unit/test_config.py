@@ -116,6 +116,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "viewer.takeover.release_chord": "Ctrl+Alt+Enter",
     "viewer.theme": "system",
     "viewer.embed_origins": [],
+    "viewer.pointer_hold_ms": 600,
     "viewer.show_agent_pointer": True,
     "agent.provider": "openai",
     "agent.model": "gpt-5.6-luna",

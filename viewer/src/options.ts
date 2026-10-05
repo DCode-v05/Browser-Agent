@@ -12,6 +12,8 @@ export interface ViewerOptions {
   toastMs: number;
   /** How often the clock on screen is refreshed, in milliseconds. 0 leaves it still. */
   tickMs: number;
+  /** How long the outline and the click mark stay after the agent has acted, in milliseconds. */
+  pointerHoldMs: number;
 }
 
 export const DEFAULT_OPTIONS: ViewerOptions = {
@@ -20,6 +22,7 @@ export const DEFAULT_OPTIONS: ViewerOptions = {
   releaseChord: 'Ctrl+Alt+Enter',
   toastMs: 4000,
   tickMs: 1000,
+  pointerHoldMs: 600,
 };
 
 /** True when a key event is the release chord, such as "Ctrl+Alt+Enter". */

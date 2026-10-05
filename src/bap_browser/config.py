@@ -315,6 +315,9 @@ class Viewer(Section):
     embed_origins: list[str] = setting(
         [], "Pages allowed to show the viewer inside themselves, and to open its WebSocket"
     )
+    pointer_hold_ms: int = setting(
+        600, "How long the outline and the click mark stay after the agent has acted, in milliseconds"
+    )
     show_agent_pointer: bool = setting(
         True, "Draw the target highlight and the agent's pointer over the live picture"
     )

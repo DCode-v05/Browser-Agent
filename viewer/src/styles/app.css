@@ -363,7 +363,8 @@
   font-size: var(--text-caption);
 }
 
-/* Where the agent is about to act. Drawn by the viewer, never inside the page. */
+/* Where the agent is about to act, and where it has just acted. Drawn by the viewer, never
+   inside the page. */
 
 .target {
   position: absolute;
@@ -373,6 +374,17 @@
   background: color-mix(in srgb, var(--agent) 14%, transparent);
   pointer-events: none;
   animation: arrive var(--duration-enter) var(--ease);
+}
+
+/* After the action the outline stays for a moment, then leaves. */
+.target[data-state='acted'],
+.target[data-state='failed'] {
+  animation: leave var(--duration-enter) var(--ease) var(--pointer-hold) forwards;
+}
+
+.target[data-state='failed'] {
+  outline-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .target[data-tone='waiting'] {
@@ -386,15 +398,44 @@
 }
 
 .agent-pointer[data-tone='waiting'],
-.agent-pointer[data-tone='neutral'] {
+.agent-pointer[data-tone='neutral'],
+.click-mark[data-tone='waiting'],
+.click-mark[data-tone='neutral'] {
   display: none;
 }
 
+/* The agent's pointer. It covers the picture and is moved by a transform, so its top-left corner,
+   where the arrow's tip is, glides from the last place the agent acted to the next. */
 .agent-pointer {
   position: absolute;
+  inset: 0;
   color: var(--agent);
   pointer-events: none;
   filter: drop-shadow(0 var(--hairline) var(--hairline) var(--surface));
+  transition: transform var(--duration-enter) var(--ease);
+  animation: arrive var(--duration-enter) var(--ease);
+}
+
+/* Where the agent clicked: a dot that stays for a moment, and one ring that spreads from it once
+   the pointer has arrived. */
+.click-mark {
+  position: absolute;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: calc(var(--space-2) / -2);
+  border-radius: var(--radius-pill);
+  background: var(--agent);
+  pointer-events: none;
+  animation: leave var(--duration-enter) var(--ease) var(--pointer-hold) forwards;
+}
+
+.click-ring {
+  position: absolute;
+  inset: calc((var(--space-2) - var(--target-min)) / 2);
+  border: var(--focus-width) solid var(--agent);
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  animation: ring var(--duration-enter) var(--ease) var(--duration-enter);
 }
 
 .frame-placeholder {

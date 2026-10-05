@@ -1070,7 +1070,7 @@ column is unchanged.
 | Address bar | Where the browser is; read-only | loading, loaded, blocked |
 | Live frame | The picture of the browser, drawn on a canvas | connecting, live, stale, paused, person in control, ended, disconnected |
 | Control border and label | Who is driving | agent, person, waiting, paused, blocked, none |
-| Target highlight and pointer | Where the agent is about to act; drawn over the picture by the viewer, never inside the page | targeting, acted |
+| Target highlight and pointer | Where the agent is about to act and where it has just acted; drawn over the picture by the viewer, never inside the page | targeting, acted, failed |
 | Status line | State, current action, elapsed time | one per state in 9.3 |
 | Control buttons | Pause or Resume, Take over or Hand back, Stop | enabled, disabled, working |
 | Approval card | One pending approval, pinned above the timeline | pending, allowed, denied, expired |
@@ -1250,6 +1250,7 @@ Target: WCAG 2.2 level AA.
 - State is one reducer fed by the event stream, so any state can be reproduced from a recorded stream.
 - **Recorded sessions.** `viewer/src/demo/` holds recorded sessions: the events of a run, the settings a surface would receive, and a picture for each step. `?demo=<name>` plays one with no service, at real pace or stepped by hand, and `?state=<name>` opens the viewer directly in one state of section 9.3. They are used for the component tests, the state screenshots, the accessibility check and design review, and they are the first thing built, so the experience can be judged before the engine exists.
 - The live frame draws each binary frame onto a canvas. A layer above it carries the target outline and the agent's pointer, so they follow the theme and never touch the page. While an approval waits, the element it is about stays outlined in the waiting colour.
+- The agent's pointer stays on the picture where the agent last acted. When a step names an element, the pointer moves there from where it was (a transform, 200 ms). The element is outlined while the step runs and for `viewer.pointer_hold_ms` after it, in the danger colour when the step failed. A click leaves a dot at the point for the same time, and one ring spreads from it once the pointer has arrived. With reduced motion the pointer jumps, and the outline and the dot stay until the next step. The pointer and the click mark are hidden while the session is paused or waits for a person, and are never shown while a person drives.
 - In full view the status and the controls become a bar above the browser, so stop, pause and take over stay one action away. Whatever needs a person (an approval, a request for help, a page dialog, a blocked page, the summary) sits between that bar and the browser, so nothing has to be answered blind.
 - During takeover, pointer positions are scaled from the canvas to page pixels and sent as `pointer`, `wheel` and `key` commands.
 - `npm run build` writes the viewer into `src/bap_browser/viewer_dist/`, which the service serves.
@@ -1610,6 +1611,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `takeover.release_chord` | `Ctrl+Alt+Enter` | Keys that leave the live frame |
 | `theme` | `system` | Or `light`, `dark` |
 | `embed_origins` | `[]` | Pages allowed to show the viewer inside themselves, and to open its WebSocket |
+| `pointer_hold_ms` | 600 | How long the outline and the click mark stay after the agent has acted |
 | `show_agent_pointer` | `true` | Draw the target highlight and the agent's pointer over the live picture |
 
 **`settings`**
