@@ -247,6 +247,29 @@ class Safety(Section):
         return sites
 
 
+class Permissions(Section):
+    consequential_words: list[str] = setting(
+        [
+            "pay",
+            "buy",
+            "order",
+            "purchase",
+            "checkout",
+            "subscribe",
+            "send",
+            "delete",
+            "remove",
+            "transfer",
+            "confirm",
+            "publish",
+            "authorize",
+            "authorise",
+            "grant",
+        ],
+        "A control whose name holds one of these makes the action consequential",
+    )
+
+
 class Control(Section):
     hold_timeout_s: int = setting(
         300, "How long an agent's call waits while a person is in control or the session is paused"
@@ -382,6 +405,7 @@ class Config(Section):
     browser: Browser = Browser()
     safety: Safety = Safety()
     control: Control = Control()
+    permissions: Permissions = Permissions()
     sessions: Sessions = Sessions()
     server: Server = Server()
     mcp: Mcp = Mcp()

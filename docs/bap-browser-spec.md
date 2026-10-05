@@ -395,7 +395,7 @@ Fields of each event. Times are in seconds on the service's clock.
 | `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
 | `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
 | `tab_changed` | `tabs`: each with `id`, `title`, `url`, `active`, `attention` |
-| `approval_requested` | `id`, `tool`, `summary`, `site`, `expires_in_s`, `ts` |
+| `approval_requested` | `id`, `tool`, `summary`, `site`, `expires_in_s`, `every_time` (true when the action cannot be allowed for the whole site), `ts` |
 | `approval_closed` | `id`, `outcome` (`allowed`, `allowed_site`, `denied`, `expired`, `unwatched`) |
 | `help_requested` | `id`, `reason`, `kind`, `expires_in_s`, `ts` |
 | `help_closed` | `id`, `outcome` (`done`, `could_not`, `timed_out`) |
@@ -897,7 +897,18 @@ Each tool is `allow`, `confirm` or `deny` (`safety.action_policies`, default `sa
 | `allow` | Everything else |
 
 A "confirm" tool raises an approval card in the viewer with three answers: Allow once, Allow on this
-site (for the rest of the session), Deny. No answer in time means deny.
+site (for the rest of the session), Deny. No answer in time (`control.approval_timeout_s`) means deny.
+The call keeps the browser while the person decides, so nothing else happens on the page meanwhile.
+"Allow on this site" covers that tool on that site until the session ends
+(`control.site_grant_lifetime`). A `deny` tool is refused without asking anyone. With no viewer
+connected, the action is not done (`control.approval_without_viewer`), and the next viewer to connect
+is told that it was asked for.
+
+What the agent is told when an action was not approved: "The person did not allow this action.",
+"The person did not answer in time, so this action was not done." or "This action needs a person's
+approval and no one is watching, so it was not done.", each followed by "Do not try another way: ask
+the person, or choose a different approach." Stopping the task or the session answers an open
+approval with no.
 
 A person can ask for more. With "Ask before: Every action" (`safety.ask_before`, section 10.2) every
 tool that acts on a page is `confirm`: clicking, typing, pressing keys, scrolling, navigating, tabs and
@@ -932,10 +943,19 @@ instructions. Marked boundaries around page text and a classifier are later item
 
 ### 8.6 Consequential actions
 
-Purchases, sending messages, deleting data and changing permissions are confirmed by the agent's own
-harness in milestone 1, because the core does not yet classify actions. In milestone 1 a person can
-also choose to approve every action (section 10.2). From milestone 2 the core and the bridge classify
-consequential actions and confirm them with the person on every backend (section 8.8).
+The core classifies one kind of consequential action, on every backend it drives: clicking,
+pressing a key on, ticking or choosing in a control whose name holds one of
+`permissions.consequential_words` as a whole word (pay, buy, order, send, delete, confirm and the like).
+
+Such an action raises the approval card of section 8.2 every time, whatever the tool's policy.
+"Allow on this site" is not offered for it (`approval_requested` carries `every_time`), and an
+earlier "Allow on this site" does not cover it. The list is broad on purpose: a false alarm costs
+one click, a miss could cost money. A person can also choose to approve every action (section 10.2).
+
+Not classified yet, and built with take-over Chrome (section 8.8), where the browser is the person's
+own: typing into a password, payment-card or one-time-code field, submitting a form that holds one,
+uploads and downloads, and granting an authorisation. Until then the agent is told to hand a sign-in
+to the person with `browser_request_human` and never to do one itself.
 
 ### 8.7 Known limits in milestone 1
 
@@ -1726,7 +1746,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `reconnect_grace_s` | 30 | How long a tool call waits for a bridge that is reconnecting |
 | `max_message_mb` | 16 | Largest message accepted on the channel |
 
-**`permissions`** (milestone 2; sent to the bridge, which enforces them)
+**`permissions`** (milestone 2; sent to the bridge, which enforces them. `consequential_words` is already used by the core, section 8.6)
 
 | Key | Default | Meaning |
 |---|---|---|

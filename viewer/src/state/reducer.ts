@@ -39,6 +39,8 @@ export interface Approval {
   tool: string;
   summary: string;
   site: string;
+  /** The action pays, sends or deletes: it is allowed once or not at all, never for the whole site. */
+  everyTime: boolean;
   requestedAt: number;
   expiresAt: number;
 }
@@ -239,6 +241,7 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
           tool: event.tool,
           summary: event.summary,
           site: event.site,
+          everyTime: event.every_time === true,
           requestedAt: event.ts,
           expiresAt: event.ts + event.expires_in_s,
         },

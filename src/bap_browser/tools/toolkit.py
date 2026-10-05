@@ -9,12 +9,14 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
 from bap_browser.driver.base import POINT, Box, Located, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
+from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 from bap_browser.tools.browser_tools import TOOLS
 from bap_browser.tools.event_log import EventLog, masked, names_only
@@ -52,6 +54,29 @@ def _point(arguments: Mapping[str, Any]) -> Located | None:
     return Located(POINT, "", Box(x, y, 0, 0))
 
 
+# The tools that only read, or only wait. With "ask before every action" these are still not asked about.
+READS = frozenset(
+    {"browser_snapshot", "browser_get_text", "browser_find", "browser_wait", "browser_request_human"}
+)
+# The tools that act on one control, whose name can show that the action pays, sends or deletes.
+ACTS_ON_A_CONTROL = frozenset(
+    {"browser_click", "browser_press_key", "browser_set_checked", "browser_select_option"}
+)
+NO_OTHER_WAY = " Do not try another way: ask the person, or choose a different approach."
+# What the agent is told when an action was not approved, and the same in a few words for the person.
+NOT_APPROVED = {
+    "denied": ("The person did not allow this action." + NO_OTHER_WAY, "the person did not allow it"),
+    "expired": (
+        "The person did not answer in time, so this action was not done." + NO_OTHER_WAY,
+        "the person did not answer",
+    ),
+    "unwatched": (
+        "This action needs a person's approval and no one is watching, so it was not done." + NO_OTHER_WAY,
+        "no one was watching",
+    ),
+}
+
+
 class Toolkit:
     def __init__(
         self,
@@ -67,6 +92,8 @@ class Toolkit:
         self._turn = asyncio.Lock()
         self._log = EventLog(session.config.logging)
         self._steps = 0
+        # The tools a person allowed on a site for the rest of the session: "Allow on this site".
+        self._grants: set[tuple[str, str]] = set()
 
     def definitions(self) -> list[ToolDefinition]:
         return list(self._tools.values())
@@ -85,7 +112,7 @@ class Toolkit:
                 return held
             self._steps += 1
             step = self._steps
-            target = await self._locate(name, arguments) if self._observer else None
+            target = await self._locate(name, arguments)
             if self._observer:
                 label = redact(label_for(name, arguments, target))
                 self._observer.step_started(step, name, label, target.box if target else None)
@@ -94,7 +121,8 @@ class Toolkit:
             if isinstance(checked, CannotRun):
                 text, failure, logged = checked.text, checked.reason, names_only(arguments)
             else:
-                text, failure = await self._run(name, *checked)
+                refused = await self._permit(name, arguments, target)
+                text, failure = refused or await self._run(name, *checked)
                 logged = masked(arguments, redact)
             tabs = await self.tabs()
             result = ToolResult(redact(admission.note + text + self._state_block(tabs)), failure is not None)
@@ -116,6 +144,59 @@ class Toolkit:
         except ValidationError as exc:
             problem = describe_problem(exc)
             return CannotRun(f"{name}: {problem}", problem)
+
+    async def _permit(
+        self, name: str, arguments: Mapping[str, Any], target: Located | None
+    ) -> tuple[str, str] | None:
+        """Whether a call may run now (spec 8.2). None when it may. Otherwise what the agent is told,
+        and why in a few words for the person watching."""
+        config = self._session.config
+        policy = config.safety.action_policies.get(name, config.safety.default_action_policy)
+        if policy == "deny":
+            return f"{name} is not allowed on this deployment.{NO_OTHER_WAY}", "it is not allowed here"
+        if config.safety.ask_before == "every_action" and name not in READS:
+            policy = "confirm"
+        consequential = self._consequential(name, target)
+        if policy != "confirm" and not consequential:
+            return None
+        site = await self._site(name, arguments)
+        # An action that pays, sends or deletes is asked about every time, whatever was allowed before.
+        if not consequential and (name, site) in self._grants:
+            return None
+        ask = self._session.ask_approval
+        if ask is None:
+            outcome = "allowed" if config.control.approval_without_viewer == "allow" else "unwatched"
+        else:
+            doing = label_for(name, arguments, target)
+            try:
+                summary = self._session.redact(f"{doing} on {site}" if site else doing)
+                outcome = await ask(name, summary, site, consequential)
+            except BapError as exc:
+                return str(exc), exc.reason or "the session ended"
+        if (
+            outcome == "allowed_site"
+            and not consequential
+            and config.control.site_grant_lifetime == "session"
+        ):
+            self._grants.add((name, site))
+        return None if outcome in ("allowed", "allowed_site") else NOT_APPROVED[outcome]
+
+    def _consequential(self, name: str, target: Located | None) -> bool:
+        """Whether the call does something a person must agree to each time (spec 8.6): it acts on
+        a control whose name says that it pays, sends or deletes."""
+        if target is None or name not in ACTS_ON_A_CONTROL:
+            return False
+        words = self._session.config.permissions.consequential_words
+        return any(re.search(rf"\b{re.escape(word)}\b", target.name, re.IGNORECASE) for word in words)
+
+    async def _site(self, name: str, arguments: Mapping[str, Any]) -> str:
+        """The site a call acts on: where it goes, for a navigation; otherwise where the browser is."""
+        address: str | None = None
+        if name == "browser_navigate" and isinstance(arguments.get("url"), str):
+            address = presentable_address(arguments["url"])
+        if address is None:
+            address = next((tab.url for tab in await self.tabs() if tab.active), "")
+        return urlsplit(address).hostname or ""
 
     async def _run(self, name: str, tool: ToolDefinition, args: Args) -> tuple[str, str | None]:
         """The result text and, when the call failed, why in a few words for the person watching."""

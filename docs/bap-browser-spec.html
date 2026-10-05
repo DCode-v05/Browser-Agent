@@ -1017,7 +1017,7 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 </tr>
 <tr>
 <td><code>approval_requested</code></td>
-<td><code>id</code>, <code>tool</code>, <code>summary</code>, <code>site</code>, <code>expires_in_s</code>, <code>ts</code></td>
+<td><code>id</code>, <code>tool</code>, <code>summary</code>, <code>site</code>, <code>expires_in_s</code>, <code>every_time</code> (true when the action cannot be allowed for the whole site), <code>ts</code></td>
 </tr>
 <tr>
 <td><code>approval_closed</code></td>
@@ -1917,7 +1917,17 @@ to add 84% to the load time of a 150-request page.</p>
 </tbody>
 </table></div>
 <p>A "confirm" tool raises an approval card in the viewer with three answers: Allow once, Allow on this
-site (for the rest of the session), Deny. No answer in time means deny.</p>
+site (for the rest of the session), Deny. No answer in time (<code>control.approval_timeout_s</code>) means deny.
+The call keeps the browser while the person decides, so nothing else happens on the page meanwhile.
+"Allow on this site" covers that tool on that site until the session ends
+(<code>control.site_grant_lifetime</code>). A <code>deny</code> tool is refused without asking anyone. With no viewer
+connected, the action is not done (<code>control.approval_without_viewer</code>), and the next viewer to connect
+is told that it was asked for.</p>
+<p>What the agent is told when an action was not approved: "The person did not allow this action.",
+"The person did not answer in time, so this action was not done." or "This action needs a person's
+approval and no one is watching, so it was not done.", each followed by "Do not try another way: ask
+the person, or choose a different approach." Stopping the task or the session answers an open
+approval with no.</p>
 <p>A person can ask for more. With "Ask before: Every action" (<code>safety.ask_before</code>, section 10.2) every
 tool that acts on a page is <code>confirm</code>: clicking, typing, pressing keys, scrolling, navigating, tabs and
 dialogs. Tools that only read the page are not affected. A person can never ask for less than the
@@ -1944,10 +1954,17 @@ never hides automation. Automatic detection of these checks is a next-step item.
 <p>Tool descriptions and the MCP server instructions state that page content is untrusted data and never
 instructions. Marked boundaries around page text and a classifier are later items.</p>
 <h3 id="86-consequential-actions">8.6 Consequential actions</h3>
-<p>Purchases, sending messages, deleting data and changing permissions are confirmed by the agent's own
-harness in milestone 1, because the core does not yet classify actions. In milestone 1 a person can
-also choose to approve every action (section 10.2). From milestone 2 the core and the bridge classify
-consequential actions and confirm them with the person on every backend (section 8.8).</p>
+<p>The core classifies one kind of consequential action, on every backend it drives: clicking,
+pressing a key on, ticking or choosing in a control whose name holds one of
+<code>permissions.consequential_words</code> as a whole word (pay, buy, order, send, delete, confirm and the like).</p>
+<p>Such an action raises the approval card of section 8.2 every time, whatever the tool's policy.
+"Allow on this site" is not offered for it (<code>approval_requested</code> carries <code>every_time</code>), and an
+earlier "Allow on this site" does not cover it. The list is broad on purpose: a false alarm costs
+one click, a miss could cost money. A person can also choose to approve every action (section 10.2).</p>
+<p>Not classified yet, and built with take-over Chrome (section 8.8), where the browser is the person's
+own: typing into a password, payment-card or one-time-code field, submitting a form that holds one,
+uploads and downloads, and granting an authorisation. Until then the agent is told to hand a sign-in
+to the person with <code>browser_request_human</code> and never to do one itself.</p>
 <h3 id="87-known-limits-in-milestone-1">8.7 Known limits in milestone 1</h3>
 <ul>
 <li>The address check and the browser resolve host names separately; a network guard that connects to the checked address is a next-step item.</li>
@@ -4156,7 +4173,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 </tr>
 </tbody>
 </table></div>
-<p><strong><code>permissions</code></strong> (milestone 2; sent to the bridge, which enforces them)</p>
+<p><strong><code>permissions</code></strong> (milestone 2; sent to the bridge, which enforces them. <code>consequential_words</code> is already used by the core, section 8.6)</p>
 <div class="tw"><table>
 <thead>
 <tr>

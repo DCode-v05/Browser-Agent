@@ -85,6 +85,10 @@ class FakeDriver:
             return Located("checkbox", "Terms", Box(10, 90, 16, 16), kind="check")
         if ref == "e6":
             return Located("combobox", "Country", Box(10, 120, 200, 24), kind="select")
+        if ref == "e7":
+            return Located("button", "Pay now", Box(10, 150, 80, 24))
+        if ref == "e8":
+            return Located("textbox", "Password", Box(10, 180, 200, 24), secret=True, kind="text")
         return Located("button", "Go", Box(10, 20, 80, 24))
 
     async def navigate(self, url: str) -> str:

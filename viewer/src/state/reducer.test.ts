@@ -141,7 +141,11 @@ describe('approvals', () => {
 
   it('a request is pending until it is closed', () => {
     const state = play([started, requested]);
-    expect(state.approval).toEqual({ id: 'a7', tool: 'browser_upload_file', summary: 'Upload cv.pdf to example.com', site: 'example.com', requestedAt: T0 + 20, expiresAt: T0 + 200 });
+    expect(state.approval).toEqual({ id: 'a7', tool: 'browser_upload_file', summary: 'Upload cv.pdf to example.com', site: 'example.com', everyTime: false, requestedAt: T0 + 20, expiresAt: T0 + 200 });
+  });
+
+  it('a request for an action that pays, sends or deletes is marked as asked about every time', () => {
+    expect(play([started, { ...requested, every_time: true }]).approval?.everyTime).toBe(true);
   });
 
   it.each(['allowed', 'allowed_site', 'denied', 'expired'] as const)('closing as %s clears it and records the outcome', (outcome) => {

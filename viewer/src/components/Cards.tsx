@@ -34,7 +34,7 @@ export function ApprovalCard({ approval, now, onAnswer, firstRef }: ApprovalProp
         <Button kind="primary" onClick={() => onAnswer('once')} ref={firstRef}>
           {W.buttons.allowOnce}
         </Button>
-        <Button onClick={() => onAnswer('site')}>{W.buttons.allowSite}</Button>
+        {!approval.everyTime && <Button onClick={() => onAnswer('site')}>{W.buttons.allowSite}</Button>}
         <Button kind="danger" onClick={() => onAnswer('deny')}>
           {W.buttons.deny}
         </Button>

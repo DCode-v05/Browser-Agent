@@ -46,7 +46,8 @@ export type ServerEvent =
   | { type: 'step_started'; step: number; tool: string; label: string; target?: Box; ts: number }
   | { type: 'step_finished'; step: number; ok: boolean; ms: number; chars: number; summary: string; url: string }
   | { type: 'tab_changed'; tabs: TabInfo[] }
-  | { type: 'approval_requested'; id: string; tool: string; summary: string; site: string; expires_in_s: number; ts: number }
+  /** `every_time`: the action pays, sends or deletes, so it cannot be allowed for the whole site. */
+  | { type: 'approval_requested'; id: string; tool: string; summary: string; site: string; expires_in_s: number; every_time?: boolean; ts: number }
   | { type: 'approval_closed'; id: string; outcome: ApprovalOutcome }
   | { type: 'help_requested'; id: string; reason: string; kind: HelpKind; expires_in_s: number; ts: number }
   | { type: 'help_closed'; id: string; outcome: HelpOutcome }

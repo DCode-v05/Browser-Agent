@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from bap_browser.config import Config
 from bap_browser.driver.base import Box, Driver, MouseButton, TabInfo
-from bap_browser.driver.session import BrowserSession
+from bap_browser.driver.session import ApprovalOutcome, BrowserSession
 from bap_browser.errors import BapError
 from bap_browser.service.events import EventHub
 from bap_browser.tools.gate import Admission
@@ -51,6 +51,11 @@ class ServiceSession:
         self.hub = EventHub(config.viewer.history_events)
         self.browser = BrowserSession(config, driver)
         self.browser.ask_person = self._ask_person
+        self.browser.ask_approval = self._ask_approval
+        # The approval that is open now, and how it was answered.
+        self._approval: str | None = None
+        self._approval_outcome: ApprovalOutcome | None = None
+        self._approvals = 0
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
         # The request for a person that is open now, and how it was answered.
         self._help: str | None = None
@@ -129,6 +134,11 @@ class ServiceSession:
             await self._take("person", ("agent", "paused", "person_requested"))
         elif kind in ("done", "could_not") and self._help is not None:
             await self._answer_help(kind)
+        elif kind in ("approve", "deny") and self._approval is not None:
+            if command.get("id") == self._approval and self._approval_outcome is None:
+                allowed: ApprovalOutcome = "allowed_site" if command.get("scope") == "site" else "allowed"
+                self._approval_outcome = "denied" if kind == "deny" else allowed
+                await self._announce()
         elif kind == "resume" and self.control == "paused":
             await self._set_control("agent")
         elif kind == "hand_back" and self.control == "person" and self._help is None:
@@ -411,6 +421,55 @@ class ServiceSession:
         return outcome, (
             f"{self._change(tabs)} Refs from before may be out of date: take a new snapshot before you act."
         )
+
+    # The agent's action needs a person's yes (spec 8.2).
+
+    async def _ask_approval(self, tool: str, summary: str, site: str, every_time: bool) -> ApprovalOutcome:
+        """Runs inside the agent's call, which keeps the browser while the person decides, so nothing
+        else happens on the page meanwhile. No answer in time means no. `every_time` marks an action
+        that cannot be allowed for the whole site: it pays, sends or deletes."""
+        self._approvals += 1
+        self._approval, self._approval_outcome = f"a{self._approvals}", None
+        control = self.config.control
+        watched = self.hub.viewers > 0
+        if not watched and control.approval_without_viewer == "allow":
+            self._approval = None
+            return "allowed"
+        self.hub.publish(
+            {
+                "type": "approval_requested",
+                "id": self._approval,
+                "tool": tool,
+                "summary": summary,
+                "site": site,
+                "expires_in_s": control.approval_timeout_s,
+                **({"every_time": True} if every_time else {}),
+                "ts": self._clock(),
+            }
+        )
+        outcome: ApprovalOutcome = "unwatched"
+        if watched:
+            with contextlib.suppress(TimeoutError):
+                async with asyncio.timeout(control.approval_timeout_s), self._changed:
+                    await self._changed.wait_for(
+                        lambda: (
+                            self._approval_outcome is not None
+                            or self.control == "ended"
+                            or self._task_stopped
+                        )
+                    )
+            # A task or a session that was stopped has its open question answered with no.
+            stopped = self.control == "ended" or self._task_stopped
+            outcome = self._approval_outcome or ("denied" if stopped else "expired")
+            if every_time and outcome == "allowed_site":
+                outcome = "allowed"
+        self.hub.publish({"type": "approval_closed", "id": self._approval, "outcome": outcome})
+        self._approval = None
+        if self.control == "ended":
+            raise BapError(
+                ENDED_BY_A_PERSON if self._ended_by == "person" else ENDED, reason="the session ended"
+            )
+        return outcome
 
     async def _answer_help(self, outcome: HelpOutcome) -> None:
         if self._help_outcome is None:

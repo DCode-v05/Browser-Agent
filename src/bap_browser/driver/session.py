@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from bap_browser.config import Config
 from bap_browser.driver.base import Driver
@@ -20,6 +21,12 @@ AskPerson = Callable[[str, str, float], Awaitable[tuple[str, str]]]
 seconds go in; the outcome (`done`, `could_not`, `timed_out`) and what changed meanwhile come out."""
 
 
+ApprovalOutcome = Literal["allowed", "allowed_site", "denied", "expired", "unwatched"]
+AskApproval = Callable[[str, str, str, bool], Awaitable[ApprovalOutcome]]
+"""Asks a person whether an action may be done: the tool, what it will do in a sentence, and the
+site go in, and whether such an action is asked about every time; their answer comes out."""
+
+
 class BrowserSession:
     def __init__(self, config: Config, driver: Driver | None = None) -> None:
         self.config = config
@@ -30,6 +37,8 @@ class BrowserSession:
         self._lost = False
         self.ask_person: AskPerson | None = None
         """Set by whoever can reach a person. None when nobody is watching this session."""
+        self.ask_approval: AskApproval | None = None
+        """Set by whoever can reach a person. None when there is nobody to ask."""
         self._closed = False
 
     def shown_address(self, url: str) -> str:
