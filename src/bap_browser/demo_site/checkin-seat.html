@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Choose your seat</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Skylark Air</div>
+  <nav><span>Book</span><b>Check in</b><span>My trips</span><span>Flight status</span></nav>
+  <div class="spacer"></div>
+  <span class="pill">Ada Lovelace</span>
+</header>
+<main>
+  <section>
+    <h1>Flight SK 214</h1>
+    <p class="lead">Chennai (MAA) to Singapore (SIN), 12 October. Booking SK4821.</p>
+    <div class="tiles">
+      <div class="tile"><span class="muted">Departs</span><b>09:40</b></div>
+      <div class="tile"><span class="muted">Boarding</span><b>08:55</b></div>
+      <div class="tile"><span class="muted">Gate</span><b>B7</b></div>
+    </div>
+    <p class="quote">Passenger: Ada Lovelace. One cabin bag and one checked bag of 23 kg are included.</p>
+  </section>
+  <form class="card" id="checkin">
+    <fieldset class="choices">
+      <legend>Seat</legend>
+      <label class="check"><input type="radio" name="seat" value="14A"> 14A, window</label>
+      <label class="check"><input type="radio" name="seat" value="14B"> 14B, middle</label>
+      <label class="check"><input type="radio" name="seat" value="14C"> 14C, aisle</label>
+      <label class="check"><input type="radio" name="seat" value="15A" disabled> 15A, window (taken)</label>
+    </fieldset>
+    <div class="field"><label for="meal">Meal</label>
+      <select id="meal"><option>Standard</option><option>Vegetarian</option><option>No meal</option></select></div>
+    <label class="check"><input id="goods" type="checkbox"> I am not carrying any dangerous goods</label>
+    <p class="error" id="problem" role="alert" hidden></p>
+    <button class="primary" id="check-in" type="submit">Check in</button>
+  </form>
+</main>
+<script>
+document.getElementById('checkin').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const seat = document.querySelector('input[name="seat"]:checked');
+  const problem = document.getElementById('problem');
+  const missing = !seat
+    ? 'Choose a seat before you check in.'
+    : !document.getElementById('goods').checked
+      ? 'Confirm that you are not carrying any dangerous goods.'
+      : '';
+  if (missing) {
+    problem.textContent = missing;
+    problem.hidden = false;
+    return;
+  }
+  const chosen = new URLSearchParams({ seat: seat.value, meal: document.getElementById('meal').value });
+  location.href = `checkin-pass.html?${chosen}`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Boarding pass</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Skylark Air</div>
+  <nav><span>Book</span><b>Check in</b><span>My trips</span><span>Flight status</span></nav>
+  <div class="spacer"></div>
+  <span class="pill">Ada Lovelace</span>
+</header>
+<main>
+  <section class="wide">
+    <h1>You are checked in</h1>
+    <p class="lead">Ada Lovelace, flight SK 214, Chennai (MAA) to Singapore (SIN), 12 October.</p>
+    <div class="tiles">
+      <div class="tile"><span class="muted">Seat</span><b id="seat"></b></div>
+      <div class="tile"><span class="muted">Boarding</span><b>08:55</b></div>
+      <div class="tile"><span class="muted">Gate</span><b>B7</b></div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Passenger</th><th>Booking</th><th>Meal</th><th>Departs</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Ada Lovelace</td><td>SK4821</td><td id="meal"></td><td>09:40</td><td><a id="pass" href="#">Download boarding pass</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+// The seat and the meal chosen on the page before. Anything else is shown as not chosen.
+const chosen = new URLSearchParams(location.search);
+const seat = chosen.get('seat');
+const meal = chosen.get('meal');
+document.getElementById('seat').textContent = ['14A', '14B', '14C'].includes(seat) ? seat : 'Not chosen';
+document.getElementById('meal').textContent = ['Standard', 'Vegetarian', 'No meal'].includes(meal) ? meal : 'Standard';
+</script>
+</body>
+</html>

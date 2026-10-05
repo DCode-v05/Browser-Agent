@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Online check-in</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Skylark Air</div>
+  <nav><span>Book</span><b>Check in</b><span>My trips</span><span>Flight status</span></nav>
+  <div class="spacer"></div>
+  <span class="pill">Help</span>
+</header>
+<main>
+  <section>
+    <h1>Check in online</h1>
+    <p class="lead">Open from 48 hours until 60 minutes before departure. You need your booking reference and the last name on the booking.</p>
+    <ul class="points">
+      <li>Choose your seat and your meal</li>
+      <li>Get your boarding pass straight away</li>
+      <li>Bag drop closes 45 minutes before departure</li>
+    </ul>
+  </section>
+  <form class="card" id="find">
+    <div class="field"><label for="reference">Booking reference</label><input id="reference" type="text" placeholder="6 characters, such as SK4821" autocomplete="off"></div>
+    <div class="field"><label for="surname">Last name</label><input id="surname" type="text" autocomplete="off"></div>
+    <p class="error" id="problem" role="alert" hidden></p>
+    <button class="primary" id="find-booking" type="submit">Find booking</button>
+  </form>
+</main>
+<script>
+// One booking exists: SK4821, Lovelace.
+document.getElementById('find').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const reference = document.getElementById('reference').value.trim().toUpperCase();
+  const surname = document.getElementById('surname').value.trim().toLowerCase();
+  const problem = document.getElementById('problem');
+  if (reference === 'SK4821' && surname === 'lovelace') {
+    location.href = 'checkin-seat.html';
+    return;
+  }
+  problem.textContent = 'We could not find that booking. Check the reference and the last name.';
+  problem.hidden = false;
+});
+</script>
+</body>
+</html>

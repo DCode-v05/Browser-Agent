@@ -13,8 +13,11 @@ import pytest
 
 from bap_browser.agent.demo import TASK, demo_script
 from bap_browser.agent.loop import run_agent
+from bap_browser.agent.models import ref_of
 from bap_browser.config import Config
+from bap_browser.driver import open_session
 from bap_browser.service.session import ServiceSession
+from bap_browser.tools import Toolkit
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -78,3 +81,47 @@ async def test_the_scripted_agent_signs_up_and_a_viewer_is_told_every_step(
     for typed in ("Ada Lovelace", "ada@example.com", "correct horse battery", "424242"):
         assert typed not in told, f"{typed!r} was sent to viewers"
         assert typed not in log, f"{typed!r} was written to the log"
+
+
+async def test_the_check_in_pages_can_be_done_with_the_tools(
+    make_config: Callable[..., Config], tmp_path: Path, demo_site: str
+) -> None:
+    async with open_session(make_config(tmp_path)) as session:
+        tools = Toolkit(session)
+
+        async def call(tool: str, **arguments: Any) -> str:
+            result = await tools.call(tool, arguments)
+            assert not result.is_error, result.text
+            return result.text
+
+        page = await call("browser_navigate", url=f"{demo_site}/checkin.html")
+        # A booking that does not exist is refused in words, and the page stays.
+        await call("browser_type", ref=ref_of(page, 'textbox "Booking reference"'), text="XX0000")
+        await call("browser_type", ref=ref_of(page, 'textbox "Last name"'), text="Nobody")
+        await call("browser_click", ref=ref_of(page, 'button "Find booking"'))
+        assert "We could not find that booking" in await call("browser_get_text")
+
+        await call("browser_type", ref=ref_of(page, 'textbox "Booking reference"'), text="sk4821")
+        await call("browser_type", ref=ref_of(page, 'textbox "Last name"'), text="Lovelace")
+        found = await call("browser_click", ref=ref_of(page, 'button "Find booking"'))
+        assert "checkin-seat.html" in found
+
+        page = await call("browser_snapshot")
+        assert 'radio "15A, window (taken)"' in page and "[disabled]" in page
+        # Checking in without a seat says what is missing.
+        await call("browser_click", ref=ref_of(page, 'button "Check in"'))
+        assert "Choose a seat before you check in." in await call("browser_get_text")
+
+        await call("browser_set_checked", ref=ref_of(page, 'radio "14A, window"'), checked=True)
+        await call("browser_select_option", ref=ref_of(page, 'combobox "Meal"'), values=["Vegetarian"])
+        await call(
+            "browser_set_checked",
+            ref=ref_of(page, 'checkbox "I am not carrying any dangerous goods"'),
+            checked=True,
+        )
+        done = await call("browser_click", ref=ref_of(page, 'button "Check in"'))
+        assert "checkin-pass.html" in done
+
+        boarding_pass = await call("browser_get_text")
+        for said in ("You are checked in", "14A", "08:55", "B7", "Vegetarian", "SK4821"):
+            assert said in boarding_pass, said

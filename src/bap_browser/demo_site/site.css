@@ -38,3 +38,7 @@ th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #ece7dd;
 th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #5b6472; }
 td a { color: #c2410c; font-weight: 600; text-decoration: none; }
 .wide { grid-column: 1 / -1; }
+.error { margin: 0 0 14px; padding: 10px 12px; border-radius: 9px; background: #fdecec; color: #b91c1c; font-size: 14px; }
+.choices { border: 0; padding: 0; margin: 0 0 12px; }
+.choices legend { font-size: 13px; font-weight: 600; margin: 0 0 8px; padding: 0; }
+.choices .check { margin: 0 0 8px; }
