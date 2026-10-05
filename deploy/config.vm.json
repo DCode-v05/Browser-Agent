@@ -1,0 +1,18 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "public_url": "http://127.0.0.1:8765",
+    "state_file": "/data/service.json"
+  },
+  "browser": {
+    "headless": true,
+    "chromium_sandbox": false,
+    "args": ["--disable-dev-shm-usage"]
+  },
+  "safety": {
+    "block_private_networks": true
+  },
+  "logging": {
+    "event_log": "/data/events.jsonl"
+  }
+}

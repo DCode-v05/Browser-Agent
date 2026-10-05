@@ -55,14 +55,20 @@ class Service:
         return f"http://{self._config.server.host}:{self.port}"
 
     @property
+    def public_address(self) -> str:
+        """Where people and agents reach the service: the public address a deployment names, or else
+        where the service listens."""
+        return (self._config.server.public_url or self.address).rstrip("/")
+
+    @property
     def mcp_address(self) -> str:
         """Where an agent reaches the tools over MCP. It sends the token as a bearer token."""
-        return f"{self.address}{self._config.mcp.http_path}"
+        return f"{self.public_address}{self._config.mcp.http_path}"
 
     @property
     def viewer_address(self) -> str:
         """Where a person opens the viewer. The token is in the fragment, which no server is sent."""
-        return f"{self.address}/#token={self.token}"
+        return f"{self.public_address}/#token={self.token}"
 
     async def _run_mcp(self, ready: asyncio.Event) -> None:
         """Keeps the MCP endpoint's own tasks alive. It is entered and left in one task, as it must be."""

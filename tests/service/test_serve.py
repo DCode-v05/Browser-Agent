@@ -109,3 +109,14 @@ async def test_the_path_is_the_configured_one(make_config: Callable[..., Config]
     async with serving(make_config(tmp_path, mcp={"http_path": "/tools"})) as (service, _):
         assert service.mcp_address == f"{service.address}/tools"
         assert await asyncio.to_thread(post, service.mcp_address, Authorization=f"Bearer {TOKEN}") == 200
+
+
+async def test_people_and_agents_are_given_the_address_they_can_reach(
+    make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    public = {"public_url": "https://vm-7.example.app/browser/"}
+    async with serving(make_config(tmp_path, server=public)) as (service, _):
+        assert service.viewer_address == f"https://vm-7.example.app/browser/#token={TOKEN}"
+        assert service.mcp_address == "https://vm-7.example.app/browser/mcp"
+        # Where it listens is still this machine's own address.
+        assert service.address.startswith("http://127.0.0.1:")

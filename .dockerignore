@@ -1,0 +1,17 @@
+# The image is built from the sources. Nothing made on this machine goes into it, and no secret.
+.git
+.venv
+.env
+.env.*
+.bap-browser
+.superpowers
+.playwright-mcp
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/node_modules
+viewer/dist
+src/bap_browser/viewer_dist
+config.json
+docs
+tests

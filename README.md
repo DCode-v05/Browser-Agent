@@ -37,6 +37,18 @@ A real task needs a model key. Copy `.env.example` to `.env` and put your key on
 `OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
 `agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
+## In a container
+
+```bash
+docker build -f deploy/Dockerfile -t bap-browser .
+docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-browser
+```
+
+The container runs `bap-browser serve` as an unprivileged user with `deploy/config.vm.json`: the
+viewer is at `http://127.0.0.1:8765/#token=<the token>` and the tools over MCP at
+`http://127.0.0.1:8765/mcp`. For a machine others reach, set `BAP_BROWSER__SERVER__PUBLIC_URL` to the
+address they use.
+
 ## Test
 
 ```bash
