@@ -95,6 +95,20 @@ describe("the agent's pointer (spec 9.11)", () => {
     expect(click).toBeNull();
   });
 
+  it('glows at the edge of the browser while the agent works, and not while a person drives', () => {
+    const glow = (events: ServerEvent[]) => {
+      let state: ViewerState = reduce(initialState, { type: 'connection', status: 'connected' });
+      state = [started, ...events].reduce((now, event) => reduce(now, { type: 'event', event }), state);
+      state = reduce(state, { type: 'frame', src: 'blob:picture', at: T0 });
+      const view = describeState(state, T0, DEFAULT_OPTIONS.staleAfterS);
+      const { container } = render(<BrowserPane state={state} view={view} now={T0} showPointer options={DEFAULT_OPTIONS} onCommand={() => {}} onRelease={() => {}} />);
+      return container.querySelector('.frame-glow');
+    };
+    expect(glow([begins(1, 'browser_click', BUTTON)])).not.toBeNull();
+    expect(glow([{ type: 'control_changed', state: 'person', since: T0 }])).toBeNull();
+    expect(glow([{ type: 'control_changed', state: 'paused', since: T0 }])).toBeNull();
+  });
+
   it('draws nothing while a person drives', () => {
     const { pointer, target } = show([begins(1, 'browser_click', BUTTON), ends(1), { type: 'control_changed', state: 'person', since: T0 + 5 }]);
     expect(pointer).toBeNull();

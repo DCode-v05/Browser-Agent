@@ -1343,6 +1343,15 @@ and a box to write the next task in.
 - The conversation continues from one task to the next. The pages a finished task read are dropped from it,
   so the next task reads the page as it is then and pays for none of the old ones.
 - The session ends only when a person stops it. After that the box is disabled.
+- The top of the chat says what the agent is doing in one word, with a dot and a colour: Working, Ready,
+  Paused, You're in control, Waiting for you, Stopped, Not connected. While it works, the line under the
+  messages names the step under way.
+- While the agent works, the edge of the live picture glows in the agent's colour and breathes slowly
+  (`--duration-breathe`); between tasks the picture's border is neutral. With reduced motion the glow is
+  still. This and the live dot are the only things that loop.
+- An answer is shown the way the model meant it: `**bold**`, `` `code` ``, `[named](links)` and bare web
+  addresses, which open in a new tab. Nothing else is interpreted, only `http` and `https` addresses become
+  links, and HTML in an answer is shown as text. What the person wrote is shown as written.
 - Messages pass through the same redaction as everything else a viewer is sent.
 
 ## 10. Configuration and settings

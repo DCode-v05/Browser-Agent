@@ -295,6 +295,17 @@
   border-color: var(--border-strong);
 }
 
+/* While the agent works, the edge of the browser glows in its colour and breathes. It is drawn over
+   the picture and takes no clicks. */
+.frame-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 var(--space-5) var(--space-1) color-mix(in srgb, var(--agent) 60%, transparent);
+  pointer-events: none;
+  animation: live var(--duration-breathe) ease-in-out infinite;
+}
+
 .frame-picture {
   display: block;
   width: 100%;
@@ -1010,6 +1021,77 @@
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-card);
   overflow: hidden;
+}
+
+.chat-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-right: var(--space-4);
+}
+
+/* What the agent is doing, in a word: an icon-sized dot, a colour and the word itself. */
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+}
+
+.agent-status-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.agent-status[data-status='working'] {
+  background: var(--agent-tint);
+  color: var(--agent);
+}
+
+.agent-status[data-status='working'] .agent-status-dot {
+  animation: live var(--duration-live) var(--ease) infinite;
+}
+
+.agent-status[data-status='ready'] {
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.agent-status[data-status='person'] {
+  background: var(--person-tint);
+  color: var(--person);
+}
+
+.agent-status[data-status='waiting'] {
+  background: var(--waiting-tint);
+  color: var(--waiting);
+}
+
+.agent-status[data-status='stopped'] {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.chat-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.chat-text code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
 }
 
 .chat-scroll {

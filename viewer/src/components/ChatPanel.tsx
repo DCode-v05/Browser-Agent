@@ -3,12 +3,39 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { Chat } from '../state/reducer';
+import type { StateView } from '../state/view';
 import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
+import { richText } from './richText';
+
+/** What the agent is doing, in a word, for the top of the chat. */
+export type AgentStatus = 'working' | 'ready' | 'paused' | 'person' | 'waiting' | 'stopped' | 'offline';
+
+export function agentStatus(view: StateView): AgentStatus {
+  switch (view.key) {
+    case 'ended':
+      return 'stopped';
+    case 'paused':
+      return 'paused';
+    case 'person':
+      return 'person';
+    case 'waiting_approval':
+    case 'person_requested':
+      return 'waiting';
+    case 'agent':
+    case 'blocked':
+      return view.working || view.key === 'blocked' ? 'working' : 'ready';
+    default:
+      return 'offline';
+  }
+}
 
 interface Props {
   chat: Chat;
+  status: AgentStatus;
+  /** What the agent is doing at this moment, as the timeline says it. */
+  doing: string;
   /** False when a task cannot be sent: the session has ended, or the connection is down. */
   open: boolean;
   /** The longest task the service takes. */
@@ -16,7 +43,7 @@ interface Props {
   onSend(text: string): void;
 }
 
-export function ChatPanel({ chat, open, maxChars, onSend }: Props) {
+export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props) {
   const [draft, setDraft] = useState('');
   const end = useRef<HTMLDivElement>(null);
   const count = chat.messages.length;
@@ -42,7 +69,13 @@ export function ChatPanel({ chat, open, maxChars, onSend }: Props) {
 
   return (
     <section className="chat" aria-label={W.chat.title}>
-      <h3 className="panel-title">{W.chat.title}</h3>
+      <div className="chat-head">
+        <h3 className="panel-title">{W.chat.title}</h3>
+        <span className="agent-status" data-status={status} data-testid="agent-status">
+          <span className="agent-status-dot" aria-hidden="true" />
+          {W.chat.status[status]}
+        </span>
+      </div>
       <div className="chat-scroll">
         <div className="chat-messages" role="log" aria-label={W.chat.messages}>
           {count === 0 && <p className="chat-empty">{W.chat.empty}</p>}
@@ -52,13 +85,13 @@ export function ChatPanel({ chat, open, maxChars, onSend }: Props) {
                 <Icon name={message.role === 'person' ? 'person' : message.failed ? 'alert' : 'agent'} />
                 {message.role === 'person' ? W.chat.you : W.chat.agent}
               </span>
-              <p className="chat-text">{message.text}</p>
+              <p className="chat-text">{message.role === 'agent' ? richText(message.text) : message.text}</p>
             </div>
           ))}
           {chat.working && (
             <p className="chat-working" data-testid="chat-working">
               <span className="chat-working-dot" aria-hidden="true" />
-              {W.chat.working}
+              {doing || W.chat.working}
             </p>
           )}
           <div ref={end} />

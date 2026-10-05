@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { BrowserPane } from './components/BrowserPane';
-import { ChatPanel } from './components/ChatPanel';
+import { agentStatus, ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
 import { Icon } from './components/Icon';
 import { SettingsScreen } from './components/SettingsScreen';
@@ -329,6 +329,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
             {state.chat.enabled && (
               <ChatPanel
                 chat={state.chat}
+                status={agentStatus(view)}
+                doing={view.working ? view.detail : ''}
                 open={state.connection === 'connected' && !state.ended}
                 maxChars={options.maxTaskChars}
                 onSend={(text) => send({ type: 'task', text })}

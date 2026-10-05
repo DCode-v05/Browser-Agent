@@ -203,7 +203,7 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
   const dimmed = view.frame === 'ended' || view.frame === 'disconnected' || view.frame === 'connecting';
 
   return (
-    <div className="frame" data-tone={view.tone} data-frame={view.frame} style={{ '--frame-w': size.width, '--frame-h': size.height, '--pointer-hold': `${options.pointerHoldMs}ms` } as CSSProperties}>
+    <div className="frame" data-tone={view.tone} data-frame={view.frame} data-working={(view.working && view.frame === 'live') || undefined} style={{ '--frame-w': size.width, '--frame-h': size.height, '--pointer-hold': `${options.pointerHoldMs}ms` } as CSSProperties}>
       <canvas
         ref={canvasRef}
         className="frame-picture"
@@ -257,6 +257,7 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
           <Icon name="pointer" size="large" />
         </span>
       )}
+      {view.working && view.frame === 'live' && <span className="frame-glow" aria-hidden="true" />}
       {dimmed && <div className="frame-veil">{view.frame === 'connecting' && <span>{W.frame.connecting}</span>}</div>}
       {view.label && <FrameLabel tone={view.tone} label={view.label} />}
       {driving && <p className="frame-hint">{W.takeover.release(options.releaseChord)}</p>}

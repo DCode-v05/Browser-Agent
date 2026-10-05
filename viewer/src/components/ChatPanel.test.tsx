@@ -5,7 +5,8 @@ import type { ServerEvent } from '../protocol';
 import { initialState, reduce, type Chat, type ViewerState } from '../state/reducer';
 import { describeState } from '../state/view';
 import { W } from '../wording';
-import { ChatPanel } from './ChatPanel';
+import { agentStatus, ChatPanel } from './ChatPanel';
+import { richText } from './richText';
 
 const T0 = 1_759_480_000;
 
@@ -27,9 +28,9 @@ function play(events: ServerEvent[]): ViewerState {
 
 const said = (id: number, role: 'person' | 'agent', text: string, failed?: boolean): ServerEvent => ({ type: 'message', id, role, text, failed, ts: T0 + id });
 
-function show(chat: Chat, open = true) {
+function show(chat: Chat, open = true, doing = '') {
   const onSend = vi.fn();
-  render(<ChatPanel chat={chat} open={open} maxChars={20} onSend={onSend} />);
+  render(<ChatPanel chat={chat} status={chat.working ? 'working' : 'ready'} doing={doing} open={open} maxChars={20} onSend={onSend} />);
   return { onSend, input: screen.getByLabelText(W.chat.inputLabel) as HTMLTextAreaElement, button: screen.getByRole('button', { name: W.chat.send }) as HTMLButtonElement };
 }
 
@@ -71,7 +72,7 @@ describe('the chat panel (spec 9.14)', () => {
 
   it('shows who said what, and marks an answer that is a failure', () => {
     const state = play([started, said(1, 'person', 'Open example.com'), said(2, 'agent', 'The model could not be reached.', true)]);
-    const { container } = render(<ChatPanel chat={state.chat} open maxChars={20} onSend={() => {}} />);
+    const { container } = render(<ChatPanel chat={state.chat} status="ready" doing="" open maxChars={20} onSend={() => {}} />);
     const messages = Array.from(container.querySelectorAll<HTMLElement>('.chat-message'));
     expect(messages.map((message) => [message.dataset.role, message.dataset.failed, message.querySelector('.chat-text')?.textContent])).toEqual([
       ['person', undefined, 'Open example.com'],
@@ -116,5 +117,68 @@ describe('the chat panel (spec 9.14)', () => {
     expect(input.disabled).toBe(true);
     expect(button.disabled).toBe(true);
     expect(input.placeholder).toBe(W.chat.closed);
+  });
+});
+
+describe('what the agent is doing, in a word', () => {
+  const statusOf = (events: ServerEvent[]) => agentStatus(describeState(play(events), T0, 5));
+  const works: ServerEvent = { type: 'task_changed', working: true, ts: T0 };
+
+  it('is ready, working, paused, in your hands or stopped', () => {
+    expect(statusOf([started])).toBe('ready');
+    expect(statusOf([started, works])).toBe('working');
+    expect(statusOf([started, works, { type: 'control_changed', state: 'paused', since: T0 }])).toBe('paused');
+    expect(statusOf([started, works, { type: 'control_changed', state: 'person', since: T0 }])).toBe('person');
+    expect(statusOf([started, works, { type: 'session_ended', reason: 'person', ts: T0 }])).toBe('stopped');
+    expect(agentStatus(describeState(initialState, T0, 5))).toBe('offline');
+  });
+
+  it('is shown at the top of the chat, with the step under way beside the working dot', () => {
+    show({ enabled: true, working: true, messages: [] }, true, 'Opening huggingface.co');
+    expect(screen.getByTestId('agent-status').textContent).toBe(W.chat.status.working);
+    expect(screen.getByTestId('agent-status').dataset.status).toBe('working');
+    expect(screen.getByTestId('chat-working').textContent).toBe('Opening huggingface.co');
+  });
+
+  it('colours the browser for the agent only while it works', () => {
+    expect(describeState(play([started]), T0, 5)).toMatchObject({ tone: 'neutral', working: false });
+    expect(describeState(play([started, works]), T0, 5)).toMatchObject({ tone: 'agent', working: true });
+    // A session with no chat has an agent that works for as long as it drives.
+    expect(describeState(play([{ ...started, chat: undefined }]), T0, 5)).toMatchObject({ tone: 'agent', working: true });
+  });
+});
+
+describe("the agent's answer, shown the way it was meant", () => {
+  const shown = (text: string) => render(<p>{richText(text)}</p>).container.querySelector('p')!;
+
+  it('makes bold, code and links of what is marked as such', () => {
+    const p = shown('I found **google/vit-base** for `image classification`: https://huggingface.co/google/vit-base.');
+    expect(p.textContent).toBe('I found google/vit-base for image classification: https://huggingface.co/google/vit-base.');
+    expect(p.querySelector('strong')?.textContent).toBe('google/vit-base');
+    expect(p.querySelector('code')?.textContent).toBe('image classification');
+    const link = p.querySelector('a')!;
+    // The full stop ends the sentence, not the address.
+    expect(link.getAttribute('href')).toBe('https://huggingface.co/google/vit-base');
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toBe('noopener noreferrer');
+  });
+
+  it('names a link by the words given for it', () => {
+    const link = shown('See [the model page](https://huggingface.co/m).').querySelector('a')!;
+    expect([link.textContent, link.getAttribute('href')]).toEqual(['the model page', 'https://huggingface.co/m']);
+  });
+
+  it('never makes a link of anything but a web address, and never uses HTML as HTML', () => {
+    const p = shown('[click](javascript:alert(1)) <img src=x onerror=alert(1)> 2 * 3 * 4');
+    expect(p.querySelector('a')).toBeNull();
+    expect(p.querySelector('img')).toBeNull();
+    expect(p.textContent).toBe('[click](javascript:alert(1)) <img src=x onerror=alert(1)> 2 * 3 * 4');
+  });
+
+  it('leaves what a person wrote as it was written', () => {
+    const state = play([started, said(1, 'person', '**not bold**')]);
+    const { container } = render(<ChatPanel chat={state.chat} status="ready" doing="" open maxChars={20} onSend={() => {}} />);
+    expect(container.querySelector('.chat-text strong')).toBeNull();
+    expect(container.querySelector('.chat-text')?.textContent).toBe('**not bold**');
   });
 });

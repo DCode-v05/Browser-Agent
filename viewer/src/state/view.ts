@@ -30,6 +30,8 @@ export interface StateView {
   controls: ControlName[];
   urgency: 'polite' | 'assertive';
   frame: FrameState;
+  /** The agent is doing something in the browser right now. */
+  working: boolean;
   /** When the session started, for the elapsed time. Zero when there is no session. */
   since: number;
 }
@@ -56,7 +58,8 @@ function frameState(state: ViewerState, key: StateKey, now: number, staleAfterS:
 
 export function describeState(state: ViewerState, now: number, staleAfterS: number): StateView {
   const since = state.session?.startedAt ?? 0;
-  const finish = (view: Omit<StateView, 'frame' | 'since'>): StateView => ({
+  const finish = (view: Omit<StateView, 'frame' | 'since' | 'working'> & { working?: boolean }): StateView => ({
+    working: false,
     ...view,
     since,
     frame: frameState(state, view.key, now, staleAfterS),
@@ -147,7 +150,9 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
     key: 'agent',
     status: idle ? W.status.waiting_for_task : W.status.agent,
     detail: idle ? '' : currentAction(state),
-    tone: 'agent',
+    // The agent's colour is for when it works. While it waits for a task the browser is at rest.
+    tone: idle ? 'neutral' : 'agent',
+    working: !idle,
     label: idle ? W.label.waiting_for_task : W.label.agent,
     controls: ['pause', 'take_over', 'stop'],
     urgency: 'polite',
