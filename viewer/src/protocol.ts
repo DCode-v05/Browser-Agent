@@ -36,6 +36,8 @@ export type ServerEvent =
       backend: Backend;
       browser: string;
       viewport: { width: number; height: number };
+      /** The agent takes its tasks from the chat in the viewer. */
+      chat?: boolean;
       ts: number;
     }
   | { type: 'control_changed'; state: ControlState; since: number }
@@ -51,6 +53,10 @@ export type ServerEvent =
   | { type: 'download_saved'; name: string; size: number; ts: number }
   | { type: 'navigation_blocked'; url: string; reason: string; ts: number }
   | { type: 'settings_changed'; changes: Record<string, unknown> }
+  /** One message of the chat: a task a person gave, or what the agent answered. */
+  | { type: 'message'; id: number; role: 'person' | 'agent'; text: string; failed?: boolean; ts: number }
+  /** The agent began a task, or finished it and waits for the next. */
+  | { type: 'task_changed'; working: boolean; ts: number }
   /** The page has not changed, so the last picture is still what the browser shows. */
   | { type: 'picture_current'; ts: number }
   | { type: 'session_ended'; reason: EndReason; detail?: string; ts: number };
@@ -69,6 +75,7 @@ export type ClientCommand =
   | { type: 'pointer'; action: 'move' | 'down' | 'up'; x: number; y: number; button: number }
   | { type: 'key'; action: 'down' | 'up'; key: string; code: string }
   | { type: 'wheel'; x: number; y: number; dx: number; dy: number }
-  | { type: 'select_tab'; id: string };
+  | { type: 'select_tab'; id: string }
+  | { type: 'task'; text: string };
 
 export type CommandType = ClientCommand['type'];

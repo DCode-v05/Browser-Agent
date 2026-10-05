@@ -37,12 +37,15 @@ async def run_agent(
     *,
     on_text: Callable[[str], None] | None = None,
     ended: Callable[[], bool] = lambda: False,
+    history: list[Message] | None = None,
 ) -> str:
     """Runs the task until the model answers without a tool call, and returns that answer.
 
-    Raises Unfinished at the step limit and when the session is ended first.
+    Raises Unfinished at the step limit and when the session is ended first. `history` is the
+    conversation so far, for a task that follows others: this task and what it leads to are added to it.
     """
-    messages: list[Message] = [Said("user", task)]
+    messages: list[Message] = [] if history is None else history
+    messages.append(Said("user", task))
     calls = 0
     while True:
         if ended():

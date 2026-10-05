@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { BrowserPane } from './components/BrowserPane';
+import { ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
 import { Icon } from './components/Icon';
 import { SettingsScreen } from './components/SettingsScreen';
@@ -325,6 +326,14 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           <section className="activity" aria-label="Activity">
             {status}
             {cards}
+            {state.chat.enabled && (
+              <ChatPanel
+                chat={state.chat}
+                open={state.connection === 'connected' && !state.ended}
+                maxChars={options.maxTaskChars}
+                onSend={(text) => send({ type: 'task', text })}
+              />
+            )}
             <Timeline state={state} now={now} options={options} selected={selected} onOpen={openStep} />
             {selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}
           </section>

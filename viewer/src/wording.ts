@@ -8,6 +8,7 @@ export const W = {
   status: {
     no_agent: 'Waiting for an agent to connect',
     agent: 'Agent is working',
+    waiting_for_task: 'Ready for your task',
     waiting_approval: 'Waiting for your approval',
     person_requested: 'The agent asked for help',
     person: "You're in control",
@@ -23,6 +24,7 @@ export const W = {
   // The words on the border of the live picture.
   label: {
     agent: 'Agent is working',
+    waiting_for_task: 'Ready for your task',
     waiting_approval: 'Paused for approval',
     person_requested: 'Agent asked for help',
     person: "You're in control",
@@ -125,6 +127,20 @@ export const W = {
     waitingForAgentHint: 'When an agent connects, its browser appears here.',
     noSession: 'No session to show',
     blockedPage: 'This page was blocked',
+  },
+
+  chat: {
+    title: 'Chat',
+    messages: 'Messages',
+    empty: 'Tell the agent what to do in the browser. It answers here when it has finished.',
+    you: 'You',
+    agent: 'Agent',
+    working: 'Working on it…',
+    inputLabel: 'Your task',
+    placeholder: 'Give the agent a task',
+    placeholderWorking: 'Add the next task',
+    closed: 'The session has ended',
+    send: 'Send the task',
   },
 
   timeline: {

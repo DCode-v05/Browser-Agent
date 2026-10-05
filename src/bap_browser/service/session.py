@@ -42,6 +42,7 @@ class ServiceSession:
         name: str = "default",
         agent: str = "Agent",
         clock: Callable[[], float] = time.time,
+        on_task: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config
         self.name = name
@@ -49,6 +50,9 @@ class ServiceSession:
         self.browser = BrowserSession(config, driver)
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
         self.control: ControlState = "agent"
+        self._on_task = on_task
+        """Given each task a person sends from the viewer's chat. None when the agent takes no tasks there."""
+        self._messages = 0
         self._agent = agent
         self._clock = clock
         self._ended_by: EndReason | None = None
@@ -69,17 +73,18 @@ class ServiceSession:
         """Starts the browser and tells viewers what this session is."""
         driver = await self.browser.driver()
         self._size = width, height = await driver.viewport()
-        self.hub.publish(
-            {
-                "type": "session_started",
-                "session": self.name,
-                "agent": self._agent,
-                "backend": self.config.backend.kind,
-                "browser": driver.description(),
-                "viewport": {"width": width, "height": height},
-                "ts": self._clock(),
-            }
-        )
+        started: dict[str, Any] = {
+            "type": "session_started",
+            "session": self.name,
+            "agent": self._agent,
+            "backend": self.config.backend.kind,
+            "browser": driver.description(),
+            "viewport": {"width": width, "height": height},
+            "ts": self._clock(),
+        }
+        if self._on_task is not None:
+            started["chat"] = True
+        self.hub.publish(started)
         self._publish_tabs(await self.toolkit.tabs())
         viewer = self.config.viewer
         await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
@@ -117,6 +122,43 @@ class ServiceSession:
             await self.close("person")
         elif kind in ("pointer", "key", "wheel") and self.control == "person":
             await self._input(kind, command)
+        elif kind == "task":
+            self.give_task(command.get("text"))
+
+    # The chat: a person gives the agent its tasks, and reads its answers (spec 9.14).
+
+    def give_task(self, text: Any) -> bool:
+        """Hands a person's task to the agent. False when it cannot be taken."""
+        if self._on_task is None or self.control == "ended" or not isinstance(text, str):
+            return False
+        task = text.strip()
+        if not task or len(task) > self.config.agent.max_task_chars:
+            return False
+        self.said("person", task)
+        self._on_task(task)
+        return True
+
+    def said(self, role: Literal["person", "agent"], text: str, *, failed: bool = False) -> None:
+        """Adds a message to the chat every viewer sees."""
+        self._messages += 1
+        message: dict[str, Any] = {
+            "type": "message",
+            "id": self._messages,
+            "role": role,
+            "text": self.browser.redact(text),
+            "ts": self._clock(),
+        }
+        if failed:
+            message["failed"] = True
+        self.hub.publish(message)
+
+    def working(self, on_a_task: bool) -> None:
+        """Tells viewers whether the agent is on a task or waits for one."""
+        self.hub.publish({"type": "task_changed", "working": on_a_task, "ts": self._clock()})
+
+    async def wait_until_ended(self) -> None:
+        async with self._changed:
+            await self._changed.wait_for(lambda: self.control == "ended")
 
     # A person's mouse and keyboard. None of it is logged, and none of it is told to viewers or the agent.
 

@@ -141,12 +141,14 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
       urgency: 'assertive',
     });
   }
+  // With a chat, the agent works only while it has a task.
+  const idle = state.chat.enabled && !state.chat.working;
   return finish({
     key: 'agent',
-    status: W.status.agent,
-    detail: currentAction(state),
+    status: idle ? W.status.waiting_for_task : W.status.agent,
+    detail: idle ? '' : currentAction(state),
     tone: 'agent',
-    label: W.label.agent,
+    label: idle ? W.label.waiting_for_task : W.label.agent,
     controls: ['pause', 'take_over', 'stop'],
     urgency: 'polite',
   });

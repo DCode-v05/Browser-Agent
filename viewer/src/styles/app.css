@@ -999,6 +999,123 @@
   color: var(--on-ink);
 }
 
+/* Chat: the tasks a person gives and the agent's answers, oldest on top; the box to write in is under them. */
+
+.chat {
+  flex: 1;
+  min-height: var(--chat-min-height);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.chat-empty {
+  color: var(--text-muted);
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 92%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--agent-tint);
+  align-self: flex-start;
+}
+
+.chat-message[data-role='person'] {
+  align-self: flex-end;
+  background: var(--surface-2);
+}
+
+.chat-message[data-failed] {
+  background: var(--danger-tint);
+}
+
+.chat-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+}
+
+.chat-message[data-role='agent'] .chat-who {
+  color: var(--agent);
+}
+
+.chat-message[data-failed] .chat-who {
+  color: var(--danger);
+}
+
+.chat-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--agent);
+  font-size: var(--text-secondary);
+}
+
+.chat-working-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--radius-pill);
+  background: var(--agent);
+  animation: live var(--duration-live) var(--ease) infinite alternate;
+}
+
+.chat-compose {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: var(--border-width) solid var(--border);
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  line-height: var(--line);
+}
+
+.chat-input:disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.chat-input::placeholder {
+  color: var(--text-muted);
+}
+
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
 
 @media (max-width: 979px) {

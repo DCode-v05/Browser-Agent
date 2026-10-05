@@ -359,8 +359,8 @@ again: it says the link cannot open the session and what to do (section 9.3).
 
 | Direction | Messages |
 |---|---|
-| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
-| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab` |
+| Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `message`, `task_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
+| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task` |
 
 Examples:
 
@@ -381,7 +381,7 @@ Fields of each event. Times are in seconds on the service's clock.
 
 | Event | Fields |
 |---|---|
-| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `ts` |
+| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `ts` |
 | `control_changed` | `state` (`agent`, `waiting_approval`, `person_requested`, `person`, `paused`, `ended`), `since` |
 | `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
 | `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
@@ -395,6 +395,8 @@ Fields of each event. Times are in seconds on the service's clock.
 | `download_saved` | `name`, `size`, `ts` |
 | `navigation_blocked` | `url`, `reason`, `ts` |
 | `settings_changed` | `changes` |
+| `message` | `id`, `role` (`person`, `agent`), `text`, `failed` (true when the agent could not do the task), `ts` |
+| `task_changed` | `working` (true while the agent is on a task), `ts` |
 | `picture_current` | `ts` |
 | `caught_up` | `ts` (the service's clock now, which the viewer sets its own by) |
 | `session_ended` | `reason` (`person`, `agent`, `timeout`, `failed`), `detail`, `ts` |
@@ -1323,6 +1325,26 @@ keyboard during takeover. Later: a plan card to approve before a run.
 
 ---
 
+### 9.14 Chat
+
+When the agent takes its tasks from the viewer (`session_started` carries `chat: true`), the activity
+column shows a chat above the timeline: the tasks the person gave and the agent's answers, oldest on top,
+and a box to write the next task in.
+
+- Enter sends the task; Shift+Enter starts a new line. A task is at most `agent.max_task_chars` characters.
+  Anything else the viewer sends as a task is dropped.
+- The viewer sends `task`; the service answers with a `message` of role `person`, so every viewer shows the
+  same conversation and a viewer that connects later is sent it again.
+- While the agent is on a task the chat says so and the status reads "Agent is working". Between tasks the
+  status reads "Ready for your task". A task sent while the agent is working waits its turn.
+- What the agent says while it works, and its answer, are `message`s of role `agent`. A task that could not
+  be done (the model could not be reached, the step limit) is answered with a `message` marked `failed`, and
+  the session goes on.
+- The conversation continues from one task to the next. The pages a finished task read are dropped from it,
+  so the next task reads the page as it is then and pays for none of the old ones.
+- The session ends only when a person stops it. After that the box is disabled.
+- Messages pass through the same redaction as everything else a viewer is sent.
+
 ## 10. Configuration and settings
 
 Two words are used with care. **Configuration** is everything a deployment can set: every key in
@@ -1662,6 +1684,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `request_timeout_s` | 120 | Longest wait for one reply from the model |
 | `max_steps` | 40 | Tool calls after which the loop stops |
 | `max_tokens` | 4096 | The most a single reply may be |
+| `max_task_chars` | 4000 | Longest task a person may send from the viewer's chat |
 
 **`logging`, `bench`**
 
@@ -2793,6 +2816,7 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--wait-for-viewer` | Starts once a viewer has connected, without opening one |
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
+| `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
 
 Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,
 with the key read from `OPENAI_API_KEY`. Put `OPENAI_API_KEY=...` in a file named `.env` in the

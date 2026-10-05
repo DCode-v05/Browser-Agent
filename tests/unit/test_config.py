@@ -125,6 +125,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "agent.request_timeout_s": 120,
     "agent.max_steps": 40,
     "agent.max_tokens": 4096,
+    "agent.max_task_chars": 4000,
     "settings.file": ".bap-browser/settings.json",
     "settings.locked": [],
     "logging.level": "INFO",
