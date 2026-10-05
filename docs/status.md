@@ -30,7 +30,7 @@ Three things are new since the last version of this page:
 | The hosted model | Built, not run for real | 13 tests against a stand-in server. With no key the command says: "OPENAI_API_KEY is not set. Put a line OPENAI_API_KEY=... in a file named .env in this folder…" and ends with code 2 |
 | Review of stage 1 | Done, all fixed | 1 critical and 9 important findings fixed. 20 minor findings deferred (listed below) |
 | Review of the live loop | Done, all fixed | 4 critical and 3 important findings fixed. Of 12 minor findings, 5 fixed and 7 deferred (listed below) |
-REVIEW_THREE_ROW
+| Review of those fixes and of the new look | Not done | A third reviewer was started on commits `68722d1..bfa2148` and was cut off by a usage limit before it reported anything |
 
 ## Try it
 

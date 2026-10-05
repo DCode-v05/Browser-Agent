@@ -254,10 +254,14 @@ async def test_a_persons_commands_act_on_the_session(running: Running) -> None:
         await socket.send(json.dumps({"type": "take_over"}))
         assert (await received(socket))["state"] == "person"
         await socket.send(json.dumps({"type": "pointer", "action": "down", "x": 40, "y": 30, "button": 0}))
+        # Stop is done at once and does not wait for what was sent before it. The press is seen to
+        # reach the page first; sent straight after it, Stop would sometimes overtake it.
+        async with asyncio.timeout(3):
+            while ("pointer", ("down", 40, 30, "left")) not in driver.calls:
+                await asyncio.sleep(0.01)
         await socket.send(json.dumps({"type": "stop"}))
         assert (await received(socket))["type"] == "session_ended"
     assert session.control == "ended"
-    assert ("pointer", ("down", 40, 30, "left")) in driver.calls
 
 
 async def test_stop_is_done_at_once_even_with_a_pause_ahead_of_it_that_is_still_waiting(

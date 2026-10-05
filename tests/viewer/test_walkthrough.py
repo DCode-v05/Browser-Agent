@@ -65,7 +65,8 @@ async def test_the_step_drawer_shows_the_evidence(open_view: OpenView) -> None:
     drawer = page.get_by_role("dialog", name="Step 8")
     await drawer.wait_for()
     picture = drawer.get_by_role("img", name="The browser at step 8")
-    assert await picture.evaluate("image => image.complete && image.naturalWidth > 0")
+    # The picture is given the time to load. A picture that cannot be shown fails here.
+    assert await picture.evaluate("image => image.decode().then(() => image.naturalWidth > 0)")
     await view.shot("step-drawer-light-desktop")
     assert await view.accessibility_violations() == []
     await page.keyboard.press("Escape")
