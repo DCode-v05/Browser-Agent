@@ -14,6 +14,7 @@ import type { Connection } from './connection/connection';
 import { DEFAULT_OPTIONS, type ViewerOptions } from './options';
 import type { ClientCommand, Surface } from './protocol';
 import { initialState, reduce, unseenNotices, type Notice } from './state/reducer';
+import { lookOf, tellPanel, type Look } from './state/look';
 import { formatSize } from './state/timeline';
 import { describeState } from './state/view';
 import type { SettingsAnswer, SettingsSource } from './settings/types';
@@ -119,6 +120,12 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const beside = state.session?.onScreen === true;
   // A person who takes over gets the whole width to work in.
   const full = !beside && (driving || wantsFull);
+  // Shown in a frame beside the browser, which is the extension's side panel: the browser's pages
+  // are told who is driving, so that they can show it (spec 9.15).
+  const look = beside && window.parent !== window ? JSON.stringify(lookOf(state, view, preferences.showAgentPointer)) : '';
+  useEffect(() => {
+    if (look) tellPanel(JSON.parse(look) as Look);
+  }, [look, preferences.colourMode]);
   const send = useCallback((command: ClientCommand) => connection.send(command), [connection]);
 
   const toast = useCallback((text: string) => {

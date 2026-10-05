@@ -222,6 +222,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#911-viewer-build">9.11 Viewer build</a></li>
 <li><a href="#912-settings-screen">9.12 Settings screen</a></li>
 <li><a href="#913-later-in-the-viewer">9.13 Later in the viewer</a></li>
+<li><a href="#915-the-extension-the-chat-in-the-browsers-side-panel">9.15 The extension: the chat in the browser&#x27;s side panel</a></li>
 <li><a href="#914-chat">9.14 Chat</a></li>
 </ul>
 </li>
@@ -2312,7 +2313,8 @@ column is unchanged.</p>
 </tbody>
 </table></div>
 <p>The target highlight is drawn by the viewer from the box in the <code>step_started</code> event. Nothing is injected
-into the visited page, so the page cannot detect or be slowed by it.</p>
+into the visited page, so the page cannot detect or be slowed by it. The one exception is the extension
+of section 9.15, which draws on the page itself because the person is looking at that page.</p>
 <h3 id="95-design-tokens">9.5 Design tokens</h3>
 <p>Only these values may be used for colour, type, spacing, radius, shadow and motion. They live in
 <code>viewer/src/tokens.css</code> as CSS variables.</p>
@@ -2872,6 +2874,50 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <p>Next: sign-in form, replay player, notifications, a note to the agent, typing with a phone's on-screen
 keyboard during takeover. Later: a plan card to approve before a run.</p>
 
+<h3 id="915-the-extension-the-chat-in-the-browsers-side-panel">9.15 The extension: the chat in the browser's side panel</h3>
+<p>A first step towards take-over Chrome (section 4.9), built to be shown. It gives the look of that
+backend, not its plumbing: the extension carries no browser commands, and the agent still drives the
+browser through the driver of the core, so every tool works as it does anywhere else.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Side panel</td>
+<td>Opened with the extension's icon or Ctrl+Shift+Y. It shows the session's viewer in a frame, which is the chat of section 9.14 beside the browser: status and controls, chat, steps. With no session running it says how to start one</td>
+</tr>
+<tr>
+<td>The page</td>
+<td>While the agent works, the edge of the page glows in the agent's colour and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing</td>
+</tr>
+<tr>
+<td>Who decides</td>
+<td>The viewer. It tells the side panel what the pages are to show, with the colours of its own theme, and the panel passes that on to the pages of its window once a second. A page that hears nothing for 3 s shows nothing. The page's script holds no words and no colours of its own</td>
+</tr>
+<tr>
+<td>What a page can see</td>
+<td>The look is drawn inside a closed shadow root on one element that takes no clicks. The agent's reading of the page does not include it, and a click reaches the page under it. This is the one place where something is put into a visited page: a page can find that element, though not what is in it</td>
+</tr>
+<tr>
+<td>Permissions</td>
+<td><code>sidePanel</code> only. The extension reads no page and drives none</td>
+</tr>
+<tr>
+<td>How it is loaded</td>
+<td><code>bap-browser agent --chat --extension</code> copies the extension beside the state file (<code>extension/</code>), starts the browser with it in a profile that is kept (<code>browser.user_data_dir</code>, or else <code>browser.kept_profile_dir</code>), and writes <code>extension/session.json</code> with the viewer's address. That file holds the session's token; it is removed when the session ends. The same folder can be loaded by hand into any Chrome with "Load unpacked"</td>
+</tr>
+<tr>
+<td>Its id</td>
+<td>Fixed by the key in its manifest, so the service can name it as a page allowed to show the viewer (<code>viewer.embed_origins</code>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Not in it, and built with take-over Chrome proper: driving the person's own everyday Chrome and its
+tabs, the bridge channel, site permission prompts and previews.</p>
 <h3 id="914-chat">9.14 Chat</h3>
 <p><strong>Beside a browser on the person's own screen.</strong> When <code>session_started</code> carries <code>on_screen: true</code>,
 the person watches the browser itself, so the viewer shows no picture of it. The page is one
@@ -3350,6 +3396,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>user_data_dir</code></td>
 <td>none</td>
 <td>Persistent profile folder; none means a fresh profile each session</td>
+</tr>
+<tr>
+<td><code>kept_profile_dir</code></td>
+<td><code>~/.bap-browser/browser-profile</code></td>
+<td>The profile folder used when a profile must be kept and <code>user_data_dir</code> names none (the extension, section 9.15). Keep it short: on Windows the browser gives up on a profile whose files have paths longer than 260 characters</td>
 </tr>
 <tr>
 <td><code>args</code></td>
@@ -8214,6 +8265,10 @@ reached, or a person stops the session. The answer is the only thing written to 
 <tr>
 <td><code>--chat</code></td>
 <td>Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with <code>--demo</code></td>
+</tr>
+<tr>
+<td><code>--extension</code></td>
+<td>With <code>--chat</code>: as <code>--show-browser</code>, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat</td>
 </tr>
 <tr>
 <td><code>--show-browser</code></td>

@@ -183,6 +183,10 @@ class Browser(Section):
     user_data_dir: str | None = setting(
         None, "Persistent profile folder; none means a fresh profile each session"
     )
+    kept_profile_dir: str = setting(
+        "~/.bap-browser/browser-profile",
+        "The profile folder used when a profile must be kept and `user_data_dir` names none. Keep it short",
+    )
     args: list[str] = setting([], "Extra launch flags")
     ignore_default_args: list[str] = setting([], "Default launch flags to drop")
     viewport: Viewport | None = setting(Viewport(), "`null` means sized to the window")

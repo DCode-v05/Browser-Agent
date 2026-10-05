@@ -99,6 +99,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the browser in a window on this screen, so the agent is seen working in it",
     )
+    agent.add_argument(
+        "--extension",
+        action="store_true",
+        help="with --chat: show the browser with the BAP extension in it, the chat in its side panel",
+    )
     agent.set_defaults(run=_agent)
     return parser
 
@@ -155,7 +160,16 @@ def _mcp(args: argparse.Namespace) -> int:
 
 def _agent(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    if args.show_browser:
+    extension: Path | None = None
+    if args.extension:
+        if not args.chat:
+            raise ConfigError("the extension shows the chat. Use --extension together with --chat")
+        from bap_browser import browser_extension
+
+        # Beside the file that says where the service is: both are this machine's own state.
+        extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+        config = browser_extension.with_extension(with_visible_browser(config), extension)
+    elif args.show_browser:
         config = with_visible_browser(config)
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
@@ -198,7 +212,11 @@ def _agent(args: argparse.Namespace) -> int:
                 raise ConfigError("the demonstration plays one fixed task. Use --chat without --demo")
             from bap_browser.agent.command import chat_with_viewer
 
-            asyncio.run(chat_with_viewer(config, model_for, first_task=task, open_viewer=args.open))
+            asyncio.run(
+                chat_with_viewer(
+                    config, model_for, first_task=task, open_viewer=args.open, extension=extension
+                )
+            )
             return 0
         asyncio.run(
             run_with_viewer(

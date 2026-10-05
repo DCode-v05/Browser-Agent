@@ -20,5 +20,7 @@ def test_the_wheel_carries_the_viewer_the_demo_site_and_the_page_script(tmp_path
     names = set(zipfile.ZipFile(wheel).namelist())
     assert "bap_browser/driver/snapshot_page.js" in names
     assert "bap_browser/demo_site/signup.html" in names
+    assert "bap_browser/extension/manifest.json" in names
+    assert "bap_browser/extension/icons/icon-128.png" in names
     assert "bap_browser/viewer_dist/index.html" in names
     assert any(name.startswith("bap_browser/viewer_dist/assets/") and name.endswith(".js") for name in names)

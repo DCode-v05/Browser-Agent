@@ -1097,7 +1097,8 @@ column is unchanged.
 | Toast | Brief confirmation of a person's own action | shown for 4 s, dismissible |
 
 The target highlight is drawn by the viewer from the box in the `step_started` event. Nothing is injected
-into the visited page, so the page cannot detect or be slowed by it.
+into the visited page, so the page cannot detect or be slowed by it. The one exception is the extension
+of section 9.15, which draws on the page itself because the person is looking at that page.
 
 ### 9.5 Design tokens
 
@@ -1325,6 +1326,25 @@ keyboard during takeover. Later: a plan card to approve before a run.
 
 ---
 
+### 9.15 The extension: the chat in the browser's side panel
+
+A first step towards take-over Chrome (section 4.9), built to be shown. It gives the look of that
+backend, not its plumbing: the extension carries no browser commands, and the agent still drives the
+browser through the driver of the core, so every tool works as it does anywhere else.
+
+| Part | What it does |
+|---|---|
+| Side panel | Opened with the extension's icon or Ctrl+Shift+Y. It shows the session's viewer in a frame, which is the chat of section 9.14 beside the browser: status and controls, chat, steps. With no session running it says how to start one |
+| The page | While the agent works, the edge of the page glows in the agent's colour and breathes, a label at the bottom left says who is driving and what is being done, and the agent's pointer is on the element it is acting on, with a mark for each click. A person in control: their colour, still. An agent waiting for a task: nothing |
+| Who decides | The viewer. It tells the side panel what the pages are to show, with the colours of its own theme, and the panel passes that on to the pages of its window once a second. A page that hears nothing for 3 s shows nothing. The page's script holds no words and no colours of its own |
+| What a page can see | The look is drawn inside a closed shadow root on one element that takes no clicks. The agent's reading of the page does not include it, and a click reaches the page under it. This is the one place where something is put into a visited page: a page can find that element, though not what is in it |
+| Permissions | `sidePanel` only. The extension reads no page and drives none |
+| How it is loaded | `bap-browser agent --chat --extension` copies the extension beside the state file (`extension/`), starts the browser with it in a profile that is kept (`browser.user_data_dir`, or else `browser.kept_profile_dir`), and writes `extension/session.json` with the viewer's address. That file holds the session's token; it is removed when the session ends. The same folder can be loaded by hand into any Chrome with "Load unpacked" |
+| Its id | Fixed by the key in its manifest, so the service can name it as a page allowed to show the viewer (`viewer.embed_origins`) |
+
+Not in it, and built with take-over Chrome proper: driving the person's own everyday Chrome and its
+tabs, the bridge channel, site permission prompts and previews.
+
 ### 9.14 Chat
 
 **Beside a browser on the person's own screen.** When `session_started` carries `on_screen: true`,
@@ -1505,6 +1525,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `chromium_sandbox` | `true` | Chromium's own sandbox. Turned off only inside a micro VM that cannot support it (section 17.2) |
 | `cdp_url` | none | Attach to a running or remote browser instead of launching |
 | `user_data_dir` | none | Persistent profile folder; none means a fresh profile each session |
+| `kept_profile_dir` | `~/.bap-browser/browser-profile` | The profile folder used when a profile must be kept and `user_data_dir` names none (the extension, section 9.15). Keep it short: on Windows the browser gives up on a profile whose files have paths longer than 260 characters |
 | `args` | `[]` | Extra launch flags |
 | `ignore_default_args` | `[]` | Default launch flags to drop |
 | `viewport` | `{width: 1280, height: 800}` | `null` means sized to the window |
@@ -2832,6 +2853,7 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
 | `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
+| `--extension` | With `--chat`: as `--show-browser`, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat |
 | `--show-browser` | Runs the browser in a window on this screen (`browser.headless` off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |
 
 Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,

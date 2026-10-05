@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "BAP Browser",
+  "version": "0.1.0",
+  "description": "Chat with the BAP browser agent beside the page, and see where it is working.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApfS8Lx4khuvXGcCp2btFS99UsbO9z7Meanac4i6qZxEy5RjshAplMlhtXrsG2hyi7thCbXK0w6I+SQusevt7wCkc9xoABwGQBPqmvWHqrDydQMMEE/iSA3OF3FyT4RNShsptjINTfe3SWcYLl+uyc+3VmcZl1CRd/UA5p9bD0j7hBZNkCdzRIlMl4vvBoR3FX4w4dA57UbZSrRnLkGil8qsXWbJoNOxNQhiWIZ+jh+mm97YmP6AJJj4bDJDcH/zuA0sNZr9E+1rFMHqk6Fib64DFnd4K09IpYXD5pSmcBKCQMx/hxA2a4XICYtwBRhoL0bzzDHrEVyGYvpxJfZ0siQIDAQAB",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Open the agent's chat",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["look.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      }
+    }
+  }
+}

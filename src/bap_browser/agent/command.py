@@ -6,7 +6,9 @@ import asyncio
 import sys
 import webbrowser
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
+from bap_browser import browser_extension
 from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
 from bap_browser.config import Config
@@ -87,7 +89,12 @@ SESSION_OVER = "The session has ended. The viewer stays open until you press Ctr
 
 
 async def chat_with_viewer(
-    config: Config, model_for: Callable[[Service], Model], *, first_task: str | None, open_viewer: bool
+    config: Config,
+    model_for: Callable[[Service], Model],
+    *,
+    first_task: str | None,
+    open_viewer: bool,
+    extension: Path | None = None,
 ) -> None:
     """Keeps one session open and does the tasks a person sends from the viewer's chat, one at a time.
 
@@ -104,6 +111,12 @@ async def chat_with_viewer(
         if open_viewer:
             webbrowser.open(service.viewer_address)
         tell(f"Demo site: {service.address}/demo-site/checkin.html")
+        if extension is not None:
+            # The side panel finds the session through this file, and the browser opens on a page
+            # that says how to open the panel.
+            browser_extension.announce(extension, service.viewer_address)
+            await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
+            tell("In the browser that opened, click the BAP icon in the toolbar (or press Ctrl+Shift+Y).")
         tell("Type a task in the viewer's chat. Press Ctrl+C to end.")
         if first_task:
             session.give_task(first_task)
@@ -117,6 +130,8 @@ async def chat_with_viewer(
         tell(SESSION_OVER)
         await service.wait()
     finally:
+        if extension is not None:
+            browser_extension.forget(extension)
         await session.close()
         await service.stop()
 

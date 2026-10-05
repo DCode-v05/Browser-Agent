@@ -116,3 +116,13 @@ def test_the_agent_command_can_show_its_browser(make_config, tmp_path: Path) -> 
     assert shown.browser.headless is False and shown.browser.viewport is None
     assert shown.browser.channel == "chrome", "nothing else about the browser changes"
     assert config.browser.headless is True, "the configuration it was made from is left as it was"
+
+
+def test_the_extension_goes_with_the_chat(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    from bap_browser.cli import _parser  # pyright: ignore[reportPrivateUsage]
+
+    assert _parser().parse_args(["agent", "--chat", "--extension"]).extension is True
+    assert _parser().parse_args(["agent", "--chat"]).extension is False
+    os.chdir(tmp_path)
+    assert main(["agent", "--extension", "Read the page"]) == 2
+    assert "Use --extension together with --chat" in capsys.readouterr().err
