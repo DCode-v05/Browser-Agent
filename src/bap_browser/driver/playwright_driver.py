@@ -153,7 +153,14 @@ class PlaywrightDriver:
             launch = launch_options(self._config, os.environ)
             profile = self._config.browser.user_data_dir
             browser: Browser | None = None
-            if profile:
+            attach = self._config.browser.cdp_url
+            if attach:
+                # A browser that is already running, started by someone else. It is driven, and on
+                # close it is let go of, not ended: the page stays where the agent left it.
+                browser = await playwright.chromium.connect_over_cdp(attach, timeout=timeouts.launch_ms)
+                self._stack.push_async_callback(browser.close)
+                context, page = self._page_to_drive(browser)
+            elif profile:
                 # A profile that is kept: its sign-ins, and an extension loaded into it, are there next time.
                 context = await playwright.chromium.launch_persistent_context(
                     profile, **launch, **context_options(self._config)
@@ -183,6 +190,16 @@ class PlaywrightDriver:
         if self._frames is not None:
             # A browser that was started again goes on sending pictures to whoever was watching.
             await self._begin_pictures(self._frames[1])
+
+    def _page_to_drive(self, browser: Browser) -> tuple[BrowserContext, Page]:
+        """The page of a running browser that the agent is to drive."""
+        mark = self._config.browser.cdp_target
+        pages = [page for context in browser.contexts for page in context.pages]
+        chosen = next((page for page in pages if mark is None or mark in page.url), None)
+        if chosen is None:
+            wanted = f"has {mark} in its address" if mark else "is there"
+            raise PlaywrightError(f"no open page {wanted}")
+        return chosen.context, chosen
 
     async def close(self) -> None:
         for task in self._acknowledging:

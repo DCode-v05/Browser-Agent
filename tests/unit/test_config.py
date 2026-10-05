@@ -16,6 +16,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "browser.headless": True,
     "browser.chromium_sandbox": True,
     "browser.cdp_url": None,
+    "browser.cdp_target": None,
     "browser.user_data_dir": None,
     "browser.kept_profile_dir": "~/.bap-browser/browser-profile",
     "browser.args": [],

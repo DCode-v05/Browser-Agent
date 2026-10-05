@@ -3460,7 +3460,12 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <tr>
 <td><code>cdp_url</code></td>
 <td>none</td>
-<td>Attach to a running or remote browser instead of launching</td>
+<td>Attach to a running or remote browser instead of launching. The browser is driven and, at the end, let go of: it is not closed</td>
+</tr>
+<tr>
+<td><code>cdp_target</code></td>
+<td>none</td>
+<td>With <code>cdp_url</code>: the page to drive is the one whose address holds this. None means the first page</td>
 </tr>
 <tr>
 <td><code>user_data_dir</code></td>

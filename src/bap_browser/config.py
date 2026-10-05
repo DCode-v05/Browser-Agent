@@ -180,6 +180,10 @@ class Browser(Section):
         True, "Chromium's own sandbox. Turned off only inside a micro VM that cannot support it"
     )
     cdp_url: str | None = setting(None, "Attach to a running or remote browser instead of launching")
+    cdp_target: str | None = setting(
+        None,
+        "With `cdp_url`: the page to drive is the one whose address holds this. None means the first page",
+    )
     user_data_dir: str | None = setting(
         None, "Persistent profile folder; none means a fresh profile each session"
     )

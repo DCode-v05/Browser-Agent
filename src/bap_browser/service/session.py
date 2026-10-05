@@ -99,7 +99,7 @@ class ServiceSession:
         }
         if self._on_task is not None:
             started["chat"] = True
-        if not self.config.browser.headless:
+        if not self.config.browser.headless or self.config.browser.cdp_url:
             # The person watches the browser itself, so a viewer need not show its picture.
             started["on_screen"] = True
         self.hub.publish(started)

@@ -1571,7 +1571,8 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `executable_path` | none | Required for `custom`; overrides any channel |
 | `headless` | `true` | Run without a window |
 | `chromium_sandbox` | `true` | Chromium's own sandbox. Turned off only inside a micro VM that cannot support it (section 17.2) |
-| `cdp_url` | none | Attach to a running or remote browser instead of launching |
+| `cdp_url` | none | Attach to a running or remote browser instead of launching. The browser is driven and, at the end, let go of: it is not closed |
+| `cdp_target` | none | With `cdp_url`: the page to drive is the one whose address holds this. None means the first page |
 | `user_data_dir` | none | Persistent profile folder; none means a fresh profile each session |
 | `kept_profile_dir` | `~/.bap-browser/browser-profile` | The profile folder used when a profile must be kept and `user_data_dir` names none (the extension, section 9.15). Keep it short: on Windows the browser gives up on a profile whose files have paths longer than 260 characters |
 | `args` | `[]` | Extra launch flags |
