@@ -9,7 +9,7 @@ import os
 from collections.abc import Callable, Coroutine, Mapping, Sequence
 from typing import Any
 
-from playwright.async_api import Browser, CDPSession, Frame, Page, Request, async_playwright
+from playwright.async_api import Browser, BrowserContext, CDPSession, Frame, Page, Request, async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -54,7 +54,9 @@ def launch_options(config: Config, env: Mapping[str, str]) -> dict[str, Any]:
         options["executable_path"] = browser.executable_path
     elif browser.channel == "custom":
         raise ConfigError("browser.channel is 'custom' but browser.executable_path is not set")
-    elif browser.channel != "chromium":
+    elif browser.channel != "chromium" or (browser.user_data_dir and browser.headless):
+        # A kept profile may hold an extension, and the browser's small build for running without a
+        # window cannot run one: the whole browser is named, so that it is the one started.
         options["channel"] = browser.channel
     if browser.proxy.server:
         proxy = {"server": browser.proxy.server}
@@ -118,6 +120,8 @@ class PlaywrightDriver:
         self._config = config
         self._stack = contextlib.AsyncExitStack()
         self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
+        self._version = ""
         self._page: Page | None = None
         self._script: PageScript | None = None
         self._navigations = 0
@@ -146,20 +150,35 @@ class PlaywrightDriver:
         try:
             playwright = await async_playwright().start()
             self._stack.push_async_callback(playwright.stop)
-            browser = await playwright.chromium.launch(**launch_options(self._config, os.environ))
-            self._stack.push_async_callback(browser.close)
-            context = await browser.new_context(**context_options(self._config))
+            launch = launch_options(self._config, os.environ)
+            profile = self._config.browser.user_data_dir
+            browser: Browser | None = None
+            if profile:
+                # A profile that is kept: its sign-ins, and an extension loaded into it, are there next time.
+                context = await playwright.chromium.launch_persistent_context(
+                    profile, **launch, **context_options(self._config)
+                )
+                self._stack.push_async_callback(context.close)
+                page = context.pages[0] if context.pages else await context.new_page()
+            else:
+                browser = await playwright.chromium.launch(**launch)
+                self._stack.push_async_callback(browser.close)
+                context = await browser.new_context(**context_options(self._config))
+                page = await context.new_page()
             context.set_default_timeout(timeouts.action_ms)
             context.set_default_navigation_timeout(timeouts.navigation_ms)
-            page = await context.new_page()
             cdp = await context.new_cdp_session(page)
+            # A browser with a kept profile is not handed over as an object of its own, so its version is asked for.
+            product = browser.version if browser else (await cdp.send("Browser.getVersion"))["product"]
         except PlaywrightError as exc:
             await self._stack.aclose()
             raise BrowserError(f"The browser could not be started: {first_line(exc)}") from exc
         page.on("request", self._on_request)
         page.on("framenavigated", self._on_frame_navigated)
         cdp.on("Page.screencastFrame", self._on_picture)
-        self._browser, self._page, self._cdp = browser, page, cdp
+        context.on("close", self._on_context_closed)
+        self._browser, self._context, self._page, self._cdp = browser, context, page, cdp
+        self._version = product.rpartition("/")[2]
         self._script = PageScript(cdp, timeouts.page_reply_ms)
         if self._frames is not None:
             # A browser that was started again goes on sending pictures to whoever was watching.
@@ -169,15 +188,22 @@ class PlaywrightDriver:
         for task in self._acknowledging:
             task.cancel()
         await self._stack.aclose()
-        self._browser = self._page = self._script = self._cdp = None
+        self._browser = self._context = self._page = self._script = self._cdp = None
+
+    def _on_context_closed(self, context: BrowserContext) -> None:
+        if context is self._context:
+            self._context = None
 
     def is_alive(self) -> bool:
-        return self._browser is not None and self._browser.is_connected()
+        if self._browser is not None:
+            return self._browser.is_connected()
+        # A browser with a kept profile is gone when its one context has closed.
+        return self._context is not None
 
     def description(self) -> str:
-        if self._browser is None:
+        if self._page is None:
             raise BrowserError("The browser has not been started.")
-        return f"Chromium {self._browser.version}"
+        return f"Chromium {self._version}"
 
     async def tabs(self) -> list[TabInfo]:
         try:

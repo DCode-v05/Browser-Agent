@@ -53,3 +53,18 @@ async def test_a_click_whose_handler_keeps_the_page_busy_is_answered_within_the_
         assert elapsed < 3, f"the click took {elapsed:.1f} s while the page was busy for 4 s"
         await (await session.driver()).page.wait_for_function("true", timeout=10000)  # type: ignore[attr-defined]
         assert not (await tools.call("browser_snapshot", {})).is_error
+
+
+async def test_a_kept_profile_is_driven_like_a_fresh_one(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    config = make_config(tmp_path, browser={"user_data_dir": str(tmp_path / "profile")})
+    async with open_session(config) as session:
+        tools = Toolkit(session)
+        page = await tools.call("browser_navigate", {"url": f"{site}/slow_handler.html"})
+        assert not page.is_error and 'button "Think"' in page.text
+        driver = await session.driver()
+        assert re.fullmatch(r"Chromium \d+\.\d+\.\d+\.\d+", driver.description())
+        assert driver.is_alive()
+    assert not driver.is_alive()
+    assert (tmp_path / "profile").is_dir(), "the profile is kept"
