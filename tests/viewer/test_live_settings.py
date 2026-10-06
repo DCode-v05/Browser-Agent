@@ -103,3 +103,38 @@ async def test_a_person_changes_settings_and_the_service_keeps_them(
         await service.stop()
         await session.close()
         await page.close()
+
+
+async def test_a_person_clears_the_browsing_data_and_the_session_ends(
+    browser: Browser, make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    profile = tmp_path / "kept-profile"
+    (profile / "Default").mkdir(parents=True)
+    (profile / "Default" / "Cookies").write_text("signed in", encoding="utf-8")
+    config = make_config(tmp_path, browser={"user_data_dir": str(profile)})
+    settings = SettingsStore(config)
+    session = ServiceSession(config, FakeDriver(), agent="Test agent", settings=settings)
+    await session.start()
+    service = Service(config, {session.name: session}, port=0, settings=settings)
+    await service.start()
+    page = await browser.new_page(viewport={"width": 1360, "height": 850})
+    try:
+        await page.goto(service.viewer_address)
+        await page.get_by_role("button", name="Open settings").click()
+        dialog = page.get_by_role("dialog", name="Settings")
+        await dialog.get_by_role("tab", name="Privacy").click()
+        await dialog.get_by_role("button", name="Clear data").click()
+        # It asks first, in words that say what will be lost.
+        asks = page.get_by_role("alertdialog")
+        await asks.get_by_text("Clear cookies and site data in the cloud browser?").wait_for()
+        await asks.get_by_text("You'll be signed out of sites there, and open sessions will end.").wait_for()
+        assert profile.exists() and session.control == "agent", "nothing is done before the answer"
+        await asks.get_by_role("button", name="Clear data").click()
+        await page.get_by_text("Browsing data cleared.").wait_for()
+        assert not profile.exists() and session.control == "ended"
+        await dialog.get_by_role("button", name="Close", exact=True).click()
+        await page.get_by_text("It was ended to clear the browsing data.").wait_for()
+    finally:
+        await service.stop()
+        await session.close()
+        await page.close()

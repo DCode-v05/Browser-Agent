@@ -36,8 +36,12 @@ export function settingsFrom(pageAddress: string, token: string): SettingsSource
       throw new SettingsUnreachable('api/settings');
     },
 
-    // This build has no setting that is an action.
-    run: async () => undefined,
+    // The one setting that is an action. The service ends the cloud browser's sessions and deletes its data.
+    async run(_surface: Surface, action: string): Promise<void> {
+      if (action !== 'clear_browsing_data') return;
+      const answer = await ask('api/browsing-data/clear', { method: 'POST' });
+      if (!answer.ok) throw new SettingsUnreachable('api/browsing-data/clear');
+    },
 
     config: () => read<ConfigAnswer>('api/config'),
   };

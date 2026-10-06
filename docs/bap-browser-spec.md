@@ -1740,12 +1740,21 @@ message naming it: passing over it would drop a site a person blocked.
 and stay. A person's allowed sites take the place of the deployment's and must lie inside them; with no
 list of their own a person narrows nothing, and the deployment's list holds and is shown.
 
-**In this build.** The catalogue holds 15 settings: `preferred_browser`, `stay_signed_in`, `ask_before`,
+**Clear browsing data.** `POST /api/browsing-data/clear` ends the open sessions of the cloud browser, with
+"It was ended to clear the browsing data." as the reason their summary gives, and then deletes that
+browser's kept profile. A session with a fresh profile holds its data only while it runs, so ending it is
+all there is to do. The answer says how many sessions ended and whether a profile was deleted. A folder is
+deleted only when it is a browser's profile (it holds `Local State` or `Default`): the configuration names
+the folder, and a wrong name must not cost a person their files. The other browsers are not touched. A
+deployment that locks `clear_browsing_data` gets 409.
+
+**In this build.** The catalogue holds 16 settings: `preferred_browser`, `stay_signed_in`, `ask_before`,
 `approval_wait`, `remember_site_approval`, `blocked_sites`, `allowed_sites`, `allow_downloads`,
-`allow_uploads`, `activity_log`, `picture_quality`, `show_agent_pointer`, `colour_mode`, `page_scripts` and
-`about`. Not yet: `clear_browsing_data` and its route; the three the bridge keeps or serves (`my_chrome`,
-`my_chrome_mode`, `approved_sites`); the three of the desktop app (`show_builtin_browser`,
-`download_folder`, `upload_folders`); and `notify_when_needed`.
+`allow_uploads`, `activity_log`, `clear_browsing_data`, `picture_quality`, `show_agent_pointer`,
+`colour_mode`, `page_scripts` and `about`: the 16 of milestone 1 on the web. Not yet: the three the bridge
+keeps or serves (`my_chrome`, `my_chrome_mode`, `approved_sites`); the three of the desktop app
+(`show_builtin_browser`, `download_folder`, `upload_folders`), with Clear browsing data for the built-in
+browser; and `notify_when_needed`.
 
 **Outside this catalogue.** Settings that belong to the desktop app itself (start at sign-in,
 shortcuts, updates, keeping the computer awake) are the desktop client's own. Importing sign-ins from

@@ -453,6 +453,16 @@ describe('settings', () => {
     expect(pointer).toBeChecked();
   });
 
+  it('does not say the browsing data is cleared when the service did not clear it', async () => {
+    const failing = { ...createDemoSettings(), run: async () => Promise.reject(new Error('no answer')) };
+    const { user, dialog } = await open('agent', { settings: failing });
+    await user.click(within(dialog).getByRole('tab', { name: 'Privacy' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Clear data' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Clear data' }));
+    expect(await within(dialog).findByText('The browsing data was not cleared: the service did not do it. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Browsing data cleared.')).not.toBeInTheDocument();
+  });
+
   it('says Saving while the service has not answered, and Saved only once it has', async () => {
     let answer: () => void = () => undefined;
     const answered = new Promise<void>((resolve) => (answer = resolve));

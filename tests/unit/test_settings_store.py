@@ -89,6 +89,23 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
         "applies": "now",
     }
     assert settings["about"]["control"] == "about" and settings["about"]["value"] is None
+    # A button asks first, in words that say what will be lost.
+    assert settings["clear_browsing_data"] == {
+        "id": "clear_browsing_data",
+        "title": "Clear browsing data",
+        "description": "Deletes cookies and site data in the cloud browser.",
+        "control": "action",
+        "action": "Clear data",
+        "confirm": {
+            "question": "Clear cookies and site data in the cloud browser?",
+            "consequence": "You'll be signed out of sites there, and open sessions will end.",
+            "button": "Clear data",
+        },
+        "value": None,
+        "default": None,
+        "locked": False,
+        "applies": "now",
+    }
 
 
 def test_a_surface_shows_only_what_it_can_act_on(make_config: MakeConfig, tmp_path: Path) -> None:
@@ -108,9 +125,9 @@ def test_every_setting_names_a_surface_and_a_group(make_config: MakeConfig, tmp_
     assert len({entry.id for entry in CATALOGUE}) == len(CATALOGUE)
     for entry in CATALOGUE:
         assert entry.surfaces and set(entry.surfaces) <= set(SURFACES)
-        assert entry.control in ("choice", "select", "switch", "list", "about")
-        # What the deployment has is always a value a person may have.
-        if entry.control != "about":
+        assert entry.control in ("choice", "select", "switch", "list", "about", "action")
+        # What the deployment has is always a value a person may have. Two hold no value at all.
+        if entry.control not in ("about", "action"):
             assert entry.problem(entry.deployed(config), config) is None, entry.id
 
 
@@ -156,6 +173,7 @@ def test_nothing_is_changed_when_one_change_is_refused(make_config: MakeConfig, 
         ("blocked_sites", "example.com"),
         ("blocked_sites", [1, 2]),
         ("about", "anything"),
+        ("clear_browsing_data", True),
     ],
 )
 def test_a_value_that_is_not_one_of_the_choices_is_refused(

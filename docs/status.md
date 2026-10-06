@@ -222,11 +222,12 @@ The settings screen of a live session is now the service's own (spec 10.2):
 
 | Part | What it does |
 |---|---|
-| The catalogue | 15 settings, each defined once: its group, the surfaces it is on, the configuration key it changes, and how a person's value is limited by the deployment's |
+| The catalogue | 16 settings (all of milestone 1 on the web), each defined once: its group, the surfaces it is on, the configuration key it changes, and how a person's value is limited by the deployment's |
 | `GET /api/settings`, `PATCH /api/settings`, `GET /api/config` | The screen is drawn from the answer; a change is saved as it is made; a refused change says which setting and why (409) |
 | A person tightens, never loosens | More approvals but not fewer; blocked sites added to the deployment's; allowed sites only narrowed; what the deployment turned off stays off; a locked setting is shown and cannot be changed |
 | A change reaches the running session | From the agent's next tool call: the site lists, the tools on offer, approvals, the event log, the picture quality |
 | Kept | In `settings.file`, for the person alone to read; a value that no longer holds is passed over |
+| Clear browsing data | Ends the cloud browser's sessions and deletes its kept profile, after asking. Only a folder that is a browser's profile is ever deleted |
 | The pop-up for an approval | "The agent needs your approval", over the page, on every backend |
 
 Tests: 28 for the store, 18 for the API on a running service, 1 in a real browser that changes settings
@@ -263,7 +264,7 @@ now acts only on a match whose name holds every word, and types into a field bef
 
 | What | Note |
 |---|---|
-| Settings, the rest | Clear browsing data; My Chrome, In my Chrome and Approved sites (the bridge's); the desktop app's three; notifications |
+| Settings, the rest | My Chrome, In my Chrome and Approved sites (the bridge's); the desktop app's three, with Clear browsing data for the built-in browser; notifications |
 | Bench, the rest | 8 of the 40 per-tool lines have no scenario yet; the page-size, system and output-size lines (spec 11.4 to 11.6) are not in the budget file; the verify skill is not in the repository |
 | Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |
