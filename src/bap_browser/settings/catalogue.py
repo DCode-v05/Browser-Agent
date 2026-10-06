@@ -23,7 +23,7 @@ Patch = dict[str, Any]
 SURFACES = ("web", "mobile", "desktop")
 EVERYWHERE = SURFACES
 NOT_ON_MOBILE = ("web", "desktop")
-GROUPS = ("Browser", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced")
+GROUPS = ("Browser", "Agent", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced")
 CLOUD = "remote_headless"
 BACKEND_NAMES = {
     "remote_headless": ("Cloud browser", "Runs beside the agent. You watch a live picture of it."),
@@ -62,6 +62,11 @@ class Entry:
     applies: Literal["now", "next_session"] = "now"
     backends: tuple[str, ...] | None = None
     """The backends whose sessions the setting changes. None means every one."""
+    per_system: bool = False
+    """Where a service has several browsers (spec 9.17), a person sets it for each one by itself."""
+    only_per_system: bool = False
+    """It is a setting of one browser among several, and of nothing else: it is not there for a
+    service with one session."""
 
     CONTROL: ClassVar[str] = ""
 
@@ -78,8 +83,9 @@ class Entry:
         """Why a person may not have this value. None when they may."""
         raise NotImplementedError
 
-    def patch(self, value: Value, config: Config) -> Patch:
-        """What the value changes in the configuration."""
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
+        """What the value changes in the configuration. `system` names the browser the
+        configuration is for, where the service has several."""
         raise NotImplementedError
 
     def fixed_by_deployment(self, config: Config) -> bool:
@@ -132,7 +138,7 @@ class Choice(Entry):
             return "not_a_choice"
         return "would_loosen" if self._too_loose(value, config) else None
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {self.key: value}
 
     def fixed_by_deployment(self, config: Config) -> bool:
@@ -171,7 +177,7 @@ class ApprovalWait(Choice):
         waits = sorted({*config.control.approval_timeout_choices_s, config.control.approval_timeout_s})
         return tuple(Option(str(seconds), _wait_in_words(seconds)) for seconds in waits)
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {self.key: int(str(value))}
 
 
@@ -200,7 +206,7 @@ class Switch(Entry):
             return "not_a_choice"
         return "would_loosen" if value and self.fixed_by_deployment(config) else None
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {self.key: bool(value)}
 
     def fixed_by_deployment(self, config: Config) -> bool:
@@ -214,7 +220,7 @@ class StaySignedIn(Switch):
     def deployed(self, config: Config) -> Value:
         return config.browser.user_data_dir is not None
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         kept = config.browser.user_data_dir or config.browser.kept_profile_dir
         return {self.key: kept if value else None}
 
@@ -226,8 +232,10 @@ class ActivityLog(Switch):
     def deployed(self, config: Config) -> Value:
         return config.logging.event_log is not None
 
-    def patch(self, value: Value, config: Config) -> Patch:
-        where = config.logging.event_log or str(Path(config.data_dir) / EVENT_LOG_NAME)
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
+        # A browser among several writes a log of its own (spec 9.17).
+        fallback = Path(config.logging.systems_dir) / f"{system}.jsonl" if system else None
+        where = config.logging.event_log or str(fallback or Path(config.data_dir) / EVENT_LOG_NAME)
         return {self.key: where if value else None}
 
 
@@ -266,7 +274,7 @@ class SiteList(Entry):
             return "would_loosen"
         return None
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         sites = value if isinstance(value, list) else []
         deployment = self._deployment(config)
         if self.adds_to_deployment:
@@ -309,8 +317,34 @@ class About(Entry):
     def problem(self, value: Any, config: Config) -> Reason | None:
         return "not_a_choice"
 
-    def patch(self, value: Value, config: Config) -> Patch:
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {}
+
+
+@dataclass(frozen=True, kw_only=True)
+class Enabled(Entry):
+    """Whether a browser of the window is in use at all (spec 9.17). It changes nothing in the
+    configuration: whoever runs the browsers asks the store."""
+
+    CONTROL: ClassVar[str] = "switch"
+
+    def deployed(self, config: Config) -> Value:
+        return True
+
+    def problem(self, value: Any, config: Config) -> Reason | None:
+        return None if isinstance(value, bool) else "not_a_choice"
+
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
+        return {}
+
+
+@dataclass(frozen=True, kw_only=True)
+class AgentModel(Choice):
+    """The model that plans the agent's steps, among those the deployment offers."""
+
+    def offered(self, config: Config) -> tuple[Option, ...]:
+        names = dict.fromkeys([config.agent.model, *config.agent.offered_models])
+        return tuple(Option(name, name) for name in names)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -328,7 +362,18 @@ class Action(About):
         return {"action": self.button, "confirm": asks}
 
 
+ENABLED = Enabled(
+    id="system_enabled",
+    group="Browser",
+    surfaces=EVERYWHERE,
+    title="Use this browser",
+    description="Turns this browser on or off in the window. Turning it off ends its session.",
+    per_system=True,
+    only_per_system=True,
+)
+
 CATALOGUE: tuple[Entry, ...] = (
+    ENABLED,
     PreferredBrowser(
         id="preferred_browser",
         group="Browser",
@@ -349,8 +394,20 @@ CATALOGUE: tuple[Entry, ...] = (
         applies="next_session",
         backends=(CLOUD,),
     ),
+    AgentModel(
+        id="agent_model",
+        group="Agent",
+        surfaces=EVERYWHERE,
+        title="Model",
+        description="The model that plans the agent's steps. A change holds from the next task.",
+        key="agent.model",
+        options=(),
+        dropdown=True,
+        per_system=True,
+    ),
     Choice(
         id="ask_before",
+        per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
         title="Ask before",
@@ -364,6 +421,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     ApprovalWait(
         id="approval_wait",
+        per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
         title="Wait for my answer",
@@ -374,6 +432,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="remember_site_approval",
+        per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
         title='Remember "Allow on this site"',
@@ -385,6 +444,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="blocked_sites",
+        per_system=True,
         group="Sites",
         surfaces=EVERYWHERE,
         title="Blocked sites",
@@ -394,6 +454,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="allowed_sites",
+        per_system=True,
         group="Sites",
         surfaces=EVERYWHERE,
         title="Only allow these sites",
@@ -403,6 +464,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="allow_downloads",
+        per_system=True,
         group="Files",
         surfaces=EVERYWHERE,
         title="Let the agent download files",
@@ -412,6 +474,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="allow_uploads",
+        per_system=True,
         group="Files",
         surfaces=EVERYWHERE,
         title="Let the agent upload files",
@@ -421,6 +484,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     ActivityLog(
         id="activity_log",
+        per_system=True,
         group="Privacy",
         surfaces=EVERYWHERE,
         title="Keep a log of the agent's steps",
@@ -439,6 +503,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="picture_quality",
+        per_system=True,
         group="Live view",
         surfaces=EVERYWHERE,
         title="Picture quality",
@@ -469,11 +534,22 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="page_scripts",
+        per_system=True,
         group="Advanced",
         surfaces=NOT_ON_MOBILE,
         title="Let the agent run scripts in pages",
         description="Offers the agent a tool that runs JavaScript in the page. Each use still asks.",
         key="browser.javascript.allow_evaluate",
+        tighten=True,
+    ),
+    Switch(
+        id="code_tool",
+        per_system=True,
+        group="Advanced",
+        surfaces=NOT_ON_MOBILE,
+        title="Let the agent run scripts of several steps",
+        description="Offers the agent a tool that does several steps in one call. Each step is still checked.",
+        key="code.enabled",
         tighten=True,
     ),
     About(

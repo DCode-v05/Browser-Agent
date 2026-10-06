@@ -7,11 +7,22 @@ with one command.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any, Protocol
 
 from bap_browser.agent.models import Message, Model, Said, ToolOutput
 from bap_browser.config import Agent
-from bap_browser.tools import Toolkit
+from bap_browser.results import ToolResult
+from bap_browser.tools import ToolDefinition
+
+
+class Tools(Protocol):
+    """What the loop needs of a toolkit: the tools on offer, and a way to call one."""
+
+    def definitions(self) -> list[ToolDefinition]: ...
+
+    async def call(self, name: str, arguments: Mapping[str, Any] | None = None) -> ToolResult: ...
+
 
 SYSTEM = (
     "You do a task in a web browser by calling tools. browser_navigate opens a page and returns it; "
@@ -37,7 +48,7 @@ class Unfinished(Exception):
 
 async def run_agent(
     task: str,
-    toolkit: Toolkit,
+    toolkit: Tools,
     model: Model,
     settings: Agent,
     *,

@@ -1,5 +1,5 @@
 """`bap-browser studio`: one window with the three browsers an agent can work in, each a page of it
-(spec 9.16).
+(spec 9.16), and each a system of its own to set up, to manage and to evaluate (spec 9.17).
 
 | Page | Where the browser is |
 |---|---|
@@ -7,13 +7,14 @@
 | My Chrome | A tab of the person's own Chrome, reached through the extension (spec 4.9) |
 | Built-in browser | A browser of the app's own that keeps its sign-ins, with a live picture |
 
-Each page is a session of its own, with its own chat. A session a person stopped can be started
-again from the page.
+Each page is a session of its own, with its own chat, its own settings, its own log and its own
+record of what its tasks took. A session a person stopped can be started again from the page.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -34,6 +35,8 @@ from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
+from bap_browser.evals import Rating, Recorder, summarise, trace_of
+from bap_browser.evals.checks import run_checklist
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
@@ -45,6 +48,12 @@ BUILT_IN_PROFILE = "built-in-browser"
 DESKTOP_STATE_FILE = "desktop-service.json"
 # What a person needs the agent's attention for.
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
+# What a person may do with a browser of the window, besides setting it up.
+ACTIONS = ("start", "stop", "restart")
+# What the summary of an ended session says, in place of "You stopped it."
+STOPPED = "You stopped this browser from the Systems page."
+TURNED_OFF = "This browser was turned off."
+RESTARTED = "It was ended to start a new session."
 
 
 @dataclass
@@ -55,10 +64,12 @@ class Room:
     backend: str
     session: ServiceSession | None = None
     phase: str = "starting"
-    """While there is no session: `starting`, `waiting` for the person's Chrome, or `failed`."""
+    """While there is no session: `starting`, `waiting` for the person's Chrome, `failed`, or
+    `off` when a person has turned the browser off."""
     note: str = ""
     """Why it failed, in words for the person."""
     restart: asyncio.Event = field(default_factory=asyncio.Event)
+    """Set when a new session is wanted on the page, or when whether it is wanted has changed."""
 
     def described(self, extension: Path) -> dict[str, Any]:
         """What the window is told about this page, to draw its tab and what is behind it."""
@@ -79,42 +90,340 @@ class Room:
         return told
 
 
+class Studio:
+    """The three browsers of the window as systems (spec 9.17): each with settings of its own, a
+    log of its own, the record of what its tasks took, and a person's hand on whether it runs."""
+
+    def __init__(
+        self,
+        config: Config,
+        settings: SettingsStore,
+        model_for: Callable[[Service], Model],
+        extension: Path,
+    ) -> None:
+        self._config = config
+        self._settings = settings
+        self._model_for = model_for
+        self._extension = extension
+        self.sessions: dict[str, ServiceSession] = {}
+        self.rooms = [
+            Room(CLOUD, "remote_headless"),
+            Room(CHROME, "takeover_chrome"),
+            Room(BUILT_IN, "bundled_chromium"),
+        ]
+        self._recorders = {room.id: Recorder(config.evals, room.id, room.backend) for room in self.rooms}
+        # A checklist runs on one browser at a time, and not on one that is being checked already.
+        self._checking: set[str] = set()
+        self.service: Service | None = None
+
+    # What the window asks (the HTTP surface).
+
+    def pages(self) -> list[dict[str, Any]]:
+        """The pages of the window, for its tabs (spec 9.16)."""
+        return [room.described(self._extension) for room in self.rooms]
+
+    def described(self) -> list[dict[str, Any]]:
+        """The systems, for the page that sets them up and manages them (spec 9.17)."""
+        told: list[dict[str, Any]] = []
+        for room in self.rooms:
+            config = self._configured(room)
+            log = config.logging.event_log
+            told.append(
+                {
+                    **room.described(self._extension),
+                    "enabled": self._settings.enabled(room.id),
+                    "model": config.agent.model,
+                    # Where this browser's log is written. None when a person turned it off.
+                    "log": str(Path(log).resolve()) if log else None,
+                    "records": str(self._recorders[room.id].folder.resolve()),
+                }
+            )
+        return told
+
+    def _room(self, system: str) -> Room | None:
+        return next((room for room in self.rooms if room.id == system), None)
+
+    def _configured(self, room: Room) -> Config:
+        """The configuration this browser has now: its session's, or what a new session would get."""
+        if room.session is not None and room.session.control != "ended":
+            return room.session.config
+        return self._settings.apply_to(self._given(room), room.backend, room.id)
+
+    async def settings_changed(self, system: str) -> None:
+        """A person changed this browser's settings. One that was turned off is ended, and one
+        that was turned on is started."""
+        room = self._room(system)
+        if room is None:
+            return
+        wanted = self._settings.enabled(system)
+        if not wanted:
+            await self._end(room, TURNED_OFF)
+        if wanted == (room.phase == "off"):
+            # Whether it is wanted has changed: its loop looks again.
+            room.restart.set()
+
+    async def manage(self, system: str, action: str) -> str | None:
+        """Starts, stops or starts again a browser of the window. None when it was done; otherwise
+        why not, in words for the person."""
+        room = self._room(system)
+        if room is None or action not in ACTIONS:
+            return "There is no such browser, or nothing of that name to do with it."
+        if not self._settings.enabled(system):
+            return "This browser is turned off. Turn it on first."
+        running = room.session is not None and room.session.control != "ended"
+        if action == "stop":
+            if not running:
+                return "This browser has no session to stop."
+            await self._end(room, STOPPED)
+            return None
+        if action == "start" and running:
+            return "This browser is running already."
+        await self._end(room, RESTARTED)
+        room.restart.set()
+        return None
+
+    async def _end(self, room: Room, why: str) -> None:
+        if room.session is not None and room.session.control != "ended":
+            await room.session.close("person", why)
+
+    def log(self, system: str) -> dict[str, Any]:
+        """The newest lines of a browser's log, as they are in its file."""
+        room = self._room(system)
+        assert room is not None
+        named = self._configured(room).logging.event_log
+        if not named:
+            return {"path": None, "lines": [], "size": 0}
+        path = Path(named)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return {"path": str(path.resolve()), "lines": [], "size": 0}
+        lines: list[Any] = []
+        for line in text.splitlines()[-self._config.logging.shown_lines :]:
+            try:
+                lines.append(json.loads(line))
+            except ValueError:
+                continue
+        return {"path": str(path.resolve()), "lines": lines, "size": len(text.encode())}
+
+    def evals(self, system: str) -> dict[str, Any]:
+        room = self._room(system)
+        assert room is not None
+        told = summarise(self._recorders[system], self._config.evals, self._configured(room).agent.model)
+        return {**told, "backend": room.backend, "checking": system in self._checking}
+
+    def trace(self, system: str, task: str) -> dict[str, Any] | None:
+        return trace_of(self._recorders[system], task)
+
+    def rate(self, system: str, task: str, rating: Rating | None) -> bool:
+        return self._recorders[system].rate(task, rating)
+
+    async def check(self, system: str) -> dict[str, Any] | str:
+        """Runs the checklist on a browser. The result; or, as a sentence, why it could not run."""
+        room, service = self._room(system), self.service
+        assert room is not None and service is not None
+        session = room.session
+        if session is None or session.control == "ended":
+            return "This browser has no session. Start it first."
+        if session.control != "agent":
+            return "The agent is not driving this browser now. Hand it back, or resume it, first."
+        if session.busy or system in self._checking:
+            return "This browser is busy. Run the checklist when its task is finished."
+        self._checking.add(system)
+        try:
+            result = await run_checklist(session, service.address, self._config.evals)
+        finally:
+            self._checking.discard(system)
+        self._recorders[system].keep_checklist(result)
+        return result
+
+    # The browsers themselves.
+
+    def _given(self, room: Room) -> Config:
+        """What the deployment gives this browser, before a person's settings."""
+        config = self._config
+        if room.id == CLOUD:
+            config = _cloud(config)
+        elif room.id == BUILT_IN:
+            config = _built_in(config)
+        return _with_its_own_log(config, room.id)
+
+    async def run(self, service: Service) -> None:
+        """Runs the three browsers until the service stops."""
+        self.service = service
+        cloud, chrome, built_in = self.rooms
+        working = [
+            asyncio.create_task(self._own_browser(cloud)),
+            asyncio.create_task(self._persons_chrome(chrome)),
+            asyncio.create_task(self._own_browser(built_in)),
+        ]
+        try:
+            await _unless_stopped(asyncio.gather(*working), service)
+        finally:
+            for task in working:
+                task.cancel()
+            await asyncio.gather(*working, return_exceptions=True)
+            for room in self.rooms:
+                if room.session is not None:
+                    await room.session.close()
+
+    async def _wanted(self, room: Room) -> None:
+        """Waits until a session is wanted on the page: a person turned the browser on, or asked
+        for a new session."""
+        while not self._settings.enabled(room.id):
+            # Turned off: there is nothing on its page, and nobody is connected to it.
+            gone = self.sessions.pop(room.id, None)
+            room.session, room.phase, room.note = None, "off", ""
+            if gone is not None:
+                gone.hub.start_over()
+            room.restart.clear()
+            await room.restart.wait()
+        if room.phase == "off":
+            room.phase = "starting"
+
+    async def _asked_again(self, room: Room) -> None:
+        """Waits until a person asks for a new session on the page, or turns the browser off."""
+        await room.restart.wait()
+        room.restart.clear()
+
+    def _take_place(self, room: Room, session: ServiceSession) -> None:
+        """Puts a session on the page. Whoever was watching the one before it connects again, and
+        finds this one."""
+        before = self.sessions.get(room.id)
+        self.sessions[room.id] = room.session = session
+        if before is not None:
+            before.hub.start_over()
+
+    async def _talk(self, room: Room, tasks: asyncio.Queue[str], session: ServiceSession) -> None:
+        """Does the tasks a person sends, one at a time, until the session ends. Each is recorded."""
+        assert self.service is not None
+        model = self._model_for(self.service)
+        history: list[Message] = []
+        while True:
+            task = await _next_task(tasks, session)
+            if task is None:
+                return
+            await _do(task, session, model, session.config, history, self._recorders[room.id])
+
+    async def _own_browser(self, room: Room) -> None:
+        """A page whose browser this process starts itself. Each time a person asks for a new
+        session, a new browser is started for it."""
+        assert self.service is not None
+        service = self.service
+        while True:
+            await self._wanted(room)
+            room.phase, room.note = "starting", ""
+            room.restart.clear()
+            tasks: asyncio.Queue[str] = asyncio.Queue()
+            session = ServiceSession(
+                self._given(room),
+                agent=AGENT_NAME,
+                name=room.id,
+                on_task=tasks.put_nowait,
+                backend=room.backend,
+                on_restart=room.restart.set,
+                settings=self._settings,
+            )
+            try:
+                await session.start()
+            except BapError as failed:
+                await session.close()
+                room.session, room.phase, room.note = None, "failed", str(failed)
+                # A person can try again from the Systems page.
+                await self._asked_again(room)
+                continue
+            self._take_place(room, session)
+            await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
+            await self._talk(room, tasks, session)
+            await self._asked_again(room)
+
+    async def _persons_chrome(self, room: Room) -> None:
+        """The page for the person's own Chrome. Its session begins when the extension has dialled in."""
+        assert self.service is not None
+        service, config = self.service, self._config
+        bridge = service.bridge
+        assert bridge is not None
+        while True:
+            await self._wanted(room)
+            if room.session is None or room.session.control == "ended":
+                room.phase = "waiting"
+            room.restart.clear()
+            if not await self._paired_or_unwanted(room):
+                continue
+            # The driver attaches to the tab through this process's own end of the bridge.
+            given = self._given(room)
+            browser = given.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
+            attached = given.model_copy(update={"browser": browser})
+            driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
+            tasks: asyncio.Queue[str] = asyncio.Queue()
+            session = ServiceSession(
+                attached,
+                driver,
+                agent=AGENT_NAME,
+                name=room.id,
+                on_task=tasks.put_nowait,
+                # The person looks at their own browser: no picture of it is sent across the bridge.
+                pictures=False,
+                backend=room.backend,
+                on_restart=room.restart.set,
+                settings=self._settings,
+            )
+            # Which sites the agent may read and act on is decided on the person's machine.
+            session.browser.ask_site = bridge.permit
+            session.browser.site_done = bridge.permit_done
+            try:
+                await session.start()
+            except BapError as failed:
+                await session.close()
+                room.note = str(failed)
+                await asyncio.sleep(config.bridge.heartbeat_s)
+                continue
+            room.note = ""
+            self._take_place(room, session)
+            # The side panel in that Chrome shows this page's chat.
+            panel = f"{service.address}/?session={room.id}#token={service.token}"
+            browser_extension.announce(self._extension, panel, bridge=service.bridge_address)
+            await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
+            await self._talk(room, tasks, session)
+            await self._asked_again(room)
+
+    async def _paired_or_unwanted(self, room: Room) -> bool:
+        """Waits for the extension to dial in. False when the browser was turned off meanwhile."""
+        assert self.service is not None and self.service.bridge is not None
+        pairing = asyncio.ensure_future(
+            _paired(self.service.bridge, self._extension, self.service, self._config.bridge.pairing_ttl_s)
+        )
+        changed = asyncio.ensure_future(room.restart.wait())
+        try:
+            await asyncio.wait({pairing, changed}, return_when=asyncio.FIRST_COMPLETED)
+            return pairing.done() and self._settings.enabled(room.id)
+        finally:
+            for waiting in (pairing, changed):
+                waiting.cancel()
+            await asyncio.gather(pairing, changed, return_exceptions=True)
+
+
 async def run_studio(
     config: Config, model_for: Callable[[Service], Model], *, open_viewer: bool, extension: Path
 ) -> None:
     """Serves the window and its three pages until the service is stopped (Ctrl+C), which raises
     Interrupted. `extension` is the folder the extension was put in, for the person's own Chrome."""
     config = browser_extension.may_show_viewer(config)
-    sessions: dict[str, ServiceSession] = {}
-    rooms = [
-        Room(CLOUD, "remote_headless"),
-        Room(CHROME, "takeover_chrome"),
-        Room(BUILT_IN, "bundled_chromium"),
-    ]
     desktop = _desktop_app(config)
     settings = SettingsStore(config)
+    studio = Studio(config, settings, model_for, extension)
     service = Service(
         config,
-        sessions,
+        studio.sessions,
         port=0,
         bridge=True,
-        rooms=lambda: [room.described(extension) for room in rooms],
+        rooms=studio.pages,
         desktop=desktop,
         settings=settings,
+        systems=studio,
     )
     await service.start()
-    working: list[asyncio.Task[None]] = []
     try:
-        cloud, chrome, built_in = rooms
-        working = [
-            asyncio.create_task(_own_browser(cloud, _cloud(config), service, sessions, model_for, settings)),
-            asyncio.create_task(
-                _persons_chrome(chrome, config, service, sessions, model_for, extension, settings)
-            ),
-            asyncio.create_task(
-                _own_browser(built_in, _built_in(config), service, sessions, model_for, settings)
-            ),
-        ]
         tell(f"Viewer: {service.viewer_address}")
         tell(f"Demo site: {service.address}/demo-site/start.html")
         tell(
@@ -124,16 +433,10 @@ async def run_studio(
         tell("Press Ctrl+C to end.")
         if open_viewer:
             webbrowser.open(service.viewer_address)
-        await _unless_stopped(asyncio.gather(*working), service)
+        await studio.run(service)
     finally:
-        for task in working:
-            task.cancel()
-        await asyncio.gather(*working, return_exceptions=True)
         browser_extension.forget(extension)
         await asyncio.to_thread(desktop.close)
-        for room in rooms:
-            if room.session is not None:
-                await room.session.close()
         await service.stop()
 
 
@@ -163,114 +466,10 @@ def _built_in(config: Config) -> Config:
     return config.model_copy(update={"browser": browser})
 
 
-def _take_place(room: Room, sessions: dict[str, ServiceSession], session: ServiceSession) -> None:
-    """Puts a session on the page. Whoever was watching the one before it connects again, and
-    finds this one."""
-    before = sessions.get(room.id)
-    sessions[room.id] = room.session = session
-    if before is not None:
-        before.hub.start_over()
-
-
-async def _own_browser(
-    room: Room,
-    config: Config,
-    service: Service,
-    sessions: dict[str, ServiceSession],
-    model_for: Callable[[Service], Model],
-    settings: SettingsStore,
-) -> None:
-    """A page whose browser this process starts itself. Each time a person asks for a new session,
-    a new browser is started for it."""
-    while True:
-        room.phase, room.note = "starting", ""
-        tasks: asyncio.Queue[str] = asyncio.Queue()
-        session = ServiceSession(
-            config,
-            agent=AGENT_NAME,
-            name=room.id,
-            on_task=tasks.put_nowait,
-            backend=room.backend,
-            on_restart=room.restart.set,
-            settings=settings,
-        )
-        try:
-            await session.start()
-        except BapError as failed:
-            await session.close()
-            room.session, room.phase, room.note = None, "failed", str(failed)
-            return
-        _take_place(room, sessions, session)
-        await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
-        await _talk(tasks, session, model_for(service), config)
-        await _asked_again(room)
-
-
-async def _persons_chrome(
-    room: Room,
-    config: Config,
-    service: Service,
-    sessions: dict[str, ServiceSession],
-    model_for: Callable[[Service], Model],
-    extension: Path,
-    settings: SettingsStore,
-) -> None:
-    """The page for the person's own Chrome. Its session begins when the extension has dialled in."""
-    bridge = service.bridge
-    assert bridge is not None
-    while True:
-        if room.session is None:
-            room.phase = "waiting"
-        await _paired(bridge, extension, service, config.bridge.pairing_ttl_s)
-        # The driver attaches to the tab through this process's own end of the bridge.
-        browser = config.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
-        attached = config.model_copy(update={"browser": browser})
-        driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
-        tasks: asyncio.Queue[str] = asyncio.Queue()
-        session = ServiceSession(
-            attached,
-            driver,
-            agent=AGENT_NAME,
-            name=room.id,
-            on_task=tasks.put_nowait,
-            # The person looks at their own browser: no picture of it is sent across the bridge.
-            pictures=False,
-            backend=room.backend,
-            on_restart=room.restart.set,
-            settings=settings,
-        )
-        # Which sites the agent may read and act on is decided on the person's machine.
-        session.browser.ask_site = bridge.permit
-        session.browser.site_done = bridge.permit_done
-        try:
-            await session.start()
-        except BapError as failed:
-            await session.close()
-            room.note = str(failed)
-            await asyncio.sleep(config.bridge.heartbeat_s)
-            continue
-        room.note = ""
-        _take_place(room, sessions, session)
-        # The side panel in that Chrome shows this page's chat.
-        panel = f"{service.address}/?session={room.id}#token={service.token}"
-        browser_extension.announce(extension, panel, bridge=service.bridge_address)
-        await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
-        await _talk(tasks, session, model_for(service), attached)
-        await _asked_again(room)
-
-
-async def _talk(tasks: asyncio.Queue[str], session: ServiceSession, model: Model, config: Config) -> None:
-    """Does the tasks a person sends, one at a time, until the session ends."""
-    history: list[Message] = []
-    while True:
-        task = await _next_task(tasks, session)
-        if task is None:
-            return
-        await _do(task, session, model, config, history)
-
-
-async def _asked_again(room: Room) -> None:
-    """Waits until a person asks for a new session on the page."""
-    room.restart.clear()
-    await room.restart.wait()
-    room.restart.clear()
+def _with_its_own_log(config: Config, system: str) -> Config:
+    """Each browser of the window writes a log of its own (spec 9.17), where the deployment keeps a
+    log at all."""
+    if config.logging.event_log is None:
+        return config
+    own = Path(config.logging.systems_dir) / f"{system}.jsonl"
+    return config.model_copy(update={"logging": config.logging.model_copy(update={"event_log": str(own)})})

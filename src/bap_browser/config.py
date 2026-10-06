@@ -389,6 +389,16 @@ class Agent(Section):
         "openai", "Whose model the loop calls. `scripted` replays fixed replies and needs no key"
     )
     model: str = setting("gpt-5.6-luna", "The model's name at that provider")
+    offered_models: list[str] = setting(
+        [], "Other models at that provider that a person may choose in the settings screen"
+    )
+    input_price_per_million: float = setting(
+        0.0,
+        "What a million tokens sent to the model cost, in US dollars. 0 means not known: no cost is shown",
+    )
+    output_price_per_million: float = setting(
+        0.0, "What a million tokens the model wrote cost, in US dollars. 0 means not known"
+    )
     api_key_env: str = setting(
         "OPENAI_API_KEY",
         "The variable, in the environment or in `.env`, that holds the key. The key is never in `config.json`",
@@ -422,6 +432,10 @@ class Logging(Section):
         True, "Arguments are logged with typed text and form values replaced by their length"
     )
     max_result_chars: int = setting(2000, "Result excerpt kept per line")
+    systems_dir: str = setting(
+        ".bap-browser/logs", "Where each browser of the three-browser window writes a log of its own"
+    )
+    shown_lines: int = setting(200, "The most lines of a log the window shows at once")
 
 
 class Code(Section):
@@ -441,6 +455,17 @@ class Code(Section):
         1_000_000, "The most a script may hand the core at once: the arguments of one step, or its result"
     )
     max_memory_mb: int = setting(512, "What the worker may hold, on a system that enforces such a limit")
+
+
+class Evals(Section):
+    enabled: bool = setting(
+        True, "Keep a record of each task a browser of the window does: its time, its steps, its tokens"
+    )
+    dir: str = setting(".bap-browser/evals", "Where those records are kept, in a folder for each browser")
+    max_task_chars: int = setting(200, "How much of a task's own words, and of its answer, a record keeps")
+    recent_tasks: int = setting(20, "The tasks the window lists for a browser, newest first")
+    max_tasks_read: int = setting(2000, "The newest records a summary is made from")
+    step_budget_ms: int = setting(2000, "The checklist's limit for one step in the browser")
 
 
 class Bench(Section):
@@ -468,6 +493,7 @@ class Config(Section):
     settings: Settings = Settings()
     logging: Logging = Logging()
     code: Code = Code()
+    evals: Evals = Evals()
     bench: Bench = Bench()
     # For each key a layer set, the layer: a file, the environment or the session. Not a setting.
     _sources: dict[str, str] = PrivateAttr(default_factory=dict[str, str])

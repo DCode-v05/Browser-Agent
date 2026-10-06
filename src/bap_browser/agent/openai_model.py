@@ -15,7 +15,7 @@ import urllib.request
 from collections.abc import Sequence
 from typing import Any
 
-from bap_browser.agent.models import Message, ModelError, Reply, ToolCall, ToolOutput
+from bap_browser.agent.models import Message, ModelError, Reply, ToolCall, ToolOutput, Usage
 from bap_browser.config import Agent
 from bap_browser.tools import ToolDefinition
 
@@ -29,6 +29,10 @@ class OpenAIModel:
         self._key = api_key
         self._turns: list[list[dict[str, Any]]] = []
         """What the provider returned for each of the model's turns, in order."""
+
+    def use(self, settings: Agent) -> None:
+        """Takes the settings as they are now: a person may have chosen another model (spec 10.2)."""
+        self._settings = settings
 
     async def complete(
         self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
@@ -76,7 +80,7 @@ class OpenAIModel:
                 f"Raise agent.max_tokens ({settings.max_tokens}) in config.json."
             )
         self._turns.append(output)
-        return Reply(text, calls)
+        return Reply(text, calls, _usage(answer.get("usage")))
 
     def _input(self, messages: Sequence[Message]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
@@ -142,6 +146,16 @@ class OpenAIModel:
         except (ValueError, KeyError, TypeError):
             return f"The model provider answered HTTP {refused.code}."
         return f"The model provider answered HTTP {refused.code}: {str(said)[:LONGEST_REFUSAL]}"
+
+
+def _usage(said: Any) -> Usage | None:
+    """The tokens of one reply, as the provider counted them. None when it did not say."""
+    if not isinstance(said, dict):
+        return None
+    sent, written = said.get("input_tokens"), said.get("output_tokens")
+    if not isinstance(sent, int) or not isinstance(written, int) or isinstance(sent, bool):
+        return None
+    return Usage(sent, written)
 
 
 def _arguments(text: Any) -> dict[str, Any]:
