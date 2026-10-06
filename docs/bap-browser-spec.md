@@ -451,20 +451,23 @@ machine, and it is the first cut of the design above, not all of it.
 
 | Part | How it is now |
 |---|---|
-| The bridge | The extension's side panel. It dials out to `/bridge` on the core, which is on the same machine, sends the token as its first message, and is let in only if it is this product's extension (its origin is checked). The panel must stay open while the agent works: closing it ends the bridge |
+| The bridge | The extension's background. It dials out to `/bridge` on the core, which is on the same machine, and is let in only if it is this product's extension (its origin is checked) and holds a pairing token. The side panel can be closed while the agent works |
+| Pairing | The core makes a pairing token for the session and hands it to the extension (on one machine: in a file inside the extension's folder). The token is taken once and runs out after `bridge.pairing_ttl_s`; while it waits for the extension, the core hands over a new one before the last has run out. The session's own token is never a pairing token. The bridge is given a key in return, which lets it come back after a cut |
+| Staying connected | The bridge says it is alive every `bridge.heartbeat_s`, and each side closes a channel that has been silent for `bridge.dead_after_s`. A bridge that lost its channel dials again by itself, a little later each time. Meanwhile the extension stays attached to the agent's tab, the driver keeps its connection, and a call waits up to `bridge.reconnect_grace_s` for the bridge. What the tab reported during the cut is lost; the tab and its refs are not. After the grace with nobody back, the agent is told "The browser on the person's machine is not connected" |
 | The agent's tab | The extension opens one new tab, in a tab group named "BAP agent", and attaches Chrome's debugger to it. The agent can reach that tab and nothing else in the browser. Chrome shows its own "started debugging this browser" bar, which is left in place |
 | What crosses the channel | DevTools Protocol commands for that tab and its events, as they are. The core's own driver attaches at `/bridge/cdp` as if it were a browser's debugging port, so the driver, the page script and every tool are the same code as on every other backend. That end takes only a connection from this machine with the token |
 | What the core answers itself | What a driver asks of a browser as a whole (its version, attaching to targets): there is no whole browser on the channel, only the tab |
 | When the tab goes | The person closes the tab or tells Chrome to stop the debugging: the extension says so, the driver's end is closed, and the agent's next call is told "The browser closed". A navigation opens a new agent tab |
 | Pictures | None are sent: the person is looking at the browser. The viewer is the chat in the side panel (section 9.14), and the page shows who is driving (section 9.15) |
-| Safety | The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere |
+| Safety | The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere. Which sites the agent may read and act on is decided by the extension (section 8.8, "As it is built now") |
+| Stop | The extension's own "Stop the agent" takes it off the tab at once and hangs up; the bridge does not dial again in that session |
 | Loading it | By hand, once: `chrome://extensions`, Developer mode, Load unpacked, the folder the command names |
 
-Not built yet, from the design above and from section 8.8: the pairing token and its expiry (the
-session's own token is used), the heartbeat and reconnecting by itself, one message per driver
-operation (the channel carries the driver's many small commands, which is slow across the internet
-and fine on one machine), site permissions and previews enforced by the extension, more than one tab,
-and a core in a micro VM.
+Not built yet, from the design above and from section 8.8: one message per driver operation (the
+channel carries the driver's many small commands, which is slow across the internet and fine on one
+machine), the extension's own check of the element a consequential action is about to act on (the
+core's rule of section 8.6 asks, in the chat), more than one tab, handing the pairing token over from
+a web client, and a core in a micro VM.
 
 **Messages.** JSON text; screenshots and frames are binary. One message per driver operation
 (section 5.1).
@@ -1036,6 +1039,19 @@ cost money.
 Results the agent sees: "The person has not allowed actions on bank.example", "The person cancelled
 this action", "The person did not answer, so this action was cancelled". Each adds "Do not try another
 way; ask the person or choose a different approach."
+
+**As it is built now.** The first cut of these rules, in the extension:
+
+| Rule | How it is now |
+|---|---|
+| Site permission | Kept by the extension on the person's machine (`chrome.storage.local`), by host name. Before each tool call the core asks the bridge, with the address and a sentence saying what the call does; the extension answers from what the person chose, and asks them when they have not: Allow once, Always allow on this site, Don't allow. "Allow once" is for the call that asked. "Don't allow" is for that call too and is not remembered |
+| Where the person is asked | In the extension's own page: the side panel when it is open, a small window of the extension's otherwise. Never inside a web page, which could press the buttons itself |
+| Not relying on the core | Every command that acts on the tab (mouse, keyboard, a navigation) is checked again in the extension, and refused unless the site is allowed or was just allowed once. On a blocked site nothing is read either. Reading a site not yet decided on is held back by the question before the call, not command by command |
+| Sites never offered | The browser's own pages, other extensions' pages, files and the extension stores. `permissions.blocked_sites` adds the deployment's list, which covers subdomains. `permissions.default_site_permission: block` refuses every site the person has not allowed |
+| Modes | `ask_before_acting` asks before every acting call, on an allowed site too, with what will be done. A consequential action is asked about by the core (section 8.6), in the chat |
+| No answer | After `permissions.preview_timeout_s` the question is a no: "The person did not answer, so this action was cancelled." |
+| The core's own pages | The agent's start page comes from the core itself and is not asked about |
+| The core's policy first | An address the core's own policy refuses is refused there; the person is not asked about it |
 
 **Bundled Chromium** is the clean-room alternative. It is separate from the person's own browser, its
 sign-ins live inside the desktop app, and the person signs in again there. The same site permissions

@@ -89,6 +89,8 @@ READS = frozenset(
 ACTS_ON_A_CONTROL = frozenset(
     {"browser_click", "browser_press_key", "browser_set_checked", "browser_select_option"}
 )
+# The tools that touch no site: asking a person, waiting, and the list of saved files.
+NEED_NO_SITE = frozenset({"browser_request_human", "browser_wait", "browser_downloads"})
 ANSWERS_A_DIALOG = "browser_handle_dialog"
 # While a page has a dialog open it answers nothing. Only these tools need nothing from it (spec 5.7).
 RUN_BESIDE_A_DIALOG = frozenset(
@@ -168,9 +170,16 @@ class Toolkit:
             if isinstance(checked, CannotRun):
                 outcome, logged = Outcome(checked.text, checked.reason), names_only(arguments)
             else:
-                outcome = self._blocked_by_a_dialog(name) or await self._permit(name, arguments, target)
+                outcome = (
+                    self._blocked_by_a_dialog(name)
+                    or await self._site_permission(name, arguments, target)
+                    or await self._permit(name, arguments, target)
+                )
                 if outcome is None:
                     outcome = await self._run(name, *checked)
+                if self._session.site_done is not None and name not in NEED_NO_SITE:
+                    # What the person allowed once was for this call.
+                    await self._session.site_done()
                 logged = masked(arguments, redact)
             tabs = await self.tabs()
             text = admission.note + outcome.text + self._state_block(tabs, self._session.take_news())
@@ -206,6 +215,29 @@ class Toolkit:
             f"Answer it first with {ANSWERS_A_DIALOG}.",
             "a dialog is open",
         )
+
+    async def _site_permission(
+        self, name: str, arguments: Mapping[str, Any], target: Located | None
+    ) -> Outcome | None:
+        """On a person's own browser, whether they let the agent read or act on this site (spec
+        8.8). The bridge on their machine decides, and asks them when they have not chosen yet."""
+        ask = self._session.ask_site
+        if ask is None or name not in self._tools or name in NEED_NO_SITE:
+            return None
+        address: str | None = None
+        if name == "browser_navigate" and isinstance(arguments.get("url"), str):
+            judged = await self._session.policy.check(arguments["url"])
+            if not judged.allowed:
+                # The core's own policy refuses it: the person is not asked about what cannot be done.
+                return None
+            address = judged.url
+        if address is None:
+            address = next((tab.url for tab in await self.tabs() if tab.active), "")
+        summary = self._session.redact(label_for(name, arguments, target))
+        refused = await ask("read" if name in READS else "act", address, summary)
+        if refused is None:
+            return None
+        return Outcome(refused + NO_OTHER_WAY, "the person has not allowed it")
 
     async def _permit(
         self, name: str, arguments: Mapping[str, Any], target: Located | None

@@ -125,10 +125,13 @@ def create_app(
                 first = _command(await socket.receive())
         except (TimeoutError, WebSocketDisconnect):
             first = None
-        if not first or first.get("type") != "auth" or not signed_in(first.get("token")):
+        # A pairing token lets it in once; the key it is given then lets it come back after a cut.
+        admitted = bridge.admit(first) if first and first.get("type") == "auth" else None
+        if admitted is None or first is None:
             await socket.close(REFUSED)
             return
-        await bridge.serve_extension(socket)
+        await socket.send_text(json.dumps(admitted))
+        await bridge.serve_extension(socket, attached=first.get("attached") is True)
 
     async def driver_socket(socket: WebSocket) -> None:
         """The driver's end of the bridge. It is this process's own driver: it comes from this

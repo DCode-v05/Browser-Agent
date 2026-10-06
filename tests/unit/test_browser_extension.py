@@ -18,7 +18,9 @@ def test_the_extension_is_copied_to_where_a_browser_loads_it(tmp_path: Path) -> 
     # The side panel for the chat; the debugger, the tabs and their groups for take-over Chrome,
     # where the extension attaches to the one tab it opened for the agent. No site is named:
     # it reads no page by itself.
-    assert manifest["permissions"] == ["sidePanel", "debugger", "tabs", "tabGroups"]
+    # Storage keeps the sites the person allowed, on their own machine; the alarm lets the background
+    # look for a session while no panel is open.
+    assert manifest["permissions"] == ["sidePanel", "debugger", "tabs", "tabGroups", "storage", "alarms"]
     assert "host_permissions" not in manifest
     named = [
         manifest["background"]["service_worker"],

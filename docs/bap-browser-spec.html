@@ -1114,7 +1114,15 @@ machine, and it is the first cut of the design above, not all of it.</p>
 <tbody>
 <tr>
 <td>The bridge</td>
-<td>The extension's side panel. It dials out to <code>/bridge</code> on the core, which is on the same machine, sends the token as its first message, and is let in only if it is this product's extension (its origin is checked). The panel must stay open while the agent works: closing it ends the bridge</td>
+<td>The extension's background. It dials out to <code>/bridge</code> on the core, which is on the same machine, and is let in only if it is this product's extension (its origin is checked) and holds a pairing token. The side panel can be closed while the agent works</td>
+</tr>
+<tr>
+<td>Pairing</td>
+<td>The core makes a pairing token for the session and hands it to the extension (on one machine: in a file inside the extension's folder). The token is taken once and runs out after <code>bridge.pairing_ttl_s</code>; while it waits for the extension, the core hands over a new one before the last has run out. The session's own token is never a pairing token. The bridge is given a key in return, which lets it come back after a cut</td>
+</tr>
+<tr>
+<td>Staying connected</td>
+<td>The bridge says it is alive every <code>bridge.heartbeat_s</code>, and each side closes a channel that has been silent for <code>bridge.dead_after_s</code>. A bridge that lost its channel dials again by itself, a little later each time. Meanwhile the extension stays attached to the agent's tab, the driver keeps its connection, and a call waits up to <code>bridge.reconnect_grace_s</code> for the bridge. What the tab reported during the cut is lost; the tab and its refs are not. After the grace with nobody back, the agent is told "The browser on the person's machine is not connected"</td>
 </tr>
 <tr>
 <td>The agent's tab</td>
@@ -1138,7 +1146,11 @@ machine, and it is the first cut of the design above, not all of it.</p>
 </tr>
 <tr>
 <td>Safety</td>
-<td>The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere</td>
+<td>The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere. Which sites the agent may read and act on is decided by the extension (section 8.8, "As it is built now")</td>
+</tr>
+<tr>
+<td>Stop</td>
+<td>The extension's own "Stop the agent" takes it off the tab at once and hangs up; the bridge does not dial again in that session</td>
 </tr>
 <tr>
 <td>Loading it</td>
@@ -1146,11 +1158,11 @@ machine, and it is the first cut of the design above, not all of it.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Not built yet, from the design above and from section 8.8: the pairing token and its expiry (the
-session's own token is used), the heartbeat and reconnecting by itself, one message per driver
-operation (the channel carries the driver's many small commands, which is slow across the internet
-and fine on one machine), site permissions and previews enforced by the extension, more than one tab,
-and a core in a micro VM.</p>
+<p>Not built yet, from the design above and from section 8.8: one message per driver operation (the
+channel carries the driver's many small commands, which is slow across the internet and fine on one
+machine), the extension's own check of the element a consequential action is about to act on (the
+core's rule of section 8.6 asks, in the chat), more than one tab, handing the pairing token over from
+a web client, and a core in a micro VM.</p>
 <p><strong>Messages.</strong> JSON text; screenshots and frames are binary. One message per driver operation
 (section 5.1).</p>
 <pre><code class="language-json">{&quot;type&quot;:&quot;hello&quot;,&quot;protocol&quot;:1,&quot;bridge&quot;:&quot;extension&quot;,&quot;version&quot;:&quot;0.1.0&quot;,&quot;browser&quot;:&quot;Chrome 154&quot;,
@@ -2102,6 +2114,49 @@ cost money.</p>
 <p>Results the agent sees: "The person has not allowed actions on bank.example", "The person cancelled
 this action", "The person did not answer, so this action was cancelled". Each adds "Do not try another
 way; ask the person or choose a different approach."</p>
+<p><strong>As it is built now.</strong> The first cut of these rules, in the extension:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>How it is now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Site permission</td>
+<td>Kept by the extension on the person's machine (<code>chrome.storage.local</code>), by host name. Before each tool call the core asks the bridge, with the address and a sentence saying what the call does; the extension answers from what the person chose, and asks them when they have not: Allow once, Always allow on this site, Don't allow. "Allow once" is for the call that asked. "Don't allow" is for that call too and is not remembered</td>
+</tr>
+<tr>
+<td>Where the person is asked</td>
+<td>In the extension's own page: the side panel when it is open, a small window of the extension's otherwise. Never inside a web page, which could press the buttons itself</td>
+</tr>
+<tr>
+<td>Not relying on the core</td>
+<td>Every command that acts on the tab (mouse, keyboard, a navigation) is checked again in the extension, and refused unless the site is allowed or was just allowed once. On a blocked site nothing is read either. Reading a site not yet decided on is held back by the question before the call, not command by command</td>
+</tr>
+<tr>
+<td>Sites never offered</td>
+<td>The browser's own pages, other extensions' pages, files and the extension stores. <code>permissions.blocked_sites</code> adds the deployment's list, which covers subdomains. <code>permissions.default_site_permission: block</code> refuses every site the person has not allowed</td>
+</tr>
+<tr>
+<td>Modes</td>
+<td><code>ask_before_acting</code> asks before every acting call, on an allowed site too, with what will be done. A consequential action is asked about by the core (section 8.6), in the chat</td>
+</tr>
+<tr>
+<td>No answer</td>
+<td>After <code>permissions.preview_timeout_s</code> the question is a no: "The person did not answer, so this action was cancelled."</td>
+</tr>
+<tr>
+<td>The core's own pages</td>
+<td>The agent's start page comes from the core itself and is not asked about</td>
+</tr>
+<tr>
+<td>The core's policy first</td>
+<td>An address the core's own policy refuses is refused there; the person is not asked about it</td>
+</tr>
+</tbody>
+</table></div>
 <p><strong>Bundled Chromium</strong> is the clean-room alternative. It is separate from the person's own browser, its
 sign-ins live inside the desktop app, and the person signs in again there. The same site permissions
 and the same consequential-action confirmation apply, shown by the desktop app. From milestone 2 the

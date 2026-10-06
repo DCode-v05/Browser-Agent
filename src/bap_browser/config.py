@@ -256,6 +256,13 @@ class Safety(Section):
 
 
 class Permissions(Section):
+    mode: Literal["act_on_allowed_sites", "ask_before_acting"] = setting(
+        "act_on_allowed_sites", "Or `ask_before_acting`. See section 8.8"
+    )
+    default_site_permission: Literal["ask", "block"] = setting(
+        "ask", "For a site the person has not decided on. Or `block`"
+    )
+    blocked_sites: list[str] = setting([], "Sites the bridge always refuses. A person cannot remove from it")
     consequential_words: list[str] = setting(
         [
             "pay",
@@ -276,6 +283,7 @@ class Permissions(Section):
         ],
         "A control whose name holds one of these makes the action consequential",
     )
+    preview_timeout_s: int = setting(120, "Then a preview is cancelled")
 
 
 class Control(Section):
@@ -309,7 +317,11 @@ class Server(Section):
 
 
 class Bridge(Section):
+    pairing_ttl_s: int = setting(120, "How long a pairing token can be used")
+    heartbeat_s: int = setting(15, "How often a bridge reports that it is alive")
+    dead_after_s: int = setting(45, "A channel silent for this long is closed")
     op_timeout_ms: int = setting(15000, "One driver operation")
+    reconnect_grace_s: int = setting(30, "How long a tool call waits for a bridge that is reconnecting")
     max_message_mb: int = setting(16, "Largest message accepted on the channel")
 
 

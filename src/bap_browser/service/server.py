@@ -41,7 +41,7 @@ class Service:
         self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
         self._mcp_running: asyncio.Task[None] | None = None
         self._mcp_over = asyncio.Event()
-        self.bridge = Bridge(config.bridge.op_timeout_ms / 1000) if bridge else None
+        self.bridge = Bridge(config) if bridge else None
         self._app = create_app(
             config,
             sessions,
@@ -105,6 +105,8 @@ class Service:
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((self._config.server.host, self._wanted_port))
         self.port = listener.getsockname()[1]
+        if self.bridge is not None:
+            self.bridge.own_address = self.address
         self._server = uvicorn.Server(
             uvicorn.Config(
                 self._app,
@@ -140,6 +142,8 @@ class Service:
     async def stop(self) -> None:
         if self._server is None or self._serving is None:
             return
+        if self.bridge is not None:
+            await self.bridge.close()
         self._server.should_exit = True
         await self._serving
         self._server = self._serving = None

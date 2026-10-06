@@ -28,6 +28,11 @@ AskApproval = Callable[[str, str, str, bool], Awaitable[ApprovalOutcome]]
 site go in, and whether such an action is asked about every time; their answer comes out."""
 
 
+AskSite = Callable[[str, str, str], Awaitable[str | None]]
+"""Asks whether the agent may read or act on a site: `read` or `act`, the address, and what the call
+does in a sentence. None when it may; otherwise what the agent is told."""
+
+
 class BrowserSession:
     def __init__(self, config: Config, driver: Driver | None = None) -> None:
         self.config = config
@@ -38,6 +43,11 @@ class BrowserSession:
         self._lost = False
         self.ask_person: AskPerson | None = None
         """Set by whoever can reach a person. None when nobody is watching this session."""
+        self.ask_site: AskSite | None = None
+        """Set on a person's own browser, where the bridge on their machine decides which sites the
+        agent may read and act on (spec 8.8). None on every other backend."""
+        self.site_done: Callable[[], Awaitable[None]] | None = None
+        """Told when a call the bridge was asked about has finished: what was allowed once is over."""
         self.ask_approval: AskApproval | None = None
         """Set by whoever can reach a person. None when there is nobody to ask."""
         self._closed = False
