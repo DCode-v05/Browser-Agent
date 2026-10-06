@@ -574,6 +574,13 @@ boundary (section 17.2).
 - Browser-internal pages (settings, downloads hub, DevTools) are never handed to the agent.
 - On take-over Chrome the agent sees only the tabs in its own tab group. The person's other tabs do not exist for any operation.
 - Frames, including cross-site frames, appear inside the snapshot under their `iframe` line. Refs inside a frame carry a frame prefix: `f2e7`.
+  - What is inside a frame is indented one step under the frame's line and has no heading of its own. A frame keeps its name (`f2`) for as long as its page lives, and a ref's number is used once across the page and all its frames.
+  - Frames are read `browser.snapshot.max_frame_depth` deep, and not at all when `include_iframes` is off. Everything together stays within the snapshot's size; when a frame is cut short, the notice is said once, at the end.
+  - A frame from another site lives in a process of its own. The core reaches it through a DevTools session of its own and reads it the same way.
+  - Every tool that takes a ref takes one inside a frame. A point or a box inside a frame is given as a point or a box of the page: the frame's position, border and padding are added. A frame that is out of sight is brought into view before the pointer goes to it.
+  - `browser_find` searches the page with its frames. `browser_get_text` with no ref gives the page's own text, without its frames.
+  - A ref into a frame that was removed, or into a page that was left, is stale.
+  - Known limit: an element inside a frame is checked for being covered within its frame only. Something of the page around the frame that lies over it is not seen.
 - Open shadow roots are read as part of the page.
 - A window that one of the agent's tabs opens becomes a tab, and the action that opened it waits for the new tab, so its own result already shows it. A window opened by anyone else in the same browser is left alone.
 - No more than `browser.tabs.max_tabs` tabs are open: a pop-up past the limit is closed at once and the agent is told.

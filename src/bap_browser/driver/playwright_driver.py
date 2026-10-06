@@ -56,7 +56,7 @@ from bap_browser.driver.base import (
 )
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.screenshots import size_of
-from bap_browser.driver.snapshot import snapshot_arguments
+from bap_browser.driver.snapshot import NOTICE, WHOLE_PAGE, matching_lines, snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
 from bap_browser.policy.address import without_credentials
 from bap_browser.results import Picture
@@ -65,6 +65,13 @@ PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
 # How many bytes of a picture the page script turns into text at a time.
 SHRINK_PIECE = 32768
+# A ref inside a frame: the frame's name, then the element's.
+FRAME_REF = re.compile(r"(f\d+)e\d+")
+# The operations that give a point of the page, and the one that gives a box.
+GIVE_A_POINT = frozenset({"prepare", "wheelPoint"})
+GIVE_A_BOX = frozenset({"locate"})
+# Before these, a frame that is out of sight is brought into view: the pointer has to reach it.
+NEED_THE_FRAME_IN_VIEW = frozenset({"prepare", "wheelPoint"})
 # After an action, two animation frames are enough for a navigation it started to show itself.
 SETTLE_FRAMES = 2
 NOT_STARTED = "The browser has not been started."
@@ -201,6 +208,25 @@ class _Taken:
 
 
 @dataclass(eq=False)
+class _InnerFrame:
+    """A frame inside a page (spec 5.3). Its elements' refs begin with its name: f2e7."""
+
+    name: str
+    script: PageScript
+    cdp: CDPSession
+    """The DevTools session that reaches it: the page's own, or one of its own when the browser
+    keeps the frame in another process (a frame from another site)."""
+    owner: str
+    """The ref of the frame's element in the document around it."""
+    parent: _InnerFrame | None
+    """The frame around it. None when it is in the page itself."""
+
+    @property
+    def depth(self) -> int:
+        return 1 + (self.parent.depth if self.parent else 0)
+
+
+@dataclass(eq=False)
 class _Tab:
     """One page of the browser, and what the driver keeps about it."""
 
@@ -217,6 +243,12 @@ class _Tab:
     pixel: float = 1.0
     """Page pixels per pixel of the last screenshot of what the browser shows."""
     shot: _Taken | None = None
+    frames: dict[str, _InnerFrame] = field(default_factory=dict[str, "_InnerFrame"])
+    """The frames read so far, by name."""
+    frame_names: dict[str, str] = field(default_factory=dict[str, str])
+    """The name each frame was given, by the browser's own id for it. A frame keeps its name."""
+    apart: dict[Frame, tuple[str, CDPSession]] = field(default_factory=dict[Frame, tuple[str, CDPSession]])
+    """The frames the browser keeps in a process of their own: its id for each, and the session that reaches it."""
 
 
 @dataclass(eq=False)
@@ -224,6 +256,14 @@ class _OpenDialog:
     info: PageDialog
     dialog: Dialog
     timer: asyncio.Task[Any] | None = None
+
+
+def _frame_ids(tree: dict[str, Any]) -> set[str]:
+    """The browser's ids of a frame and of every frame inside it that the same session reaches."""
+    ids = {tree["frame"]["id"]}
+    for child in tree.get("childFrames", []):
+        ids |= _frame_ids(child)
+    return ids
 
 
 class PlaywrightDriver:
@@ -241,6 +281,7 @@ class PlaywrightDriver:
         # Tab ids are never used twice in a session, and neither are refs, in any tab.
         self._tab_count = 0
         self._next_ref = 1
+        self._next_frame = 1
         self._frames: tuple[Callable[[bytes], None], QualityLevel] | None = None
         self._next_acknowledgement = 0.0
         self._tasks: set[asyncio.Task[Any]] = set()
@@ -616,8 +657,8 @@ class PlaywrightDriver:
         return await self._locate(self._current(), ref)
 
     async def _locate(self, tab: _Tab, ref: str) -> Located:
-        found = await tab.script.call(
-            "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        found = await self._ask(
+            tab, "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         if found.get("error") == "stale":
             raise StaleRef(ref)
@@ -625,20 +666,178 @@ class PlaywrightDriver:
         return Located(found["role"], found["name"], box, found["secret"], found["kind"])
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
+        tab = self._current()
+        frame = self._frame_of(tab, ref)
+        return await self._read(tab, frame, mode, ref, max_chars, include_bboxes, embedded=False, indent=0)
+
+    async def _read(
+        self,
+        tab: _Tab,
+        frame: _InnerFrame | None,
+        mode: str,
+        ref: str | None,
+        max_chars: int,
+        include_bboxes: bool,
+        *,
+        embedded: bool,
+        indent: int,
+    ) -> str:
+        """The page, a frame or a subtree as text, with what is inside each of its frames under that
+        frame's line (spec 5.3). Everything together stays within `max_chars`."""
+        settings = self._config.browser.snapshot
         arguments = snapshot_arguments(
-            self._config.browser.snapshot,
+            settings,
             mode=mode,
             ref=ref,
             max_chars=max_chars,
             include_bboxes=include_bboxes,
             next_ref=self._next_ref,
         )
-        data = await self._current().script.call("snapshot", arguments)
+        arguments |= {"prefix": frame.name if frame else "", "embedded": embedded, "indent": indent}
+        data = await (frame.script if frame else tab.script).call("snapshot", arguments)
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
-        # Numbering continues across navigations and tabs, so an old ref can never point at a new element.
+        # Numbering continues across navigations, tabs and frames, so an old ref can never point at a
+        # new element.
         self._next_ref = data["next"]
-        return data["text"]
+        text: str = data["text"]
+        depth = frame.depth if frame else 0
+        if not settings.include_iframes or depth >= settings.max_frame_depth or data["truncated"]:
+            return text
+        lines, used = text.split("\n"), len(text)
+        inside: list[tuple[int, str]] = []
+        for met in data["frames"]:
+            left = max_chars - used
+            if left < 2 * len(NOTICE):
+                break
+            try:
+                inner = await self._frame_under(tab, frame, met["ref"])
+                if inner is None:
+                    continue
+                read = await self._read(
+                    tab, inner, mode, None, left, include_bboxes, embedded=True, indent=met["indent"] + 1
+                )
+            except BrowserError:
+                # A frame that cannot be read (it is loading, or gone) is listed and left empty.
+                continue
+            # The notice that something was left out is said once, at the end of the whole.
+            cut_short = read.endswith(NOTICE)
+            read = read.removesuffix(NOTICE).rstrip("\n")
+            if read:
+                inside.append((met["line"], read))
+                used += len(read) + 1
+            if cut_short:
+                lines.append(NOTICE)
+                break
+        for line, read in reversed(inside):
+            lines[line + 1 : line + 1] = read.split("\n")
+        return "\n".join(lines)
+
+    # Frames (spec 5.3).
+
+    def _frame_of(self, tab: _Tab, ref: str | None) -> _InnerFrame | None:
+        """The frame a ref is in. None for an element of the page itself."""
+        named = FRAME_REF.fullmatch(ref) if ref else None
+        if named is None:
+            return None
+        frame = tab.frames.get(named.group(1))
+        if frame is None:
+            raise StaleRef(ref or "")
+        return frame
+
+    async def _ask(self, tab: _Tab, operation: str, arguments: dict[str, Any], *, wait_ms: int = 0) -> Any:
+        """Runs an operation where its element is: in the page, or in a frame. A point or a box that
+        comes back from a frame is given as a point or a box of the page."""
+        ref = arguments.get("ref")
+        frame = self._frame_of(tab, ref)
+        if frame is None:
+            return await tab.script.call(operation, arguments, wait_ms=wait_ms)
+        dx, dy = await self._where(tab, frame, str(ref), bring=operation in NEED_THE_FRAME_IN_VIEW)
+        if "x" in arguments and "y" in arguments:
+            arguments = {**arguments, "x": arguments["x"] - dx, "y": arguments["y"] - dy}
+        result = await frame.script.call(operation, arguments, wait_ms=wait_ms)
+        if not isinstance(result, dict) or result.get("error"):
+            return result
+        if operation in GIVE_A_POINT:
+            return {**result, "x": result["x"] + dx, "y": result["y"] + dy}
+        if operation in GIVE_A_BOX and result.get("box"):
+            x, y, width, height = result["box"]
+            return {**result, "box": [x + dx, y + dy, width, height]}
+        return result
+
+    async def _where(self, tab: _Tab, frame: _InnerFrame, ref: str, *, bring: bool) -> tuple[float, float]:
+        """How far the page inside a frame is from the top left of what the browser shows."""
+        chain: list[_InnerFrame] = []
+        at: _InnerFrame | None = frame
+        while at is not None:
+            chain.append(at)
+            at = at.parent
+        dx = dy = 0.0
+        for inner in reversed(chain):
+            around = inner.parent.script if inner.parent else tab.script
+            if bring:
+                await around.call("intoView", {"ref": inner.owner})
+            box = await around.call("frameBox", {"ref": inner.owner})
+            if box.get("error"):
+                # The frame's own element is gone, and everything inside it with it.
+                raise StaleRef(ref)
+            dx, dy = dx + box["x"], dy + box["y"]
+        return dx, dy
+
+    async def _frame_under(self, tab: _Tab, parent: _InnerFrame | None, owner: str) -> _InnerFrame | None:
+        """The frame a frame element holds, ready to be read. None when it cannot be reached."""
+        around, session = (parent.script, parent.cdp) if parent else (tab.script, tab.cdp)
+        element = await around.object_of(owner)
+        if element is None:
+            return None
+        try:
+            described = await session.send("DOM.describeNode", {"objectId": element})
+        except PlaywrightError:
+            return None
+        frame_id = described.get("node", {}).get("frameId")
+        if not frame_id:
+            return None
+        reached = await self._session_for(tab, session, frame_id)
+        if reached is None:
+            return None
+        name = tab.frame_names.get(frame_id)
+        if name is None:
+            name = tab.frame_names[frame_id] = f"f{self._next_frame}"
+            self._next_frame += 1
+        known = tab.frames.get(name)
+        if known and known.cdp is reached and known.owner == owner and known.parent is parent:
+            return known
+        script = PageScript(
+            reached, self._config.browser.timeouts.page_reply_ms, self._within, frame_id=frame_id
+        )
+        frame = tab.frames[name] = _InnerFrame(name, script, reached, owner, parent)
+        return frame
+
+    async def _session_for(self, tab: _Tab, session: CDPSession, frame_id: str) -> CDPSession | None:
+        """The DevTools session that reaches a frame: the one of the document around it, or the
+        frame's own when the browser keeps it in another process."""
+        try:
+            tree = await session.send("Page.getFrameTree")
+        except PlaywrightError:
+            return None
+        if frame_id in _frame_ids(tree["frameTree"]):
+            return session
+        for frame, (known_id, own) in tab.apart.items():
+            if known_id == frame_id and not frame.is_detached():
+                return own
+        for frame in tab.page.frames[1:]:
+            if frame in tab.apart or frame.is_detached():
+                continue
+            try:
+                own = await tab.page.context.new_cdp_session(frame)
+                root = (await own.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
+            except PlaywrightError:
+                # A frame in the page's own process has no session of its own.
+                continue
+            tab.apart[frame] = (root, own)
+            if root == frame_id:
+                return own
+        return None
 
     async def click(
         self, ref: str, *, button: MouseButton = "left", click_count: int = 1, modifiers: Sequence[str] = ()
@@ -671,8 +870,11 @@ class PlaywrightDriver:
         point = await self._prepare(tab, ref)
         await self._move_to(tab, point["x"], point["y"])
         frame_ms = self._config.browser.timeouts.frame_ms
-        still_there = await tab.script.call(
-            "holds", {"ref": ref, "x": point["x"], "y": point["y"], "frameMs": frame_ms}, wait_ms=frame_ms
+        still_there = await self._ask(
+            tab,
+            "holds",
+            {"ref": ref, "x": point["x"], "y": point["y"], "frameMs": frame_ms},
+            wait_ms=frame_ms,
         )
         if not still_there:
             # Moving the pointer changed the page: a menu it was over has closed, say. The element
@@ -683,7 +885,8 @@ class PlaywrightDriver:
 
     async def _prepare(self, tab: _Tab, ref: str) -> dict[str, Any]:
         browser = self._config.browser
-        point = await tab.script.call(
+        point = await self._ask(
+            tab,
             "prepare",
             {
                 "ref": ref,
@@ -749,8 +952,8 @@ class PlaywrightDriver:
     ) -> ActionOutcome:
         tab = self._current()
         browser = self._config.browser
-        field = await tab.script.call(
-            "focus", {"ref": ref, "clear": clear, "maxName": browser.snapshot.max_name_chars}
+        field = await self._ask(
+            tab, "focus", {"ref": ref, "clear": clear, "maxName": browser.snapshot.max_name_chars}
         )
         self._raise_for(field, ref)
         navigations, commits = tab.navigations, tab.commits
@@ -809,26 +1012,17 @@ class PlaywrightDriver:
         return tab.page.url
 
     async def text(self, ref: str | None, max_chars: int) -> tuple[str, int]:
-        data = await self._current().script.call("text", {"ref": ref, "maxChars": max_chars})
+        data = await self._ask(self._current(), "text", {"ref": ref, "maxChars": max_chars})
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
         return data["text"], data["more"]
 
     async def find(self, query: str, limit: int) -> Found:
-        settings = self._config.browser.snapshot
-        arguments = snapshot_arguments(
-            settings,
-            mode="all",
-            ref=None,
-            max_chars=settings.max_chars,
-            include_bboxes=False,
-            next_ref=self._next_ref,
+        # The whole page with its frames, read in the browser and searched here.
+        page = await self._read(
+            self._current(), None, "all", None, WHOLE_PAGE, False, embedded=False, indent=0
         )
-        data = await self._current().script.call(
-            "find", {"query": query, "limit": limit, "snapshot": arguments}
-        )
-        self._next_ref = data["next"]
-        return Found(data["lines"], data["total"])
+        return Found(*matching_lines(page, query, limit))
 
     async def hover(self, ref: str) -> ActionOutcome:
         tab = self._current()
@@ -900,8 +1094,8 @@ class PlaywrightDriver:
     ) -> ScrollPosition:
         tab = self._current()
         if ref is not None:
-            point = await tab.script.call(
-                "wheelPoint", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+            point = await self._ask(
+                tab, "wheelPoint", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
             )
             self._raise_for(point, ref)
             x, y = point["x"], point["y"]
@@ -920,16 +1114,16 @@ class PlaywrightDriver:
     async def _scrolled(self, tab: _Tab, ref: str | None, *, wait: bool) -> dict[str, Any]:
         timeouts = self._config.browser.timeouts
         wait_ms = timeouts.settle_ms if wait else 0
-        position = await tab.script.call(
-            "scrolled", {"ref": ref, "timeoutMs": wait_ms, "frameMs": timeouts.frame_ms}, wait_ms=wait_ms
+        position = await self._ask(
+            tab, "scrolled", {"ref": ref, "timeoutMs": wait_ms, "frameMs": timeouts.frame_ms}, wait_ms=wait_ms
         )
         self._raise_for(position, ref)
         return position
 
     async def scroll_to(self, ref: str) -> ActionOutcome:
         tab = self._current()
-        found = await tab.script.call(
-            "reveal", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        found = await self._ask(
+            tab, "reveal", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         self._raise_for(found, ref)
         await self._scrolled(tab, None, wait=True)
@@ -939,8 +1133,8 @@ class PlaywrightDriver:
         tab = self._current()
         described = ""
         if ref is not None:
-            found = await tab.script.call(
-                "focusOn", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+            found = await self._ask(
+                tab, "focusOn", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
             )
             self._raise_for(found, ref)
             described = found["describe"]
@@ -985,7 +1179,8 @@ class PlaywrightDriver:
         tab = self._current()
         settings = self._config.browser.snapshot
         navigations, commits = tab.navigations, tab.commits
-        chosen = await tab.script.call(
+        chosen = await self._ask(
+            tab,
             "select",
             {
                 "ref": ref,
@@ -1039,8 +1234,8 @@ class PlaywrightDriver:
         return Checked(before["describe"], checked, changed=True)
 
     async def _checkable(self, tab: _Tab, ref: str) -> dict[str, Any]:
-        state = await tab.script.call(
-            "checkable", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
+        state = await self._ask(
+            tab, "checkable", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         if state.get("error") == "not_checkable":
             raise BadInput(
@@ -1593,3 +1788,7 @@ class PlaywrightDriver:
         if frame == tab.page.main_frame:
             tab.commits += 1
             tab.committed.set()
+            # Another document: its frames are other frames.
+            tab.frames.clear()
+        # A frame that went to another site may have moved to another process, or back.
+        tab.apart.pop(frame, None)

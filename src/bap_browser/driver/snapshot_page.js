@@ -223,7 +223,8 @@
   function lineFor(el, role, indent, a, state) {
     let ref = ids.get(el);
     if (!ref) {
-      ref = 'e' + state.next++;
+      // A ref inside a frame begins with the frame's name: f2e7.
+      ref = (a.prefix || '') + 'e' + state.next++;
       ids.set(el, ref);
       refs.set(ref, new WeakRef(el));
     }
@@ -247,6 +248,8 @@
   function snapshot(a) {
     const state = { next: a.next };
     const lines = [];
+    // The frames met on the way: the driver reads each one and puts it under its line.
+    const framesMet = [];
     let size = 0;
     let truncated = false;
     const budget = a.maxChars - a.notice.length - 1;
@@ -282,6 +285,7 @@
       let childNamed = named;
       if (role && (listed || a.mode === 'all')) {
         emit(lineFor(node, role, indent, a, state));
+        if (node.tagName === 'IFRAME') framesMet.push({ ref: ids.get(node), line: lines.length - 1, indent });
         childIndent = indent + 1;
         childNamed = named || NAMED_BY_CONTENT.has(role);
       }
@@ -297,15 +301,18 @@
       if (!root) return { error: 'stale' };
     }
     try {
-      emit('Page: ' + clean(document.title, a.maxText));
-      emit('URL: ' + clean(location.href, a.maxText));
-      emit(`Scroll: ${Math.round(scrollY)}px of ${document.documentElement.scrollHeight}px (viewport ${innerHeight}px)`);
-      visit(root, 0, 0, false, true);
+      // A frame read as part of its page has no heading of its own.
+      if (!a.embedded) {
+        emit('Page: ' + clean(document.title, a.maxText));
+        emit('URL: ' + clean(location.href, a.maxText));
+        emit(`Scroll: ${Math.round(scrollY)}px of ${document.documentElement.scrollHeight}px (viewport ${innerHeight}px)`);
+      }
+      visit(root, 0, a.indent || 0, false, true);
     } catch (error) {
       if (error !== STOP) throw error;
     }
     if (truncated) lines.push(a.notice);
-    return { text: lines.join('\n'), next: state.next, truncated };
+    return { text: lines.join('\n'), next: state.next, truncated, frames: framesMet };
   }
 
   // Resolves at the next animation frame, or after `ms` on a page that is not being painted.
@@ -526,33 +533,6 @@
     return { text: shown, more: all.length - shown.length };
   }
 
-  // The snapshot lines that hold the words asked for, best first. A line that holds the whole
-  // phrase comes before one that holds only some of its words. A line of text has no ref of its
-  // own: it is given with the ref of the element it is in.
-  function find(a) {
-    const page = snapshot({ ...a.snapshot, mode: 'all', ref: null, maxChars: Infinity, bboxes: false });
-    const words = a.query.toLowerCase().split(/\s+/).filter(Boolean);
-    const phrase = words.join(' ');
-    const found = [];
-    const around = [];
-    page.text.split('\n').forEach((line, index) => {
-      const depth = line.search(/\S/);
-      if (!line.startsWith('-', depth)) return;
-      const ref = (line.match(/\[ref=([^\]]+)\]/) || [])[1];
-      around.length = depth;
-      around[depth] = ref;
-      // The ref is not part of what the element says: e250 is no match for "250".
-      const low = line.replace(/\[ref=[^\]]+\]/, '').toLowerCase();
-      let score = words.filter((word) => low.includes(word)).length;
-      if (!score) return;
-      if (low.includes(phrase)) score += words.length;
-      const parent = ref ? null : around.findLast((one) => one);
-      found.push({ score, index, line: line.trim() + (parent ? ` (in ${parent})` : '') });
-    });
-    found.sort((one, other) => other.score - one.score || one.index - other.index);
-    return { lines: found.slice(0, a.limit).map((entry) => entry.line), total: found.length, next: page.next };
-  }
-
   // The nearest thing around an element that scrolls by itself: a list, a panel, a dialog.
   function scroller(el) {
     for (let node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement || (node.getRootNode() || {}).host) {
@@ -741,6 +721,31 @@
     return { drawn };
   }
 
+  // Where the page inside a frame begins, in this document's own window: the frame's box without
+  // its border and padding. A point inside the frame is this far from the same point out here.
+  function frameBox(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return {
+      x: rect.left + el.clientLeft + parseFloat(style.paddingLeft || '0'),
+      y: rect.top + el.clientTop + parseFloat(style.paddingTop || '0'),
+    };
+  }
+
+  // Brings an element into view when its middle is outside what the window shows. One that can be
+  // seen is left where it is, so the page does not jump at every action.
+  function intoView(a) {
+    const el = resolve(a.ref);
+    if (!el) return { error: 'stale' };
+    const middle = target(el);
+    if (!middle || middle.x < 0 || middle.y < 0 || middle.x >= innerWidth || middle.y >= innerHeight) {
+      el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    }
+    return {};
+  }
+
   // Makes a picture smaller, in the browser itself, so that no image library is needed. The picture
   // comes in and goes out as base64.
   async function shrink(a) {
@@ -763,6 +768,6 @@
     return { data: btoa(text) };
   }
 
-  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label, shrink });
+  Object.assign(operations, { locate, prepare, holds, focus, text, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label, shrink, frameBox, intoView });
   globalThis.__bap.withActions = true;
 })();
