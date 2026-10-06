@@ -171,14 +171,16 @@ async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, s
         everything = body((await tools.call("browser_console", {})).text)
         lines = everything.splitlines()
         assert re.fullmatch(r"\d console messages, oldest first:", lines[0]), lines[0]
-        assert lines[1:5] == [
+        # A picture that could not be loaded is an error the browser itself reports. It can arrive
+        # before or after what the page's own script writes.
+        missing = [line for line in lines[1:] if line.startswith("[error] Failed to load resource")]
+        assert missing, lines
+        assert [line for line in lines[1:] if line not in missing] == [
             "[debug] starting up",
             "[info] page ready",
             "[warning] careful now",
             "[error] went wrong",
         ]
-        # A picture that could not be loaded is an error the browser itself reports.
-        assert any(line.startswith("[error] Failed to load resource") for line in lines[5:]), lines
 
         serious = body((await tools.call("browser_console", {"level": "warning"})).text)
         assert "[warning] careful now\n[error] went wrong" in serious
