@@ -172,6 +172,12 @@ export const W = {
     turnedOffLead: 'It has no session, so the agent cannot work in it. Turn it on to start one.',
     turnOn: 'Turn it on',
     systems: 'Systems',
+    views: (browser: string) => `What to show of ${browser}`,
+    view: {
+      agent: 'Browser and chat',
+      configuration: 'Configuration',
+      evaluations: 'Evaluations',
+    },
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
     desktop: {

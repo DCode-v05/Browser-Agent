@@ -33,12 +33,10 @@ interface Props {
   wordFor(system: SystemInfo): string;
 }
 
-export function SystemsPage({ api, surface, pollMs, wordFor }: Props) {
-  const [view, setView] = useState<View>('configuration');
+/** Where the systems stand, asked of the service now and at a steady pace after that. */
+function useSystems(api: SystemsApi, pollMs: number) {
   const [systems, setSystems] = useState<SystemInfo[] | null>(null);
   const [failed, setFailed] = useState(false);
-  /** What a settings screen opened from here has to say, such as that data was cleared. */
-  const [said, setSaid] = useState('');
 
   const show = useCallback((listed: SystemInfo[] | null) => {
     setFailed(listed === null);
@@ -57,6 +55,57 @@ export function SystemsPage({ api, surface, pollMs, wordFor }: Props) {
       clearInterval(timer);
     };
   }, [api, pollMs, show]);
+
+  return { systems, failed, load };
+}
+
+interface PanelProps extends Props {
+  /** The one system to show. */
+  system: string;
+  view: View;
+  /** Told when the system was changed here, so that its tab follows at once. */
+  onChanged?(): void;
+}
+
+/** One system by itself, under its own tab of the window: its configuration, or its evaluations. */
+export function SystemPanel({ api, system: id, view, surface, pollMs, wordFor, onChanged }: PanelProps) {
+  const { systems, failed, load } = useSystems(api, pollMs);
+  const [said, setSaid] = useState('');
+  const system = systems?.find((one) => one.id === id);
+  const changed = useCallback(async () => {
+    await load();
+    onChanged?.();
+  }, [load, onChanged]);
+
+  return (
+    <section className="systems" aria-label={W.systems[view]}>
+      {said && (
+        <p className="systems-note" role="status">
+          {said}
+        </p>
+      )}
+      {!system ? (
+        <p className="systems-note" role="status">
+          {failed ? W.systems.unreachable : W.systems.loading}
+        </p>
+      ) : (
+        <div className="systems-grid" data-single="true">
+          {view === 'configuration' ? (
+            <Configuration system={system} api={api} surface={surface} word={wordFor(system)} onChanged={changed} onToast={setSaid} />
+          ) : (
+            <Evaluation system={system} api={api} word={wordFor(system)} />
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function SystemsPage({ api, surface, pollMs, wordFor }: Props) {
+  const [view, setView] = useState<View>('configuration');
+  const { systems, failed, load } = useSystems(api, pollMs);
+  /** What a settings screen opened from here has to say, such as that data was cleared. */
+  const [said, setSaid] = useState('');
 
   return (
     <section className="systems" aria-label={W.systems.title}>

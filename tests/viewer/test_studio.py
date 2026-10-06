@@ -520,3 +520,48 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         await page.get_by_role("button", name="Open settings").click()
         dialog = page.get_by_role("dialog", name="Settings")
         await dialog.get_by_role("switch", name="Use this browser").wait_for()
+
+
+async def test_each_system_shows_its_configuration_and_its_evaluations_under_its_own_tab(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
+        page = opened.page
+        for name in ("Cloud browser", "Built-in browser"):
+            await opened.open(name)
+            views = page.get_by_role("tablist", name=f"What to show of {name}")
+            assert await views.get_by_role("tab").all_inner_texts() == [
+                "Browser and chat",
+                "Configuration",
+                "Evaluations",
+            ]
+
+        # Under the built-in browser's own tab: how it is set up, with what to enable and how to manage it.
+        await page.get_by_role("tab", name="Configuration").click()
+        card = page.get_by_role("article", name="Built-in browser")
+        await card.get_by_role("switch", name="Use this browser: Built-in browser").wait_for()
+        await card.get_by_role("switch", name="Let the agent download files: Built-in browser").wait_for()
+        await card.get_by_role("button", name="Restart").wait_for()
+        await card.get_by_text(str((tmp_path / "logs" / "builtin.jsonl").resolve())).wait_for()
+        assert await page.get_by_role("article").count() == 1, "that browser's card, and no other's"
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        SHOTS.mkdir(parents=True, exist_ok=True)
+        await page.screenshot(path=str(SHOTS / "system-configuration-under-its-tab.png"))
+
+        # And what its tasks took, with its checklist.
+        await page.get_by_role("tab", name="Evaluations").click()
+        card = page.get_by_role("article", name="Built-in browser")
+        await card.get_by_text("No task has been done in this browser yet.").wait_for()
+        await card.get_by_role("button", name="Run the checklist").click()
+        await card.get_by_text("10 of 11 passed").wait_for(timeout=60_000)
+        await page.screenshot(path=str(SHOTS / "system-evaluations-under-its-tab.png"))
+
+        # The view stays from one browser to the next: the cloud browser's evaluations are one press away.
+        await opened.open("Cloud browser")
+        await page.get_by_role("article", name="Cloud browser").get_by_text("Not run yet.").wait_for()
+        assert await page.get_by_role("article").count() == 1
+
+        # Back to the browser itself and its chat.
+        await page.get_by_role("tab", name="Browser and chat").click()
+        await page.get_by_label("Your task").wait_for()
+        assert await page.get_by_title("Session").inner_text() == "Session\ncloud"
