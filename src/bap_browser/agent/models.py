@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
+from bap_browser.results import Picture
 from bap_browser.tools import ToolDefinition
 
 
@@ -38,6 +39,8 @@ class ToolOutput:
     call: ToolCall
     text: str
     is_error: bool
+    picture: Picture | None = None
+    """The screenshot the call took, when it took one."""
 
 
 Message = Said | ToolOutput

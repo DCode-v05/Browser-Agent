@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from bap_browser.config import Config
-from bap_browser.driver.base import Box, Driver, MouseButton, TabInfo
+from bap_browser.driver.base import Box, Driver, Happened, MouseButton, TabInfo
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession
 from bap_browser.errors import BapError
 from bap_browser.service.events import EventHub
@@ -53,6 +53,7 @@ class ServiceSession:
         self.browser = BrowserSession(config, driver)
         self.browser.ask_person = self._ask_person
         self.browser.ask_approval = self._ask_approval
+        self.browser.on_event = self._happened
         # The approval that is open now, and how it was answered.
         self._approval: str | None = None
         self._approval_outcome: ApprovalOutcome | None = None
@@ -155,6 +156,32 @@ class ServiceSession:
             self.give_task(command.get("text"))
         elif kind == "stop_task":
             await self._stop_task()
+        elif kind == "select_tab" and self.control == "person":
+            await self._select_tab(command.get("id"))
+
+    async def _select_tab(self, tab_id: Any) -> None:
+        """A person who is driving looks at another tab."""
+        driver = self.browser.started_driver
+        if driver is None or not isinstance(tab_id, str):
+            return
+        with contextlib.suppress(BapError):
+            await driver.switch_tab(tab_id)
+        self._publish_tabs(await self.toolkit.tabs())
+
+    def _happened(self, event: Happened) -> None:
+        """What happened in the browser by itself, for whoever is watching: a native dialog is not in
+        the live picture, and neither is a file that was saved."""
+        if not event.detail:
+            return
+        redact = self.browser.redact
+        if event.kind == "dialog_opened":
+            shown = {**event.detail, "text": redact(str(event.detail["text"]))}
+            self.hub.publish({"type": "dialog_opened", **shown, "ts": self._clock()})
+        elif event.kind == "dialog_closed":
+            self.hub.publish({"type": "dialog_closed", **event.detail})
+        elif event.kind == "download":
+            saved = {"name": redact(str(event.detail["name"])), "size": event.detail["size"]}
+            self.hub.publish({"type": "download_saved", **saved, "ts": self._clock()})
 
     # The chat: a person gives the agent its tasks, and reads its answers (spec 9.14).
 
@@ -500,6 +527,8 @@ class ServiceSession:
         redact = self.browser.redact
         shown = [
             {"id": tab.id, "title": redact(tab.title), "url": redact(tab.url), "active": tab.active}
+            # A tab with a dialog open wants a person's eye.
+            | ({"attention": True} if tab.attention else {})
             for tab in tabs
         ]
         if shown != self._tabs:

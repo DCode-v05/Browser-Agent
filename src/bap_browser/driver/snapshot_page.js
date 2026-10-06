@@ -332,13 +332,13 @@
   };
 
   // Shared with the action operations added to this file.
-  globalThis.__bapParts = { refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
+  globalThis.__bapParts = { INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
 })();
 
 // Operations that prepare an element for an action. The driver then sends the real input events.
 (() => {
   if (globalThis.__bap.withActions) return;
-  const { resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE } =
+  const { INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE } =
     globalThis.__bapParts;
 
   // What an element is and what it is called. What a field holds is what was typed into it, so a
@@ -681,6 +681,66 @@
     }
   }
 
-  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText });
+  // What the browser shows of the page and how large the whole page is, in page pixels, and how
+  // many pixels of the screen one page pixel takes.
+  function area() {
+    const doc = document.documentElement;
+    const body = document.body;
+    return {
+      x: scrollX,
+      y: scrollY,
+      width: innerWidth,
+      height: innerHeight,
+      fullWidth: Math.max(doc.scrollWidth, body ? body.scrollWidth : 0, innerWidth),
+      fullHeight: Math.max(doc.scrollHeight, body ? body.scrollHeight : 0, innerHeight),
+      ratio: devicePixelRatio,
+    };
+  }
+
+  // The labels of an annotated screenshot: the ref of each control a snapshot has listed, drawn at
+  // its corner. They are in the page only while the picture is taken, inside a closed shadow root,
+  // and take no room in it.
+  const LABEL_HEIGHT = 14;
+  const LABEL_STYLE = `position:absolute;height:${LABEL_HEIGHT}px;padding:0 3px;border-radius:3px;font:bold 11px/${LABEL_HEIGHT}px sans-serif;white-space:nowrap;color:#fff;background:#b3261e`;
+  const OUTLINE_STYLE = 'position:absolute;box-sizing:border-box;border:1px solid #b3261e';
+  let labels = null;
+
+  async function label(a) {
+    if (labels) labels.remove();
+    labels = null;
+    if (!a.on) return { drawn: 0 };
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none';
+    const root = host.attachShadow({ mode: 'closed' });
+    let drawn = 0;
+    for (const [ref, weak] of refs) {
+      const el = weak.deref();
+      if (!el || !el.isConnected || visibility(el) !== SHOWN) continue;
+      const role = roleOf(el);
+      // A heading or a paragraph has a ref too, and is not something to act on.
+      if (role && !INTERACTIVE.has(role)) continue;
+      const box = el.getBoundingClientRect();
+      if (!box.width || !box.height) continue;
+      const shown = box.right > 0 && box.bottom > 0 && box.left < innerWidth && box.top < innerHeight;
+      if (!a.fullPage && !shown) continue;
+      const left = box.left + scrollX;
+      const top = box.top + scrollY;
+      const outline = document.createElement('div');
+      outline.style.cssText = `${OUTLINE_STYLE};left:${left}px;top:${top}px;width:${box.width}px;height:${box.height}px`;
+      const tag = document.createElement('div');
+      tag.textContent = ref;
+      tag.style.cssText = `${LABEL_STYLE};left:${left}px;top:${Math.max(0, top - LABEL_HEIGHT)}px`;
+      root.append(outline, tag);
+      drawn++;
+    }
+    document.documentElement.append(host);
+    labels = host;
+    // The picture is taken of what has been painted.
+    await nextFrame(a.frameMs);
+    await nextFrame(a.frameMs);
+    return { drawn };
+  }
+
+  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label });
   globalThis.__bap.withActions = true;
 })();

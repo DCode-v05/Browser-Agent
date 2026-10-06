@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,14 +18,26 @@ WORLD = "bap"
 NOT_INSTALLED = "__bap_not_installed__"
 
 
+Within = Callable[[float, Awaitable[Any]], Awaitable[Any]]
+"""Waits for an answer for at most so many seconds, and raises TimeoutError when none came."""
+
+
 class _DocumentGone(Exception):
     """The document was replaced while it was being used."""
 
 
+async def _within(seconds: float, work: Awaitable[Any]) -> Any:
+    async with asyncio.timeout(seconds):
+        return await work
+
+
 class PageScript:
-    def __init__(self, cdp: CDPSession, reply_ms: int) -> None:
+    def __init__(self, cdp: CDPSession, reply_ms: int, within: Within = _within) -> None:
+        """`within` is how a time limit is kept. The driver gives one that does not count the time a
+        dialog is open, because a page answers nothing while one is."""
         self._cdp = cdp
         self._reply_ms = reply_ms
+        self._within = within
         self._frame_id: str | None = None
         self._context_id: int | None = None
 
@@ -36,8 +49,7 @@ class PageScript:
         """
         limit = (self._reply_ms + wait_ms) / 1000
         try:
-            async with asyncio.timeout(limit):
-                return await self._call_on_the_live_document(operation, arguments)
+            return await self._within(limit, self._call_on_the_live_document(operation, arguments))
         except TimeoutError:
             raise BrowserError(
                 f"The page did not answer within {limit:g} s. It may be busy or still loading. "
@@ -62,8 +74,10 @@ class PageScript:
     async def frames_passed(self, count: int, frame_ms: int) -> bool:
         """Waits for `count` animation frames. False means the document went away: a navigation."""
         try:
-            async with asyncio.timeout((self._reply_ms + count * frame_ms) / 1000):
-                await self._call("frames", {"count": count, "frameMs": frame_ms})
+            await self._within(
+                (self._reply_ms + count * frame_ms) / 1000,
+                self._call("frames", {"count": count, "frameMs": frame_ms}),
+            )
         except _DocumentGone:
             self._context_id = None
             return False

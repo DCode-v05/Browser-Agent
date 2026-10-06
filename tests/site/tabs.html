@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tabs</title>
+</head>
+<body>
+<h1>Tabs</h1>
+<a href="welcome.html?name=Report" target="_blank">Open the report</a>
+<button id="window">Open a window</button>
+<button id="close">Close this tab</button>
+<button id="quiet">Do nothing</button>
+<script>
+document.getElementById('window').addEventListener('click', () => window.open('welcome.html?name=Window'));
+document.getElementById('close').addEventListener('click', () => window.close());
+</script>
+</body>
+</html>

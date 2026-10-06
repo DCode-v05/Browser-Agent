@@ -1,4 +1,4 @@
-"""Drives a browser that this process launched: the remote headless backend."""
+"""Drives a browser through Playwright: one this process launched, or one that is already running."""
 
 from __future__ import annotations
 
@@ -6,10 +6,26 @@ import asyncio
 import base64
 import contextlib
 import os
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+import re
+from collections import deque
+from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Browser, BrowserContext, CDPSession, Frame, Page, Request, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    CDPSession,
+    ConsoleMessage,
+    Dialog,
+    Download,
+    Frame,
+    Page,
+    Request,
+    Response,
+    async_playwright,
+)
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -18,26 +34,50 @@ from bap_browser.driver.base import (
     ActionOutcome,
     Box,
     Checked,
+    ConsoleLine,
+    DialogKind,
+    Dragged,
     Found,
+    Happened,
     KeyAction,
     LoadState,
     Located,
+    LogLevel,
     MouseButton,
+    NetworkLine,
+    PageDialog,
+    Place,
     PointerAction,
+    SavedFile,
     ScrollPosition,
     Selected,
+    Shot,
     TabInfo,
 )
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.snapshot import snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
 from bap_browser.policy.address import without_credentials
+from bap_browser.results import Picture
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
-TAB_ID = "t1"
 # After an action, two animation frames are enough for a navigation it started to show itself.
 SETTLE_FRAMES = 2
+NOT_STARTED = "The browser has not been started."
+NO_TAB = "No tab is open. Open a page with browser_navigate."
+DIALOG_KINDS: tuple[DialogKind, ...] = ("alert", "confirm", "prompt", "beforeunload")
+# How the browser names what a page writes to its console, as the levels a call may ask for.
+CONSOLE_LEVELS: dict[str, LogLevel] = {
+    "error": "error",
+    "assert": "error",
+    "warning": "warning",
+    "debug": "debug",
+    "trace": "debug",
+}
+# What a file name may not hold, on any system a browser runs on.
+NOT_IN_A_FILE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+NAMELESS_DOWNLOAD = "download"
 
 
 def launch_options(config: Config, env: Mapping[str, str]) -> dict[str, Any]:
@@ -74,6 +114,7 @@ def context_options(config: Config) -> dict[str, Any]:
     options: dict[str, Any] = {
         "ignore_https_errors": browser.ignore_https_errors,
         "java_script_enabled": browser.javascript_enabled,
+        "accept_downloads": browser.downloads.enabled,
     }
     if browser.viewport is None:
         options["no_viewport"] = True
@@ -115,6 +156,73 @@ def load_failure(error: Exception) -> str:
     return next((words for sign, words in LOAD_FAILURES.items() if sign in text), "the page did not load")
 
 
+def capped(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: max(limit - 1, 0)] + "…"
+
+
+def file_name(suggested: str) -> str:
+    """The name a download is saved under. The page suggests it, so it is never trusted as a path."""
+    name = NOT_IN_A_FILE_NAME.sub("_", suggested.replace("\\", "/").rsplit("/", 1)[-1]).strip(" .")
+    return name or NAMELESS_DOWNLOAD
+
+
+def free_path(folder: str, name: str) -> Path:
+    """Where a file of that name goes in the folder, which is made if it is not there. A name
+    already taken is numbered: report (1).pdf."""
+    kept = Path(folder).resolve()
+    kept.mkdir(parents=True, exist_ok=True)
+    path, count = kept / name, 0
+    while path.exists():
+        count += 1
+        stem, dot, ending = name.rpartition(".")
+        path = kept / (f"{stem} ({count}).{ending}" if dot and stem else f"{name} ({count})")
+    return path
+
+
+def _retrieved(task: asyncio.Future[Any]) -> None:
+    """The failure of work that was given up on is of no interest to anyone."""
+    if not task.cancelled():
+        task.exception()
+
+
+@dataclass(frozen=True)
+class _Taken:
+    """The last screenshot of a tab: where on the page it begins, how many of its pixels show one
+    page pixel, and its size."""
+
+    x: float
+    y: float
+    scale: float
+    width: int
+    height: int
+
+
+@dataclass(eq=False)
+class _Tab:
+    """One page of the browser, and what the driver keeps about it."""
+
+    id: str
+    page: Page
+    cdp: CDPSession
+    script: PageScript
+    console: deque[ConsoleLine]
+    network: deque[NetworkLine]
+    committed: asyncio.Event = field(default_factory=asyncio.Event)
+    navigations: int = 0
+    commits: int = 0
+    title: str = ""
+    pixel: float = 1.0
+    """Page pixels per pixel of the last screenshot of what the browser shows."""
+    shot: _Taken | None = None
+
+
+@dataclass(eq=False)
+class _OpenDialog:
+    info: PageDialog
+    dialog: Dialog
+    timer: asyncio.Task[Any] | None = None
+
+
 class PlaywrightDriver:
     def __init__(self, config: Config, *, cdp_headers: Mapping[str, str] | None = None) -> None:
         """`cdp_headers` go with the request that attaches to a running browser (`browser.cdp_url`),
@@ -125,28 +233,61 @@ class PlaywrightDriver:
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
         self._version = ""
-        self._page: Page | None = None
-        self._script: PageScript | None = None
-        self._navigations = 0
-        self._commits = 0
-        self._committed = asyncio.Event()
+        self._tabs: dict[str, _Tab] = {}
+        self._active: _Tab | None = None
+        # Tab ids are never used twice in a session, and neither are refs, in any tab.
+        self._tab_count = 0
         self._next_ref = 1
-        self._cdp: CDPSession | None = None
         self._frames: tuple[Callable[[bytes], None], QualityLevel] | None = None
         self._next_acknowledgement = 0.0
-        self._acknowledging: set[asyncio.Task[None]] = set()
+        self._tasks: set[asyncio.Task[Any]] = set()
+        self._on_event: Callable[[Happened], None] | None = None
+        # The dialogs that wait for an answer, oldest first.
+        self._dialogs: list[_OpenDialog] = []
+        self._dialog_count = 0
+        self._dialog_open = asyncio.Event()
+        self._no_dialog = asyncio.Event()
+        self._no_dialog.set()
+        self._downloads: list[SavedFile] = []
+        # Windows that a page has opened and that have not been handed over yet, and windows that
+        # were handed over before their page said it was opening them.
+        self._opening = 0
+        self._early = 0
+        self._arrived = asyncio.Event()
+        # Pages this driver is opening itself. They are not windows that a page opened.
+        self._own_pages = 0
+        # Tabs this driver is closing itself: whoever asked is told by the answer, not as news.
+        self._closing: set[str] = set()
+        # The tab the live picture is of.
+        self._pictured: _Tab | None = None
+
+    def listen(self, on_event: Callable[[Happened], None]) -> None:
+        self._on_event = on_event
+
+    def _tell(self, event: Happened) -> None:
+        if self._on_event is not None:
+            self._on_event(event)
+
+    def _spawn(self, work: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
+        """Runs work that nothing waits for. It ends with the browser."""
+        task = asyncio.create_task(work)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    def _current(self) -> _Tab:
+        if self._active is None:
+            raise BrowserError(NOT_STARTED if self._context is None else NO_TAB)
+        return self._active
 
     @property
     def page(self) -> Page:
-        if self._page is None:
-            raise BrowserError("The browser has not been started.")
-        return self._page
+        """The page of the active tab."""
+        return self._current().page
 
     @property
     def page_script(self) -> PageScript:
-        if self._script is None:
-            raise BrowserError("The browser has not been started.")
-        return self._script
+        return self._current().script
 
     async def start(self) -> None:
         timeouts = self._config.browser.timeouts
@@ -179,19 +320,19 @@ class PlaywrightDriver:
                 page = await context.new_page()
             context.set_default_timeout(timeouts.action_ms)
             context.set_default_navigation_timeout(timeouts.navigation_ms)
-            cdp = await context.new_cdp_session(page)
+            self._browser, self._context = browser, context
+            tab = await self._add_tab(page)
             # A browser with a kept profile is not handed over as an object of its own, so its version is asked for.
-            product = browser.version if browser else (await cdp.send("Browser.getVersion"))["product"]
+            product = browser.version if browser else (await tab.cdp.send("Browser.getVersion"))["product"]
         except PlaywrightError as exc:
             await self._stack.aclose()
+            self._browser = self._context = None
+            self._tabs.clear()
             raise BrowserError(f"The browser could not be started: {first_line(exc)}") from exc
-        page.on("request", self._on_request)
-        page.on("framenavigated", self._on_frame_navigated)
-        cdp.on("Page.screencastFrame", self._on_picture)
+        context.on("page", self._on_page)
         context.on("close", self._on_context_closed)
-        self._browser, self._context, self._page, self._cdp = browser, context, page, cdp
+        self._active = tab
         self._version = product.rpartition("/")[2]
-        self._script = PageScript(cdp, timeouts.page_reply_ms)
         if self._frames is not None:
             # A browser that was started again goes on sending pictures to whoever was watching.
             await self._begin_pictures(self._frames[1])
@@ -207,10 +348,17 @@ class PlaywrightDriver:
         return chosen.context, chosen
 
     async def close(self) -> None:
-        for task in self._acknowledging:
+        tasks = list(self._tasks)
+        for task in tasks:
             task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         await self._stack.aclose()
-        self._browser = self._context = self._page = self._script = self._cdp = None
+        self._browser = self._context = self._active = self._pictured = None
+        self._tabs.clear()
+        self._dialogs.clear()
+        self._dialog_open.clear()
+        self._no_dialog.set()
+        self._opening = self._early = 0
 
     def _on_context_closed(self, context: BrowserContext) -> None:
         if context is self._context:
@@ -223,46 +371,247 @@ class PlaywrightDriver:
         return self._context is not None
 
     def description(self) -> str:
-        if self._page is None:
-            raise BrowserError("The browser has not been started.")
+        if self._context is None and self._browser is None:
+            raise BrowserError(NOT_STARTED)
         return f"Chromium {self._version}"
 
+    # Tabs (spec 5.3).
+
+    async def _add_tab(self, page: Page) -> _Tab:
+        """Takes a page in as a tab, and listens to what happens in it."""
+        browser = self._config.browser
+        if self._context is None:
+            raise BrowserError(NOT_STARTED)
+        self._tab_count += 1
+        tab_id = f"t{self._tab_count}"
+        # First of all: a dialog that nobody listens for is dismissed by the browser's driver at once.
+        page.on("dialog", lambda dialog: self._on_dialog(tab_id, dialog))
+        cdp = await self._context.new_cdp_session(page)
+        tab = _Tab(
+            tab_id,
+            page,
+            cdp,
+            PageScript(cdp, browser.timeouts.page_reply_ms, self._within),
+            deque(maxlen=browser.capture.max_console_entries),
+            deque(maxlen=browser.capture.max_network_entries),
+        )
+        page.on("request", lambda request: self._on_request(tab, request))
+        page.on("framenavigated", lambda frame: self._on_frame_navigated(tab, frame))
+        page.on("close", lambda _: self._forget(tab))
+        page.on("download", lambda download: self._spawn(self._save(download)))
+        if browser.capture.console:
+            page.on("console", lambda message: self._on_console(tab, message))
+            page.on("pageerror", lambda error: self._on_page_error(tab, error))
+        if browser.capture.network:
+            page.on("response", lambda response: self._on_response(tab, response))
+            page.on("requestfailed", lambda request: self._on_request_failed(tab, request))
+        cdp.on("Page.screencastFrame", lambda frame: self._on_picture(tab, frame))
+        cdp.on("Page.windowOpen", lambda _: self._window_opening())
+        # The page says when it opens a window only to one who has asked to hear about the page.
+        await cdp.send("Page.enable")
+        self._tabs[tab_id] = tab
+        return tab
+
+    def _tab_of(self, page: Page) -> _Tab | None:
+        return next((tab for tab in self._tabs.values() if tab.page is page), None)
+
+    def _tab(self, tab_id: str) -> _Tab:
+        tab = self._tabs.get(tab_id)
+        if tab is None:
+            open_tabs = ", ".join(self._tabs) or "none"
+            raise BadInput(f"There is no tab {tab_id}. Open tabs: {open_tabs}.", reason="there is no such tab")
+        return tab
+
     async def tabs(self) -> list[TabInfo]:
+        tabs = list(self._tabs.values())
+        asking = {entry.info.tab for entry in self._dialogs}
+        await asyncio.gather(*(self._read_title(tab) for tab in tabs if tab.id not in asking))
+        return [
+            TabInfo(tab.id, tab.page.url, tab.title, tab is self._active, tab.id in asking) for tab in tabs
+        ]
+
+    async def _read_title(self, tab: _Tab) -> None:
+        """A page with a dialog open answers nothing, so it is not asked: its last title stands."""
         try:
             async with asyncio.timeout(self._config.browser.timeouts.page_reply_ms / 1000):
-                title = await self.page.title()
+                tab.title = await tab.page.title()
         except (PlaywrightError, TimeoutError):
-            title = ""
-        return [TabInfo(TAB_ID, self.page.url, title, True)]
+            tab.title = ""
+
+    async def new_tab(self) -> str:
+        tab = await self._open_tab()
+        return tab.id
+
+    async def _open_tab(self) -> _Tab:
+        most = self._config.browser.tabs.max_tabs
+        if self._context is None:
+            raise BrowserError(NOT_STARTED)
+        if len(self._tabs) >= most:
+            raise BadInput(
+                f"{most} tabs are open, which is the most allowed. Close one first.",
+                reason="too many tabs are open",
+            )
+        self._own_pages += 1
+        try:
+            page = await self._context.new_page()
+            tab = await self._add_tab(page)
+        except PlaywrightError as exc:
+            raise BrowserError(
+                f"A tab could not be opened: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+        finally:
+            self._own_pages -= 1
+        await self._show(tab)
+        return tab
+
+    async def switch_tab(self, tab_id: str) -> None:
+        await self._show(self._tab(tab_id))
+
+    async def close_tab(self, tab_id: str | None) -> str:
+        tab = self._current() if tab_id is None else self._tab(tab_id)
+        self._closing.add(tab.id)
+        with contextlib.suppress(PlaywrightError):
+            await tab.page.close()
+        self._forget(tab)
+        if self._active is not None:
+            await self._show(self._active)
+        return tab.id
+
+    async def _show(self, tab: _Tab) -> None:
+        """Makes a tab the active one: it comes to the front, and the live picture is of it."""
+        self._active = tab
+        with contextlib.suppress(PlaywrightError):
+            await tab.page.bring_to_front()
+        if self._frames is None or self._pictured is tab:
+            return
+        if self._pictured is not None:
+            with contextlib.suppress(PlaywrightError):
+                await self._pictured.cdp.send("Page.stopScreencast")
+        with contextlib.suppress(BrowserError):
+            await self._begin_pictures(self._frames[1])
+
+    def _forget(self, tab: _Tab) -> None:
+        """A tab has closed. The one opened last becomes the active one."""
+        if self._tabs.pop(tab.id, None) is None:
+            return
+        for entry in [entry for entry in self._dialogs if entry.info.tab == tab.id]:
+            self._close_dialog(entry, "dismissed", "")
+        was_active = tab is self._active
+        if was_active:
+            self._active = next(reversed(self._tabs.values()), None)
+        if tab.id in self._closing:
+            return
+        now = f"; {self._active.id} is now the active tab" if was_active and self._active else ""
+        self._tell(Happened("tab_closed", f"tab {tab.id} closed{now}"))
+        if was_active and self._active is not None:
+            self._spawn(self._show(self._active))
+
+    def _on_page(self, page: Page) -> None:
+        if not self._own_pages:
+            self._spawn(self._adopt(page))
+
+    def _window_opening(self) -> None:
+        if self._early:
+            self._early -= 1
+        else:
+            self._opening += 1
+
+    async def _adopt(self, page: Page) -> None:
+        """A window that one of the agent's tabs opened becomes a tab. A window that someone else
+        opened in the same browser is theirs, and is left alone."""
+        browser = self._config.browser
+        try:
+            opener = await page.opener()
+        except PlaywrightError:
+            return
+        if opener is None or self._tab_of(opener) is None:
+            return
+        try:
+            if len(self._tabs) >= browser.tabs.max_tabs:
+                await page.close()
+                self._tell(
+                    Happened(
+                        "tab_out_of_reach",
+                        f"a new tab was closed at once: {browser.tabs.max_tabs} tabs are open, "
+                        "which is the most allowed",
+                    )
+                )
+                return
+            tab = await self._add_tab(page)
+            with contextlib.suppress(PlaywrightError):
+                await page.wait_for_load_state("domcontentloaded", timeout=browser.timeouts.popup_adopt_ms)
+            focus = browser.tabs.focus_new_tabs and tab.id in self._tabs
+            if focus:
+                await self._show(tab)
+            now = " and is now the active tab" if focus else ""
+            # A page can make its own address as long as it likes.
+            address = capped(without_credentials(page.url), browser.snapshot.max_text_chars)
+            self._tell(Happened("tab_opened", f"tab {tab.id} opened{now}: {address}"))
+        except (PlaywrightError, BrowserError):
+            # It closed again before it could be taken in.
+            return
+        finally:
+            if self._opening:
+                self._opening -= 1
+            else:
+                self._early += 1
+            self._arrived.set()
+
+    async def _let_new_tabs_in(self) -> None:
+        """A window that the page opened is handed over a moment later. The action waits for it, so
+        that its own result already shows the new tab."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._config.browser.timeouts.popup_adopt_ms / 1000
+        while self._opening:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                self._opening = 0
+                self._tell(
+                    Happened(
+                        "tab_out_of_reach",
+                        "the page opened a new window, and these tools cannot reach it",
+                    )
+                )
+                return
+            self._arrived.clear()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._arrived.wait(), remaining)
 
     async def viewport(self) -> tuple[int, int]:
-        size = self.page.viewport_size
+        return await self._viewport(self._current())
+
+    async def _viewport(self, tab: _Tab) -> tuple[int, int]:
+        size = tab.page.viewport_size
         if size is None:
             # No fixed size was asked for: the page is as large as its window.
-            size = await self.page.evaluate("({ width: innerWidth, height: innerHeight })")
+            size = await tab.page.evaluate("({ width: innerWidth, height: innerHeight })")
         return size["width"], size["height"]
 
     async def navigate(self, url: str) -> str:
-        navigations, commits = self._navigations, self._commits
+        tab = self._active or await self._open_tab()
+        navigations, commits = tab.navigations, tab.commits
         try:
-            await self.page.goto(url, wait_until="domcontentloaded")
+            await tab.page.goto(url, wait_until="domcontentloaded")
         except PlaywrightError as exc:
-            if self._navigations != navigations:
+            if tab.navigations != navigations:
                 # The browser shows its own error page for an address it could not load. A
                 # navigation started before that page arrives would be interrupted by it.
-                await self._wait_for_commit(commits, self._config.browser.timeouts.settle_ms)
+                await self._wait_for_commit(tab, commits, self._config.browser.timeouts.settle_ms)
             # The browser's own words repeat the address, which may hold a name and password.
             shown = without_credentials(url)
             raise BrowserError(
                 f"Could not open {shown}: {first_line(exc).replace(url, shown)}", reason=load_failure(exc)
             ) from exc
         finally:
-            self.page_script.forget_document()
-        await self._wait_for_load()
-        return self.page.url
+            tab.script.forget_document()
+        await self._wait_for_load(tab)
+        return tab.page.url
 
     async def locate(self, ref: str) -> Located:
-        found = await self.page_script.call(
+        return await self._locate(self._current(), ref)
+
+    async def _locate(self, tab: _Tab, ref: str) -> Located:
+        found = await tab.script.call(
             "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         if found.get("error") == "stale":
@@ -279,18 +628,23 @@ class PlaywrightDriver:
             include_bboxes=include_bboxes,
             next_ref=self._next_ref,
         )
-        data = await self.page_script.call("snapshot", arguments)
+        data = await self._current().script.call("snapshot", arguments)
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
-        # Numbering continues across navigations, so an old ref can never point at a new element.
+        # Numbering continues across navigations and tabs, so an old ref can never point at a new element.
         self._next_ref = data["next"]
         return data["text"]
 
     async def click(
         self, ref: str, *, button: MouseButton = "left", click_count: int = 1, modifiers: Sequence[str] = ()
     ) -> ActionOutcome:
-        point = await self._point_under_pointer(ref)
-        navigated_to = await self._click(point["x"], point["y"], ref, button, click_count, modifiers)
+        return await self._click_ref(self._current(), ref, button, click_count, modifiers)
+
+    async def _click_ref(
+        self, tab: _Tab, ref: str, button: MouseButton, click_count: int, modifiers: Sequence[str]
+    ) -> ActionOutcome:
+        point = await self._point_under_pointer(tab, ref)
+        navigated_to = await self._click(tab, point["x"], point["y"], ref, button, click_count, modifiers)
         return ActionOutcome(point["describe"], navigated_to)
 
     async def click_at(
@@ -302,28 +656,29 @@ class PlaywrightDriver:
         click_count: int = 1,
         modifiers: Sequence[str] = (),
     ) -> ActionOutcome:
-        described = await self._describe_at(x, y)
-        navigated_to = await self._click(x, y, f"at ({x:g}, {y:g})", button, click_count, modifiers)
+        tab = self._current()
+        described = await self._describe_at(tab, x, y)
+        navigated_to = await self._click(tab, x, y, f"at ({x:g}, {y:g})", button, click_count, modifiers)
         return ActionOutcome(described, navigated_to)
 
-    async def _point_under_pointer(self, ref: str) -> dict[str, Any]:
+    async def _point_under_pointer(self, tab: _Tab, ref: str) -> dict[str, Any]:
         """Waits until an element can be pressed, and moves the pointer onto it."""
-        point = await self._prepare(ref)
-        await self._move_to(point["x"], point["y"])
+        point = await self._prepare(tab, ref)
+        await self._move_to(tab, point["x"], point["y"])
         frame_ms = self._config.browser.timeouts.frame_ms
-        still_there = await self.page_script.call(
+        still_there = await tab.script.call(
             "holds", {"ref": ref, "x": point["x"], "y": point["y"], "frameMs": frame_ms}, wait_ms=frame_ms
         )
         if not still_there:
             # Moving the pointer changed the page: a menu it was over has closed, say. The element
             # is found again where it is now.
-            point = await self._prepare(ref)
-            await self._move_to(point["x"], point["y"])
+            point = await self._prepare(tab, ref)
+            await self._move_to(tab, point["x"], point["y"])
         return point
 
-    async def _prepare(self, ref: str) -> dict[str, Any]:
+    async def _prepare(self, tab: _Tab, ref: str) -> dict[str, Any]:
         browser = self._config.browser
-        point = await self.page_script.call(
+        point = await tab.script.call(
             "prepare",
             {
                 "ref": ref,
@@ -337,16 +692,23 @@ class PlaywrightDriver:
         return point
 
     async def _click(
-        self, x: float, y: float, where: str, button: MouseButton, click_count: int, modifiers: Sequence[str]
+        self,
+        tab: _Tab,
+        x: float,
+        y: float,
+        where: str,
+        button: MouseButton,
+        click_count: int,
+        modifiers: Sequence[str],
     ) -> str | None:
         """Presses the mouse at a point. Returns the address the page went to, if it went anywhere."""
-        navigations, commits = self._navigations, self._commits
-        keyboard = self.page.keyboard
+        navigations, commits = tab.navigations, tab.commits
+        keyboard = tab.page.keyboard
 
         async def press() -> None:
             for key in modifiers:
                 await keyboard.down(key)
-            await self.page.mouse.click(x, y, button=button, click_count=click_count)
+            await tab.page.mouse.click(x, y, button=button, click_count=click_count)
 
         async def release() -> None:
             for key in reversed(modifiers):
@@ -362,17 +724,17 @@ class PlaywrightDriver:
             if modifiers:
                 with contextlib.suppress(BrowserError, PlaywrightError):
                     await self._input(release(), "the click")
-        return await self._settle(navigations, commits)
+        return await self._settle(tab, navigations, commits)
 
-    async def _describe_at(self, x: float, y: float) -> str:
+    async def _describe_at(self, tab: _Tab, x: float, y: float) -> str:
         """What is at a point, as the snapshot names it. A point outside the page is refused."""
-        width, height = await self.viewport()
+        width, height = await self._viewport(tab)
         if not (0 <= x < width and 0 <= y < height):
             raise BadInput(
                 f"({x:g}, {y:g}) is outside the page, which is {width} by {height} pixels.",
                 reason="the point is outside the page",
             )
-        found = await self.page_script.call(
+        found = await tab.script.call(
             "at", {"x": x, "y": y, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         return found["describe"]
@@ -380,13 +742,14 @@ class PlaywrightDriver:
     async def type_text(
         self, ref: str | None, text: str, *, clear: bool = True, submit: bool = False, slowly: bool = False
     ) -> ActionOutcome:
+        tab = self._current()
         browser = self._config.browser
-        field = await self.page_script.call(
+        field = await tab.script.call(
             "focus", {"ref": ref, "clear": clear, "maxName": browser.snapshot.max_name_chars}
         )
         self._raise_for(field, ref)
-        navigations, commits = self._navigations, self._commits
-        keyboard = self.page.keyboard
+        navigations, commits = tab.navigations, tab.commits
+        keyboard = tab.page.keyboard
         delay = browser.input.slow_type_delay_ms if slowly else browser.input.type_delay_ms
 
         async def enter() -> None:
@@ -408,35 +771,40 @@ class PlaywrightDriver:
                 f"Could not type into {ref or 'the focused element'}: {first_line(exc)}",
                 reason="the browser did not respond",
             ) from exc
-        navigated_to = await self._settle(navigations, commits) if submit else None
+        navigated_to = await self._settle(tab, navigations, commits) if submit else None
         return ActionOutcome(field["describe"], navigated_to)
 
     async def back(self) -> str | None:
-        return await self._through_history(self.page.go_back, "go back")
+        tab = self._current()
+        return await self._through_history(tab, tab.page.go_back, "go back")
 
     async def forward(self) -> str | None:
-        return await self._through_history(self.page.go_forward, "go forward")
+        tab = self._current()
+        return await self._through_history(tab, tab.page.go_forward, "go forward")
 
     async def reload(self) -> str:
-        address = await self._through_history(self.page.reload, "reload the page")
-        return address or self.page.url
+        tab = self._current()
+        address = await self._through_history(tab, tab.page.reload, "reload the page")
+        return address or tab.page.url
 
-    async def _through_history(self, move: Callable[..., Coroutine[Any, Any, Any]], what: str) -> str | None:
-        commits = self._commits
+    async def _through_history(
+        self, tab: _Tab, move: Callable[..., Coroutine[Any, Any, Any]], what: str
+    ) -> str | None:
+        commits = tab.commits
         try:
             await move(wait_until="domcontentloaded")
         except PlaywrightError as exc:
             raise BrowserError(f"Could not {what}: {first_line(exc)}", reason=load_failure(exc)) from exc
         finally:
-            self.page_script.forget_document()
-        if self._commits == commits:
+            tab.script.forget_document()
+        if tab.commits == commits:
             # Nothing was loaded: there is no page that way.
             return None
-        await self._wait_for_load()
-        return self.page.url
+        await self._wait_for_load(tab)
+        return tab.page.url
 
     async def text(self, ref: str | None, max_chars: int) -> tuple[str, int]:
-        data = await self.page_script.call("text", {"ref": ref, "maxChars": max_chars})
+        data = await self._current().script.call("text", {"ref": ref, "maxChars": max_chars})
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
         return data["text"], data["more"]
@@ -451,77 +819,128 @@ class PlaywrightDriver:
             include_bboxes=False,
             next_ref=self._next_ref,
         )
-        data = await self.page_script.call("find", {"query": query, "limit": limit, "snapshot": arguments})
+        data = await self._current().script.call(
+            "find", {"query": query, "limit": limit, "snapshot": arguments}
+        )
         self._next_ref = data["next"]
         return Found(data["lines"], data["total"])
 
     async def hover(self, ref: str) -> ActionOutcome:
-        point = await self._point_under_pointer(ref)
-        await self.page_script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        tab = self._current()
+        point = await self._point_under_pointer(tab, ref)
+        await tab.script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
         return ActionOutcome(point["describe"])
 
     async def hover_at(self, x: float, y: float) -> ActionOutcome:
-        described = await self._describe_at(x, y)
-        await self._move_to(x, y)
-        await self.page_script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        tab = self._current()
+        described = await self._describe_at(tab, x, y)
+        await self._move_to(tab, x, y)
+        await tab.script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
         return ActionOutcome(described)
 
-    async def _move_to(self, x: float, y: float) -> None:
+    async def _move_to(self, tab: _Tab, x: float, y: float) -> None:
         try:
-            await self._input(self.page.mouse.move(x, y), "the pointer moved")
+            await self._input(tab.page.mouse.move(x, y), "the pointer moved")
         except PlaywrightError as exc:
             raise BrowserError(
                 f"The pointer could not be moved: {first_line(exc)}", reason="the browser did not respond"
             ) from exc
 
+    async def drag(self, start: Place, end: Place) -> Dragged:
+        tab = self._current()
+        if isinstance(start, str):
+            point = await self._prepare(tab, start)
+            sx, sy, source = point["x"], point["y"], point["describe"]
+        else:
+            sx, sy = start
+            source = await self._describe_at(tab, sx, sy)
+        if isinstance(end, str):
+            # Bringing the source into view may have moved the page: the target is looked for where it is now.
+            found = await self._locate(tab, end)
+            target = f'{found.role} "{found.name}"' if found.name else found.role
+            if found.box is None:
+                raise BrowserError(
+                    f"{end} ({target}) is outside what the browser shows while the start of the drag "
+                    "is in view. Scroll until both are visible, or drag to a point.",
+                    reason="the two are not on the screen together",
+                )
+            tx, ty = found.box.x + found.box.w / 2, found.box.y + found.box.h / 2
+        else:
+            tx, ty = end
+            target = await self._describe_at(tab, tx, ty)
+        navigations, commits = tab.navigations, tab.commits
+        mouse = tab.page.mouse
+
+        async def pull() -> None:
+            await mouse.move(sx, sy)
+            await mouse.down()
+            await mouse.move(tx, ty, steps=self._config.browser.input.drag_steps)
+            await mouse.up()
+
+        try:
+            await self._input(pull(), "the drag")
+        except (PlaywrightError, BrowserError) as exc:
+            # A drag that failed part-way leaves the button held, and every move after it would drag.
+            with contextlib.suppress(BrowserError, PlaywrightError):
+                await self._input(mouse.up(), "the drag")
+            if isinstance(exc, BrowserError):
+                raise
+            raise BrowserError(
+                f"Could not drag: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+        return Dragged(source, target, await self._settle(tab, navigations, commits))
+
     async def scroll(
         self, dx: float, dy: float, *, ref: str | None = None, at: tuple[float, float] | None = None
     ) -> ScrollPosition:
+        tab = self._current()
         if ref is not None:
-            point = await self.page_script.call(
+            point = await tab.script.call(
                 "wheelPoint", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
             )
             self._raise_for(point, ref)
             x, y = point["x"], point["y"]
         elif at is not None:
             x, y = at
-            await self._describe_at(x, y)
+            await self._describe_at(tab, x, y)
         else:
-            width, height = await self.viewport()
+            width, height = await self._viewport(tab)
             x, y = width / 2, height / 2
-        before = await self._scrolled(ref, wait=False)
-        await self.wheel(x, y, dx, dy)
-        after = await self._scrolled(ref, wait=True)
+        before = await self._scrolled(tab, ref, wait=False)
+        await self._wheel(tab, x, y, dx, dy)
+        after = await self._scrolled(tab, ref, wait=True)
         moved = (after["x"], after["y"]) != (before["x"], before["y"])
         return ScrollPosition(after["x"], after["y"], after["width"], after["height"], moved, after["inside"])
 
-    async def _scrolled(self, ref: str | None, *, wait: bool) -> dict[str, Any]:
+    async def _scrolled(self, tab: _Tab, ref: str | None, *, wait: bool) -> dict[str, Any]:
         timeouts = self._config.browser.timeouts
         wait_ms = timeouts.settle_ms if wait else 0
-        position = await self.page_script.call(
+        position = await tab.script.call(
             "scrolled", {"ref": ref, "timeoutMs": wait_ms, "frameMs": timeouts.frame_ms}, wait_ms=wait_ms
         )
         self._raise_for(position, ref)
         return position
 
     async def scroll_to(self, ref: str) -> ActionOutcome:
-        found = await self.page_script.call(
+        tab = self._current()
+        found = await tab.script.call(
             "reveal", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         self._raise_for(found, ref)
-        await self._scrolled(None, wait=True)
+        await self._scrolled(tab, None, wait=True)
         return ActionOutcome(found["describe"])
 
     async def press_key(self, keys: str, *, repeat: int = 1, ref: str | None = None) -> ActionOutcome:
+        tab = self._current()
         described = ""
         if ref is not None:
-            found = await self.page_script.call(
+            found = await tab.script.call(
                 "focusOn", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
             )
             self._raise_for(found, ref)
             described = found["describe"]
-        navigations, commits = self._navigations, self._commits
-        keyboard = self.page.keyboard
+        navigations, commits = tab.navigations, tab.commits
+        keyboard = tab.page.keyboard
 
         async def press() -> None:
             for _ in range(repeat):
@@ -555,12 +974,13 @@ class PlaywrightDriver:
             raise BrowserError(
                 f"The key could not be pressed: {first_line(exc)}", reason="the browser did not respond"
             ) from exc
-        return ActionOutcome(described, await self._settle(navigations, commits))
+        return ActionOutcome(described, await self._settle(tab, navigations, commits))
 
     async def select_option(self, ref: str, values: Sequence[str]) -> Selected:
+        tab = self._current()
         settings = self._config.browser.snapshot
-        navigations, commits = self._navigations, self._commits
-        chosen = await self.page_script.call(
+        navigations, commits = tab.navigations, tab.commits
+        chosen = await tab.script.call(
             "select",
             {
                 "ref": ref,
@@ -589,11 +1009,12 @@ class PlaywrightDriver:
             )
         self._raise_for(chosen, ref)
         # A page may load another one as soon as an option is chosen.
-        await self._settle(navigations, commits)
+        await self._settle(tab, navigations, commits)
         return Selected(chosen["describe"], chosen["selected"])
 
     async def set_checked(self, ref: str, checked: bool) -> Checked:
-        before = await self._checkable(ref)
+        tab = self._current()
+        before = await self._checkable(tab, ref)
         if before["checked"] == checked:
             return Checked(before["describe"], checked, changed=False)
         if before["radio"] and not checked:
@@ -602,8 +1023,8 @@ class PlaywrightDriver:
                 "of its group.",
                 reason="a radio button cannot be cleared",
             )
-        await self.click(ref)
-        after = await self._checkable(ref)
+        await self._click_ref(tab, ref, "left", 1, ())
+        after = await self._checkable(tab, ref)
         if after["checked"] != checked:
             raise BrowserError(
                 f"Clicked {ref} ({before['describe']}), but it is still "
@@ -612,8 +1033,8 @@ class PlaywrightDriver:
             )
         return Checked(before["describe"], checked, changed=True)
 
-    async def _checkable(self, ref: str) -> dict[str, Any]:
-        state = await self.page_script.call(
+    async def _checkable(self, tab: _Tab, ref: str) -> dict[str, Any]:
+        state = await tab.script.call(
             "checkable", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
         )
         if state.get("error") == "not_checkable":
@@ -631,7 +1052,7 @@ class PlaywrightDriver:
         while True:
             remaining_ms = max(0, round((deadline - loop.time()) * 1000))
             try:
-                found = await self.page_script.call(
+                found = await self._current().script.call(
                     "waitText",
                     {"text": text, "gone": gone, "timeoutMs": remaining_ms, "pollMs": timeouts.frame_ms},
                     wait_ms=remaining_ms,
@@ -647,7 +1068,7 @@ class PlaywrightDriver:
 
     async def wait_for_load(self, state: LoadState, timeout_s: float) -> bool:
         try:
-            await self.page.wait_for_load_state(state, timeout=timeout_s * 1000)
+            await self._current().page.wait_for_load_state(state, timeout=timeout_s * 1000)
         except PlaywrightTimeoutError:
             return False
         except PlaywrightError as exc:
@@ -656,22 +1077,331 @@ class PlaywrightDriver:
             ) from exc
         return True
 
+    # Pictures (spec 5.5).
+
+    async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
+        tab = self._current()
+        settings = self._config.browser.screenshot
+        frame_ms = self._config.browser.timeouts.frame_ms
+        area = await tab.script.call("area", {})
+        if full_page:
+            x, y, width, height = 0, 0, area["fullWidth"], area["fullHeight"]
+        else:
+            x, y, width, height = area["x"], area["y"], area["width"], area["height"]
+        # One pixel of the picture is one pixel of the page, unless the picture would be too large.
+        scale = min(1.0, settings.max_dimension / max(width, height))
+        if annotate:
+            await tab.script.call(
+                "label", {"on": True, "fullPage": full_page, "frameMs": frame_ms}, wait_ms=2 * frame_ms
+            )
+        try:
+            picture = await self._capture(tab, x, y, width, height, scale / area["ratio"], beyond=full_page)
+        finally:
+            if annotate:
+                with contextlib.suppress(BrowserError):
+                    await tab.script.call("label", {"on": False})
+        taken = _Taken(x, y, scale, max(1, round(width * scale)), max(1, round(height * scale)))
+        tab.shot = taken
+        if not full_page:
+            # From now on a point the agent gives is a point of this picture.
+            tab.pixel = 1 / scale
+        return Shot(picture, taken.width, taken.height, scaled=scale < 1)
+
+    async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
+        tab = self._current()
+        taken = tab.shot
+        if taken is None:
+            raise BadInput(
+                "Take a screenshot first: the region is given in its pixels.", reason="there is no screenshot"
+            )
+        x0, y0, x1, y1 = region
+        if not (0 <= x0 < x1 <= taken.width and 0 <= y0 < y1 <= taken.height):
+            raise BadInput(
+                f"The region must lie inside the last screenshot, which is {taken.width} by "
+                f"{taken.height} pixels, with x0 less than x1 and y0 less than y1.",
+                reason="the region is outside the screenshot",
+            )
+        width, height = (x1 - x0) / taken.scale, (y1 - y0) / taken.scale
+        ratio = (await tab.script.call("area", {}))["ratio"]
+        # Every pixel the browser draws for the region, unless that picture would be too large.
+        most = self._config.browser.screenshot.max_dimension
+        scale = min(1.0, most / (max(width, height) * ratio))
+        picture = await self._capture(
+            tab, taken.x + x0 / taken.scale, taken.y + y0 / taken.scale, width, height, scale, beyond=True
+        )
+        return Shot(
+            picture, max(1, round(width * ratio * scale)), max(1, round(height * ratio * scale)), scale < 1
+        )
+
+    async def _capture(
+        self, tab: _Tab, x: float, y: float, width: float, height: float, scale: float, *, beyond: bool
+    ) -> Picture:
+        """A picture of a rectangle of the page. `scale` is in the browser's own pixels, of which a
+        dense screen has several to a page pixel. The browser draws the picture at that size itself,
+        so it is never made smaller afterwards."""
+        settings = self._config.browser.screenshot
+        limit = self._config.browser.timeouts.action_ms / 1000
+        wanted: dict[str, Any] = {
+            "format": settings.format,
+            "clip": {"x": x, "y": y, "width": width, "height": height, "scale": scale},
+            "captureBeyondViewport": beyond,
+        }
+        if settings.format == "jpeg":
+            wanted["quality"] = settings.jpeg_quality
+        try:
+            reply = await self._within(limit, tab.cdp.send("Page.captureScreenshot", wanted))
+        except TimeoutError:
+            raise BrowserError(
+                f"The browser did not give the picture within {limit:g} s.",
+                reason="the page is not answering",
+            ) from None
+        except PlaywrightError as exc:
+            raise BrowserError(
+                f"The picture could not be taken: {first_line(exc)}", reason="the browser did not respond"
+            ) from exc
+        return Picture(base64.b64decode(reply["data"]), f"image/{settings.format}")
+
+    def page_point(self, x: float, y: float) -> tuple[float, float]:
+        pixel = self._active.pixel if self._active else 1.0
+        return x * pixel, y * pixel
+
+    # Dialogs (spec 5.7).
+
+    def _on_dialog(self, tab_id: str, dialog: Dialog) -> None:
+        settings = self._config.browser.dialogs
+        self._dialog_count += 1
+        kind: DialogKind = "alert"
+        for known in DIALOG_KINDS:
+            if dialog.type == known:
+                kind = known
+        text = capped(dialog.message, self._config.browser.snapshot.max_text_chars)
+        info = PageDialog(f"d{self._dialog_count}", kind, text, tab_id)
+        if settings.policy != "agent":
+            accept = settings.policy == "auto_accept"
+            self._spawn(self._answer(dialog, accept, settings.default_prompt_text))
+            done = "accepted" if accept else "dismissed"
+            self._tell(Happened("dialog_closed", f"{info.named} opened and was {done} automatically"))
+            return
+        entry = _OpenDialog(info, dialog)
+        entry.timer = self._spawn(self._expire(entry))
+        self._dialogs.append(entry)
+        self._dialog_open.set()
+        self._no_dialog.clear()
+        # The agent is told by the call the dialog interrupts, or by the next one, which is refused.
+        shown = {"id": info.id, "kind": kind, "text": text, "expires_in_s": settings.timeout_s}
+        self._tell(Happened("dialog_opened", "", shown))
+
+    @staticmethod
+    async def _answer(dialog: Dialog, accept: bool, text: str | None) -> None:
+        with contextlib.suppress(PlaywrightError):
+            if accept:
+                await dialog.accept(text)
+            else:
+                await dialog.dismiss()
+
+    async def _expire(self, entry: _OpenDialog) -> None:
+        """A dialog nobody answers is dismissed, so that a page is not held for ever."""
+        wait = self._config.browser.dialogs.timeout_s
+        await asyncio.sleep(wait)
+        if entry in self._dialogs:
+            await self._answer(entry.dialog, False, None)
+            self._close_dialog(
+                entry, "timed_out", f"{entry.info.named} was dismissed: nobody answered it within {wait} s"
+            )
+
+    def _close_dialog(self, entry: _OpenDialog, outcome: str, told: str) -> None:
+        if entry not in self._dialogs:
+            return
+        self._dialogs.remove(entry)
+        if entry.timer is not None and entry.timer is not asyncio.current_task():
+            entry.timer.cancel()
+        if not self._dialogs:
+            self._dialog_open.clear()
+            self._no_dialog.set()
+        self._tell(Happened("dialog_closed", told, {"id": entry.info.id, "outcome": outcome}))
+
+    def pending_dialog(self) -> PageDialog | None:
+        return self._dialogs[0].info if self._dialogs else None
+
+    async def dialog_opened(self) -> None:
+        await self._dialog_open.wait()
+
+    async def answer_dialog(self, accept: bool, text: str | None) -> PageDialog:
+        if not self._dialogs:
+            raise BadInput("No dialog is open.", reason="no dialog is open")
+        entry = self._dialogs[0]
+        try:
+            if accept:
+                # A prompt that is accepted with no text keeps the text the page put there.
+                await entry.dialog.accept(entry.dialog.default_value if text is None else text)
+            else:
+                await entry.dialog.dismiss()
+        except PlaywrightError as exc:
+            self._close_dialog(entry, "dismissed", "")
+            raise BrowserError(
+                f"The dialog could not be answered: {first_line(exc)}", reason="the dialog has gone"
+            ) from exc
+        self._close_dialog(entry, "accepted" if accept else "dismissed", "")
+        return entry.info
+
+    async def _within(self, seconds: float, work: Awaitable[Any]) -> Any:
+        """Waits for the browser for at most `seconds`, not counting the time a dialog is open: while
+        one is, its page answers nothing. Raises TimeoutError when no answer came."""
+        task = asyncio.ensure_future(work)
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=seconds)
+                if done:
+                    return task.result()
+                if not self._dialogs:
+                    raise TimeoutError
+                await self._no_dialog.wait()
+        finally:
+            if not task.done():
+                task.cancel()
+                task.add_done_callback(_retrieved)
+
+    # Diagnostics (spec 5.9).
+
+    def _on_console(self, tab: _Tab, message: ConsoleMessage) -> None:
+        limit = self._config.browser.capture.max_entry_chars
+        tab.console.append(ConsoleLine(CONSOLE_LEVELS.get(message.type, "info"), capped(message.text, limit)))
+
+    def _on_page_error(self, tab: _Tab, error: Exception) -> None:
+        limit = self._config.browser.capture.max_entry_chars
+        tab.console.append(ConsoleLine("error", capped(f"Uncaught {first_line(error)}", limit)))
+
+    @staticmethod
+    def _on_response(tab: _Tab, response: Response) -> None:
+        request = response.request
+        tab.network.append(NetworkLine(request.method, response.status, request.resource_type, request.url))
+
+    @staticmethod
+    def _on_request_failed(tab: _Tab, request: Request) -> None:
+        tab.network.append(
+            NetworkLine(request.method, None, request.resource_type, request.url, request.failure or "failed")
+        )
+
+    def console(self, *, clear: bool) -> list[ConsoleLine]:
+        tab = self._current()
+        lines = list(tab.console)
+        if clear:
+            tab.console.clear()
+        return lines
+
+    def network(self, *, clear: bool) -> list[NetworkLine]:
+        tab = self._current()
+        lines = list(tab.network)
+        if clear:
+            tab.network.clear()
+        return lines
+
+    async def evaluate(self, expression: str) -> Any:
+        tab = self._current()
+        limit = self._config.browser.timeouts.action_ms / 1000
+        try:
+            return await self._within(limit, tab.page.evaluate(expression))
+        except TimeoutError:
+            raise BrowserError(
+                f"The script did not finish within {limit:g} s.", reason="the script took too long"
+            ) from None
+        except PlaywrightError as exc:
+            said = first_line(exc).removeprefix("Page.evaluate: ")
+            raise BrowserError(f"The script failed: {said}", reason="the script failed") from exc
+
+    # Files (spec 5.8).
+
+    async def upload(self, ref: str, paths: Sequence[str]) -> ActionOutcome:
+        tab = self._current()
+        point = await self._point_under_pointer(tab, ref)
+        described = point["describe"]
+        try:
+            # The element is clicked as a person would click it, and the file chooser that opens is
+            # given the files. No chooser is ever shown on a screen.
+            async with tab.page.expect_file_chooser(
+                timeout=self._config.browser.timeouts.settle_ms
+            ) as opening:
+                await self._click(tab, point["x"], point["y"], ref, "left", 1, ())
+            chooser = await opening.value
+        except PlaywrightTimeoutError:
+            raise BadInput(
+                f"Clicked {ref} ({described}) and no file chooser opened. Give the ref of a file field, "
+                "or of the button that opens the file chooser.",
+                reason="no file chooser opened",
+            ) from None
+        if len(paths) > 1 and not chooser.is_multiple():
+            raise BadInput(
+                f"{ref} ({described}) takes one file, and {len(paths)} were given.",
+                reason="it takes one file",
+            )
+        try:
+            await chooser.set_files(list(paths))
+        except PlaywrightError as exc:
+            raise BrowserError(
+                f"The files could not be given to {ref} ({described}): {first_line(exc)}",
+                reason="the browser did not take the files",
+            ) from exc
+        return ActionOutcome(described)
+
+    def downloads(self) -> list[SavedFile]:
+        return list(self._downloads)
+
+    async def _save(self, download: Download) -> None:
+        """Keeps a file the browser downloaded: in the downloads folder, under a name of its own."""
+        settings = self._config.browser.downloads
+        name = file_name(download.suggested_filename)
+        place = len(self._downloads)
+        self._downloads.append(SavedFile(name, "downloading"))
+
+        def failed(reason: str) -> None:
+            self._downloads[place] = SavedFile(name, "failed", reason=reason)
+            self._tell(Happened("download", f"the download of {name} failed: {reason}"))
+
+        if not settings.enabled:
+            with contextlib.suppress(PlaywrightError):
+                await download.cancel()
+            failed("downloads are turned off")
+            return
+        try:
+            arrived = await download.path()
+        except PlaywrightError:
+            failed("the browser could not finish it")
+            return
+        size = await asyncio.to_thread(os.path.getsize, arrived)
+        if size > settings.max_size_mb * 1024 * 1024:
+            with contextlib.suppress(PlaywrightError):
+                await download.delete()
+            failed(f"it is larger than {settings.max_size_mb} MB, the most allowed")
+            return
+        try:
+            target = await asyncio.to_thread(free_path, settings.dir, name)
+            await download.save_as(target)
+        except (PlaywrightError, OSError):
+            failed("it could not be saved in the downloads folder")
+            return
+        self._downloads[place] = SavedFile(target.name, "saved", str(target), size)
+        self._tell(
+            Happened("download", f"download saved: {target.name}", {"name": target.name, "size": size})
+        )
+
+    # The live picture.
+
     async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         self._frames = (on_frame, level)
         await self._begin_pictures(level)
 
     async def stop_frames(self) -> None:
         self._frames = None
-        if self._cdp is not None:
+        pictured, self._pictured = self._pictured, None
+        if pictured is not None:
             with contextlib.suppress(PlaywrightError):
-                await self._cdp.send("Page.stopScreencast")
+                await pictured.cdp.send("Page.stopScreencast")
 
     async def _begin_pictures(self, level: QualityLevel) -> None:
-        if self._cdp is None:
-            raise BrowserError("The browser has not been started.")
-        width, height = await self.viewport()
+        tab = self._current()
+        width, height = await self._viewport(tab)
         try:
-            await self._cdp.send(
+            await tab.cdp.send(
                 "Page.startScreencast",
                 {
                     "format": "jpeg",
@@ -682,17 +1412,16 @@ class PlaywrightDriver:
             )
         except PlaywrightError as exc:
             raise BrowserError(f"The live picture could not be started: {first_line(exc)}") from exc
+        self._pictured = tab
 
-    def _on_picture(self, frame: dict[str, Any]) -> None:
-        if self._frames is None:
+    def _on_picture(self, tab: _Tab, frame: dict[str, Any]) -> None:
+        if self._frames is None or tab is not self._active:
             return
         on_frame, level = self._frames
         on_frame(base64.b64decode(frame["data"]))
-        task = asyncio.create_task(self._acknowledge(frame["sessionId"], level.max_fps))
-        self._acknowledging.add(task)
-        task.add_done_callback(self._acknowledging.discard)
+        self._spawn(self._acknowledge(tab, frame["sessionId"], level.max_fps))
 
-    async def _acknowledge(self, picture: int, max_fps: int) -> None:
+    async def _acknowledge(self, tab: _Tab, picture: int, max_fps: int) -> None:
         """The browser sends its next picture only once this one is acknowledged. Waiting here is what
         limits the rate, and the picture that follows is always the newest one."""
         now = asyncio.get_running_loop().time()
@@ -700,12 +1429,13 @@ class PlaywrightDriver:
         self._next_acknowledgement = max(now, self._next_acknowledgement) + 1 / max_fps
         if wait > 0:
             await asyncio.sleep(wait)
-        if self._cdp is not None:
-            with contextlib.suppress(PlaywrightError):
-                await self._cdp.send("Page.screencastFrameAck", {"sessionId": picture})
+        with contextlib.suppress(PlaywrightError):
+            await tab.cdp.send("Page.screencastFrameAck", {"sessionId": picture})
+
+    # What a person does with the mouse and the keyboard while they are in control.
 
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton = "left") -> None:
-        mouse = self.page.mouse
+        mouse = self._current().page.mouse
 
         async def act() -> None:
             await mouse.move(x, y)
@@ -720,7 +1450,7 @@ class PlaywrightDriver:
             raise BrowserError(f"The pointer could not be moved: {first_line(exc)}") from exc
 
     async def key(self, action: KeyAction, key: str) -> None:
-        keyboard = self.page.keyboard
+        keyboard = self._current().page.keyboard
 
         async def act() -> None:
             try:
@@ -742,9 +1472,12 @@ class PlaywrightDriver:
             raise BrowserError(f"The key could not be pressed: {first_line(exc)}") from exc
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
+        await self._wheel(self._current(), x, y, dx, dy)
+
+    async def _wheel(self, tab: _Tab, x: float, y: float, dx: float, dy: float) -> None:
         async def act() -> None:
-            await self.page.mouse.move(x, y)
-            await self.page.mouse.wheel(dx, dy)
+            await tab.page.mouse.move(x, y)
+            await tab.page.mouse.wheel(dx, dy)
 
         try:
             await self._input(act(), "the wheel turned")
@@ -756,8 +1489,7 @@ class PlaywrightDriver:
         page can take as long as it likes: past the action limit, the call fails instead of waiting."""
         limit = self._config.browser.timeouts.action_ms / 1000
         try:
-            async with asyncio.timeout(limit + extra_ms / 1000):
-                await work
+            await self._within(limit + extra_ms / 1000, work)
         except TimeoutError:
             raise BrowserError(
                 f"The page did not answer within {limit:g} s after {what}. It may still be working on it. "
@@ -787,38 +1519,45 @@ class PlaywrightDriver:
             f"Could not act on {subject} ({result['describe']}): {result['reason']}.", reason=result["reason"]
         )
 
-    async def _settle(self, navigations_before: int, commits_before: int) -> str | None:
-        """Waits for a navigation the action started. Returns the new address, or None if there was none."""
+    async def _settle(self, tab: _Tab, navigations_before: int, commits_before: int) -> str | None:
+        """Waits for a navigation the action started, and for a window it opened. Returns the new
+        address of the tab, or None if it went nowhere."""
         timeouts = self._config.browser.timeouts
-        document_alive = await self.page_script.frames_passed(SETTLE_FRAMES, timeouts.frame_ms)
-        if self._navigations != navigations_before or not document_alive:
-            await self._wait_for_commit(commits_before, timeouts.settle_ms)
+        document_alive = await tab.script.frames_passed(SETTLE_FRAMES, timeouts.frame_ms)
+        if tab.id not in self._tabs:
+            # The action closed its own tab.
+            return None
+        if tab.navigations != navigations_before or not document_alive:
+            await self._wait_for_commit(tab, commits_before, timeouts.settle_ms)
             with contextlib.suppress(PlaywrightTimeoutError):
-                await self.page.wait_for_load_state("domcontentloaded", timeout=timeouts.settle_ms)
-            await self._wait_for_load()
-        return self.page.url if self._commits != commits_before else None
+                await tab.page.wait_for_load_state("domcontentloaded", timeout=timeouts.settle_ms)
+            await self._wait_for_load(tab)
+        await self._let_new_tabs_in()
+        return tab.page.url if tab.commits != commits_before else None
 
-    async def _wait_for_commit(self, commits_before: int, timeout_ms: int) -> None:
+    async def _wait_for_commit(self, tab: _Tab, commits_before: int, timeout_ms: int) -> None:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_ms / 1000
-        while self._commits == commits_before:
-            self._committed.clear()
+        while tab.commits == commits_before:
+            tab.committed.clear()
             remaining = deadline - loop.time()
             if remaining <= 0:
                 return
             with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(self._committed.wait(), remaining)
+                await asyncio.wait_for(tab.committed.wait(), remaining)
 
-    async def _wait_for_load(self) -> None:
+    async def _wait_for_load(self, tab: _Tab) -> None:
         # Some pages never fire the load event. The wait has a ceiling, and reaching it is not a failure.
         with contextlib.suppress(PlaywrightTimeoutError):
-            await self.page.wait_for_load_state("load", timeout=self._config.browser.timeouts.load_wait_ms)
+            await tab.page.wait_for_load_state("load", timeout=self._config.browser.timeouts.load_wait_ms)
 
-    def _on_request(self, request: Request) -> None:
-        if request.is_navigation_request() and request.frame == self.page.main_frame:
-            self._navigations += 1
+    @staticmethod
+    def _on_request(tab: _Tab, request: Request) -> None:
+        if request.is_navigation_request() and request.frame == tab.page.main_frame:
+            tab.navigations += 1
 
-    def _on_frame_navigated(self, frame: Frame) -> None:
-        if frame == self.page.main_frame:
-            self._commits += 1
-            self._committed.set()
+    @staticmethod
+    def _on_frame_navigated(tab: _Tab, frame: Frame) -> None:
+        if frame == tab.page.main_frame:
+            tab.commits += 1
+            tab.committed.set()

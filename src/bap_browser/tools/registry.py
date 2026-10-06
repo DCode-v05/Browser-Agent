@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from bap_browser.driver.session import BrowserSession
+from bap_browser.results import Picture
 
 REF_PATTERN = r"^(f\d+)?e\d+$"
 NULL = {"type": "null"}
@@ -21,11 +22,19 @@ class Args(BaseModel):
 
 
 @dataclass(frozen=True)
+class Shown:
+    """What a tool returns when its result holds a picture."""
+
+    text: str
+    picture: Picture
+
+
+@dataclass(frozen=True)
 class ToolDefinition:
     name: str
     description: str
     args: type[Args]
-    handler: Callable[[BrowserSession, Any], Awaitable[str]]
+    handler: Callable[[BrowserSession, Any], Awaitable[str | Shown]]
 
     @property
     def input_schema(self) -> dict[str, Any]:

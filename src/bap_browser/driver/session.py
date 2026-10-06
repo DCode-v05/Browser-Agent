@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Literal
 
 from bap_browser.config import Config
-from bap_browser.driver.base import Driver
+from bap_browser.driver.base import Driver, Happened, PageDialog
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BrowserError
 from bap_browser.policy.address import without_credentials
@@ -40,6 +41,32 @@ class BrowserSession:
         self.ask_approval: AskApproval | None = None
         """Set by whoever can reach a person. None when there is nobody to ask."""
         self._closed = False
+        self.on_event: Callable[[Happened], None] | None = None
+        """Set by whoever shows the session to a person. It is told at once what happens in the browser
+        by itself: a tab that opens, a dialog, a file that was saved."""
+        # The same, kept for the agent until its next result.
+        self._news: deque[str] = deque(maxlen=config.browser.capture.max_state_events)
+        self._driver.listen(self._happened)
+
+    def _happened(self, event: Happened) -> None:
+        if event.text:
+            self._news.append(event.text)
+        if self.on_event is not None:
+            self.on_event(event)
+
+    def take_news(self) -> list[str]:
+        """What happened in the browser by itself since this was last asked."""
+        news = list(self._news)
+        self._news.clear()
+        return news
+
+    def pending_dialog(self) -> PageDialog | None:
+        """The dialog a page has open and that waits for an answer."""
+        return self._driver.pending_dialog() if self._started else None
+
+    async def dialog_opened(self) -> None:
+        """Returns when a page has a dialog open that waits for an answer."""
+        await self._driver.dialog_opened()
 
     def shown_address(self, url: str) -> str:
         """An address as it may appear in a result, an event or the log: no name and password, and capped,

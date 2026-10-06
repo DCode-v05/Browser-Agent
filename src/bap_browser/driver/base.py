@@ -6,17 +6,22 @@ sent as one message over the bridge channel.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from typing import Literal, Protocol
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Literal, Protocol
 
 from bap_browser.config import QualityLevel
+from bap_browser.results import Picture
 
 MouseButton = Literal["left", "right", "middle"]
 PointerAction = Literal["move", "down", "up"]
 KeyAction = Literal["down", "up"]
 FieldKind = Literal["text", "check", "select", "other"]
 LoadState = Literal["domcontentloaded", "load", "networkidle"]
+DialogKind = Literal["alert", "confirm", "prompt", "beforeunload"]
+LogLevel = Literal["debug", "info", "warning", "error"]
+Place = str | tuple[float, float]
+"""An element by its ref, or a point of the page in pixels from the top left of what the browser shows."""
 
 
 # The role of a place an agent names by its position instead of by an element.
@@ -29,6 +34,8 @@ class TabInfo:
     url: str
     title: str
     active: bool
+    attention: bool = False
+    """A dialog is open in it and waits for an answer."""
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,95 @@ class Checked:
 class Selected:
     target: str
     labels: list[str]
+
+
+@dataclass(frozen=True)
+class Shot:
+    """A picture of the page, and its size in its own pixels."""
+
+    picture: Picture
+    width: int
+    height: int
+    scaled: bool = False
+    """True when the picture is smaller than the page it shows."""
+
+
+@dataclass(frozen=True)
+class Dragged:
+    source: str
+    target: str
+    navigated_to: str | None = None
+
+
+@dataclass(frozen=True)
+class PageDialog:
+    """A dialog a page opened (alert, confirm, prompt, or "leave this page?") that waits for an answer."""
+
+    id: str
+    kind: DialogKind
+    text: str
+    tab: str
+
+    @property
+    def a_kind(self) -> str:
+        """What it is, as a sentence says it: a confirm dialog."""
+        if self.kind == "beforeunload":
+            return "a dialog that asks whether to leave the page"
+        return f"{'an' if self.kind == 'alert' else 'a'} {self.kind} dialog"
+
+    @property
+    def quoted(self) -> str:
+        """What it says, to follow what it is: ('Proceed?'). The dialog that asks whether to leave
+        the page says nothing of its own."""
+        return "" if self.kind == "beforeunload" else f" ('{self.text}')"
+
+    @property
+    def named(self) -> str:
+        """As a sentence names it: a confirm dialog ('Proceed?')."""
+        return self.a_kind + self.quoted
+
+
+@dataclass(frozen=True)
+class ConsoleLine:
+    level: LogLevel
+    text: str
+
+
+@dataclass(frozen=True)
+class NetworkLine:
+    method: str
+    status: int | None
+    """None when the request failed before any answer came."""
+    kind: str
+    """What was asked for: document, script, image, fetch, …"""
+    url: str
+    failure: str = ""
+
+
+@dataclass(frozen=True)
+class SavedFile:
+    """A file the browser downloaded, or is downloading."""
+
+    name: str
+    state: Literal["saved", "downloading", "failed"]
+    path: str = ""
+    size: int = 0
+    reason: str = ""
+    """Why it failed, in a few words."""
+
+
+@dataclass(frozen=True)
+class Happened:
+    """Something that happened in the browser by itself: a tab opened or closed, a dialog opened or
+    was answered, a file was saved."""
+
+    kind: Literal[
+        "tab_opened", "tab_closed", "tab_out_of_reach", "dialog_opened", "dialog_closed", "download"
+    ]
+    text: str
+    """As the agent is told, in the state block of its next result."""
+    detail: Mapping[str, Any] = field(default_factory=dict[str, Any])
+    """What a person watching is shown. Empty when there is nothing to show them."""
 
 
 class Driver(Protocol):
@@ -177,3 +273,66 @@ class Driver(Protocol):
     async def key(self, action: KeyAction, key: str) -> None: ...
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None: ...
+
+    def listen(self, on_event: Callable[[Happened], None]) -> None:
+        """Names who is told what happens in the browser by itself."""
+        ...
+
+    # Pictures. None is taken unless a call asks for one.
+
+    async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
+        """A picture of what the browser shows, or of the whole page. `annotate` draws each
+        element's ref on it."""
+        ...
+
+    async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
+        """A region of the last screenshot, given in its pixels, at the page's full resolution."""
+        ...
+
+    def page_point(self, x: float, y: float) -> tuple[float, float]:
+        """A point given in the pixels of the last screenshot of the visible area, as a point of the page."""
+        ...
+
+    async def drag(self, start: Place, end: Place) -> Dragged: ...
+
+    # Tabs. A window a page opens becomes a tab.
+
+    async def new_tab(self) -> str:
+        """Opens an empty tab, makes it the active one and returns its id."""
+        ...
+
+    async def switch_tab(self, tab_id: str) -> None: ...
+
+    async def close_tab(self, tab_id: str | None) -> str:
+        """Closes a tab, the active one when none is named, and returns its id."""
+        ...
+
+    # Dialogs. While one is open its page answers nothing.
+
+    def pending_dialog(self) -> PageDialog | None:
+        """The dialog that has waited longest for an answer."""
+        ...
+
+    async def dialog_opened(self) -> None:
+        """Returns when a dialog is open that waits for an answer: at once, if one is open now."""
+        ...
+
+    async def answer_dialog(self, accept: bool, text: str | None) -> PageDialog: ...
+
+    # Diagnostics, of the active tab.
+
+    def console(self, *, clear: bool) -> list[ConsoleLine]: ...
+
+    def network(self, *, clear: bool) -> list[NetworkLine]: ...
+
+    async def evaluate(self, expression: str) -> Any:
+        """Runs a script in the page, among the page's own scripts, and returns its value."""
+        ...
+
+    # Files.
+
+    async def upload(self, ref: str, paths: Sequence[str]) -> ActionOutcome:
+        """Gives files to a file field, or to the file chooser that a button opens."""
+        ...
+
+    def downloads(self) -> list[SavedFile]: ...

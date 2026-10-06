@@ -3,19 +3,25 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from bap_browser import keys
-from bap_browser.driver.base import ActionOutcome, Driver, LoadState
+from bap_browser.driver.base import ActionOutcome, Driver, LoadState, LogLevel, Place, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
-from bap_browser.tools.registry import REF_PATTERN, Args, ToolDefinition
+from bap_browser.policy.files import allowed_file
+from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition
 
 Modifier = Literal["Alt", "Control", "Meta", "Shift"]
 # What a person is shown in place of an address that could not be read.
 UNREADABLE = "That address"
+TAB_PATTERN = r"^t\d+$"
+# From the least serious to the most.
+LOG_LEVELS: tuple[LogLevel, ...] = ("debug", "info", "warning", "error")
 
 
 class NavigateArgs(Args):
@@ -156,9 +162,10 @@ async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | No
     )
 
 
-async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
-    decision = await session.policy.check(args.url)
-    # Only the address the policy judged is handed to the browser, never the text as it was given.
+async def _allowed(session: BrowserSession, given: str) -> str:
+    """The address to open, when the policy allows it. Only the address the policy judged is handed
+    to the browser, never the text as it was given."""
+    decision = await session.policy.check(given)
     url = decision.url
     if not decision.allowed:
         shown = session.shown_address(url) if url else ""
@@ -170,6 +177,11 @@ async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
             # The setting's name is for whoever runs the deployment, not for the person watching.
             reason=decision.reason.split(" (")[0],
         )
+    return url
+
+
+async def navigate(session: BrowserSession, args: NavigateArgs) -> str:
+    url = await _allowed(session, args.url)
     driver = await session.driver(may_restart=True)
     text = f"Navigated to {session.shown_address(await driver.navigate(url))}"
     if session.config.browser.snapshot.after_navigation:
@@ -254,7 +266,7 @@ async def click(session: BrowserSession, args: ClickArgs) -> str:
             args.ref, button=args.button, click_count=args.click_count, modifiers=args.modifiers
         )
     else:
-        x, y = args.point or (0, 0)
+        x, y = driver.page_point(*(args.point or (0, 0)))
         outcome = await driver.click_at(
             x, y, button=args.button, click_count=args.click_count, modifiers=args.modifiers
         )
@@ -277,7 +289,7 @@ async def hover(session: BrowserSession, args: TargetArgs) -> str:
     if args.ref is not None:
         outcome = await driver.hover(args.ref)
     else:
-        x, y = args.point or (0, 0)
+        x, y = driver.page_point(*(args.point or (0, 0)))
         outcome = await driver.hover_at(x, y)
     return await _after_action(
         session, driver, f"Hovering over {_named(args.place, outcome.target)}", outcome
@@ -290,7 +302,8 @@ async def scroll(session: BrowserSession, args: ScrollArgs) -> str:
     dx, dy = {"up": (0, -distance), "down": (0, distance), "left": (-distance, 0), "right": (distance, 0)}[
         args.direction
     ]
-    position = await driver.scroll(dx, dy, ref=args.ref, at=args.point)
+    at = driver.page_point(*args.point) if args.point else None
+    position = await driver.scroll(dx, dy, ref=args.ref, at=at)
     sideways = args.direction in ("left", "right")
     at, of = (position.x, position.width) if sideways else (position.y, position.height)
     where = f" inside {args.ref}" if position.inside and args.ref else ""
@@ -430,6 +443,260 @@ async def request_human(session: BrowserSession, args: RequestHumanArgs) -> str:
     return f"{said}\n{change}"
 
 
+class ScreenshotArgs(Args):
+    full_page: bool | None = None
+    annotate: bool | None = None
+
+
+async def screenshot(session: BrowserSession, args: ScreenshotArgs) -> Shown:
+    settings = session.config.browser.screenshot
+    full = settings.full_page if args.full_page is None else args.full_page
+    annotate = settings.annotate_by_default if args.annotate is None else args.annotate
+    driver = await session.driver()
+    # The snapshot comes first: it is what gives each control the ref that is drawn on the picture.
+    page = await _page(session, driver, SnapshotArgs(mode="interactive")) if annotate else ""
+    shot = await driver.screenshot(full_page=full, annotate=annotate)
+    if full:
+        text = (
+            f"Screenshot of the whole page, {shot.width} by {shot.height} pixels. To click by x and y, "
+            "take a screenshot of what the browser shows first."
+        )
+    else:
+        text = (
+            f"Screenshot of what the browser shows, {shot.width} by {shot.height} pixels. "
+            "x and y of a click are pixels of this picture."
+        )
+    if annotate:
+        text += " Each ref is drawn at its element.\n" + page
+    return Shown(text, shot.picture)
+
+
+class ZoomArgs(Args):
+    region: list[float] = Field(min_length=4, max_length=4)
+
+
+async def zoom(session: BrowserSession, args: ZoomArgs) -> Shown:
+    driver = await session.driver()
+    x0, y0, x1, y1 = args.region
+    shot = await driver.zoom((x0, y0, x1, y1))
+    return Shown(
+        f"The region ({x0:g}, {y0:g}) to ({x1:g}, {y1:g}) of the last screenshot, "
+        f"{shot.width} by {shot.height} pixels.",
+        shot.picture,
+    )
+
+
+class DragArgs(Args):
+    from_ref: str | None = Field(default=None, pattern=REF_PATTERN)
+    from_xy: list[float] | None = Field(default=None, min_length=2, max_length=2)
+    to_ref: str | None = Field(default=None, pattern=REF_PATTERN)
+    to_xy: list[float] | None = Field(default=None, min_length=2, max_length=2)
+
+    @model_validator(mode="after")
+    def _one_start_and_one_end(self) -> DragArgs:
+        if (self.from_ref is None) == (self.from_xy is None):
+            raise ValueError("give either from_ref or from_xy")
+        if (self.to_ref is None) == (self.to_xy is None):
+            raise ValueError("give either to_ref or to_xy")
+        return self
+
+
+def _end_of_drag(driver: Driver, ref: str | None, xy: Sequence[float] | None) -> tuple[Place, str]:
+    """One end of a drag, for the driver and as the result names it."""
+    if ref is not None:
+        return ref, ref
+    x, y = xy or (0, 0)
+    return driver.page_point(x, y), f"({x:g}, {y:g})"
+
+
+async def drag(session: BrowserSession, args: DragArgs) -> str:
+    driver = await session.driver()
+    start, start_said = _end_of_drag(driver, args.from_ref, args.from_xy)
+    end, end_said = _end_of_drag(driver, args.to_ref, args.to_xy)
+    done = await driver.drag(start, end)
+    text = f"Dragged from {_named(start_said, done.source)} to {_named(end_said, done.target)}"
+    return await _after_action(session, driver, text, ActionOutcome("", done.navigated_to))
+
+
+class DialogArgs(Args):
+    action: Literal["accept", "dismiss"]
+    prompt_text: str | None = None
+
+
+async def handle_dialog(session: BrowserSession, args: DialogArgs) -> str:
+    driver = await session.driver()
+    dialog = await driver.answer_dialog(args.action == "accept", args.prompt_text)
+    done = "Accepted" if args.action == "accept" else "Dismissed"
+    if dialog.kind == "beforeunload":
+        return f"{done} the dialog that asked whether to leave the page."
+    return f"{done} the dialog '{dialog.text}'."
+
+
+class TabsArgs(Args):
+    action: Literal["list", "new", "switch", "close"]
+    tab_id: str | None = Field(default=None, pattern=TAB_PATTERN)
+    url: str | None = None
+
+
+def _tab_list(session: BrowserSession, tabs: Sequence[TabInfo]) -> str:
+    if not tabs:
+        return "No tab is open. browser_navigate opens one."
+    limit = session.config.browser.snapshot.max_name_chars
+    lines = [
+        f"{tab.id}{'*' if tab.active else ''} {tab.title[:limit] or '(no title)'} | "
+        f"{session.shown_address(tab.url)}"
+        for tab in tabs
+    ]
+    count = f"{len(tabs)} tab{'' if len(tabs) == 1 else 's'}"
+    return f"{count}, the active one marked *:\n" + "\n".join(lines)
+
+
+async def _the_page_now(session: BrowserSession, driver: Driver) -> str:
+    """The snapshot of the tab now active, to follow what was done. Not while a dialog is open: its
+    page answers nothing."""
+    if not session.config.browser.snapshot.after_navigation or session.pending_dialog() is not None:
+        return ""
+    return "\n" + await _page(session, driver)
+
+
+async def tabs(session: BrowserSession, args: TabsArgs) -> str:
+    if args.action == "new":
+        url = None if args.url is None else await _allowed(session, args.url)
+        driver = await session.driver(may_restart=True)
+        text = f"Opened tab {await driver.new_tab()}."
+        if url is None:
+            return text + " It is empty: open a page in it with browser_navigate."
+        text += f"\nNavigated to {session.shown_address(await driver.navigate(url))}"
+        return text + await _the_page_now(session, driver)
+    driver = await session.driver()
+    if args.action == "list":
+        return _tab_list(session, await driver.tabs())
+    if args.action == "switch":
+        if args.tab_id is None:
+            raise BadInput("Give tab_id: the tab to switch to.", reason="no tab was named")
+        await driver.switch_tab(args.tab_id)
+        return f"Switched to {args.tab_id}." + await _the_page_now(session, driver)
+    closed = await driver.close_tab(args.tab_id)
+    active = next((tab.id for tab in await driver.tabs() if tab.active), None)
+    if active is None:
+        return f"Closed {closed}. No tab is open now: browser_navigate opens one."
+    return f"Closed {closed}. {active} is the active tab." + await _the_page_now(session, driver)
+
+
+class ConsoleArgs(Args):
+    level: LogLevel | None = None
+    clear: bool = False
+    limit: int | None = Field(default=None, ge=1)
+
+
+def _newest(session: BrowserSession, lines: Sequence[str], limit: int | None, what: str) -> str:
+    """The newest lines of a log, oldest first, never more than the cap."""
+    most = session.config.browser.capture.read_limit
+    shown = lines[-min(limit or most, most) :]
+    count = f"{len(shown)} {what}{'' if len(shown) == 1 else 's'}"
+    if len(lines) > len(shown):
+        count += f", the newest of {len(lines)}"
+    return f"{count}, oldest first:\n" + "\n".join(shown)
+
+
+async def console(session: BrowserSession, args: ConsoleArgs) -> str:
+    driver = await session.driver()
+    least = LOG_LEVELS.index(args.level or "debug")
+    lines = [
+        f"[{line.level}] {line.text}"
+        for line in driver.console(clear=args.clear)
+        if LOG_LEVELS.index(line.level) >= least
+    ]
+    if not lines:
+        return "The console holds no message" + (f" of level {args.level} or above." if args.level else ".")
+    return _newest(session, lines, args.limit, "console message")
+
+
+class NetworkArgs(Args):
+    filter: str | None = Field(default=None, min_length=1)
+    failed_only: bool = False
+    clear: bool = False
+    limit: int | None = Field(default=None, ge=1)
+
+
+async def network(session: BrowserSession, args: NetworkArgs) -> str:
+    driver = await session.driver()
+    lines: list[str] = []
+    for request in driver.network(clear=args.clear):
+        failed = request.status is None or request.status >= 400
+        if (args.failed_only and not failed) or (args.filter and args.filter not in request.url):
+            continue
+        status = "failed" if request.status is None else str(request.status)
+        why = f" ({request.failure})" if request.failure else ""
+        lines.append(
+            f"{request.method} {status} [{request.kind}] {session.shown_address(request.url)}{why}"
+        )
+    if not lines:
+        return "No request matches." if args.filter or args.failed_only else "No request has been made."
+    return _newest(session, lines, args.limit, "request")
+
+
+class EvaluateArgs(Args):
+    expression: str = Field(min_length=1)
+
+
+async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
+    driver = await session.driver()
+    value = await driver.evaluate(args.expression)
+    if value is None:
+        return "The script gave no value."
+    try:
+        text = json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        text = json.dumps(str(value), ensure_ascii=False)
+    cap = session.config.browser.javascript.max_result_chars
+    # The first line says what was done. The value is what the page holds, and follows it.
+    head = f"The script's value, as JSON ({len(text)} characters):"
+    if len(text) > cap:
+        return f"{head}\n{text[:cap]}\n\u2026 {len(text) - cap} more characters not shown."
+    return f"{head}\n{text}"
+
+
+class UploadArgs(Args):
+    ref: str = Field(pattern=REF_PATTERN)
+    paths: list[str] = Field(min_length=1)
+
+
+async def upload_file(session: BrowserSession, args: UploadArgs) -> str:
+    folders = session.config.browser.uploads.allowed_dirs
+    files = [allowed_file(folders, path) for path in args.paths]
+    driver = await session.driver()
+    outcome = await driver.upload(args.ref, [str(file) for file in files])
+    names = ", ".join(file.name for file in files)
+    text = f"Uploaded {names} via {_named(args.ref, outcome.target)}."
+    return await _after_action(session, driver, text, ActionOutcome(outcome.target))
+
+
+def _size(count: int) -> str:
+    """A file's size as a person says it."""
+    if count < 1024:
+        return f"{count} bytes"
+    if count < 1024 * 1024:
+        return f"{count / 1024:.0f} KB"
+    return f"{count / (1024 * 1024):.1f} MB"
+
+
+async def downloads(session: BrowserSession, args: NoArgs) -> str:
+    driver = await session.driver()
+    files = driver.downloads()
+    if not files:
+        return "No file has been downloaded in this session."
+    lines: list[str] = []
+    for file in files:
+        if file.state == "saved":
+            lines.append(f"{file.name} ({_size(file.size)}) saved at {file.path}")
+        elif file.state == "downloading":
+            lines.append(f"{file.name} is still downloading")
+        else:
+            lines.append(f"{file.name} failed: {file.reason}")
+    return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + "\n".join(lines)
+
+
 TOOLS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         "browser_navigate",
@@ -462,6 +729,19 @@ TOOLS: tuple[ToolDefinition, ...] = (
         find,
     ),
     ToolDefinition(
+        "browser_screenshot",
+        "A picture of what the browser shows, or of the whole page with full_page. Use it only when "
+        "the text of the page is not enough. annotate draws each element's ref on the picture.",
+        ScreenshotArgs,
+        screenshot,
+    ),
+    ToolDefinition(
+        "browser_zoom",
+        "A closer picture of a region [x0, y0, x1, y1] of the last screenshot, in its pixels.",
+        ZoomArgs,
+        zoom,
+    ),
+    ToolDefinition(
         "browser_click",
         "Click an element by its ref from the latest snapshot, or a point by x and y in page pixels.",
         ClickArgs,
@@ -472,6 +752,13 @@ TOOLS: tuple[ToolDefinition, ...] = (
         "Move the pointer over an element by ref, or to x and y, to open a menu or a tooltip.",
         TargetArgs,
         hover,
+    ),
+    ToolDefinition(
+        "browser_drag",
+        "Drag from an element (from_ref) or a point (from_xy: [x, y]) to an element (to_ref) or a "
+        "point (to_xy).",
+        DragArgs,
+        drag,
     ),
     ToolDefinition(
         "browser_type",
@@ -518,6 +805,48 @@ TOOLS: tuple[ToolDefinition, ...] = (
         "Wait for one of: text to appear, text_gone to disappear, a load_state, or seconds.",
         WaitArgs,
         wait,
+    ),
+    ToolDefinition(
+        "browser_handle_dialog",
+        "Answer the alert, confirm or prompt dialog a page has opened: accept or dismiss. "
+        "prompt_text is what to enter in a prompt.",
+        DialogArgs,
+        handle_dialog,
+    ),
+    ToolDefinition(
+        "browser_tabs",
+        "List the tabs, open a new one (empty, or on url), switch to one or close one by tab_id.",
+        TabsArgs,
+        tabs,
+    ),
+    ToolDefinition(
+        "browser_console",
+        "The page's console messages and errors, oldest first. level is the least serious to show.",
+        ConsoleArgs,
+        console,
+    ),
+    ToolDefinition(
+        "browser_network",
+        "The requests the page made: method, status, type, address. filter keeps the addresses that "
+        "hold that text.",
+        NetworkArgs,
+        network,
+    ),
+    ToolDefinition(
+        "browser_evaluate",
+        "Run a JavaScript expression in the page and return its value as JSON. A person is asked first.",
+        EvaluateArgs,
+        evaluate,
+    ),
+    ToolDefinition(
+        "browser_upload_file",
+        "Give files to a file field, or to the button that opens a file chooser. paths are file names "
+        "in the upload folder. A person is asked first.",
+        UploadArgs,
+        upload_file,
+    ),
+    ToolDefinition(
+        "browser_downloads", "The files downloaded in this session, with size and path.", NoArgs, downloads
     ),
     ToolDefinition(
         "browser_request_human",
