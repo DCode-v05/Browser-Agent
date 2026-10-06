@@ -1,68 +1,135 @@
 # bap-browser: Status
 
-Date: 2026-10-04 · Branch `prototype/base` · 49 commits on the branch · nothing pushed
+Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`) together with this page
 
 ## Where things stand
 
-One command runs an agent in a real browser while a person watches it in the viewer and can pause it,
-take over the browser, hand it back and stop it.
+Work was stopped on 2026-10-06, at your word, in the middle of the ten remaining tools.
 
-Three things are new since the last version of this page:
+- **`main` holds everything that is finished and tested.** It is the state to run and to show.
+- **The branch `wip/remaining-tools` holds the ten remaining tools, unfinished.** On it 14 tests
+  fail, 9 of them tests that pass on `main`. It is kept apart from `main` for that reason alone, and
+  goes onto `main` when its tests pass. Its plan, with what is left step by step, is on that branch:
+  `docs/plans/2026-10-06-remaining-tools.md`.
 
-1. **A real model is connected.** Without `--demo`, the agent loop calls OpenAI's `gpt-5.6-luna`. The
-   key is read from `OPENAI_API_KEY` in a file named `.env`. **It has not been run against the real
-   service**: there is no key on this side, so it was tested against a stand-in server built from
-   OpenAI's published reference. Your first run with your key is the first real one.
-2. **The second review was acted on.** A fresh reviewer read the live loop and found 4 critical and 3
-   important faults. All seven are fixed, each with a test that failed first.
-3. **The viewer has the BAP product's look**: its colours, its typeface (Hanken Grotesk) and its
-   shapes, taken from the product's own code. It is not a copy of the product's screens.
+## Completed (on `main`)
 
-| Part | State | Proof (measured on 2026-10-04 at commit `bfa2148`) |
+| # | Part | What it does | How to run it |
+|---|---|---|---|
+| 1 | Engine | Settings in one file, the address policy, redaction, the browser driver, the page as text with refs | `uv run pytest` |
+| 2 | 18 of the 28 tools | `browser_navigate`, `go_back`, `go_forward`, `reload`, `snapshot`, `get_text`, `find`, `click`, `hover`, `type`, `fill_form`, `select_option`, `set_checked`, `press_key`, `scroll`, `scroll_to`, `wait`, `request_human` | Through any of the commands below |
+| 3 | MCP over stdio | An outside agent starts the browser tools as a process | `uv run bap-browser mcp` |
+| 4 | MCP over HTTP, with the viewer | An agent in another process calls the tools with a bearer token while a person watches | `uv run bap-browser serve --open` |
+| 5 | Viewer | Live picture, timeline of steps, Pause, Take over, Hand back, Stop, in the BAP product's colours and typeface | `--open` on any command |
+| 6 | Chat | A person gives tasks one after another and reads the answers; one conversation with the steps inside it; Stop task ends the task and keeps the session | `uv run bap-browser agent --chat --open` |
+| 7 | Reference agent loop | A scripted demonstration with no key, and a hosted model (OpenAI `gpt-5.6-luna`, key in `.env`) | `uv run bap-browser agent --demo --open` |
+| 8 | Help from a person | The agent asks for a sign-in, a CAPTCHA or a code, and waits | `browser_request_human` |
+| 9 | Approvals in the UI | A tool can be allow, confirm or deny; "Ask before every action"; an action that pays, sends or deletes is asked every time; "Allow on this site" | `safety.action_policies`, `safety.ask_before` in `config.json` |
+| 10 | The browser on screen | The agent works in a window you can see, with the chat beside it; the profile can be kept | `uv run bap-browser agent --chat --show-browser --open` |
+| 11 | The extension in the agent's browser | The chat in the browser's own side panel; a glow, a label and the agent's pointer on the page | `uv run bap-browser agent --chat --extension` |
+| 12 | Take-over Chrome, first cut | The agent works in a tab of your own Chrome, through the extension and Chrome's debugger. You load the extension by hand, once | `uv run bap-browser agent --chat --takeover` |
+| 13 | Attach | The driver attaches to a browser that is already running | `browser.cdp_url` in `config.json` |
+| 14 | Desktop app, first cut | Electron with a shadcn/ui shell: the agent's browser and the chat in one window. It runs from this folder and needs `uv` | `npm --prefix desktop install`, then `npm --prefix desktop start` |
+| 15 | Container image | `deploy/Dockerfile` and `deploy/config.vm.json` for the browser service. Written, never built | `docker build -f deploy/Dockerfile .` |
+| 16 | Demo site | A sign-up form and an airline check-in (booking SK4821, name Lovelace) | Opens with `--chat` |
+
+### Proof
+
+Measured on Windows on 2026-10-06, on the files of commit `455c754`, which is `main` without this page.
+
+| Check | Result |
+|---|---|
+| `uv run pytest -q` | 846 passed in 270 s |
+| `uv run ruff format --check .`, `uv run ruff check .`, `uv run pyright` | No findings |
+| `npm --prefix viewer run test` | 400 passed |
+| `npm --prefix viewer run typecheck`, `run lint`, `run build` | No findings; it builds |
+| `npm --prefix desktop run typecheck`, `npm --prefix desktop test` | No findings; 5 passed |
+| Run by hand, with a made-up key and a token of my own | `agent --demo --show-browser` ended with code 0. `agent --chat --extension` opened the start page and stayed open. `serve`: an outside MCP client listed the 18 tools, the cloud-metadata address was blocked, and a call with no token got 401. The desktop app: the core attached, the chat said "Ready", and the tools read and clicked in the app's browser |
+
+### Not checked
+
+| What | Why |
+|---|---|
+| A task with the real model key, by me | I never read `.env`. The notes of pull request #1 say your teammate ran `gpt-5.6-luna` with a key and it worked |
+| The extension's toolbar icon | The side panel was tested as a tab; a click on the icon cannot be made from a test |
+| The container image | The Docker engine was not running on this machine. The image has never been built or started |
+| CI on Linux | The two tests that made CI red were fixed and pass on Windows. The first CI run with the fix is the one this push starts |
+| `/verify` over the whole build | You asked for it at the end of the build. The build was stopped before its end, so it was not run |
+| A review by a fresh reviewer of the work since pull request #1 | Not done. The third review of 2026-10-04 was cut off by a usage limit and reported nothing |
+
+## Not completed
+
+### 1. Started, not finished: the ten remaining tools
+
+On the branch `wip/remaining-tools`. The code for all ten is written. Measured there on 2026-10-06:
+`uv run pytest -q`: 865 passed, 14 failed. `ruff check` and `pyright`: no findings. `ruff format`: 8
+files not yet formatted. Nothing of it is in the spec yet, which should have come first.
+
+| Tool | State | Its new tests |
 |---|---|---|
-| Whole Python suite | Passing | `uv run pytest -q`: 696 passed, exit code 0. 495 unit, 74 in a real browser against the engine, 35 against the real service and commands, 92 of the built viewer in a real browser |
-| Python checks | Clean | `uv run ruff format --check .`, `uv run ruff check .`, `uv run pyright`: no findings |
-| Viewer unit tests | Passing | `npm --prefix viewer run test`: 347 passed |
-| Viewer checks | Clean | `npm --prefix viewer run typecheck`, `run lint`: no findings. `run build`: builds |
-| Accessibility | No findings | The axe scanner runs on every state, light and dark, desktop and phone, inside the 92 viewer tests |
-| The whole path | Proven | `tests/viewer/test_live_session.py`: a real agent browser, the real service and the real viewer in a second browser |
-| The command, run by hand | Works | `bap-browser agent --demo --wait-for-viewer --pace 3`, watched in a browser: steps and pictures arrive live; a Stop pressed right after a Pause ended the session in 74 ms; the browser's console stayed empty |
-| The hosted model | Built, not run for real | 13 tests against a stand-in server. With no key the command says: "OPENAI_API_KEY is not set. Put a line OPENAI_API_KEY=... in a file named .env in this folder…" and ends with code 2 |
-| Review of stage 1 | Done, all fixed | 1 critical and 9 important findings fixed. 20 minor findings deferred (listed below) |
-| Review of the live loop | Done, all fixed | 4 critical and 3 important findings fixed. Of 12 minor findings, 5 fixed and 7 deferred (listed below) |
-| Review of those fixes and of the new look | Not done | A third reviewer was started on commits `68722d1..bfa2148` and was cut off by a usage limit before it reported anything |
+| `browser_tabs`, and pop-ups that become tabs | Works in a real browser | 7 pass |
+| `browser_handle_dialog`: alert, confirm, prompt, "leave this page?" | Works in a real browser: a dialog interrupts the action, other tools are refused until it is answered, the action then finishes | 9 pass |
+| `browser_console`, `browser_network` | Work | 2 pass |
+| `browser_evaluate` | Works; offered only when turned on, and asks first | 1 passes |
+| `browser_screenshot`, `browser_zoom` | **A real fault.** A picture that is made smaller is taken in a way that resets the screen the browser emulates (seen with a screen of double density). The cure is designed and written down in the plan, not applied | 7 pass, 2 fail |
+| `browser_upload_file` | The files reach the page. Its test reads the page before the page has read the file | 1 passes, 1 fails |
+| `browser_downloads` | Files are saved in the folder, numbered when the name is taken, refused over the size limit. One check in its test is stricter than it should be | 1 passes, 1 fails |
+| `browser_drag` | Not seen working yet: its test stops at the wording of the result before it reaches the page's answer | 1 fails |
 
-## Try it
+The 9 tests that pass on `main` and fail on the branch:
+
+- Six still describe a list of 18 tools: one in `test_registry.py`, two in `test_mcp.py`, one each in
+  `test_serve.py`, `test_agent_loop.py` and `test_toolkit.py`. Expected; the tests are to be brought up
+  to date.
+- Two in `test_driver_options.py` describe the browser's options without the new switch for
+  downloads. Expected, likewise.
+- One is a small fault: when the browser has gone away, the result now also says "tab t1 closed"
+  (`test_toolkit_in_process.py`).
+
+Still to do for these tools, in order: the cure for pictures; the 14 tests; the tests not yet written
+(the dialog rule with the stand-in driver, the new timeline sentences, what a viewer is told, a
+picture over MCP and to the model, which files may be uploaded); the spec; `ruff format`; the README.
+Known limits to write into the spec: a download's size is checked when it has arrived, not while it
+arrives; a window that a page opens in take-over Chrome cannot be reached; the address policy is not
+applied to a window a page opens.
+
+### 2. Not started
+
+| What | Note |
+|---|---|
+| Frames in the snapshot | A frame is listed by its name; what is inside it is not read |
+| The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
+| The address policy at the network layer | Redirects, link clicks, pop-ups and sub-resources are not checked. Only an address the agent opens itself is |
+| Bench, `perf/budget.json`, `bap-browser doctor`, the verify skill in the repository | None exists |
+| Take-over Chrome, the rest | A pairing token, a heartbeat and reconnecting by itself, permissions and previews enforced by the extension, more than one tab, a core that runs in a micro VM |
+| Desktop app, the rest | An installer, settings, running without `uv` and this folder |
+| The micro VM | The image has never been built, started or deployed |
+| The code tool `browser_run` (milestone 4) | Not begun |
+| Viewer states the spec lists | Session picker, "saving", "working", "handing back", "failed", address "loading", "limit reached" |
+| The deferred minor findings of the two reviews | Listed further down, unchanged |
+
+### 3. Waiting for your word
+
+| # | Question |
+|---|---|
+| 1 | The unfinished tools are on a branch, not on `main`, although you asked for one `main` branch: on `main` they would turn 9 passing tests red. Say if you want them on `main` as they are |
+| 2 | The font is two files in the repository. Say if you prefer the npm package `@fontsource-variable/hanken-grotesk` |
+| 3 | `CLAUDE.md` says form values never reach a result; the spec shows the model what a field holds in a snapshot (never a password). I kept the spec. The wording in `CLAUDE.md` is yours to change |
+
+## How to go on
 
 ```bash
-npm --prefix viewer install
-npm --prefix viewer run build
-uv sync
-uv run playwright install chromium
-uv run bap-browser agent --demo --open                      # the scripted sign-up, no key needed
-uv run bap-browser agent "What is on example.com?" --open   # a real task, done by GPT-5.6 Luna
+git switch wip/remaining-tools
+uv run pytest tests/e2e/test_tabs.py tests/e2e/test_dialogs.py tests/e2e/test_pictures.py tests/e2e/test_files_and_logs.py -q
 ```
 
-For a real task, copy `.env.example` to `.env` and put your key after `OPENAI_API_KEY=`. The file is
-never committed. `--open` opens the viewer in your browser, waits for it to connect, and then starts.
-While the agent works you can press Pause, Take over (then click and type in the picture: it reaches
-the real page), Hand back, and Stop session. When the task is done the answer is printed in the
-terminal, the viewer shows the summary, and the viewer stays open until you press Ctrl+C.
+Then follow `docs/plans/2026-10-06-remaining-tools.md` on that branch from its first open box. When
+`uv run pytest` passes there, the branch goes onto `main`, and `/verify` is run over the whole build.
 
-| Option | Effect |
-|---|---|
-| `--demo` | The scripted sign-up on the demo site. Needs no key |
-| `--open` | Opens the viewer in your browser and starts once it has connected |
-| `--wait-for-viewer` | Starts once a viewer has connected, without opening one |
-| `--pace 0.5` | Seconds the demonstration waits before each step. Default 1 |
-| `--exit-when-done` | Ends when the task is finished, instead of keeping the viewer open |
+## Earlier record
 
-The command ends with 0 when the task was answered, 1 when the model failed or the task was not
-finished (the step limit, or a person stopped the session), 2 when the command or the configuration
-was wrong.
-
-The recorded viewer screens still work without the service: `npm --prefix viewer run dev`, then add
-`?demo=signup` or `?state=<name>` to the address it prints (add `&theme=dark` for the dark theme).
+The sections from here to "Documents" were written on 2026-10-04 and 2026-10-05 and are kept as they
+were. Where they speak of what is next or of what has not been run, the sections above are newer.
 
 ## The hosted model
 
@@ -330,17 +397,6 @@ Added on 2026-10-05, on branch `feature/agent-cursor`. The table at the top was 
 | `docs/plans/2026-10-03-m1-stage-1-first-path.md` | The engine plan, stage 1 (11 tasks, done) |
 | `docs/plans/2026-10-03-m1-viewer-experience.md` | The viewer plan (11 tasks, done) |
 | `docs/plans/2026-10-03-m1-stage-2-live-loop.md` | The live loop plan (9 tasks, done) |
-| `docs/research/` | Research reports: hermes, betterwright, performance, uiux, video, settings |
+| `docs/plans/2026-10-06-remaining-tools.md` | The plan for the ten remaining tools. On the branch `wip/remaining-tools` only |
+| `docs/research/` | Research reports, among them `bap-product-fit.md` (how the BAP product is built) and `claude-in-chrome.md` (how Claude's Chrome extension works) |
 | `README.md`, `CLAUDE.md` | Install, run, test; project rules and gotchas |
-
-## Next, in order
-
-1. Your test through the viewer with a real key, and whatever it shows.
-2. The remaining 10 tools: screenshots and zoom, tabs and pop-ups, dialogs, the console and network logs,
-   drag, files (upload, downloads), `browser_evaluate`. Frames in the snapshot go
-   with them. (17 of the 28 exist since 2026-10-05: see "Since this page was measured".)
-3. Approvals for real: tools marked "confirm" wait for the person's answer in the viewer.
-4. The settings API, so the settings screen acts on a live session.
-5. The address policy at the network layer, so redirects and link clicks are checked too.
-6. MCP over HTTP with the service (`bap-browser serve`), the micro VM image, the bench and the verify loop.
-7. Then milestone 2 (take-over Chrome), milestone 3 (bundled Chromium), milestone 4 (the code tool).
