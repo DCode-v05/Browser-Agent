@@ -9,7 +9,7 @@ import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 
-function timeLeft(expiresAt: number, now: number): string {
+export function timeLeft(expiresAt: number, now: number): string {
   return formatElapsed(Math.max(0, Math.ceil(expiresAt - now)));
 }
 
@@ -96,7 +96,7 @@ export function UnwatchedNotice({ onDismiss }: { onDismiss(): void }) {
   );
 }
 
-export function SummaryCard({ state }: { state: ViewerState }) {
+export function SummaryCard({ state, onNewSession }: { state: ViewerState; onNewSession?(): void }) {
   if (!state.ended || !state.session) return null;
   const facts: [string, string][] = [
     [W.summary.steps, formatCount(state.steps.length)],
@@ -115,6 +115,13 @@ export function SummaryCard({ state }: { state: ViewerState }) {
           </div>
         ))}
       </dl>
+      {onNewSession && state.session.restartable && (
+        <div className="card-actions">
+          <Button kind="primary" icon="play" onClick={onNewSession}>
+            {W.buttons.newSession}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

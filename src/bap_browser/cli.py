@@ -75,6 +75,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     serve.set_defaults(run=_serve)
 
+    studio = commands.add_parser(
+        "studio",
+        help="one window with the three browsers an agent can work in: the cloud browser, your own "
+        "Chrome and the built-in browser, each with its chat",
+    )
+    studio.add_argument("--config", help="path of config.json")
+    studio.add_argument("--open", action="store_true", help="open the window in your browser")
+    studio.set_defaults(run=_studio)
+
     doctor = commands.add_parser(
         "doctor", help="check that this machine has what bap-browser needs, and which browsers launch here"
     )
@@ -238,6 +247,44 @@ def _serve(args: argparse.Namespace) -> int:
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(run_http(config, open_viewer=args.open))
+    # It runs until it is interrupted, so that is how it always ends.
+    return 130
+
+
+def _key_for_the_model(config: Config) -> str:
+    """The key of the hosted model, from the environment or from `.env`. Without one, says how to set it."""
+    if config.agent.provider == "scripted":
+        raise ConfigError("the scripted model only plays the demonstration. Run: bap-browser agent --demo")
+    name = config.agent.api_key_env
+    key = os.environ.get(name, "").strip()
+    if not key:
+        raise ConfigError(
+            f"{name} is not set. Put a line {name}=... in a file named .env in this folder, or set it "
+            "in the environment. To try without a model: bap-browser agent --demo"
+        )
+    return key
+
+
+def _studio(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    key = _key_for_the_model(config)
+    # Imported here so that the config commands start without loading the browser and the web server.
+    from bap_browser import browser_extension
+    from bap_browser.agent.command import Interrupted
+    from bap_browser.agent.openai_model import OpenAIModel
+    from bap_browser.agent.studio import run_studio
+
+    extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
+    with contextlib.suppress(Interrupted, KeyboardInterrupt):
+        asyncio.run(
+            run_studio(
+                config,
+                lambda service: OpenAIModel(config.agent, key),
+                open_viewer=args.open,
+                extension=extension,
+            )
+        )
     # It runs until it is interrupted, so that is how it always ends.
     return 130
 

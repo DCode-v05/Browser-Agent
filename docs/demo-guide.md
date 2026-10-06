@@ -23,7 +23,8 @@ The agent asks the person when it meets a sign-in, a CAPTCHA or a payment.
 | Approvals | A tool can be allowed, asked about or denied; an action that pays, sends or deletes is asked about every time |
 | Safety | An address policy checked for every page the browser loads, also after a redirect, a link or inside a frame; the cloud metadata address is always refused; typed text and passwords never reach a log |
 | Three ways for an agent to use it | The built-in agent loop (OpenAI `gpt-5.6-luna`, or a scripted demo with no key); MCP over stdio; MCP over HTTP with the viewer |
-| Three places for the browser | A headless browser with a live picture; a browser window on your screen with the chat beside it; a tab of your own Chrome through the extension |
+| Three places for the browser, in one window | `bap-browser studio`: the cloud browser, your own Chrome and the built-in browser as three pages, each with its session and chat; a tab says when one needs you |
+| A pop-up when a person is needed | For a sign-in, a human check such as a CAPTCHA, a payment or other help: on every backend, with Take over, Couldn't do it and Look first |
 | The Chrome extension | The chat in Chrome's side panel; for your own Chrome it is the bridge: it pairs with a one-time token, reconnects by itself, asks you site by site what the agent may do, and has its own Stop |
 | A desktop app, first cut | Electron: the agent's browser and the chat in one window |
 | `doctor` and `bench` | Which browsers launch on this machine; how fast each tool is against the budget |
@@ -46,9 +47,31 @@ model, the key is in `.env` in this folder (`OPENAI_API_KEY=...`). The scripted 
 
 Close every earlier run first (Ctrl+C in its terminal). Each command below opens its own viewer.
 
-## The show, in order
+## The short show: one window, three browsers (5 minutes)
 
-About ten minutes. Each part stands by itself, so any can be left out.
+```bash
+uv run bap-browser studio --open
+```
+
+One window opens with three pages, one for each place a browser can be: **Cloud browser**, **My
+Chrome**, **Built-in browser**. Each has its own session and its own chat.
+
+| Do | Point at | Say |
+|---|---|---|
+| Stay on **Cloud browser**. Type: `Open the members' area from this page, sign in, and tell me the renewal date.` | The agent opens the sign-in page, stops, and a pop-up comes up: "The agent needs you to sign in" | "It never types a password or passes a human check itself. It asks, on every backend." |
+| Press **Take over**. In the picture: any email, the password `demo-1234`, tick "I am not a robot", press Sign in. Press **Done** | The agent goes on and answers "14 March 2027" | "I did the one step only a person may do. It went on from where I left it." |
+| While it works, look at the tabs | "Working", and "Needs you" in amber when it asks | "From any page I see which browser is waiting for me." |
+| Open **Built-in browser** and give it a task, for example `Check in for booking SK4821, last name Lovelace` | Another browser, another conversation | "This one keeps its sign-ins between runs, apart from my own browser." |
+| Open **My Chrome** | The three steps to load the extension, with the folder to copy | "And this is my real Chrome, with my sign-ins. The extension asks me site by site what the agent may do." Load the extension if you have rehearsed it; the page turns into the chat by itself |
+| Press **Stop session** on a page, then **Start a new session** | A new browser and an empty chat on that page | "Each page starts again by itself. The others are not touched." |
+
+The pop-up has the same shape for every reason a person is needed: a sign-in, a human check such as
+a CAPTCHA, a payment, or anything else the agent asks for.
+
+## The longer show, part by part
+
+About ten minutes. Each part stands by itself, so any can be left out. Parts 1 to 4 use one browser
+(`agent --chat`); everything in them also works on each page of the window above.
 
 ### 1. The scripted demo: no key, nothing can go wrong (2 minutes)
 
@@ -165,6 +188,8 @@ Say these plainly if asked.
 | Not built | Note |
 |---|---|
 | Settings changed from the viewer on a live session | Only colour mode and the agent's pointer. The rest is changed in `config.json` |
+| The three-page window inside the desktop app | The window runs in your browser. The desktop app shows one browser of its own |
+| A pop-up for an approval | Approvals are cards beside the browser; only requests for a person's step pop up |
 | More than one agent tab in your own Chrome | One tab, in its own tab group |
 | A core that runs in the cloud with your Chrome at home | The pieces are there (pairing, reconnecting); it has only been run on one machine |
 | An installer for the desktop app | It runs from this folder |

@@ -14,6 +14,7 @@ from bap_browser.driver.base import ActionOutcome, Driver, LoadState, LogLevel, 
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
 from bap_browser.policy.files import allowed_file
+from bap_browser.tools.human_checks import notice_for
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition
 
 Modifier = Literal["Alt", "Control", "Meta", "Shift"]
@@ -153,13 +154,16 @@ class TypeArgs(Args):
 async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | None = None) -> str:
     settings = session.config.browser.snapshot
     args = args or SnapshotArgs()
-    return await driver.snapshot(
+    page = await driver.snapshot(
         mode=args.mode or settings.default_mode,
         ref=args.ref,
         # A call may ask for less than the cap, never for more.
         max_chars=min(args.max_chars or settings.max_chars, settings.max_chars),
         include_bboxes=args.include_bboxes or settings.include_bboxes,
     )
+    # A page that needs a person says so in the result that shows it (spec 8.4).
+    notice = notice_for(page)
+    return f"{page}\n{notice}" if notice else page
 
 
 async def _allowed(session: BrowserSession, given: str) -> str:

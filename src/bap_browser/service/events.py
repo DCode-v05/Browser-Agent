@@ -36,6 +36,12 @@ class Subscriber:
             self._items.append(item)
         self._wake.set()
 
+    def send_back(self) -> None:
+        """Makes the viewer connect again and be sent everything from the start."""
+        self._fell_behind = True
+        self._items.clear()
+        self._wake.set()
+
     async def next(self) -> Item:
         while True:
             if self._fell_behind:
@@ -88,6 +94,11 @@ class EventHub:
         self._subscribers.append(subscriber)
         self._viewer_arrived.set()
         return self._replay(), subscriber
+
+    def start_over(self) -> None:
+        """Another session has taken this one's place: every viewer connects again, and finds it."""
+        for subscriber in self._subscribers:
+            subscriber.send_back()
 
     async def wait_for_viewer(self) -> None:
         """Returns once a viewer has connected, so that a person misses nothing of what follows."""

@@ -224,6 +224,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#913-later-in-the-viewer">9.13 Later in the viewer</a></li>
 <li><a href="#915-the-extension-the-chat-in-the-browsers-side-panel">9.15 The extension: the chat in the browser&#x27;s side panel</a></li>
 <li><a href="#914-chat">9.14 Chat</a></li>
+<li><a href="#916-one-window-three-browsers">9.16 One window, three browsers</a></li>
 </ul>
 </li>
 <li class="s"><a href="#10-configuration-and-settings">10. Configuration and settings</a>
@@ -967,7 +968,7 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 </tr>
 <tr>
 <td>Viewer to service</td>
-<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code>, <code>task</code>, <code>stop_task</code></td>
+<td><code>auth</code>, <code>approve</code>, <code>deny</code>, <code>pause</code>, <code>resume</code>, <code>stop</code>, <code>take_over</code>, <code>hand_back</code>, <code>done</code>, <code>could_not</code>, <code>pointer</code>, <code>key</code>, <code>wheel</code>, <code>select_tab</code>, <code>task</code>, <code>stop_task</code>, <code>new_session</code></td>
 </tr>
 </tbody>
 </table></div>
@@ -994,7 +995,7 @@ again: it says the link cannot open the session and what to do (section 9.3).</p
 <tbody>
 <tr>
 <td><code>session_started</code></td>
-<td><code>session</code>, <code>agent</code>, <code>backend</code>, <code>browser</code>, <code>viewport</code> (<code>width</code>, <code>height</code>), <code>chat</code> (true when the agent takes its tasks from the viewer's chat), <code>on_screen</code> (true when the browser is a window on the person's own screen), <code>ts</code></td>
+<td><code>session</code>, <code>agent</code>, <code>backend</code>, <code>browser</code>, <code>viewport</code> (<code>width</code>, <code>height</code>), <code>chat</code> (true when the agent takes its tasks from the viewer's chat), <code>on_screen</code> (true when the browser is a window on the person's own screen), <code>restartable</code> (true when a person can ask for a new session once this one has ended), <code>ts</code></td>
 </tr>
 <tr>
 <td><code>control_changed</code></td>
@@ -3183,6 +3184,72 @@ and a box to write the next task in.</p>
   links, and HTML in an answer is shown as text. What the person wrote is shown as written.</li>
 <li>Messages pass through the same redaction as everything else a viewer is sent.</li>
 </ul>
+<h3 id="916-one-window-three-browsers">9.16 One window, three browsers</h3>
+<p><code>bap-browser studio</code> serves one window in which each browser the agent can work in is a page: the three
+backends of section 4.3, side by side, each with a session and a chat of its own.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Backend</th>
+<th>Where the browser is</th>
+<th>What the page shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cloud browser</td>
+<td><code>remote_headless</code></td>
+<td>A headless browser of the service's own, with a fresh profile each session</td>
+<td>The live picture, the chat, the steps</td>
+</tr>
+<tr>
+<td>My Chrome</td>
+<td><code>takeover_chrome</code></td>
+<td>A tab of the person's own Chrome, through the extension (section 4.9)</td>
+<td>Until the extension has dialled in: how to load it, with its folder to copy. Then the chat; the person watches the browser itself</td>
+</tr>
+<tr>
+<td>Built-in browser</td>
+<td><code>bundled_chromium</code></td>
+<td>A browser of the app's own that keeps its sign-ins in a profile of its own (<code>&lt;data_dir&gt;/built-in-browser</code>), apart from the other two</td>
+<td>The live picture, the chat, the steps</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>The tabs.</strong> A bar above the page has one tab for each browser, with a word and a colour for where it
+  stands: Ready, Working, Needs you, You're in control, Paused, Stopped, and for a page with no session
+  Starting, Not connected or Could not start. A page whose agent waits for the person says so on its tab,
+  whichever page is open. The window asks the service where the pages stand (<code>GET /api/sessions</code>, which
+  lists them under <code>rooms</code>) at a steady pace.</li>
+<li><strong>One session for each page.</strong> A page's session is named after it (<code>cloud</code>, <code>chrome</code>, <code>builtin</code>). The
+  page that is open is the only one connected; coming back to a page replays its conversation and its
+  steps from the session's history. A link that names a session (<code>?session=chrome</code>) shows that session
+  alone: this is what the extension's side panel opens.</li>
+<li><strong>The pop-up for a person's step.</strong> When the agent asks a person to do a step
+  (<code>browser_request_human</code>), a pop-up comes up over the page, on every backend. Its title says what is
+  needed: "The agent needs you to sign in" (<code>login</code>), "…to pass a human check" (<code>verification</code>), "…to make
+  a payment" (<code>payment</code>), "…your help" (<code>other</code>). Under it: the agent's own words, what to do, and the time
+  left. Its buttons: Take over (for the person's own Chrome: "I'll do it"), Couldn't do it, and Look first,
+  which puts the pop-up away and leaves the request open as the card of section 9.4. While the pop-up is
+  open, the same answers are not offered a second time behind it. After taking over, the person does the
+  step in the live picture (or in their own Chrome) and answers Done.</li>
+<li><strong>Noticing such a page.</strong> The engine never tries a human check or a sign-in. When a page it shows the
+  agent has a CAPTCHA or other human check ("I'm not a robot", "Verify you are human"), or is a sign-in page
+  (a password field, and a title, heading or button that says sign in or log in), the result ends with a
+  notice that says so and says what to call. A page where a password is chosen, and a link that merely
+  says "Sign in", are not sign-in pages.</li>
+<li><strong>A new session.</strong> A session that can be replaced says so (<code>restartable</code> in <code>session_started</code>). Once it
+  has ended, its summary offers "Start a new session": the page gets a new browser and a new conversation,
+  and whoever was watching is connected to it. The other pages are not touched.</li>
+<li><strong>Where the browser is, said to the model.</strong> Each task from the chat is handed to the model with the
+  address the browser is on, so "sign in on this page" means the page the person is looking at.</li>
+<li>The demo site has a page made for showing this: a members' area with a sign-in and a human check
+  (<code>/demo-site/members.html</code>).</li>
+</ul>
+<p>Not built yet: the same window inside the desktop app (it shows one browser of its own), a micro VM for
+the cloud browser's page, and the pop-up for an approval (it is a card).</p>
 <h2 id="10-configuration-and-settings">10. Configuration and settings</h2>
 <p>Two words are used with care. <strong>Configuration</strong> is everything a deployment can set: every key in
 <code>config.py</code>. <strong>Settings</strong> are the part of it that a person may change in the settings screen.</p>
@@ -8558,20 +8625,12 @@ reached, or a person stops the session. The answer is the only thing written to 
 <td><code>--chat</code></td>
 <td>Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with <code>--demo</code></td>
 </tr>
-<tr>
-<td><code>--takeover</code></td>
-<td>With <code>--chat</code>: the agent works in a tab of the person's own Chrome, through the extension loaded there by hand (section 4.9). The command says where the extension's folder is, and waits for it to connect</td>
-</tr>
-<tr>
-<td><code>--extension</code></td>
-<td>With <code>--chat</code>: as <code>--show-browser</code>, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat</td>
-</tr>
-<tr>
-<td><code>--show-browser</code></td>
-<td>Runs the browser in a window on this screen (<code>browser.headless</code> off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14)</td>
-</tr>
 </tbody>
 </table></div>
+<p><code>bap-browser studio --open</code> runs the same loop on three browsers at once, each a page of one window (section 9.16).
+| <code>--takeover</code> | With <code>--chat</code>: the agent works in a tab of the person's own Chrome, through the extension loaded there by hand (section 4.9). The command says where the extension's folder is, and waits for it to connect |
+| <code>--extension</code> | With <code>--chat</code>: as <code>--show-browser</code>, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat |
+| <code>--show-browser</code> | Runs the browser in a window on this screen (<code>browser.headless</code> off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |</p>
 <p>Without <code>--demo</code> the loop calls the hosted model: OpenAI's <code>gpt-5.6-luna</code>, over the Responses API,
 with the key read from <code>OPENAI_API_KEY</code>. Put <code>OPENAI_API_KEY=...</code> in a file named <code>.env</code> in the
 folder the command is run from. With no key, the command says so and says how to set one. The

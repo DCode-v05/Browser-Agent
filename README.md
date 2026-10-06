@@ -16,6 +16,7 @@ npm --prefix viewer run build      # the viewer, which the service serves
 ## Run
 
 ```bash
+uv run bap-browser studio --open          # one window, three browsers: the cloud browser, your own Chrome, the built-in browser
 uv run bap-browser agent --demo --open    # watch a scripted agent sign up on the built-in demo site
 uv run bap-browser agent "Find the price of ..." --open   # a real task, done by GPT-5.6 Luna
 uv run bap-browser agent --chat --show-browser --open     # the agent works in a browser window you watch; you talk to it in the chat
