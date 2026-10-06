@@ -193,7 +193,7 @@ Say these plainly if asked.
 | A core that runs in the cloud with your Chrome at home | The pieces are there (pairing, reconnecting); it has only been run on one machine |
 | An installer for the desktop app | It runs from this folder |
 | The micro VM image | Written, never built or started |
-| The code tool `browser_run` | Planned last |
+| The code tool `browser_run` on by default | Built: one call runs a short script of several steps. Off until the core runs in its micro VM; `{"code": {"enabled": true}}` turns it on |
 | One tool slower than its target | A click by point takes 17 ms against a target of 5: the browser hands a mouse press to the page with its next frame. See `docs/status.md` |
 
 ## Numbers you can quote

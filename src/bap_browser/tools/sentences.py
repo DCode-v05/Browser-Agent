@@ -42,6 +42,8 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
             return "Reading the page"
         case "browser_find":
             return _row("Looking for ", _query(arguments), "")
+        case "browser_run":
+            return "Running a script"
         case "browser_click":
             return _row("Clicking ", _element(arguments, target), "")
         case "browser_hover":
@@ -105,6 +107,8 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
             return "Read the page"
         case "browser_find":
             return _row("Looked for ", _query(arguments), "")
+        case "browser_run":
+            return "Ran a script"
         case "browser_click":
             kind = f" ({target.role})" if target is not None and target.name else ""
             return _row("Clicked ", _element(arguments, target), kind)
@@ -165,6 +169,8 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
             return "reload the page"
         case "browser_snapshot" | "browser_get_text":
             return "read the page"
+        case "browser_run":
+            return "run the script"
         case "browser_find":
             return "search the page"
         case "browser_click":

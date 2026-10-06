@@ -424,6 +424,25 @@ class Logging(Section):
     max_result_chars: int = setting(2000, "Result excerpt kept per line")
 
 
+class Code(Section):
+    enabled: bool = setting(
+        False,
+        "Offer `browser_run`, which runs a script the agent writes. Off until the core runs in its "
+        "micro VM: that is the boundary a script cannot cross, and the check before a script runs is not",
+    )
+    timeout_s: int = setting(
+        60, "How long a script may compute. The time its steps take in the browser is not counted"
+    )
+    max_timeout_s: int = setting(300, "The longest `timeout_s` a call may ask for")
+    max_steps: int = setting(50, "The steps in the browser one script may do")
+    max_output_chars: int = setting(12000, "What a script printed, and its value, are each cut to this")
+    max_code_chars: int = setting(20000, "The longest script that is taken")
+    max_message_chars: int = setting(
+        1_000_000, "The most a script may hand the core at once: the arguments of one step, or its result"
+    )
+    max_memory_mb: int = setting(512, "What the worker may hold, on a system that enforces such a limit")
+
+
 class Bench(Section):
     runs: int = setting(30, "Samples per line")
     warmup: int = setting(5, "Runs thrown away first")
@@ -448,6 +467,7 @@ class Config(Section):
     agent: Agent = Agent()
     settings: Settings = Settings()
     logging: Logging = Logging()
+    code: Code = Code()
     bench: Bench = Bench()
     # For each key a layer set, the layer: a file, the environment or the session. Not a setting.
     _sources: dict[str, str] = PrivateAttr(default_factory=dict[str, str])

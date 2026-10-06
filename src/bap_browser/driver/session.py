@@ -54,6 +54,8 @@ class BrowserSession:
         self.on_event: Callable[[Happened], None] | None = None
         """Set by whoever shows the session to a person. It is told at once what happens in the browser
         by itself: a tab that opens, a dialog, a file that was saved."""
+        # What must end with the session, besides the browser: told when the session closes.
+        self._closers: list[Callable[[], Awaitable[None]]] = []
         # The same, kept for the agent until its next result.
         self._news: deque[Happened] = deque(maxlen=config.browser.capture.max_state_events)
         self._driver.listen(self._happened)
@@ -130,9 +132,16 @@ class BrowserSession:
                 raise BrowserError(SESSION_ENDED, reason="the session ended")
         return self._driver
 
+    def at_close(self, closer: Callable[[], Awaitable[None]]) -> None:
+        """Has `closer` called when the session ends, for what a part started beside the browser."""
+        self._closers.append(closer)
+
     async def close(self) -> None:
         """Ends the session for good. No later call starts the browser again."""
         self._closed = True
+        closers, self._closers = self._closers, []
+        for closer in closers:
+            await closer()
         await self._stop()
 
     async def _stop(self) -> None:

@@ -20,7 +20,8 @@ def test_the_budget_file_holds_the_lines_of_the_spec() -> None:
     lines = runner.load_budget(BUDGET)
     ids = [line.id for line in lines]
     assert len(ids) == len(set(ids)) == 40
-    known = {tool.name for tool in TOOLS}
+    # The code tool is of milestone 4. Its lines are with those of the next steps (spec 11.4).
+    known = {tool.name for tool in TOOLS} - {"browser_run"}
     assert {line.tool for line in lines} <= known
     # Every tool of milestone 1 has at least one line.
     assert {line.tool for line in lines} == known
