@@ -103,9 +103,15 @@ textarea {
   background: var(--surface-2);
 }
 
-.button:disabled {
+.button:disabled,
+.button[aria-disabled='true'] {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* A control that was pressed and has not taken hold yet. */
+.button[aria-busy='true'] {
+  cursor: progress;
 }
 
 .button[data-kind='primary'] {

@@ -19,7 +19,7 @@ import type { ClientCommand, Surface } from './protocol';
 import { initialState, reduce, unseenNotices, type Notice } from './state/reducer';
 import { lookOf, tellPanel, type Look } from './state/look';
 import { formatSize } from './state/timeline';
-import { describeState } from './state/view';
+import { describeState, type ControlName, type StateKey } from './state/view';
 import type { SettingsAnswer, SettingsSource } from './settings/types';
 import { W } from './wording';
 
@@ -29,6 +29,9 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = { colourMode: 'system', showAgentPointer: true };
+
+/** The commands that take hold only when the agent's action in progress has finished. */
+const TAKES_A_MOMENT: Partial<Record<ClientCommand['type'], ControlName>> = { pause: 'pause', resume: 'resume', take_over: 'take_over', hand_back: 'hand_back' };
 
 /** The preferences the viewer itself acts on, read from the settings answer. */
 export function preferencesFrom(answer: SettingsAnswer): Preferences {
@@ -83,6 +86,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const [approvalLookedAt, setApprovalLookedAt] = useState<string | null>(null);
   const [preferences, setPreferences] = useState(given);
   const [ownToasts, setOwnToasts] = useState<Toast[]>([]);
+  /** The control a person pressed, and the state the session was in when they did. */
+  const [pressed, setPressed] = useState<{ name: ControlName; at: StateKey } | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -135,7 +140,24 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   useEffect(() => {
     if (look) tellPanel(JSON.parse(look) as Look);
   }, [look, preferences.colourMode]);
-  const send = useCallback((command: ClientCommand) => connection.send(command), [connection]);
+  const viewKey = view.key;
+  const send = useCallback(
+    (command: ClientCommand) => {
+      // A pause or a take-over begins when the agent's action in progress has finished. Until the
+      // session says so, the control that was pressed shows that it is working (spec 9.4).
+      const control = TAKES_A_MOMENT[command.type];
+      if (control) setPressed({ name: control, at: viewKey });
+      connection.send(command);
+    },
+    [connection, viewKey],
+  );
+  // The press is over once the session has moved on, or when nothing came of it.
+  const working = pressed && pressed.at === viewKey ? pressed.name : null;
+  useEffect(() => {
+    if (!pressed) return;
+    const timer = setTimeout(() => setPressed(null), options.workingMs);
+    return () => clearTimeout(timer);
+  }, [pressed, options.workingMs]);
 
   const toast = useCallback((text: string) => {
     toastCount.current += 1;
@@ -258,6 +280,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       stopRef={stopButton}
       onShowSplit={full && !driving ? () => setWantsFull(false) : undefined}
       titleRef={statusTitle}
+      working={working}
     />
   );
   const blocked = view.key === 'blocked' ? state.blocked : null;

@@ -32,11 +32,24 @@ interface ButtonProps {
   ref?: Ref<HTMLButtonElement>;
   disabled?: boolean;
   label?: string;
+  /** Pressed, and not taken hold yet. It keeps the focus, and takes no second press. */
+  busy?: boolean;
 }
 
-export function Button({ kind = 'plain', icon, onClick, children, ref, disabled, label }: ButtonProps) {
+export function Button({ kind = 'plain', icon, onClick, children, ref, disabled, label, busy }: ButtonProps) {
   return (
-    <button type="button" className="button" data-kind={kind} onClick={onClick} ref={ref} disabled={disabled} aria-label={label}>
+    <button
+      type="button"
+      className="button"
+      data-kind={kind}
+      onClick={busy ? undefined : onClick}
+      ref={ref}
+      disabled={disabled}
+      aria-label={label}
+      // Not `disabled`: a button that is disabled while it has the focus drops the focus.
+      aria-busy={busy || undefined}
+      aria-disabled={busy || undefined}
+    >
       {icon && <Icon name={icon} />}
       {children}
     </button>
@@ -54,13 +67,15 @@ interface Props {
   /** The button a person lands on when leaving the live picture. */
   primaryRef: Ref<HTMLButtonElement>;
   stopRef: Ref<HTMLButtonElement>;
+  /** The control a person pressed that has not taken hold yet (spec 9.4). */
+  working?: ControlName | null;
   /** In full view, the way back to the split view. */
   onShowSplit?(): void;
   /** Where the focus goes when what held it is gone: an answered card, a closed question. */
   titleRef?: Ref<HTMLHeadingElement>;
 }
 
-export function StatusPanel({ view, now, layout, options, onCommand, onStop, onHandBack, primaryRef, stopRef, onShowSplit, titleRef }: Props) {
+export function StatusPanel({ view, now, layout, options, onCommand, onStop, onHandBack, primaryRef, stopRef, onShowSplit, titleRef, working }: Props) {
   const driving = view.key === 'person';
   const title = driving && layout === 'bar' ? W.takeover.bar : view.status;
   // The reason a session ended is told once, in the summary.
@@ -70,26 +85,26 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
     switch (name) {
       case 'pause':
         return (
-          <Button key={name} icon="pause" onClick={() => onCommand({ type: 'pause' })}>
-            {W.buttons.pause}
+          <Button key={name} icon="pause" busy={working === name} onClick={() => onCommand({ type: 'pause' })}>
+            {working === name ? W.buttons.pausing : W.buttons.pause}
           </Button>
         );
       case 'resume':
         return (
-          <Button key={name} icon="play" kind="primary" onClick={() => onCommand({ type: 'resume' })}>
-            {W.buttons.resume}
+          <Button key={name} icon="play" kind="primary" busy={working === name} onClick={() => onCommand({ type: 'resume' })}>
+            {working === name ? W.buttons.resuming : W.buttons.resume}
           </Button>
         );
       case 'take_over':
         return (
-          <Button key={name} icon="hand" onClick={() => onCommand({ type: 'take_over' })}>
-            {W.buttons.takeOver}
+          <Button key={name} icon="hand" busy={working === name} onClick={() => onCommand({ type: 'take_over' })}>
+            {working === name ? W.buttons.takingOver : W.buttons.takeOver}
           </Button>
         );
       case 'hand_back':
         return (
-          <Button key={name} kind="person" onClick={onHandBack} ref={primaryRef}>
-            {W.buttons.handBack}
+          <Button key={name} kind="person" busy={working === name} onClick={onHandBack} ref={primaryRef}>
+            {working === name ? W.buttons.handingBack : W.buttons.handBack}
           </Button>
         );
       case 'done':

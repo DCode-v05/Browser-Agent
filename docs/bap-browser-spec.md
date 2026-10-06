@@ -1225,7 +1225,7 @@ column is unchanged.
 | Control border and label | Who is driving | agent, person, waiting, paused, blocked, none |
 | Target highlight and pointer | Where the agent is about to act and where it has just acted; drawn over the picture by the viewer, never inside the page | targeting, acted, failed |
 | Status line | State, current action, elapsed time | one per state in 9.3 |
-| Control buttons | Pause or Resume, Take over or Hand back, Stop | enabled, disabled, working |
+| Control buttons | Pause or Resume, Take over or Hand back, Stop | enabled, disabled, working. A pause or a take-over begins when the agent's action in progress has finished; until the session says so, the pressed control reads "Pausing…", "Taking over…", "Resuming…" or "Handing back…", keeps the focus and takes no second press. When nothing comes of a press, it goes back to what it was |
 | Approval card | One pending approval, pinned above the timeline, once the person has put its pop-up away (section 9.16) | pending, allowed, denied, expired |
 | Help card | An agent's request for a person | requested, person active, done, could not, timed out |
 | Dialog card | A page dialog the agent must answer | open, answered, timed out |
