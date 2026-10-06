@@ -231,7 +231,7 @@ async def _do(
     session.working(True)
     try:
         answer = await run_agent(
-            task,
+            await _with_where_the_browser_is(task, session),
             session.toolkit,
             model,
             config.agent,
@@ -248,6 +248,20 @@ async def _do(
     finally:
         _tidy(history, begun)
         session.working(False)
+
+
+NOWHERE = ("", "about:blank")
+
+
+async def _with_where_the_browser_is(task: str, session: ServiceSession) -> str:
+    """The task as the model is given it: with the page the browser is on now. A person who types a
+    task looks at that page and means it; the model has not seen it yet."""
+    here = next((tab for tab in await session.toolkit.tabs() if tab.active), None)
+    if here is None or here.url in NOWHERE:
+        return task
+    return (
+        f"{task}\n\n[The browser is on {here.url} now. Read the page with browser_snapshot before you act.]"
+    )
 
 
 def _tidy(history: list[Message], begun: int) -> None:

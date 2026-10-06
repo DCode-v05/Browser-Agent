@@ -55,6 +55,7 @@ def create_app(
     token: str,
     mcp: ASGIApp | None = None,
     bridge: Bridge | None = None,
+    rooms: Callable[[], list[dict[str, Any]]] | None = None,
 ) -> Starlette:
     """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
     Chrome dials in. Without them the service has no such endpoints."""
@@ -78,9 +79,13 @@ def create_app(
         scheme, _, given = request.headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not signed_in(given):
             return Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-        return JSONResponse(
-            {"sessions": [{"id": name, "state": session.control} for name, session in sessions.items()]}
-        )
+        listed: dict[str, Any] = {
+            "sessions": [{"id": name, "state": session.control} for name, session in sessions.items()]
+        }
+        if rooms is not None:
+            # One window, several browsers: each is a page of it (spec 9.16).
+            listed["rooms"] = rooms()
+        return JSONResponse(listed)
 
     async def viewer_socket(socket: WebSocket) -> None:
         origin = socket.headers.get("origin")

@@ -62,7 +62,8 @@ def announce(
     told: dict[str, str] = {}
     if viewer_address is not None:
         # Inside the side panel the viewer is a guest: it drops its own product name.
-        told["viewer"] = viewer_address.replace("/#", "/?embed=1#", 1)
+        address, _, fragment = viewer_address.partition("#")
+        told["viewer"] = f"{address}{'&' if '?' in address else '?'}embed=1#{fragment}"
     if bridge is not None:
         told["bridge"] = bridge
     if token is not None:

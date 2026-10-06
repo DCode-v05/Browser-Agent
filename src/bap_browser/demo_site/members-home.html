@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your Northfield account</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Northfield</div>
+  <nav><span>Product</span><span>Pricing</span><span>Customers</span><b>Members</b></nav>
+  <div class="spacer"></div>
+  <span class="pill" id="who">Signed in</span>
+</header>
+<main>
+  <section class="wide" id="inside" hidden>
+    <h1>Welcome back</h1>
+    <p class="lead">You are signed in to the members' area.</p>
+    <div class="tiles">
+      <div class="tile"><span class="muted">Plan</span><br><b>Team, 5 seats</b></div>
+      <div class="tile"><span class="muted">Renewal date</span><br><b>14 March 2027</b></div>
+      <div class="tile"><span class="muted">Open invoices</span><br><b>3</b></div>
+    </div>
+  </section>
+  <section class="wide" id="outside" hidden>
+    <h1>You are not signed in</h1>
+    <p class="lead"><a href="members.html">Sign in to the members' area</a></p>
+  </section>
+</main>
+<script>
+const member = sessionStorage.getItem('northfield.member');
+document.getElementById(member ? 'inside' : 'outside').hidden = false;
+if (member) document.getElementById('who').textContent = 'Signed in as ' + member;
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import { BrowserPane } from './components/BrowserPane';
 import { Conversation } from './components/Conversation';
 import { agentStatus, ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
+import { HelpPopup } from './components/HelpPopup';
 import { Icon } from './components/Icon';
 import { SettingsScreen } from './components/SettingsScreen';
 import { Button, Confirm, StatusPanel } from './components/StatusPanel';
@@ -75,6 +76,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const [selected, setSelected] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
+  /** The request for help the person chose to look at first, before answering its pop-up. */
+  const [lookingFirst, setLookingFirst] = useState<string | null>(null);
   const [preferences, setPreferences] = useState(given);
   const [ownToasts, setOwnToasts] = useState<Toast[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
@@ -225,9 +228,14 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         : '';
   const polite = view.urgency === 'polite' ? (view.key === 'agent' && view.detail ? W.announce.newStep(view.detail) : view.status) : '';
 
+  // The agent asked a person to do a step: a pop-up says so over whatever is on screen, until the
+  // person answers it or chooses to look at the page first (spec 9.16).
+  const askingForHelp = state.help !== null && state.control === 'person_requested' && lookingFirst !== state.help.id && !settingsOpen && !confirmingStop;
+
   const status = (
     <StatusPanel
-      view={view}
+      // While the pop-up asks, it holds the answers: the same buttons are not offered twice.
+      view={askingForHelp ? { ...view, controls: view.controls.filter((control) => control === 'stop') } : view}
       now={now}
       layout={full ? 'bar' : 'card'}
       options={options}
@@ -262,7 +270,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       {state.dialog && <DialogCard dialog={state.dialog} />}
       {blocked && <BlockedNotice url={blocked.url} reason={blocked.reason} />}
       {unwatched && <UnwatchedNotice onDismiss={() => dismiss(`notice-${unwatched.id}`)} />}
-      <SummaryCard state={state} />
+      <SummaryCard state={state} onNewSession={() => send({ type: 'new_session' })} />
     </>
   );
   const selectedStep = selected === null ? undefined : state.steps.find((step) => step.n === selected);
@@ -396,6 +404,17 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           onClose={() => closeSettings('button')}
           onChanged={(answer) => setPreferences(preferencesFrom(answer))}
           onToast={toast}
+        />
+      )}
+
+      {askingForHelp && state.help && (
+        <HelpPopup
+          help={state.help}
+          now={now}
+          ownBrowser={beside}
+          onTakeOver={() => send({ type: 'take_over' })}
+          onCouldNot={() => send({ type: 'could_not' })}
+          onLater={() => setLookingFirst(state.help?.id ?? null)}
         />
       )}
 

@@ -1488,6 +1488,197 @@
   gap: var(--space-1);
 }
 
+/* The window of three pages (spec 9.16): a bar of tabs, one for each browser, and the page under it. */
+
+.studio {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.studio-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.studio-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.studio-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.studio-tab:hover {
+  background: var(--surface-2);
+}
+
+.studio-tab[aria-selected='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.studio-tab-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-regular);
+}
+
+.studio-tab-dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.studio-tab[data-mood='ready'] .studio-tab-dot {
+  background: var(--success);
+}
+
+.studio-tab[data-mood='working'] .studio-tab-dot {
+  background: var(--agent);
+  animation: live var(--duration-live) var(--ease) infinite;
+}
+
+.studio-tab[data-mood='person'] .studio-tab-dot {
+  background: var(--person);
+}
+
+.studio-tab[data-mood='stopped'] .studio-tab-dot {
+  background: var(--danger);
+}
+
+/* A page that waits for the person says so on its tab, whichever page is open. */
+.studio-tab[data-mood='attention'] {
+  border-color: var(--waiting);
+  background: var(--waiting-tint);
+  color: var(--waiting);
+}
+
+.studio-tab[data-mood='attention'][aria-selected='true'] {
+  background: var(--waiting);
+  color: var(--surface);
+}
+
+.studio-page {
+  flex: 1;
+  min-height: 0;
+}
+
+.studio-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: var(--dialog-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.studio-wait-title {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-title);
+}
+
+.studio-wait-lead,
+.studio-wait-note {
+  color: var(--text-muted);
+}
+
+.studio-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  text-align: left;
+}
+
+.studio-folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.studio-folder code {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* The pop-up that asks a person to do a step (spec 9.16). */
+
+.popup {
+  gap: var(--space-3);
+  border-color: var(--waiting);
+}
+
+.popup-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.popup-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--status-icon);
+  height: var(--status-icon);
+  border-radius: var(--radius-pill);
+  background: var(--waiting-tint);
+  color: var(--waiting);
+}
+
+.popup-kind {
+  color: var(--waiting);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.popup-reason {
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
 
 @media (max-width: 979px) {

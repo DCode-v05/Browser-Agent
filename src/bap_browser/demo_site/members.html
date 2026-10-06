@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in to Northfield</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header>
+  <div class="brand"><i></i>Northfield</div>
+  <nav><span>Product</span><span>Pricing</span><span>Customers</span><b>Members</b></nav>
+  <div class="spacer"></div>
+  <span class="pill">Members only</span>
+</header>
+<main>
+  <section>
+    <h1>Sign in to your account</h1>
+    <p class="lead">The members' area holds your invoices and your renewal date. Only you can sign in: an agent that works for you asks you to do this step.</p>
+    <ul class="points">
+      <li>Your password is never typed by anyone but you</li>
+      <li>The human check below is for a person to pass</li>
+      <li>For this demonstration: any email, and the password <b>demo-1234</b></li>
+    </ul>
+  </section>
+  <form class="card" id="sign-in">
+    <p class="error" id="problem" hidden></p>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password"></div>
+    <fieldset class="choices" aria-label="Human check (CAPTCHA)">
+      <label class="check"><input id="human" type="checkbox"> I am not a robot</label>
+      <span class="muted">Human check (CAPTCHA)</span>
+    </fieldset>
+    <button class="primary" id="enter" type="submit">Sign in</button>
+  </form>
+</main>
+<script>
+document.getElementById('sign-in').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const problem = document.getElementById('problem');
+  const says = (text) => { problem.textContent = text; problem.hidden = false; };
+  if (!document.getElementById('email').value.trim()) return says('Enter your email.');
+  if (document.getElementById('password').value !== 'demo-1234') return says('That password is not right.');
+  if (!document.getElementById('human').checked) return says('Pass the human check first.');
+  sessionStorage.setItem('northfield.member', document.getElementById('email').value.trim());
+  location.href = 'members-home.html';
+});
+</script>
+</body>
+</html>

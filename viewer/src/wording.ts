@@ -55,6 +55,7 @@ export const W = {
     showSplit: 'Show the browser beside the activity',
     viewStep: 'View step',
     dismiss: 'Dismiss',
+    newSession: 'Start a new session',
   },
 
   ended: {
@@ -87,6 +88,18 @@ export const W = {
     } satisfies Record<HelpKind, string>,
     left: (time: string) => `${time} left, then the agent is told you could not`,
     hint: 'Take over, do the step in the browser, then choose Done.',
+    popup: {
+      title: {
+        login: 'The agent needs you to sign in',
+        verification: 'The agent needs you to pass a human check',
+        payment: 'The agent needs you to make a payment',
+        other: 'The agent needs your help',
+      } satisfies Record<HelpKind, string>,
+      hint: 'Take over, do the step in the browser, then choose Done. The agent waits and goes on from there. Nothing you type is recorded.',
+      hintOwnBrowser: 'Do the step in your browser, then choose Done here. The agent waits and goes on from there.',
+      doIt: "I'll do it",
+      later: 'Look first',
+    },
     outcome: {
       done: 'Done. The agent continues.',
       could_not: 'The agent was told you could not do it.',
@@ -127,6 +140,35 @@ export const W = {
     waitingForAgentHint: 'When an agent connects, its browser appears here.',
     noSession: 'No session to show',
     blockedPage: 'This page was blocked',
+  },
+
+  studio: {
+    pages: 'Where the agent works',
+    mood: {
+      attention: 'Needs you',
+      working: 'Working',
+      ready: 'Ready',
+      person: "You're in control",
+      paused: 'Paused',
+      stopped: 'Stopped',
+    },
+    off: {
+      starting: 'Starting',
+      waiting: 'Not connected',
+      failed: 'Could not start',
+    },
+    starting: 'Starting the browser…',
+    failed: 'The browser could not be started',
+    connect: {
+      title: 'Connect your Chrome',
+      lead: 'The agent works in a tab of your own Chrome, with your sign-ins, and asks you site by site what it may do.',
+      open: 'In your Chrome, open chrome://extensions and switch on Developer mode.',
+      load: 'Press "Load unpacked" and choose this folder:',
+      icon: 'Click the BAP icon in the toolbar. It opens the chat beside your pages.',
+      byItself: 'This page connects by itself, a moment after the extension is loaded.',
+      copy: 'Copy the folder',
+      copied: 'Copied',
+    },
   },
 
   chat: {

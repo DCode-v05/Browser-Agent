@@ -40,6 +40,8 @@ export type ServerEvent =
       chat?: boolean;
       /** The browser is a window on the person's own screen. */
       on_screen?: boolean;
+      /** Once this session has ended, a person can ask for a new one in its place. */
+      restartable?: boolean;
       ts: number;
     }
   | { type: 'control_changed'; state: ControlState; since: number }
@@ -81,6 +83,7 @@ export type ClientCommand =
   | { type: 'select_tab'; id: string }
   | { type: 'task'; text: string }
   /** Ends the task the agent is on. The session goes on. */
-  | { type: 'stop_task' };
+  | { type: 'stop_task' }
+  | { type: 'new_session' };
 
 export type CommandType = ClientCommand['type'];

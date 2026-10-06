@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App, preferencesFrom } from './App';
+import { Studio } from './Studio';
+import { roomsFrom } from './studio/rooms';
 import { socketAddress, takeToken } from './connection/address';
 import type { Connection } from './connection/connection';
 import { DemoConnection } from './connection/demo';
@@ -15,6 +17,9 @@ import './styles/app.css';
 import './styles/settings.css';
 
 const HEARTBEAT_MS = 2000;
+/** How often the window asks the service where its pages stand. */
+const ROOMS_MS = 1500;
+const PAGE_KEY = 'bap-browser.page';
 /** What the viewer keeps by itself. The rest of the settings arrive with the settings API (spec 10.2). */
 const KEPT_BY_THE_VIEWER = ['colour_mode', 'show_agent_pointer'];
 
@@ -43,9 +48,13 @@ if (!recorded) {
   });
 }
 
+function connectionFor(session: string): Connection {
+  return new SocketConnection({ url: socketAddress(location.href, session), token: token ?? '' });
+}
+
 function createConnection(): Connection {
   if (recorded) return new DemoConnection(recording, { pace, heartbeatMs: HEARTBEAT_MS });
-  if (token) return new SocketConnection({ url: socketAddress(location.href, query.get('session') ?? 'default'), token });
+  if (token) return connectionFor(query.get('session') ?? 'default');
   // Opened without its token: there is no session this page may show.
   return { start: (handlers) => handlers.onStatus('refused'), send: () => undefined, now: () => Date.now() / 1000, close: () => undefined };
 }
@@ -56,8 +65,27 @@ const preferences = preferencesFrom(await settings.load(surface));
 const theme = query.get('theme');
 if (theme === 'light' || theme === 'dark') preferences.colourMode = theme;
 
+// A service that has several browsers shows them as pages of one window (spec 9.16). A link that
+// names a session shows that session alone, as the extension's side panel does.
+const loadRooms = token && !recorded && !query.has('session') ? roomsFrom(location.href, token) : null;
+const rooms = loadRooms ? await loadRooms() : null;
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} />
+    {rooms && loadRooms ? (
+      <Studio
+        rooms={rooms}
+        loadRooms={loadRooms}
+        connectionFor={connectionFor}
+        pollMs={ROOMS_MS}
+        opensOn={tabStorage.getItem(PAGE_KEY) ?? undefined}
+        onPage={(room) => tabStorage.setItem(PAGE_KEY, room)}
+        settings={settings}
+        surface={surface}
+        preferences={preferences}
+      />
+    ) : (
+      <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} />
+    )}
   </StrictMode>,
 );

@@ -185,6 +185,30 @@ extension asked in a small window of its own ("127.0.0.1", "Opening …/form.htm
 site" let the agent go on and type, and "Stop the agent" took it off the tab. Not pressed by hand: the
 toolbar icon. The desktop app's own checks pass (typecheck, 5 tests, build); its window was not opened.
 
+### 1h. Finished on 2026-10-06: one window with the three browsers, and the pop-up for a person's step
+
+`uv run bap-browser studio --open` (spec 9.16):
+
+| Part | What it does |
+|---|---|
+| Three pages in one window | Cloud browser, My Chrome and Built-in browser, each with its own session, chat and steps; a tab for each says where it stands, and "Needs you" shows from any page |
+| The built-in browser | A browser of the app's own that keeps its sign-ins in a profile of its own |
+| My Chrome as a page | Says how to load the extension, then becomes the chat for that Chrome when the extension dials in |
+| The pop-up | When the agent asks for a sign-in, a human check, a payment or other help, a pop-up comes up on every backend, with Take over, Couldn't do it and Look first |
+| Noticing a human check or a sign-in | The result that shows such a page tells the agent to ask the person |
+| A new session | "Start a new session" on a page whose session was stopped |
+| The model knows where the browser is | Each chat task carries the address the browser is on |
+| A demo page for it | The members' area on the demo site: a sign-in with a human check |
+
+Run with the real model on 2026-10-06, cloud page: asked to sign in to the members' area, the agent
+asked for help; the pop-up came up; the person took over, signed in through the live picture and ticked
+the human check, answered Done; the agent read the renewal date. 4 tests in a real browser
+(`tests/viewer/test_studio.py`), one of them with the extension loaded into a second Chromium.
+
+Not checked by me: the My Chrome page with a Chrome that has a visible window in this window's own flow
+(the extension itself was run that way, section 1g), and the pop-up on the My Chrome page with a real
+model.
+
 ### 2. Not started
 
 | What | Note |

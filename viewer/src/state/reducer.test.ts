@@ -42,6 +42,7 @@ describe('session', () => {
       browser: 'Chromium 153',
       viewport: { width: 1280, height: 800 },
       onScreen: false,
+      restartable: false,
       startedAt: T0,
     });
     expect(state.control).toBe('agent');

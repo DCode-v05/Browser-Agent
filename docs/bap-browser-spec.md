@@ -369,7 +369,7 @@ again: it says the link cannot open the session and what to do (section 9.3).
 | Direction | Messages |
 |---|---|
 | Service to viewer | `session_started`, `control_changed`, `step_started`, `step_finished`, `tab_changed`, `approval_requested`, `approval_closed`, `help_requested`, `help_closed`, `dialog_opened`, `dialog_closed`, `download_saved`, `picture_current`, `caught_up`, `navigation_blocked`, `settings_changed`, `message`, `task_changed`, `bridge_changed` (milestone 2), `session_ended`, frame |
-| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task`, `stop_task` |
+| Viewer to service | `auth`, `approve`, `deny`, `pause`, `resume`, `stop`, `take_over`, `hand_back`, `done`, `could_not`, `pointer`, `key`, `wheel`, `select_tab`, `task`, `stop_task`, `new_session` |
 
 Examples:
 
@@ -390,7 +390,7 @@ Fields of each event. Times are in seconds on the service's clock.
 
 | Event | Fields |
 |---|---|
-| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `on_screen` (true when the browser is a window on the person's own screen), `ts` |
+| `session_started` | `session`, `agent`, `backend`, `browser`, `viewport` (`width`, `height`), `chat` (true when the agent takes its tasks from the viewer's chat), `on_screen` (true when the browser is a window on the person's own screen), `restartable` (true when a person can ask for a new session once this one has ended), `ts` |
 | `control_changed` | `state` (`agent`, `waiting_approval`, `person_requested`, `person`, `paused`, `ended`), `since` |
 | `step_started` | `step`, `tool`, `label` (what the agent is doing, as a sentence), `target` (the element's box, when there is one), `ts` |
 | `step_finished` | `step`, `ok`, `ms`, `chars`, `summary` (what happened, as a sentence), `url` |
@@ -1515,6 +1515,50 @@ and a box to write the next task in.
   addresses, which open in a new tab. Nothing else is interpreted, only `http` and `https` addresses become
   links, and HTML in an answer is shown as text. What the person wrote is shown as written.
 - Messages pass through the same redaction as everything else a viewer is sent.
+
+### 9.16 One window, three browsers
+
+`bap-browser studio` serves one window in which each browser the agent can work in is a page: the three
+backends of section 4.3, side by side, each with a session and a chat of its own.
+
+| Page | Backend | Where the browser is | What the page shows |
+|---|---|---|---|
+| Cloud browser | `remote_headless` | A headless browser of the service's own, with a fresh profile each session | The live picture, the chat, the steps |
+| My Chrome | `takeover_chrome` | A tab of the person's own Chrome, through the extension (section 4.9) | Until the extension has dialled in: how to load it, with its folder to copy. Then the chat; the person watches the browser itself |
+| Built-in browser | `bundled_chromium` | A browser of the app's own that keeps its sign-ins in a profile of its own (`<data_dir>/built-in-browser`), apart from the other two | The live picture, the chat, the steps |
+
+- **The tabs.** A bar above the page has one tab for each browser, with a word and a colour for where it
+  stands: Ready, Working, Needs you, You're in control, Paused, Stopped, and for a page with no session
+  Starting, Not connected or Could not start. A page whose agent waits for the person says so on its tab,
+  whichever page is open. The window asks the service where the pages stand (`GET /api/sessions`, which
+  lists them under `rooms`) at a steady pace.
+- **One session for each page.** A page's session is named after it (`cloud`, `chrome`, `builtin`). The
+  page that is open is the only one connected; coming back to a page replays its conversation and its
+  steps from the session's history. A link that names a session (`?session=chrome`) shows that session
+  alone: this is what the extension's side panel opens.
+- **The pop-up for a person's step.** When the agent asks a person to do a step
+  (`browser_request_human`), a pop-up comes up over the page, on every backend. Its title says what is
+  needed: "The agent needs you to sign in" (`login`), "…to pass a human check" (`verification`), "…to make
+  a payment" (`payment`), "…your help" (`other`). Under it: the agent's own words, what to do, and the time
+  left. Its buttons: Take over (for the person's own Chrome: "I'll do it"), Couldn't do it, and Look first,
+  which puts the pop-up away and leaves the request open as the card of section 9.4. While the pop-up is
+  open, the same answers are not offered a second time behind it. After taking over, the person does the
+  step in the live picture (or in their own Chrome) and answers Done.
+- **Noticing such a page.** The engine never tries a human check or a sign-in. When a page it shows the
+  agent has a CAPTCHA or other human check ("I'm not a robot", "Verify you are human"), or is a sign-in page
+  (a password field, and a title, heading or button that says sign in or log in), the result ends with a
+  notice that says so and says what to call. A page where a password is chosen, and a link that merely
+  says "Sign in", are not sign-in pages.
+- **A new session.** A session that can be replaced says so (`restartable` in `session_started`). Once it
+  has ended, its summary offers "Start a new session": the page gets a new browser and a new conversation,
+  and whoever was watching is connected to it. The other pages are not touched.
+- **Where the browser is, said to the model.** Each task from the chat is handed to the model with the
+  address the browser is on, so "sign in on this page" means the page the person is looking at.
+- The demo site has a page made for showing this: a members' area with a sign-in and a human check
+  (`/demo-site/members.html`).
+
+Not built yet: the same window inside the desktop app (it shows one browser of its own), a micro VM for
+the cloud browser's page, and the pop-up for an approval (it is a card).
 
 ## 10. Configuration and settings
 
@@ -3018,6 +3062,8 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--pace SECONDS` | How long the demonstration waits before each step, so a person can follow it. Default 1 |
 | `--exit-when-done` | Ends the process when the task is finished. Without it the viewer stays open until Ctrl+C |
 | `--chat` | Keeps the session open and takes tasks from the chat in the viewer, one after another (section 9.14). A task on the command line is the first one. Not with `--demo` |
+
+`bap-browser studio --open` runs the same loop on three browsers at once, each a page of one window (section 9.16).
 | `--takeover` | With `--chat`: the agent works in a tab of the person's own Chrome, through the extension loaded there by hand (section 4.9). The command says where the extension's folder is, and waits for it to connect |
 | `--extension` | With `--chat`: as `--show-browser`, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat |
 | `--show-browser` | Runs the browser in a window on this screen (`browser.headless` off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |

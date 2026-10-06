@@ -7,7 +7,7 @@ import json
 import os
 import secrets
 import socket
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +31,7 @@ class Service:
         port: int | None = None,
         mcp: McpServer[Any] | None = None,
         bridge: bool = False,
+        rooms: Callable[[], list[dict[str, Any]]] | None = None,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
         server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
@@ -48,6 +49,7 @@ class Service:
             self.token,
             self._mcp.handle_request if self._mcp is not None else None,
             self.bridge,
+            rooms,
         )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s

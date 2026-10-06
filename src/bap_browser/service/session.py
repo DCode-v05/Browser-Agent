@@ -46,7 +46,12 @@ class ServiceSession:
         clock: Callable[[], float] = time.time,
         on_task: Callable[[str], None] | None = None,
         pictures: bool = True,
+        backend: str | None = None,
+        on_restart: Callable[[], None] | None = None,
     ) -> None:
+        """`backend` names where the browser is, when that is not what the configuration says: a
+        person's own Chrome, or the browser built into the app (spec 4.3). `on_restart` is told when
+        a person asks, after this session has ended, for a new one in its place."""
         self.config = config
         self.name = name
         self.hub = EventHub(config.viewer.history_events)
@@ -64,6 +69,8 @@ class ServiceSession:
         self._help_outcome: HelpOutcome | None = None
         self._helps = 0
         self.control: ControlState = "agent"
+        self._backend = backend
+        self._on_restart = on_restart
         self._on_task = on_task
         # Whether viewers are sent live pictures of the browser. Not when each one would cross a bridge.
         self._pictures = pictures
@@ -96,13 +103,16 @@ class ServiceSession:
             "type": "session_started",
             "session": self.name,
             "agent": self._agent,
-            "backend": self.config.backend.kind,
+            "backend": self._backend or self.config.backend.kind,
             "browser": driver.description(),
             "viewport": {"width": width, "height": height},
             "ts": self._clock(),
         }
         if self._on_task is not None:
             started["chat"] = True
+        if self._on_restart is not None:
+            # A person can ask for a new session here once this one has ended.
+            started["restartable"] = True
         if not self.config.browser.headless or self.config.browser.cdp_url:
             # The person watches the browser itself, so a viewer need not show its picture.
             started["on_screen"] = True
@@ -156,6 +166,8 @@ class ServiceSession:
             self.give_task(command.get("text"))
         elif kind == "stop_task":
             await self._stop_task()
+        elif kind == "new_session" and self.control == "ended" and self._on_restart is not None:
+            self._on_restart()
         elif kind == "select_tab" and self.control == "person":
             await self._select_tab(command.get("id"))
 
@@ -211,6 +223,11 @@ class ServiceSession:
         if failed:
             message["failed"] = True
         self.hub.publish(message)
+
+    @property
+    def busy(self) -> bool:
+        """Whether the agent is on a task from the chat."""
+        return self._on_a_task
 
     def task_stopped(self) -> bool:
         """Whether a person has stopped the task the agent is on."""

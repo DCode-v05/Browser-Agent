@@ -92,6 +92,8 @@ export interface SessionInfo {
   viewport: { width: number; height: number };
   /** The browser is a window on the person's own screen, so there is no picture of it to show. */
   onScreen: boolean;
+  /** A person can ask for a new session here once this one has ended. */
+  restartable: boolean;
   startedAt: number;
 }
 
@@ -193,6 +195,7 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
           browser: event.browser,
           viewport: event.viewport,
           onScreen: event.on_screen === true,
+          restartable: event.restartable === true,
           startedAt: event.ts,
         },
         control: 'agent',
