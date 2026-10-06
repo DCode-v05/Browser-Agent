@@ -94,7 +94,7 @@ async def test_type_reports_a_count_and_never_the_text(make_config, tmp_path: Pa
 async def test_bad_calls_are_results_not_crashes(make_config, tmp_path: Path) -> None:
     tools, driver = kit(make_config, tmp_path)
     cases = {
-        ("browser_fly", ()): "Unknown tool 'browser_fly'. Available: browser_click, browser_fill_form, ",
+        ("browser_fly", ()): "Unknown tool 'browser_fly'. Available: browser_click, browser_console, ",
         ("browser_click", (("reff", "e1"),)): "browser_click: unknown argument 'reff'",
         ("browser_click", ()): "browser_click: give ref, or both x and y",
         ("browser_click", (("x", 5),)): "browser_click: give either ref, or both x and y",

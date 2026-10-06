@@ -20,7 +20,7 @@ from bap_browser.config import Config
 from bap_browser.mcp.server import build_server
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
-from bap_browser.tools import TOOLS
+from bap_browser.tools import tools_for
 
 TOKEN = "a-token-made-up-for-these-tests"
 
@@ -66,7 +66,7 @@ async def test_an_agent_with_the_token_is_offered_the_tools_and_a_person_sees_wh
             Client(streamable_http_client(service.mcp_address, http_client=http)) as client,
         ):
             listed = await client.list_tools()
-            assert [tool.name for tool in listed.tools] == [tool.name for tool in TOOLS]
+            assert [tool.name for tool in listed.tools] == [tool.name for tool in tools_for(Config())]
             read = await client.call_tool("browser_snapshot", {})
             assert not read.is_error and read.content[0].text.startswith("Page: ")  # type: ignore[union-attr]
             bad = await client.call_tool("browser_click", {"ref": "not a ref"})

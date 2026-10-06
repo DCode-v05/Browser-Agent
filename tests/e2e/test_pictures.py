@@ -41,7 +41,9 @@ async def test_a_picture_of_the_whole_page_is_made_to_fit(driver: PlaywrightDriv
     assert await driver.page.evaluate("scrollY") == 0
 
 
-async def test_a_region_of_the_last_screenshot_at_full_resolution(driver: PlaywrightDriver, site: str) -> None:
+async def test_a_region_of_the_last_screenshot_at_full_resolution(
+    driver: PlaywrightDriver, site: str
+) -> None:
     await driver.navigate(f"{site}/tools.html")
     whole = await driver.screenshot(full_page=True, annotate=False)
     page_height = await driver.page.evaluate("document.documentElement.scrollHeight")
@@ -83,6 +85,9 @@ async def test_on_a_dense_screen_a_picture_is_still_one_pixel_to_a_page_pixel(
         # The closer picture holds every pixel the screen has for the region.
         closer = await dense.zoom((600, 40, 700, 80))
         assert size_of(closer.picture) == (200, 80) == (closer.width, closer.height)
+        # Taking pictures left the screen the browser emulates as it was.
+        screen = await dense.page.evaluate("[devicePixelRatio, innerWidth, innerHeight]")
+        assert screen == [2, 1280, 800]
     finally:
         await dense.close()
 

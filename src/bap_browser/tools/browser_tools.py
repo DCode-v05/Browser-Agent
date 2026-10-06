@@ -628,9 +628,7 @@ async def network(session: BrowserSession, args: NetworkArgs) -> str:
             continue
         status = "failed" if request.status is None else str(request.status)
         why = f" ({request.failure})" if request.failure else ""
-        lines.append(
-            f"{request.method} {status} [{request.kind}] {session.shown_address(request.url)}{why}"
-        )
+        lines.append(f"{request.method} {status} [{request.kind}] {session.shown_address(request.url)}{why}")
     if not lines:
         return "No request matches." if args.filter or args.failed_only else "No request has been made."
     return _newest(session, lines, args.limit, "request")

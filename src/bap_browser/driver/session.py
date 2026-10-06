@@ -45,18 +45,18 @@ class BrowserSession:
         """Set by whoever shows the session to a person. It is told at once what happens in the browser
         by itself: a tab that opens, a dialog, a file that was saved."""
         # The same, kept for the agent until its next result.
-        self._news: deque[str] = deque(maxlen=config.browser.capture.max_state_events)
+        self._news: deque[Happened] = deque(maxlen=config.browser.capture.max_state_events)
         self._driver.listen(self._happened)
 
     def _happened(self, event: Happened) -> None:
         if event.text:
-            self._news.append(event.text)
+            self._news.append(event)
         if self.on_event is not None:
             self.on_event(event)
 
     def take_news(self) -> list[str]:
         """What happened in the browser by itself since this was last asked."""
-        news = list(self._news)
+        news = [event.text for event in self._news]
         self._news.clear()
         return news
 
@@ -89,6 +89,10 @@ class BrowserSession:
         if self._started and not self._driver.is_alive():
             await self._stop()
             self._lost = True
+            # The agent is told that the browser closed. That its tabs closed with it is no news.
+            kept = [event for event in self._news if event.kind != "tab_closed"]
+            self._news.clear()
+            self._news.extend(kept)
         if self._lost and not may_restart:
             raise BrowserError(
                 "The browser closed. Open a page with browser_navigate to start it again.",

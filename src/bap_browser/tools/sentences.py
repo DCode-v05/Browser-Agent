@@ -213,7 +213,12 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
     return f"run {tool}"
 
 
-_TABS_DOING = {"list": "Listing the tabs", "new": "Opening a tab", "switch": "Switching to", "close": "Closing"}
+_TABS_DOING = {
+    "list": "Listing the tabs",
+    "new": "Opening a tab",
+    "switch": "Switching to",
+    "close": "Closing",
+}
 _TABS_DONE = {"list": "Listed the tabs", "new": "Opened a tab", "switch": "Switched to", "close": "Closed"}
 _TABS_TO_DO = {"list": "list the tabs", "new": "open a tab", "switch": "switch to", "close": "close"}
 

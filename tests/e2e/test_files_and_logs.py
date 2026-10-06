@@ -58,13 +58,17 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
             "browser_upload_file", {"ref": button, "paths": ["cv.txt", str(folder / "photo.txt")]}
         )
         assert two.text.startswith(f'Uploaded cv.txt, photo.txt via {button} (button "Attach files").')
-        assert "Chosen: cv.txt (my cv), photo.txt (my photo)" in (await tools.call("browser_get_text", {})).text
+        assert (
+            "Chosen: cv.txt (my cv), photo.txt (my photo)" in (await tools.call("browser_get_text", {})).text
+        )
 
         # Only a file in a folder uploads may come from.
         for path in (str(tmp_path / "secret.txt"), "../secret.txt"):
             outside = await tools.call("browser_upload_file", {"ref": field, "paths": [path]})
             assert outside.is_error
-            assert outside.text.startswith("secret.txt is not in a folder uploads may come from ("), outside.text
+            assert outside.text.startswith("secret.txt is not in a folder uploads may come from ("), (
+                outside.text
+            )
         missing = await tools.call("browser_upload_file", {"ref": field, "paths": ["nothing.txt"]})
         assert missing.is_error and missing.text.startswith("There is no file nothing.txt in ")
         assert "not for any page" not in (await tools.call("browser_get_text", {})).text
@@ -140,7 +144,8 @@ async def test_a_download_is_kept_in_the_downloads_folder_under_a_name_of_its_ow
         await tools.call("browser_click", {"ref": ref_of(page.text, 'link "Download with a strange name"')})
         await finished(tools, 3)
         kept = sorted(file.name for file in folder.iterdir())
-        assert len(kept) == 3 and all(".." not in name for name in kept), kept
+        assert len(kept) == 3, kept
+        assert all(file.resolve().parent == folder.resolve() for file in folder.iterdir())
         assert not (tmp_path / "escape.txt").exists() and not (tmp_path.parent / "escape.txt").exists()
 
 
@@ -194,7 +199,11 @@ async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, s
         assert capped[0] == "50 console messages, the newest of 80, oldest first:"
         assert (capped[1], capped[-1], len(capped)) == ("[info] chatter 31", "[info] chatter 80", 51)
         few = body((await tools.call("browser_console", {"limit": 2})).text).splitlines()
-        assert few == ["2 console messages, the newest of 80, oldest first:", "[info] chatter 79", "[info] chatter 80"]
+        assert few == [
+            "2 console messages, the newest of 80, oldest first:",
+            "[info] chatter 79",
+            "[info] chatter 80",
+        ]
 
 
 async def test_the_network_log(make_config: Callable[..., Config], tmp_path: Path, site: str) -> None:
@@ -242,7 +251,9 @@ async def test_a_script_in_the_page_runs_only_where_it_is_allowed_and_approved(
             "The script gave no value."
         )
         broken = await tools.call("browser_evaluate", {"expression": "nope.nothing"})
-        assert broken.is_error and broken.text.startswith("The script failed: ReferenceError: nope is not defined")
+        assert broken.is_error and broken.text.startswith(
+            "The script failed: ReferenceError: nope is not defined"
+        )
         long = await tools.call("browser_evaluate", {"expression": "'x'.repeat(500)"})
         shown = body(long.text).splitlines()
         assert shown[0] == "The script's value, as JSON (502 characters):"
@@ -276,14 +287,14 @@ async def test_dragging(make_config: Callable[..., Config], tmp_path: Path, site
         knob = ref_of(page.text, 'clickable "Knob"')
         # A slider that follows the mouse: its knob is taken to a point.
         slid = await tools.call("browser_drag", {"from_ref": knob, "to_xy": [255, 270]})
-        assert body(slid.text) == f'Dragged from {knob} (clickable "Knob") to (255, 270)', slid.text
+        assert body(slid.text) == f'Dragged from {knob} (div "Knob") to (255, 270) (div)', slid.text
         assert "Knob at 200" in (await tools.call("browser_get_text", {})).text
 
         # A card that is dropped on a column, the way a page built for dragging expects it.
         card, column = ref_of(page.text, 'clickable "Card A"'), ref_of(page.text, 'clickable "Done column"')
         dropped = await tools.call("browser_drag", {"from_ref": card, "to_ref": column})
         assert body(dropped.text) == (
-            f'Dragged from {card} (clickable "Card A") to {column} (clickable "Done column")'
+            f'Dragged from {card} (div "Card A") to {column} (div "Done column")'
         ), dropped.text
         assert "Dropped Card A on Done" in (await tools.call("browser_get_text", {})).text
 

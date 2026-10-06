@@ -741,6 +741,28 @@
     return { drawn };
   }
 
-  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label });
+  // Makes a picture smaller, in the browser itself, so that no image library is needed. The picture
+  // comes in and goes out as base64.
+  async function shrink(a) {
+    const bytes = Uint8Array.from(atob(a.data), (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: a.mime }), {
+      resizeWidth: a.width,
+      resizeHeight: a.height,
+      resizeQuality: 'high',
+    });
+    const canvas = new OffscreenCanvas(a.width, a.height);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const blob = await canvas.convertToBlob({ type: a.mime, quality: a.quality });
+    const smaller = new Uint8Array(await blob.arrayBuffer());
+    let text = '';
+    // In pieces: a call with every byte as an argument would be too long for the browser.
+    for (let from = 0; from < smaller.length; from += a.piece) {
+      text += String.fromCharCode.apply(null, smaller.subarray(from, from + a.piece));
+    }
+    return { data: btoa(text) };
+  }
+
+  Object.assign(operations, { locate, prepare, holds, focus, text, find, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label, shrink });
   globalThis.__bap.withActions = true;
 })();

@@ -215,7 +215,9 @@ class Toolkit:
         config = self._session.config
         policy = config.safety.action_policies.get(name, config.safety.default_action_policy)
         if policy == "deny":
-            return Outcome(f"{name} is not allowed on this deployment.{NO_OTHER_WAY}", "it is not allowed here")
+            return Outcome(
+                f"{name} is not allowed on this deployment.{NO_OTHER_WAY}", "it is not allowed here"
+            )
         if config.safety.ask_before == "every_action" and name not in READS:
             policy = "confirm"
         consequential = self._consequential(name, target)
@@ -364,7 +366,9 @@ class Toolkit:
         the last call."""
         block = ""
         if tabs:
-            block += "\n[tabs] " + " | ".join(f"{tab.id}{'*' if tab.active else ''} {tab.url}" for tab in tabs)
+            block += "\n[tabs] " + " | ".join(
+                f"{tab.id}{'*' if tab.active else ''} {tab.url}" for tab in tabs
+            )
         if news:
             block += "\n[events] " + "; ".join(news)
         return block

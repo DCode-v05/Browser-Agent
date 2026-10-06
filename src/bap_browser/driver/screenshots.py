@@ -29,5 +29,7 @@ def size_of(picture: Picture) -> tuple[int, int]:
         if marker in JPEG_FRAMES:
             height, width = struct.unpack(">HH", data[at + 5 : at + 9])
             return width, height
-        at += 2 if marker in JPEG_ALONE or marker == 0xFF else 2 + struct.unpack(">H", data[at + 2 : at + 4])[0]
+        at += (
+            2 if marker in JPEG_ALONE or marker == 0xFF else 2 + struct.unpack(">H", data[at + 2 : at + 4])[0]
+        )
     raise BrowserError("The browser gave a picture that could not be read.", reason="the picture is broken")

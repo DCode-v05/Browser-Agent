@@ -52,7 +52,9 @@ async def test_a_link_that_opens_a_new_tab_is_followed_into_it(
 
         # A tab id is never used twice.
         new = await tools.call("browser_tabs", {"action": "new", "url": f"{site}/form.html"})
-        assert new.text.startswith(f"Opened tab t4.\nNavigated to {site}/form.html\nPage: Sign up\n"), new.text
+        assert new.text.startswith(f"Opened tab t4.\nNavigated to {site}/form.html\nPage: Sign up\n"), (
+            new.text
+        )
         empty = await tools.call("browser_tabs", {"action": "new"})
         assert empty.text.startswith("Opened tab t5. It is empty: open a page in it with browser_navigate.")
 

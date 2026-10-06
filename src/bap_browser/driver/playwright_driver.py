@@ -55,6 +55,7 @@ from bap_browser.driver.base import (
     TabInfo,
 )
 from bap_browser.driver.page_script import PageScript
+from bap_browser.driver.screenshots import size_of
 from bap_browser.driver.snapshot import snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
 from bap_browser.policy.address import without_credentials
@@ -62,6 +63,8 @@ from bap_browser.results import Picture
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
+# How many bytes of a picture the page script turns into text at a time.
+SHRINK_PIECE = 32768
 # After an action, two animation frames are enough for a navigation it started to show itself.
 SETTLE_FRAMES = 2
 NOT_STARTED = "The browser has not been started."
@@ -419,7 +422,9 @@ class PlaywrightDriver:
         tab = self._tabs.get(tab_id)
         if tab is None:
             open_tabs = ", ".join(self._tabs) or "none"
-            raise BadInput(f"There is no tab {tab_id}. Open tabs: {open_tabs}.", reason="there is no such tab")
+            raise BadInput(
+                f"There is no tab {tab_id}. Open tabs: {open_tabs}.", reason="there is no such tab"
+            )
         return tab
 
     async def tabs(self) -> list[TabInfo]:
@@ -1081,26 +1086,26 @@ class PlaywrightDriver:
 
     async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
         tab = self._current()
-        settings = self._config.browser.screenshot
         frame_ms = self._config.browser.timeouts.frame_ms
         area = await tab.script.call("area", {})
         if full_page:
-            x, y, width, height = 0, 0, area["fullWidth"], area["fullHeight"]
+            x, y, width = 0, 0, area["fullWidth"]
         else:
-            x, y, width, height = area["x"], area["y"], area["width"], area["height"]
-        # One pixel of the picture is one pixel of the page, unless the picture would be too large.
-        scale = min(1.0, settings.max_dimension / max(width, height))
+            x, y, width = area["x"], area["y"], area["width"]
         if annotate:
             await tab.script.call(
                 "label", {"on": True, "fullPage": full_page, "frameMs": frame_ms}, wait_ms=2 * frame_ms
             )
         try:
-            picture = await self._capture(tab, x, y, width, height, scale / area["ratio"], beyond=full_page)
+            # One pixel of the picture is one pixel of the page, on a screen of any density.
+            picture = await self._capture(tab, None, full_page=full_page, every_pixel=False)
         finally:
             if annotate:
                 with contextlib.suppress(BrowserError):
                     await tab.script.call("label", {"on": False})
-        taken = _Taken(x, y, scale, max(1, round(width * scale)), max(1, round(height * scale)))
+        picture, (shown_width, shown_height) = await self._fitted(tab, picture)
+        scale = shown_width / width
+        taken = _Taken(x, y, scale, shown_width, shown_height)
         tab.shot = taken
         if not full_page:
             # From now on a point the agent gives is a point of this picture.
@@ -1121,36 +1126,39 @@ class PlaywrightDriver:
                 f"{taken.height} pixels, with x0 less than x1 and y0 less than y1.",
                 reason="the region is outside the screenshot",
             )
-        width, height = (x1 - x0) / taken.scale, (y1 - y0) / taken.scale
-        ratio = (await tab.script.call("area", {}))["ratio"]
+        clip = {
+            "x": taken.x + x0 / taken.scale,
+            "y": taken.y + y0 / taken.scale,
+            "width": (x1 - x0) / taken.scale,
+            "height": (y1 - y0) / taken.scale,
+        }
         # Every pixel the browser draws for the region, unless that picture would be too large.
-        most = self._config.browser.screenshot.max_dimension
-        scale = min(1.0, most / (max(width, height) * ratio))
-        picture = await self._capture(
-            tab, taken.x + x0 / taken.scale, taken.y + y0 / taken.scale, width, height, scale, beyond=True
-        )
-        return Shot(
-            picture, max(1, round(width * ratio * scale)), max(1, round(height * ratio * scale)), scale < 1
-        )
+        whole = await self._capture(tab, clip, full_page=True, every_pixel=True)
+        picture, (width, height) = await self._fitted(tab, whole)
+        return Shot(picture, width, height, scaled=size_of(whole) != (width, height))
 
     async def _capture(
-        self, tab: _Tab, x: float, y: float, width: float, height: float, scale: float, *, beyond: bool
+        self, tab: _Tab, clip: dict[str, float] | None, *, full_page: bool, every_pixel: bool
     ) -> Picture:
-        """A picture of a rectangle of the page. `scale` is in the browser's own pixels, of which a
-        dense screen has several to a page pixel. The browser draws the picture at that size itself,
-        so it is never made smaller afterwards."""
+        """A picture of the page, or of a rectangle of it given in page pixels. It is taken the way the
+        browser's own driver takes one: a capture asked for on this driver's own DevTools session
+        resets the screen the browser emulates (spec 5.5)."""
         settings = self._config.browser.screenshot
         limit = self._config.browser.timeouts.action_ms / 1000
         wanted: dict[str, Any] = {
-            "format": settings.format,
-            "clip": {"x": x, "y": y, "width": width, "height": height, "scale": scale},
-            "captureBeyondViewport": beyond,
+            "type": settings.format,
+            "full_page": full_page,
+            # "css": one picture pixel to a page pixel. "device": every pixel a dense screen has.
+            "scale": "device" if every_pixel else "css",
+            "timeout": limit * 1000,
         }
+        if clip is not None:
+            wanted["clip"] = clip
         if settings.format == "jpeg":
             wanted["quality"] = settings.jpeg_quality
         try:
-            reply = await self._within(limit, tab.cdp.send("Page.captureScreenshot", wanted))
-        except TimeoutError:
+            data = await self._within(limit, tab.page.screenshot(**wanted))
+        except (TimeoutError, PlaywrightTimeoutError):
             raise BrowserError(
                 f"The browser did not give the picture within {limit:g} s.",
                 reason="the page is not answering",
@@ -1159,7 +1167,31 @@ class PlaywrightDriver:
             raise BrowserError(
                 f"The picture could not be taken: {first_line(exc)}", reason="the browser did not respond"
             ) from exc
-        return Picture(base64.b64decode(reply["data"]), f"image/{settings.format}")
+        return Picture(data, f"image/{settings.format}")
+
+    async def _fitted(self, tab: _Tab, picture: Picture) -> tuple[Picture, tuple[int, int]]:
+        """The picture, made smaller when its longest side is over the limit, and its size. The
+        browser makes it smaller itself, in the page script."""
+        settings = self._config.browser.screenshot
+        width, height = size_of(picture)
+        longest = max(width, height)
+        if longest <= settings.max_dimension:
+            return picture, (width, height)
+        fit = settings.max_dimension / longest
+        width, height = max(1, round(width * fit)), max(1, round(height * fit))
+        smaller = await tab.script.call(
+            "shrink",
+            {
+                "data": base64.b64encode(picture.data).decode("ascii"),
+                "mime": picture.mime,
+                "width": width,
+                "height": height,
+                "quality": settings.jpeg_quality / 100,
+                "piece": SHRINK_PIECE,
+            },
+            wait_ms=self._config.browser.timeouts.action_ms,
+        )
+        return Picture(base64.b64decode(smaller["data"]), picture.mime), (width, height)
 
     def page_point(self, x: float, y: float) -> tuple[float, float]:
         pixel = self._active.pixel if self._active else 1.0
