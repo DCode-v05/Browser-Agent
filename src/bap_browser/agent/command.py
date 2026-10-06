@@ -13,6 +13,7 @@ from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
 from bap_browser.config import Config
 from bap_browser.driver.playwright_driver import PlaywrightDriver
+from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 
@@ -167,13 +168,13 @@ async def chat_in_own_chrome(
     await service.start()
     try:
         assert service.bridge is not None
-        browser_extension.announce(extension, bridge=service.bridge_address, token=service.token)
+        bridge = service.bridge
         tell(
             "Load the extension into your Chrome, once: open chrome://extensions, switch on Developer "
             f"mode, press Load unpacked and choose {extension}"
         )
-        tell("Then open its side panel with the BAP icon in the toolbar, and keep it open.")
-        await _unless_stopped(service.bridge.wait_connected(), service)
+        tell("Then open its side panel with the BAP icon in the toolbar.")
+        await _unless_stopped(_paired(bridge, extension, service, config.bridge.pairing_ttl_s), service)
         tell("The extension has connected. Opening the agent's tab.")
         # The driver attaches to the tab through this process's own end of the bridge.
         browser = config.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
@@ -181,11 +182,12 @@ async def chat_in_own_chrome(
         driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
         # The person looks at their own browser: no picture of it is sent across the bridge.
         session = ServiceSession(attached, driver, agent=AGENT_NAME, on_task=tasks.put_nowait, pictures=False)
+        # Which sites the agent may read and act on is decided on the person's machine.
+        session.browser.ask_site = bridge.permit
+        session.browser.site_done = bridge.permit_done
         await _unless_stopped(session.start(), service)
         sessions[session.name] = session
-        browser_extension.announce(
-            extension, service.viewer_address, bridge=service.bridge_address, token=service.token
-        )
+        browser_extension.announce(extension, service.viewer_address, bridge=service.bridge_address)
         await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
         tell("Type a task in the side panel's chat. Press Ctrl+C to end.")
         await _converse(tasks, session, service, model_for(service), attached, first_task)
@@ -194,6 +196,18 @@ async def chat_in_own_chrome(
         if session is not None:
             await session.close()
         await service.stop()
+
+
+async def _paired(bridge: Bridge, extension: Path, service: Service, ttl_s: float) -> None:
+    """Waits for the extension to dial in. A pairing token is good for a short time only, so the
+    extension is handed a new one before the last has run out."""
+    waiting = asyncio.ensure_future(bridge.wait_connected())
+    try:
+        while not waiting.done():
+            browser_extension.announce(extension, bridge=service.bridge_address, token=bridge.pairing_token())
+            await asyncio.wait({waiting}, timeout=ttl_s / 2)
+    finally:
+        waiting.cancel()
 
 
 async def _next_task(tasks: asyncio.Queue[str], session: ServiceSession) -> str | None:

@@ -63,8 +63,11 @@ def announce(
     if viewer_address is not None:
         # Inside the side panel the viewer is a guest: it drops its own product name.
         told["viewer"] = viewer_address.replace("/#", "/?embed=1#", 1)
-    if bridge is not None and token is not None:
-        told["bridge"], told["token"] = bridge, token
+    if bridge is not None:
+        told["bridge"] = bridge
+    if token is not None:
+        # A pairing token: it lets the extension in once, and soon runs out.
+        told["token"] = token
     (folder / SESSION_FILE).write_text(json.dumps(told), encoding="utf-8")
 
 

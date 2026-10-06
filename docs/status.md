@@ -97,6 +97,28 @@ tool that takes a ref works inside a frame, and `browser_find` searches the fram
 browser (`tests/e2e/test_frames.py`). Known limit: something of the outer page that covers an element
 inside a frame is not noticed.
 
+### 1c. Finished on 2026-10-06: the extension as a real bridge
+
+For take-over Chrome (`uv run bap-browser agent --chat --takeover`):
+
+| Part | What it does now |
+|---|---|
+| The bridge in the background | The side panel can be closed while the agent works |
+| Pairing | A pairing token that is taken once and runs out; the session's own token no longer lets a bridge in |
+| Heartbeat and reconnect | A silent channel is closed; the bridge dials again by itself; the tab, its refs and the run survive a cut |
+| Site permissions | Allow once, Always allow on this site, Don't allow, asked in the extension's own page and kept on the person's machine; sites never offered; a deployment's block list; "ask before every action" |
+| Not relying on the core | Mouse, keyboard and navigation commands are checked again in the extension |
+| Stop | The extension's own "Stop the agent" |
+
+A fault that was there before was found and fixed on the way: the bridge could hand the driver something
+a tab said before the answer that came just ahead of it. The driver then dropped the page it had not
+heard of yet, and the agent's browser never started (about 1 start in 6 on a busy machine; none in 72
+after the fix).
+
+12 tests in a real Chromium with the extension loaded (`tests/viewer/test_takeover.py`). Not checked by
+me: the toolbar icon and the question window in a Chrome with a visible window, which a test cannot
+press; try them by hand.
+
 ### 2. Not started
 
 | What | Note |
@@ -104,7 +126,7 @@ inside a frame is not noticed.
 | The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
 | The address policy at the network layer | Redirects, link clicks, pop-ups and sub-resources are not checked. Only an address the agent opens itself is |
 | Bench, `perf/budget.json`, `bap-browser doctor`, the verify skill in the repository | None exists |
-| Take-over Chrome, the rest | A pairing token, a heartbeat and reconnecting by itself, permissions and previews enforced by the extension, more than one tab, a core that runs in a micro VM |
+| Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |
 | The micro VM | The image has never been built, started or deployed |
 | The code tool `browser_run` (milestone 4) | Not begun |

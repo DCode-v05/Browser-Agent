@@ -2,50 +2,61 @@
 //  1. shows the session's viewer, which is the chat;
 //  2. passes on to the pages of this window what the viewer says about who is driving, so that each
 //     page can show it (look.js);
-//  3. for take-over Chrome, is the bridge (spec 4.9): it dials out to the agent's core, attaches to
-//     one tab of this browser, and carries the core's commands to that tab and the tab's events back.
-// The bridge lives here and not in the background, because a page that stays open keeps its
-// connection, and the panel is open for as long as the person is working with the agent.
+//  3. is where the person answers the bridge's questions and stops the agent: whether it may work on
+//     a site, and the extension's own Stop (spec 8.8).
+// The bridge itself is in the background (background.js), so this panel can be closed while the
+// agent works.
 
-const SESSION_FILE = 'session.json';
 const LOOK = 'bap-browser.look';
-// How often the session file is read again, and how often the pages are told again. A page that has
-// just loaded learns within that time who is driving.
+// How often the background is asked where things stand, and how often the pages are told again. A
+// page that has just loaded learns within that time who is driving.
 const RELOAD_MS = 2000;
 const RETELL_MS = 1000;
-// How long a new tab is given to load before the browser lets a debugger attach to it.
-const TAB_READY_MS = 5000;
-const GROUP = { title: 'BAP agent', color: 'purple' };
 
 const frame = document.getElementById('viewer');
 const waiting = document.getElementById('waiting');
 const connecting = document.getElementById('connecting');
+const stopped = document.getElementById('stopped');
+const bar = document.getElementById('bridge');
+const barText = document.getElementById('bridge-text');
+const stop = document.getElementById('stop');
+const card = document.getElementById('question');
+const cardSite = document.getElementById('question-site');
+const cardDoing = document.getElementById('question-doing');
+const always = document.getElementById('always');
 
 /** The viewer's address now shown, and its origin: only messages from there are passed on. */
 let shown = '';
 let origin = '';
 /** What the viewer said last about who is driving. */
 let look = null;
+/** The question on screen now. */
+let asked = null;
 
-/** The bridge: where it dials in, its connection, and the tab it is attached to. */
-let bridgeAt = '';
-let bridge = null;
-let agentTab = null;
-
-async function connect() {
-  let session = {};
-  try {
-    // The core writes this file when a session starts and removes it when the session ends.
-    const answer = await fetch(chrome.runtime.getURL(SESSION_FILE), { cache: 'no-store' });
-    session = answer.ok ? await answer.json() : {};
-  } catch {
-    session = {};
-  }
-  showViewer(typeof session.viewer === 'string' ? session.viewer : '');
-  dial(typeof session.bridge === 'string' ? session.bridge : '', session.token);
+function show(state) {
+  showViewer(state.viewer);
   frame.hidden = !shown;
-  connecting.hidden = Boolean(shown) || !bridgeAt;
-  waiting.hidden = Boolean(shown) || Boolean(bridgeAt);
+  stopped.hidden = !state.stopped;
+  connecting.hidden = state.stopped || Boolean(shown) || !state.wanted;
+  waiting.hidden = state.stopped || Boolean(shown) || state.wanted;
+
+  // The bridge's own line: only where there is a bridge, which is take-over Chrome.
+  bar.hidden = !state.wanted || state.stopped;
+  bar.dataset.state = state.connected ? 'connected' : 'reconnecting';
+  barText.textContent = state.connected
+    ? state.attached
+      ? 'The agent is connected to its tab in this browser.'
+      : 'The agent is connected.'
+    : 'Reconnecting to the agent…';
+  stop.hidden = !state.connected;
+
+  asked = state.question;
+  card.hidden = !asked;
+  if (asked) {
+    cardSite.textContent = asked.site;
+    cardDoing.textContent = asked.summary;
+    always.hidden = !asked.always;
+  }
 }
 
 function showViewer(viewer) {
@@ -77,94 +88,28 @@ window.addEventListener('message', (event) => {
   tell(look);
 });
 
-// The bridge.
-
-function dial(address, token) {
-  if (address === bridgeAt) return;
-  bridgeAt = address;
-  bridge?.close();
-  bridge = null;
-  if (!address || typeof token !== 'string') return;
-  const socket = new WebSocket(address);
-  bridge = socket;
-  socket.onopen = () => socket.send(JSON.stringify({ type: 'auth', token }));
-  socket.onmessage = (message) => answer(socket, message.data);
-  socket.onclose = () => {
-    if (bridge !== socket) return;
-    // The session file is read again in a moment, and the bridge dials again if the core is still there.
-    bridge = null;
-    bridgeAt = '';
-    letGo();
-  };
-}
-
-async function answer(socket, data) {
-  let asked;
+async function refresh() {
   try {
-    asked = JSON.parse(data);
+    show(await chrome.runtime.sendMessage({ type: 'bap.check' }));
   } catch {
-    return;
+    // The background is starting again. It is asked again in a moment.
   }
-  const reply = { id: asked.id };
-  try {
-    reply.result = await carryOut(asked.method, asked.params ?? {});
-  } catch (error) {
-    reply.error = error instanceof Error ? error.message : String(error);
-  }
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(reply));
 }
 
-async function carryOut(method, params) {
-  if (method === 'attachToTab') return { targetInfo: await attach() };
-  if (method === 'detachFromTab') return letGo();
-  if (method === 'forwardCDPCommand') {
-    if (agentTab === null) throw new Error("The agent's tab is not attached.");
-    const target = params.sessionId ? { tabId: agentTab, sessionId: params.sessionId } : { tabId: agentTab };
-    return (await chrome.debugger.sendCommand(target, params.method, params.params)) ?? {};
-  }
-  throw new Error(`The bridge does not know "${method}".`);
-}
-
-/** Opens the agent's own tab, in a group of its own, and attaches to it. */
-async function attach() {
-  await letGo();
-  const tab = await chrome.tabs.create({ url: 'about:blank', active: true });
-  try {
-    const group = await chrome.tabs.group({ tabIds: tab.id });
-    await chrome.tabGroups.update(group, GROUP);
-  } catch {
-    // A browser with no tab strip has no groups. The tab is the agent's all the same.
-  }
-  const until = Date.now() + TAB_READY_MS;
-  while ((await chrome.tabs.get(tab.id)).status !== 'complete' && Date.now() < until) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  await chrome.debugger.attach({ tabId: tab.id }, '1.3');
-  agentTab = tab.id;
-  return (await chrome.debugger.sendCommand({ tabId: tab.id }, 'Target.getTargetInfo')).targetInfo;
-}
-
-/** Stops driving the agent's tab. The tab stays open, where the agent left it. */
-async function letGo() {
-  if (agentTab === null) return {};
-  const tab = agentTab;
-  agentTab = null;
-  await chrome.debugger.detach({ tabId: tab }).catch(() => undefined);
-  return {};
-}
-
-chrome.debugger.onEvent.addListener((source, method, params) => {
-  if (source.tabId !== agentTab || bridge?.readyState !== WebSocket.OPEN) return;
-  bridge.send(JSON.stringify({ method: 'forwardCDPEvent', params: { sessionId: source.sessionId, method, params } }));
+chrome.runtime.onMessage.addListener((message) => {
+  if (typeof message === 'object' && message !== null && message.type === 'bap.state') show(message.state);
 });
 
-// The person closed the tab, or told the browser to stop the debugging: the agent has lost its tab.
-chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId !== agentTab) return;
-  agentTab = null;
-  if (bridge?.readyState === WebSocket.OPEN) bridge.send(JSON.stringify({ method: 'detached' }));
-});
+for (const button of card.querySelectorAll('button[data-choice]')) {
+  button.addEventListener('click', () => {
+    if (!asked) return;
+    chrome.runtime.sendMessage({ type: 'bap.answer', id: asked.id, choice: button.dataset.choice });
+    card.hidden = true;
+  });
+}
 
-setInterval(connect, RELOAD_MS);
+stop.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'bap.stop' }));
+
+setInterval(refresh, RELOAD_MS);
 setInterval(() => look && tell(look), RETELL_MS);
-connect();
+refresh();
