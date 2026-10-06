@@ -118,6 +118,11 @@ describe('the chat panel (spec 9.14)', () => {
     expect(button.disabled).toBe(true);
     expect(input.placeholder).toBe(W.chat.closed);
   });
+
+  it('says how to go on once the session has ended', () => {
+    render(<ChatPanel chat={{ enabled: true, working: false, messages: [] }} status="stopped" doing="" open={false} maxChars={20} onSend={() => {}} />);
+    expect(screen.getByText(W.chat.startAgain)).toBeTruthy();
+  });
 });
 
 describe('what the agent is doing, in a word', () => {
