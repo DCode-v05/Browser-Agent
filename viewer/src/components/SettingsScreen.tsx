@@ -20,7 +20,7 @@ interface Props {
   onToast(text: string): void;
 }
 
-type RowStatus = { id: string; tone: 'saved' | 'refused'; text: string };
+type RowStatus = { id: string; tone: 'saving' | 'saved' | 'refused'; text: string };
 
 export function SettingsScreen({ source, surface, version, onClose, onChanged, onToast }: Props) {
   const [answer, setAnswer] = useState<SettingsAnswer | null>(null);
@@ -62,6 +62,8 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
 
   async function change(setting: Setting, value: SettingValue) {
     let result: ChangeResult;
+    // The service saves it. Until it has answered, the row says so and does not say Saved.
+    setStatus({ id: setting.id, tone: 'saving', text: W.settings.saving });
     try {
       result = await source.change(surface, { [setting.id]: value });
     } catch {

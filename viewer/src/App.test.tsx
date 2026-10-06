@@ -453,6 +453,21 @@ describe('settings', () => {
     expect(pointer).toBeChecked();
   });
 
+  it('says Saving while the service has not answered, and Saved only once it has', async () => {
+    let answer: () => void = () => undefined;
+    const answered = new Promise<void>((resolve) => (answer = resolve));
+    const real = createDemoSettings();
+    const slow = { ...real, change: async (...given: Parameters<typeof real.change>) => answered.then(() => real.change(...given)) };
+    const { user, dialog } = await open('agent', { settings: slow });
+    await user.click(within(dialog).getByRole('tab', { name: 'Live view' }));
+    await user.click(within(dialog).getByRole('switch', { name: 'Show where the agent is acting' }));
+    expect(await within(dialog).findByText('Saving…')).toHaveAttribute('role', 'status');
+    expect(within(dialog).queryByText('Saved')).not.toBeInTheDocument();
+    await act(async () => answer());
+    expect(await within(dialog).findByText('Saved')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Saving…')).not.toBeInTheDocument();
+  });
+
   it('opens from the top bar, with a group per kind of setting', async () => {
     const { dialog } = await open();
     expect(within(dialog).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Browser', 'Approvals', 'Sites', 'Files', 'Privacy', 'Live view', 'Appearance', 'Advanced']);
