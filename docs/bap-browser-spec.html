@@ -225,6 +225,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#915-the-extension-the-chat-in-the-browsers-side-panel">9.15 The extension: the chat in the browser&#x27;s side panel</a></li>
 <li><a href="#914-chat">9.14 Chat</a></li>
 <li><a href="#916-one-window-three-browsers">9.16 One window, three browsers</a></li>
+<li><a href="#917-the-three-browsers-as-systems">9.17 The three browsers as systems</a></li>
 </ul>
 </li>
 <li class="s"><a href="#10-configuration-and-settings">10. Configuration and settings</a>
@@ -256,6 +257,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#123-bench-output">12.3 Bench output</a></li>
 <li><a href="#124-the-verify-skill">12.4 The verify skill</a></li>
 <li><a href="#125-checklist">12.5 Checklist</a></li>
+<li><a href="#126-evaluations-of-the-three-systems">12.6 Evaluations of the three systems</a></li>
 </ul>
 </li>
 <li class="s"><a href="#13-testing">13. Testing</a>
@@ -909,6 +911,11 @@ starts once per service, not once per session.</p>
 <tr>
 <td><code>GET /api/config</code></td>
 <td>The effective configuration and where each value came from, with secrets left out</td>
+<td>Token</td>
+</tr>
+<tr>
+<td><code>GET /api/systems</code> and the routes under it</td>
+<td>The browsers of the three-browser window as systems: manage one, read its log, see what its tasks took, run its checklist (sections 9.17 and 12.6)</td>
 <td>Token</td>
 </tr>
 <tr>
@@ -3294,8 +3301,103 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 <li>The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (<code>/demo-site/members.html</code>).</li>
 </ul>
-<p>Not built yet: the same window inside the desktop app (it shows one browser of its own), a micro VM for
-the cloud browser's page, and the pop-up for an approval (it is a card).</p>
+<p>Not built yet: the same window inside the desktop app (it shows one browser of its own), and a micro VM
+for the cloud browser's page.</p>
+<h3 id="917-the-three-browsers-as-systems">9.17 The three browsers as systems</h3>
+<p>Each browser of the window is a <strong>system</strong>: it is set up by itself, managed by itself, writes a log of
+its own and keeps a record of its own tasks. The names are those of the pages: <code>cloud</code>, <code>chrome</code>,
+<code>builtin</code>.</p>
+<p><strong>Settings of its own.</strong> Most settings are each system's own (section 10.2 marks them): what the agent
+may do there, what it must ask about, the sites, the log, the picture, the model. A system's own value
+holds for it. Where it has none, the value a person set for every browser holds, and where there is none
+of those, the deployment's. The rule of section 10.1 holds for each system by itself: a person tightens
+and never loosens. The settings that are the person's and not a browser's (Colour mode, Show where the
+agent is acting) are one for the window, whichever system's screen they are changed on.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>On a page of the window</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The settings button</td>
+<td>Opens the settings of that page's browser. Its first setting is "Use this browser"</td>
+</tr>
+<tr>
+<td>A browser that is turned off</td>
+<td>Its tab says "Turned off". Its page says so, and has "Turn it on"</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>The Systems page.</strong> "Systems" in the bar opens a page in place of a browser's own, with the three
+systems side by side, each a card, and two views of them.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>View</th>
+<th>What a card shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Configuration</td>
+<td>Where the system stands. <strong>Use this browser</strong> (on, off). <strong>Restart</strong> and <strong>Stop</strong> for one that runs, <strong>Start</strong> for one that does not; a person's own Chrome is not started from here, it connects by itself. <strong>What the agent may do here</strong>: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". <strong>How it is set up</strong>: the model and every other setting of this system, in the words of its choices. <strong>All settings</strong> opens the settings screen of this system. <strong>Log file</strong>: where it is, and "Show the log" for its newest lines. <strong>Records of its tasks</strong>: the folder</td>
+</tr>
+<tr>
+<td>Evaluations</td>
+<td>Section 12.6</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Turning a system off</strong> ends its session, with "This browser was turned off." as the reason, and takes
+it off its page: nobody is connected to it, and the agent cannot work in it. It stays off the next time
+the service starts. Turning it on starts a new session. <strong>Stop</strong> ends the session and leaves the system
+on; <strong>Start</strong> and <strong>Restart</strong> give it a new browser and a new conversation. What cannot be done is
+answered with a sentence for the person: "This browser is turned off. Turn it on first."</p>
+<p><strong>A log of its own.</strong> Each system writes its tool calls to <code>&lt;logging.systems_dir&gt;/&lt;name&gt;.jsonl</code>, in the
+form of section 5.9's event log, and nothing goes to the one log of a single session. Where a deployment
+keeps no log (<code>logging.event_log</code> is <code>null</code>) no system writes one, until a person turns the log on for a
+system. The Systems page reads the newest <code>logging.shown_lines</code> lines of the file.</p>
+<p><strong>The API.</strong> All behind the token. A system the service does not have answers 404; a service with one
+session has none of these routes.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/systems</code></td>
+<td>Each system: where it stands, <code>enabled</code>, <code>model</code>, where its <code>log</code> is (<code>null</code> when it is off), the folder of its <code>records</code></td>
+</tr>
+<tr>
+<td><code>POST /api/systems/{name}/start</code>, <code>/stop</code>, <code>/restart</code></td>
+<td>Manage it. 409 with <code>{"error": …}</code>, a sentence, when it cannot be done</td>
+</tr>
+<tr>
+<td><code>GET /api/systems/{name}/log</code></td>
+<td><code>path</code>, the newest <code>lines</code>, the file's <code>size</code></td>
+</tr>
+<tr>
+<td><code>GET /api/settings?surface=…&amp;system={name}</code></td>
+<td>That system's settings. Each carries <code>scope</code>: <code>system</code> when a change is this system's alone, <code>all</code> when it is every browser's</td>
+</tr>
+<tr>
+<td><code>PATCH /api/settings</code> with <code>"system": "{name}"</code></td>
+<td>Change them. A system that was turned on or off is started or ended</td>
+</tr>
+<tr>
+<td><code>GET /api/systems/{name}/evals</code>, <code>/evals/{task}</code>, <code>POST …/evals/{task}/rating</code>, <code>POST …/checks</code></td>
+<td>Section 12.6</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>GET /api/sessions</code> says <code>systems: true</code> where the service has them, and the window then has the Systems
+page.</p>
 <h2 id="10-configuration-and-settings">10. Configuration and settings</h2>
 <p>Two words are used with care. <strong>Configuration</strong> is everything a deployment can set: every key in
 <code>config.py</code>. <strong>Settings</strong> are the part of it that a person may change in the settings screen.</p>
@@ -3641,6 +3743,13 @@ by the deployment (<code>settings.locked</code>); a deployment that must keep it
 <p><code>clear_browsing_data</code> and <code>about</code> hold no value: one is an action, the other is read-only.</p>
 <p><strong>When a change takes effect.</strong> <code>preferred_browser</code>, <code>stay_signed_in</code> and <code>show_builtin_browser</code> apply
 to the next session; the screen says so. Every other setting applies to the agent's next tool call.</p>
+<p><strong>Each system's own.</strong> Where the service has several browsers (section 9.17), these are set for each
+system by itself: <code>system_enabled</code> ("Use this browser", which is there only for a system), <code>agent_model</code>
+("Model", among <code>agent.model</code> and <code>agent.offered_models</code>), <code>ask_before</code>, <code>approval_wait</code>,
+<code>remember_site_approval</code>, <code>blocked_sites</code>, <code>allowed_sites</code>, <code>allow_downloads</code>, <code>allow_uploads</code>,
+<code>activity_log</code>, <code>picture_quality</code>, <code>page_scripts</code> and <code>code_tool</code> ("Let the agent run scripts of several
+steps", <code>code.enabled</code>, tighten only). The saved file holds a system's own values under
+<code>"systems": {"cloud": {…}}</code>, beside the values for every browser.</p>
 <p><strong>The settings API.</strong> <code>GET /api/settings?surface=web</code> returns the groups and, for each setting, its
 name, kind of control, choices, current value, default, whether it is locked and why, and when a
 change applies. A build returns only the settings whose feature it contains.</p>
@@ -4589,6 +4698,21 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>The model's name at that provider</td>
 </tr>
 <tr>
+<td><code>offered_models</code></td>
+<td><code>[]</code></td>
+<td>Other models at that provider that a person may choose in the settings screen, for each system</td>
+</tr>
+<tr>
+<td><code>input_price_per_million</code></td>
+<td>0.0</td>
+<td>What a million tokens sent to the model cost, in US dollars. 0 means not known: no cost is shown</td>
+</tr>
+<tr>
+<td><code>output_price_per_million</code></td>
+<td>0.0</td>
+<td>What a million tokens the model wrote cost, in US dollars</td>
+</tr>
+<tr>
 <td><code>api_key_env</code></td>
 <td><code>OPENAI_API_KEY</code></td>
 <td>The variable, in the environment or in <code>.env</code>, that holds the key. The key is never in <code>config.json</code></td>
@@ -4649,6 +4773,46 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>logging.max_result_chars</code></td>
 <td>2000</td>
 <td>The first line of the result, which says what was done, cut to this length. The page's content is never logged</td>
+</tr>
+<tr>
+<td><code>logging.systems_dir</code></td>
+<td><code>.bap-browser/logs</code></td>
+<td>Where each browser of the three-browser window writes a log of its own, <code>&lt;name&gt;.jsonl</code> (section 9.17)</td>
+</tr>
+<tr>
+<td><code>logging.shown_lines</code></td>
+<td>200</td>
+<td>The most lines of a log the window shows at once</td>
+</tr>
+<tr>
+<td><code>evals.enabled</code></td>
+<td><code>true</code></td>
+<td>Keep a record of each task a browser of the window does (section 12.6)</td>
+</tr>
+<tr>
+<td><code>evals.dir</code></td>
+<td><code>.bap-browser/evals</code></td>
+<td>Where those records are kept, in a folder for each browser</td>
+</tr>
+<tr>
+<td><code>evals.max_task_chars</code></td>
+<td>200</td>
+<td>How much of a task's own words, and of its answer, a record keeps</td>
+</tr>
+<tr>
+<td><code>evals.recent_tasks</code></td>
+<td>20</td>
+<td>The tasks the window lists for a browser, newest first</td>
+</tr>
+<tr>
+<td><code>evals.max_tasks_read</code></td>
+<td>2000</td>
+<td>The newest records a summary is made from</td>
+</tr>
+<tr>
+<td><code>evals.step_budget_ms</code></td>
+<td>2000</td>
+<td>The checklist's limit for one step in the browser</td>
 </tr>
 <tr>
 <td><code>bench.runs</code> / <code>bench.warmup</code></td>
@@ -5806,6 +5970,152 @@ the evidence before a change is called done.</p>
 <li class="ck"><span class="box" aria-hidden="true"></span>A script run by <code>browser_run</code> completes a multi-step task in one call, on every backend. Proof: test output.</li>
 <li class="ck"><span class="box" aria-hidden="true"></span>A script cannot import, reach underscore names, or bypass the policy. Proof: checker tests.</li>
 </ul>
+<h3 id="126-evaluations-of-the-three-systems">12.6 Evaluations of the three systems</h3>
+<p>The bench of sections 12.1 to 12.4 times each tool on pages made for it. This section is about the
+systems as a person uses them: every task a system does is recorded, and what the records add up to is
+shown for each system on the Systems page (section 9.17), beside a checklist of real steps.</p>
+<p><strong>What is recorded.</strong> One line for each task, in <code>&lt;evals.dir&gt;/&lt;name&gt;/tasks.jsonl</code>, for the person alone
+to read.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Kept</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>outcome</code></td>
+<td>How the task ended: <code>answered</code> (the agent gave its answer), <code>failed</code> (the model could not answer), <code>stopped</code> (a person stopped the task), <code>step_limit</code> (it ran out of steps), <code>ended</code> (the session ended under it)</td>
+</tr>
+<tr>
+<td><code>duration_ms</code>, <code>model_ms</code>, <code>tool_ms</code>, <code>waited_ms</code></td>
+<td>The whole task; the model's replies; the steps in the browser; and what those steps waited for a person, which is taken out of their time</td>
+</tr>
+<tr>
+<td><code>steps</code>, <code>steps_failed</code>, <code>model_calls</code></td>
+<td>Counts</td>
+</tr>
+<tr>
+<td><code>model</code>, <code>input_tokens</code>, <code>output_tokens</code>, <code>tokens_known</code>, <code>cost_usd</code></td>
+<td>The model, the tokens as the provider counted them, and what they cost. A model that does not say its tokens (a scripted one) has none and no cost. The cost is made from <code>agent.input_price_per_million</code> and <code>agent.output_price_per_million</code>; where neither is set, tokens are counted and no cost is made up</td>
+</tr>
+<tr>
+<td><code>task</code>, <code>answer</code></td>
+<td>The task and the answer in their own words, cut to <code>evals.max_task_chars</code>, with what the deployment hides taken out. Where the log is off for the system, they are not kept: only the numbers</td>
+</tr>
+<tr>
+<td><code>spans</code></td>
+<td>The trace: every reply of the model and every step, in order, each with when it began, how long it took, whether it worked, what it waited, and for a reply its tokens. A step is kept by its tool's name, never by what it was given: what is typed never reaches a record</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>What is shown for a system</strong> (<code>GET /api/systems/{name}/evals</code>), from its newest <code>evals.max_tasks_read</code>
+records:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>What it says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model</td>
+<td>The model the system uses now, and those its tasks used</td>
+</tr>
+<tr>
+<td>Outcome quality</td>
+<td>The share of tasks answered; how many failed, were stopped, ran out of steps; how many steps failed; and how many answers the person rated good and bad</td>
+</tr>
+<tr>
+<td>Latency</td>
+<td>A step in the browser and a reply of the model: the typical one (the median) and the slow one (95 in 100 are faster)</td>
+</tr>
+<tr>
+<td>Performance by tool</td>
+<td>For each tool: calls, typical, slow, failed. The tool most used comes first</td>
+</tr>
+<tr>
+<td>Time</td>
+<td>A task, typical and slow; and where the time of the tasks went: the model, the browser, waiting for the person</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>Tokens in and out, and dollars in all and for a task, where a price is set</td>
+</tr>
+<tr>
+<td>Traces</td>
+<td>The newest <code>evals.recent_tasks</code> tasks. <code>GET …/evals/{task}</code> gives one with its spans, which the page draws as bars: where in the task each began, and how long it was</td>
+</tr>
+<tr>
+<td>Rating</td>
+<td><code>POST …/evals/{task}/rating</code> with <code>{"rating": "good"}</code>, <code>"bad"</code> or <code>null</code>: the person's word on one answer. Pressed again, it is taken back</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>The checklist</strong> (<code>POST /api/systems/{name}/checks</code>) runs a short series of real steps on the service's
+own demo site, in that system's browser, and says for each whether it passed. Each step is a tool call
+like any other: it passes the same checks, is written to the system's log, and is a row of the timeline
+a person watches. What it types is made up. When it has finished, the browser goes back to where it
+was. It runs only on a session the agent is driving and that is doing nothing; otherwise the answer is
+409 with the reason in a sentence. The result is kept, and shown until the next run.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Passes when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The browser answers</td>
+<td><code>browser_tabs</code> answers</td>
+</tr>
+<tr>
+<td>Opens a page</td>
+<td>The demo site's start page opens</td>
+</tr>
+<tr>
+<td>Reads the page</td>
+<td>The snapshot holds the page's words</td>
+</tr>
+<tr>
+<td>Finds an element by its words</td>
+<td><code>browser_find</code> gives a ref for "create an account"</td>
+</tr>
+<tr>
+<td>Clicks, and the page follows</td>
+<td>A click on it opens the sign-up page</td>
+</tr>
+<tr>
+<td>Types into a field</td>
+<td>Typing into the first field works</td>
+</tr>
+<tr>
+<td>Takes a picture</td>
+<td><code>browser_screenshot</code> returns a picture</td>
+</tr>
+<tr>
+<td>Refuses the cloud metadata address</td>
+<td>Opening <code>169.254.169.254</code> is refused by the address policy</td>
+</tr>
+<tr>
+<td>Every step within <code>evals.step_budget_ms</code></td>
+<td>The slowest step of the run is within it</td>
+</tr>
+<tr>
+<td>Writes its log</td>
+<td>The system's log file grew during the run. Skipped where the log is off</td>
+</tr>
+<tr>
+<td>A person can be asked</td>
+<td>Someone is watching the system's page. Skipped when no one is</td>
+</tr>
+</tbody>
+</table></div>
+<p>Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
+section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.</p>
 <h2 id="13-testing">13. Testing</h2>
 <div class="tw"><table>
 <thead>

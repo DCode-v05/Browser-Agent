@@ -1628,13 +1628,22 @@
   margin-top: var(--space-2);
 }
 
+/* What the window has besides its browsers: the Systems page and the desktop app. */
+.studio-side {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
 .studio-desktop {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-3);
-  margin-inline-start: auto;
 }
 
 .studio-desktop-note {
@@ -1698,6 +1707,333 @@
   background: var(--surface-2);
   font-weight: var(--weight-medium);
   overflow-wrap: anywhere;
+}
+
+/* The Systems page (spec 9.17, 12.6): the three browsers side by side, each a card. */
+
+.systems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+  min-width: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.systems-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.systems-title {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-emphasis);
+  line-height: var(--line-tight);
+  letter-spacing: var(--tracking-title);
+}
+
+.systems-lead,
+.systems-note {
+  color: var(--text-muted);
+}
+
+.systems-views {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.systems-view {
+  min-height: var(--control-height);
+  padding: var(--space-1) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.systems-view[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.systems-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--activity-width)), 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.system-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.system-card[data-enabled='false'] {
+  background: var(--surface-2);
+}
+
+.system-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.system-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-emphasis);
+}
+
+.system-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.system-state[data-on='true'] {
+  color: var(--success);
+}
+
+.system-section {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-emphasis);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.system-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.system-row-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.system-locked,
+.system-check-detail {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.system-list,
+.system-checks,
+.system-tasks,
+.system-log-lines,
+.system-trace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.system-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.system-note {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.system-note[data-tone='success'] {
+  color: var(--success);
+}
+
+.system-note[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.system-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.system-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-3);
+}
+
+.system-fact dt {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.system-fact dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.system-path {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.system-log-line,
+.system-span {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-secondary);
+}
+
+.system-log-when,
+.system-log-took,
+.system-check-took,
+.system-span-took {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+.system-log-tool,
+.system-span-name {
+  font-family: var(--font-mono);
+}
+
+.system-log-said {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.system-log-line[data-ok='false'] .system-log-took,
+.system-span[data-ok='false'] .system-span-name {
+  color: var(--danger);
+}
+
+.system-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-secondary);
+}
+
+.system-table th,
+.system-table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+  text-align: right;
+  font-weight: var(--weight-regular);
+}
+
+.system-table th:first-child {
+  text-align: left;
+  font-family: var(--font-mono);
+}
+
+.system-table thead th,
+.system-table thead th:first-child {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+
+.system-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.system-check[data-state='ok'] {
+  color: var(--success);
+}
+
+.system-check[data-state='failed'] {
+  color: var(--danger);
+}
+
+.system-check[data-state='skipped'] {
+  color: var(--text-muted);
+}
+
+.system-check-title {
+  color: var(--text);
+}
+
+.system-task {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+}
+
+.system-task-words {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.system-span {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+}
+
+.system-span-track {
+  display: block;
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.system-span-bar {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--agent);
+}
+
+.system-span[data-kind='model'] .system-span-bar {
+  background: var(--person);
+}
+
+.system-span[data-ok='false'] .system-span-bar {
+  background: var(--danger);
 }
 
 /* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */

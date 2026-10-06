@@ -51,6 +51,9 @@ def write_config(folder: Path, **sections: Any) -> Path:
     data["server"] = {"state_file": str(folder / "service.json"), **data.get("server", {})}
     # And what a person saved in the settings screen: the developer's own must not reach a test.
     data["settings"] = {"file": str(folder / "settings.json"), **data.get("settings", {})}
+    # And the records of what each browser of the window did, and their logs.
+    data["evals"] = {"dir": str(folder / "evals"), **data.get("evals", {})}
+    data["logging"] = {"systems_dir": str(folder / "logs"), **data.get("logging", {})}
     path = folder / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     return path

@@ -13,6 +13,7 @@ from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
 from bap_browser.config import Config
 from bap_browser.driver.playwright_driver import PlaywrightDriver
+from bap_browser.evals.record import Outcome, Recorder
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
@@ -235,16 +236,40 @@ async def _next_task(tasks: asyncio.Queue[str], session: ServiceSession) -> str 
 
 
 async def _do(
-    task: str, session: ServiceSession, model: Model, config: Config, history: list[Message]
+    task: str,
+    session: ServiceSession,
+    model: Model,
+    config: Config,
+    history: list[Message],
+    recorder: Recorder | None = None,
 ) -> None:
-    """Runs one task and says how it went in the chat."""
+    """Runs one task and says how it went in the chat. With `recorder`, what the task took is
+    kept: its time, its steps, its tokens and how it ended (spec 12.6)."""
     begun = len(history)
     session.working(True)
+    # A person may have chosen another model for this browser since the last task (spec 10.2).
+    use = getattr(model, "use", None)
+    if callable(use):
+        use(config.agent)
+    trace = (
+        recorder.begin(
+            task,
+            config.agent,
+            # Where a person turned the log off, the task's own words are not kept either.
+            keep_words=session.config.logging.event_log is not None,
+            waited_s=lambda: session.waited_for_a_person_s,
+            redact=session.browser.redact,
+        )
+        if recorder is not None
+        else None
+    )
+    outcome: Outcome = "ended"
+    answer = ""
     try:
         answer = await run_agent(
             await _with_where_the_browser_is(task, session),
-            session.toolkit,
-            model,
+            session.toolkit if trace is None else trace.tools(session.toolkit),
+            model if trace is None else trace.model(model),
             config.agent,
             on_text=lambda text: session.said("agent", text),
             ended=lambda: session.control == "ended",
@@ -252,11 +277,20 @@ async def _do(
             history=history,
         )
         session.said("agent", answer)
+        outcome = "answered"
     except (ModelError, Unfinished) as stopped:
+        if isinstance(stopped, ModelError):
+            outcome = "failed"
+        elif session.task_stopped():
+            outcome = "stopped"
+        elif session.control != "ended":
+            outcome = "step_limit"
         if session.control != "ended":
             # A task a person stopped has not failed.
             session.said("agent", str(stopped), failed=not session.task_stopped())
     finally:
+        if trace is not None:
+            trace.finish(outcome, answer)
         _tidy(history, begun)
         session.working(False)
 

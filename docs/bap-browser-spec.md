@@ -340,6 +340,7 @@ Rules:
 | `GET /api/settings?surface=…` | The settings a person may see on that surface: each with its value, its choices and whether it is locked | Token |
 | `PATCH /api/settings` | Change settings a person is allowed to change | Token |
 | `GET /api/config` | The effective configuration and where each value came from, with secrets left out | Token |
+| `GET /api/systems` and the routes under it | The browsers of the three-browser window as systems: manage one, read its log, see what its tasks took, run its checklist (sections 9.17 and 12.6) | Token |
 | `POST /api/browsing-data/clear` | Delete cookies and site data in the cloud browser. Ends that browser's open sessions first | Token |
 | `/mcp` | MCP over streamable HTTP | Bearer token |
 | `POST /api/bridge/pairings` | Create a pairing token for a bridge (milestone 2) | Token |
@@ -1598,8 +1599,60 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 - The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (`/demo-site/members.html`).
 
-Not built yet: the same window inside the desktop app (it shows one browser of its own), a micro VM for
-the cloud browser's page, and the pop-up for an approval (it is a card).
+Not built yet: the same window inside the desktop app (it shows one browser of its own), and a micro VM
+for the cloud browser's page.
+
+### 9.17 The three browsers as systems
+
+Each browser of the window is a **system**: it is set up by itself, managed by itself, writes a log of
+its own and keeps a record of its own tasks. The names are those of the pages: `cloud`, `chrome`,
+`builtin`.
+
+**Settings of its own.** Most settings are each system's own (section 10.2 marks them): what the agent
+may do there, what it must ask about, the sites, the log, the picture, the model. A system's own value
+holds for it. Where it has none, the value a person set for every browser holds, and where there is none
+of those, the deployment's. The rule of section 10.1 holds for each system by itself: a person tightens
+and never loosens. The settings that are the person's and not a browser's (Colour mode, Show where the
+agent is acting) are one for the window, whichever system's screen they are changed on.
+
+| On a page of the window | What it is |
+|---|---|
+| The settings button | Opens the settings of that page's browser. Its first setting is "Use this browser" |
+| A browser that is turned off | Its tab says "Turned off". Its page says so, and has "Turn it on" |
+
+**The Systems page.** "Systems" in the bar opens a page in place of a browser's own, with the three
+systems side by side, each a card, and two views of them.
+
+| View | What a card shows |
+|---|---|
+| Configuration | Where the system stands. **Use this browser** (on, off). **Restart** and **Stop** for one that runs, **Start** for one that does not; a person's own Chrome is not started from here, it connects by itself. **What the agent may do here**: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". **How it is set up**: the model and every other setting of this system, in the words of its choices. **All settings** opens the settings screen of this system. **Log file**: where it is, and "Show the log" for its newest lines. **Records of its tasks**: the folder |
+| Evaluations | Section 12.6 |
+
+**Turning a system off** ends its session, with "This browser was turned off." as the reason, and takes
+it off its page: nobody is connected to it, and the agent cannot work in it. It stays off the next time
+the service starts. Turning it on starts a new session. **Stop** ends the session and leaves the system
+on; **Start** and **Restart** give it a new browser and a new conversation. What cannot be done is
+answered with a sentence for the person: "This browser is turned off. Turn it on first."
+
+**A log of its own.** Each system writes its tool calls to `<logging.systems_dir>/<name>.jsonl`, in the
+form of section 5.9's event log, and nothing goes to the one log of a single session. Where a deployment
+keeps no log (`logging.event_log` is `null`) no system writes one, until a person turns the log on for a
+system. The Systems page reads the newest `logging.shown_lines` lines of the file.
+
+**The API.** All behind the token. A system the service does not have answers 404; a service with one
+session has none of these routes.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/systems` | Each system: where it stands, `enabled`, `model`, where its `log` is (`null` when it is off), the folder of its `records` |
+| `POST /api/systems/{name}/start`, `/stop`, `/restart` | Manage it. 409 with `{"error": …}`, a sentence, when it cannot be done |
+| `GET /api/systems/{name}/log` | `path`, the newest `lines`, the file's `size` |
+| `GET /api/settings?surface=…&system={name}` | That system's settings. Each carries `scope`: `system` when a change is this system's alone, `all` when it is every browser's |
+| `PATCH /api/settings` with `"system": "{name}"` | Change them. A system that was turned on or off is started or ended |
+| `GET /api/systems/{name}/evals`, `/evals/{task}`, `POST …/evals/{task}/rating`, `POST …/checks` | Section 12.6 |
+
+`GET /api/sessions` says `systems: true` where the service has them, and the window then has the Systems
+page.
 
 ## 10. Configuration and settings
 
@@ -1693,6 +1746,14 @@ by the deployment (`settings.locked`); a deployment that must keep its event log
 
 **When a change takes effect.** `preferred_browser`, `stay_signed_in` and `show_builtin_browser` apply
 to the next session; the screen says so. Every other setting applies to the agent's next tool call.
+
+**Each system's own.** Where the service has several browsers (section 9.17), these are set for each
+system by itself: `system_enabled` ("Use this browser", which is there only for a system), `agent_model`
+("Model", among `agent.model` and `agent.offered_models`), `ask_before`, `approval_wait`,
+`remember_site_approval`, `blocked_sites`, `allowed_sites`, `allow_downloads`, `allow_uploads`,
+`activity_log`, `picture_quality`, `page_scripts` and `code_tool` ("Let the agent run scripts of several
+steps", `code.enabled`, tighten only). The saved file holds a system's own values under
+`"systems": {"cloud": {…}}`, beside the values for every browser.
 
 **The settings API.** `GET /api/settings?surface=web` returns the groups and, for each setting, its
 name, kind of control, choices, current value, default, whether it is locked and why, and when a
@@ -1984,6 +2045,9 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 |---|---|---|
 | `provider` | `openai` | Whose model the loop calls. `scripted` replays fixed replies and needs no key |
 | `model` | `gpt-5.6-luna` | The model's name at that provider |
+| `offered_models` | `[]` | Other models at that provider that a person may choose in the settings screen, for each system |
+| `input_price_per_million` | 0.0 | What a million tokens sent to the model cost, in US dollars. 0 means not known: no cost is shown |
+| `output_price_per_million` | 0.0 | What a million tokens the model wrote cost, in US dollars |
 | `api_key_env` | `OPENAI_API_KEY` | The variable, in the environment or in `.env`, that holds the key. The key is never in `config.json` |
 | `base_url` | `https://api.openai.com/v1` | Where the provider's API is. Change it for a proxy or a compatible service |
 | `request_timeout_s` | 120 | Longest wait for one reply from the model |
@@ -1999,6 +2063,14 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `logging.event_log` | `.bap-browser/events.jsonl` | One line per tool call; `null` disables |
 | `logging.log_tool_args` | `true` | Arguments are logged with typed text replaced by its length and without a name and password in an address. A call that could not run is logged with the names of its arguments only |
 | `logging.max_result_chars` | 2000 | The first line of the result, which says what was done, cut to this length. The page's content is never logged |
+| `logging.systems_dir` | `.bap-browser/logs` | Where each browser of the three-browser window writes a log of its own, `<name>.jsonl` (section 9.17) |
+| `logging.shown_lines` | 200 | The most lines of a log the window shows at once |
+| `evals.enabled` | `true` | Keep a record of each task a browser of the window does (section 12.6) |
+| `evals.dir` | `.bap-browser/evals` | Where those records are kept, in a folder for each browser |
+| `evals.max_task_chars` | 200 | How much of a task's own words, and of its answer, a record keeps |
+| `evals.recent_tasks` | 20 | The tasks the window lists for a browser, newest first |
+| `evals.max_tasks_read` | 2000 | The newest records a summary is made from |
+| `evals.step_budget_ms` | 2000 | The checklist's limit for one step in the browser |
 | `bench.runs` / `bench.warmup` | 30 / 5 | Samples per line |
 | `bench.budget_file` | `perf/budget.json` | |
 | `bench.results_dir` | `.bap-browser/bench` | |
@@ -2425,6 +2497,62 @@ The items below are milestone 1. Items added by later milestones follow at the e
 **Added by milestone 4: code tool**
 - [ ] A script run by `browser_run` completes a multi-step task in one call, on every backend. Proof: test output.
 - [ ] A script cannot import, reach underscore names, or bypass the policy. Proof: checker tests.
+
+### 12.6 Evaluations of the three systems
+
+The bench of sections 12.1 to 12.4 times each tool on pages made for it. This section is about the
+systems as a person uses them: every task a system does is recorded, and what the records add up to is
+shown for each system on the Systems page (section 9.17), beside a checklist of real steps.
+
+**What is recorded.** One line for each task, in `<evals.dir>/<name>/tasks.jsonl`, for the person alone
+to read.
+
+| Kept | What it is |
+|---|---|
+| `outcome` | How the task ended: `answered` (the agent gave its answer), `failed` (the model could not answer), `stopped` (a person stopped the task), `step_limit` (it ran out of steps), `ended` (the session ended under it) |
+| `duration_ms`, `model_ms`, `tool_ms`, `waited_ms` | The whole task; the model's replies; the steps in the browser; and what those steps waited for a person, which is taken out of their time |
+| `steps`, `steps_failed`, `model_calls` | Counts |
+| `model`, `input_tokens`, `output_tokens`, `tokens_known`, `cost_usd` | The model, the tokens as the provider counted them, and what they cost. A model that does not say its tokens (a scripted one) has none and no cost. The cost is made from `agent.input_price_per_million` and `agent.output_price_per_million`; where neither is set, tokens are counted and no cost is made up |
+| `task`, `answer` | The task and the answer in their own words, cut to `evals.max_task_chars`, with what the deployment hides taken out. Where the log is off for the system, they are not kept: only the numbers |
+| `spans` | The trace: every reply of the model and every step, in order, each with when it began, how long it took, whether it worked, what it waited, and for a reply its tokens. A step is kept by its tool's name, never by what it was given: what is typed never reaches a record |
+
+**What is shown for a system** (`GET /api/systems/{name}/evals`), from its newest `evals.max_tasks_read`
+records:
+
+| Dimension | What it says |
+|---|---|
+| Model | The model the system uses now, and those its tasks used |
+| Outcome quality | The share of tasks answered; how many failed, were stopped, ran out of steps; how many steps failed; and how many answers the person rated good and bad |
+| Latency | A step in the browser and a reply of the model: the typical one (the median) and the slow one (95 in 100 are faster) |
+| Performance by tool | For each tool: calls, typical, slow, failed. The tool most used comes first |
+| Time | A task, typical and slow; and where the time of the tasks went: the model, the browser, waiting for the person |
+| Cost | Tokens in and out, and dollars in all and for a task, where a price is set |
+| Traces | The newest `evals.recent_tasks` tasks. `GET …/evals/{task}` gives one with its spans, which the page draws as bars: where in the task each began, and how long it was |
+| Rating | `POST …/evals/{task}/rating` with `{"rating": "good"}`, `"bad"` or `null`: the person's word on one answer. Pressed again, it is taken back |
+
+**The checklist** (`POST /api/systems/{name}/checks`) runs a short series of real steps on the service's
+own demo site, in that system's browser, and says for each whether it passed. Each step is a tool call
+like any other: it passes the same checks, is written to the system's log, and is a row of the timeline
+a person watches. What it types is made up. When it has finished, the browser goes back to where it
+was. It runs only on a session the agent is driving and that is doing nothing; otherwise the answer is
+409 with the reason in a sentence. The result is kept, and shown until the next run.
+
+| Check | Passes when |
+|---|---|
+| The browser answers | `browser_tabs` answers |
+| Opens a page | The demo site's start page opens |
+| Reads the page | The snapshot holds the page's words |
+| Finds an element by its words | `browser_find` gives a ref for "create an account" |
+| Clicks, and the page follows | A click on it opens the sign-up page |
+| Types into a field | Typing into the first field works |
+| Takes a picture | `browser_screenshot` returns a picture |
+| Refuses the cloud metadata address | Opening `169.254.169.254` is refused by the address policy |
+| Every step within `evals.step_budget_ms` | The slowest step of the run is within it |
+| Writes its log | The system's log file grew during the run. Skipped where the log is off |
+| A person can be asked | Someone is watching the system's page. Skipped when no one is |
+
+Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
+section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.
 
 ---
 

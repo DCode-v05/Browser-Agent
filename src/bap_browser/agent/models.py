@@ -20,9 +20,19 @@ class ToolCall:
 
 
 @dataclass(frozen=True)
+class Usage:
+    """What one reply cost in tokens, as the provider counted them."""
+
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True)
 class Reply:
     text: str
     tool_calls: tuple[ToolCall, ...] = ()
+    usage: Usage | None = None
+    """None when the model does not say, as a scripted one does not."""
 
 
 @dataclass(frozen=True)

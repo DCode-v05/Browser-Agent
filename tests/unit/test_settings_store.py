@@ -31,6 +31,7 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
     assert answer["surface"] == "web"
     assert [(group["id"], group["title"]) for group in answer["groups"]] == [
         ("browser", "Browser"),
+        ("agent", "Agent"),
         ("approvals", "Approvals"),
         ("sites", "Sites"),
         ("files", "Files"),
@@ -112,7 +113,7 @@ def test_a_surface_shows_only_what_it_can_act_on(make_config: MakeConfig, tmp_pa
     store = SettingsStore(make_config(tmp_path))
     web, mobile = settings_in(store.answer("web")), settings_in(store.answer("mobile"))
     assert set(mobile) < set(web)
-    assert set(web) - set(mobile) == {"preferred_browser", "page_scripts", "about"}
+    assert set(web) - set(mobile) == {"preferred_browser", "page_scripts", "code_tool", "about"}
     assert "advanced" not in [group["id"] for group in store.answer("mobile")["groups"]]
     assert settings_in(store.answer("desktop")).keys() == web.keys()
     # A setting of another surface is neither shown nor accepted.
@@ -389,3 +390,154 @@ def test_a_configuration_no_person_changed_is_handed_back_as_it_is(
 ) -> None:
     config = make_config(tmp_path)
     assert SettingsStore(config).apply_to(config) is config
+
+
+# Where a service has several browsers, each is a system with settings of its own (spec 9.17).
+
+
+def test_a_system_has_settings_of_its_own(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    assert store.change("web", {"ask_before": "every_action", "blocked_sites": ["ads.example"]}, "cloud") == {
+        "ask_before": "every_action",
+        "blocked_sites": ["ads.example"],
+    }
+    cloud, built_in = store.apply_to(config, system="cloud"), store.apply_to(config, system="builtin")
+    assert cloud.safety.ask_before == "every_action" and cloud.safety.blocked_domains == ["ads.example"]
+    assert built_in.safety.ask_before == "risky" and built_in.safety.blocked_domains == []
+    # A service with one session, which is no system among several, is not touched by it either.
+    assert store.apply_to(config) is config
+
+    shown = store.answer("web", "cloud")
+    assert shown["system"] == "cloud"
+    assert settings_in(shown)["ask_before"]["value"] == "every_action"
+    # The screen is told which settings are this browser's alone, and which are every browser's.
+    assert settings_in(shown)["ask_before"]["scope"] == "system"
+    assert settings_in(shown)["colour_mode"]["scope"] == "all"
+    assert "scope" not in settings_in(store.answer("web"))["ask_before"]
+    assert settings_in(store.answer("web", "builtin"))["ask_before"]["value"] == "risky"
+    assert "system" not in store.answer("web")
+    assert json.loads(Path(config.settings.file).read_text(encoding="utf-8")) == {
+        "systems": {"cloud": {"ask_before": "every_action", "blocked_sites": ["ads.example"]}}
+    }
+    # And it is there again the next time the service starts.
+    assert SettingsStore(config).apply_to(config, system="cloud").safety.ask_before == "every_action"
+
+
+def test_a_system_without_a_value_of_its_own_has_the_one_for_every_browser(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.change("web", {"approval_wait": "60"})
+    store.change("web", {"approval_wait": "600"}, "chrome")
+    assert store.apply_to(config, system="cloud").control.approval_timeout_s == 60
+    assert store.apply_to(config, system="chrome").control.approval_timeout_s == 600
+    assert settings_in(store.answer("web", "cloud"))["approval_wait"]["value"] == "60"
+
+
+def test_what_is_the_persons_and_not_a_browsers_is_kept_for_every_browser(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    """The colour of the window is not one browser's. Changed on a system's screen, it changes everywhere."""
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.change("web", {"colour_mode": "dark", "picture_quality": "high"}, "cloud")
+    assert json.loads(Path(config.settings.file).read_text(encoding="utf-8")) == {
+        "colour_mode": "dark",
+        "systems": {"cloud": {"picture_quality": "high"}},
+    }
+    assert settings_in(store.answer("web", "builtin"))["colour_mode"]["value"] == "dark"
+    assert store.apply_to(config, system="builtin").viewer.quality == "standard"
+
+
+def test_a_browser_of_the_window_is_turned_off_and_on(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    assert all(store.enabled(system) for system in ("cloud", "chrome", "builtin"))
+    shown = settings_in(store.answer("web", "chrome"))["system_enabled"]
+    assert (shown["title"], shown["control"], shown["value"]) == ("Use this browser", "switch", True)
+    store.change("web", {"system_enabled": False}, "chrome")
+    assert not store.enabled("chrome") and store.enabled("cloud") and store.enabled("builtin")
+    assert not SettingsStore(config).enabled("chrome"), "it stays off the next time"
+    store.change("web", {"system_enabled": True}, "chrome")
+    assert store.enabled("chrome")
+    # A service with one session has no browser to turn off.
+    assert "system_enabled" not in settings_in(store.answer("web"))
+    assert refused(store, "web", system_enabled=False) == ("system_enabled", "not_on_this_surface")
+
+
+def test_a_system_cannot_loosen_what_the_deployment_requires_either(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    for setting in ("page_scripts", "code_tool"):
+        assert settings_in(store.answer("web", "cloud"))[setting]["locked"] is True
+        with pytest.raises(Refused) as no:
+            store.change("web", {setting: True}, "cloud")
+        assert (no.value.setting, no.value.reason) == (setting, "would_loosen")
+    # Where the deployment offers the script tool, a person turns it off for one browser.
+    offered = make_config(tmp_path, code={"enabled": True})
+    choosing = SettingsStore(offered)
+    choosing.change("web", {"code_tool": False}, "chrome")
+    assert choosing.apply_to(offered, system="chrome").code.enabled is False
+    assert choosing.apply_to(offered, system="cloud").code.enabled is True
+
+
+def test_the_model_is_chosen_for_each_browser_among_those_offered(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, agent={"model": "model-a", "offered_models": ["model-b", "model-a"]})
+    store = SettingsStore(config)
+    shown = settings_in(store.answer("web", "cloud"))["agent_model"]
+    assert [choice["value"] for choice in shown["choices"]] == ["model-a", "model-b"]
+    assert shown["value"] == "model-a" and shown["control"] == "select"
+    store.change("web", {"agent_model": "model-b"}, "cloud")
+    assert store.apply_to(config, system="cloud").agent.model == "model-b"
+    assert store.apply_to(config, system="builtin").agent.model == "model-a"
+    with pytest.raises(Refused) as no:
+        store.change("web", {"agent_model": "model-z"}, "cloud")
+    assert no.value.reason == "not_a_choice"
+
+
+def test_each_browser_writes_a_log_of_its_own(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path, logging={"event_log": None, "systems_dir": str(tmp_path / "logs")})
+    store = SettingsStore(config)
+    # The deployment keeps no log. A person who wants one for a browser gets that browser's own file.
+    assert store.apply_to(config, system="cloud").logging.event_log is None
+    store.change("web", {"activity_log": True}, "cloud")
+    assert store.apply_to(config, system="cloud").logging.event_log == str(tmp_path / "logs" / "cloud.jsonl")
+    assert store.apply_to(config, system="builtin").logging.event_log is None
+    store.change("web", {"activity_log": False}, "cloud")
+    assert store.apply_to(config, system="cloud").logging.event_log is None
+
+
+def test_saved_settings_of_systems_are_read_with_care(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    Path(config.settings.file).write_text(
+        json.dumps(
+            {
+                "colour_mode": "dark",
+                "systems": {
+                    "cloud": {
+                        "ask_before": "every_action",
+                        "a_later_setting": 1,
+                        "picture_quality": "finest",
+                    },
+                    "Not A Name": {"ask_before": "every_action"},
+                    "chrome": "not settings",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = SettingsStore(config)
+    assert store.apply_to(config, system="cloud").safety.ask_before == "every_action"
+    assert store.apply_to(config, system="cloud").viewer.quality == "standard"
+    assert store.apply_to(config, system="chrome").safety.ask_before == "risky"
+    with pytest.raises(Refused):
+        store.change("web", {"ask_before": "risky"}, "Not A Name")
+    # A file whose systems are no object is still a person's settings for every browser.
+    Path(config.settings.file).write_text('{"colour_mode": "light", "systems": []}', encoding="utf-8")
+    assert settings_in(SettingsStore(config).answer("web"))["colour_mode"]["value"] == "light"

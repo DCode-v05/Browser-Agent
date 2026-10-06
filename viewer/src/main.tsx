@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { App, preferencesFrom } from './App';
 import { Studio } from './Studio';
 import { desktopOpener, factsFrom, NO_FACTS, roomsFrom } from './studio/rooms';
+import { systemsFrom } from './systems/api';
+import { W } from './wording';
 import { socketAddress, takeToken } from './connection/address';
 import type { Connection } from './connection/connection';
 import { DemoConnection } from './connection/demo';
@@ -85,6 +87,7 @@ if (theme === 'light' || theme === 'dark') preferences.colourMode = theme;
 const loadRooms = token && !recorded && !query.has('session') ? roomsFrom(location.href, token) : null;
 const rooms = loadRooms ? facts.rooms : null;
 const openDesktop = rooms && token && facts.desktop ? desktopOpener(location.href, token) : undefined;
+const systems = rooms && token && facts.systems ? systemsFrom(location.href, token, W.systems.unreachable) : undefined;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -97,6 +100,7 @@ createRoot(document.getElementById('root')!).render(
         opensOn={tabStorage.getItem(PAGE_KEY) ?? undefined}
         onPage={(room) => tabStorage.setItem(PAGE_KEY, room)}
         openDesktop={openDesktop}
+        systems={systems}
         settings={settings}
         surface={surface}
         preferences={preferences}

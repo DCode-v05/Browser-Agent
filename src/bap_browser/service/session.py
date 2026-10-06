@@ -59,13 +59,16 @@ class ServiceSession:
         self._given = config
         self._settings = settings
         if settings is not None:
-            config = settings.apply_to(config, backend)
+            # A browser among several has settings of its own, under the session's name (spec 9.17).
+            config = settings.apply_to(config, backend, name)
         self.config = config
         self.name = name
         self.hub = EventHub(config.viewer.history_events)
         self.browser = BrowserSession(config, driver)
-        self.browser.ask_person = self._ask_person
-        self.browser.ask_approval = self._ask_approval
+        self.browser.ask_person = self._ask_person_timed
+        self.browser.ask_approval = self._ask_approval_timed
+        # How long the agent's calls have waited for a person in all, in seconds (spec 12.6).
+        self.waited_for_a_person_s = 0.0
         self.browser.on_event = self._happened
         # The approval that is open now, and how it was answered.
         self._approval: str | None = None
@@ -142,7 +145,7 @@ class ServiceSession:
         if self._settings is None or self.control == "ended":
             return
         before = self.config
-        self.config = config = self._settings.apply_to(self._given, self._backend)
+        self.config = config = self._settings.apply_to(self._given, self._backend, self.name)
         self.browser.reconfigure(config)
         self.toolkit.reconfigure()
         self.hub.publish({"type": "settings_changed", "changes": dict(changes)})
@@ -458,6 +461,22 @@ class ServiceSession:
         )
 
     # The agent asks a person to do a step (spec 8.4): a sign-in, a CAPTCHA, a code.
+
+    async def _ask_person_timed(self, reason: str, kind: str, timeout_s: float) -> tuple[str, str]:
+        since = time.monotonic()
+        try:
+            return await self._ask_person(reason, kind, timeout_s)
+        finally:
+            self.waited_for_a_person_s += time.monotonic() - since
+
+    async def _ask_approval_timed(
+        self, tool: str, summary: str, site: str, every_time: bool
+    ) -> ApprovalOutcome:
+        since = time.monotonic()
+        try:
+            return await self._ask_approval(tool, summary, site, every_time)
+        finally:
+            self.waited_for_a_person_s += time.monotonic() - since
 
     async def _ask_person(self, reason: str, kind: str, timeout_s: float) -> tuple[str, str]:
         """Runs inside the agent's call. The call holds the browser; it is let go while the person

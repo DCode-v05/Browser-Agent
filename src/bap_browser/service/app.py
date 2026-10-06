@@ -35,6 +35,7 @@ from bap_browser.service.bridge import Bridge
 from bap_browser.service.browsing_data import CLEAR, clear_browsing_data
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
+from bap_browser.service.systems import Systems
 from bap_browser.settings.store import Refused, SettingsStore, known_surface
 
 # The first byte of a binary message says what it carries.
@@ -61,10 +62,12 @@ def create_app(
     rooms: Callable[[], list[dict[str, Any]]] | None = None,
     desktop: DesktopApp | None = None,
     settings: SettingsStore | None = None,
+    systems: Systems | None = None,
 ) -> Starlette:
     """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
     Chrome dials in. Without them the service has no such endpoints. `desktop` is the desktop app,
-    for the window to open. `settings` holds what a person chose in the settings screen."""
+    for the window to open. `settings` holds what a person chose in the settings screen. `systems`
+    is whoever runs the browsers of a window that has several (spec 9.17)."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -102,6 +105,9 @@ def create_app(
         if settings is not None:
             # The settings screen is this service's to draw (spec 10.2).
             listed["settings"] = True
+        if systems is not None:
+            # Its browsers are systems to set up, manage and evaluate (spec 9.17).
+            listed["systems"] = True
         return JSONResponse(listed)
 
     async def open_desktop(request: Request) -> Response:
@@ -115,14 +121,23 @@ def create_app(
             return JSONResponse({"error": str(failed)}, status_code=409)
         return JSONResponse({"state": "opened" if opened else "open"})
 
+    def a_system_or_none(system: Any) -> bool:
+        """Whether a request names no system, or one of the browsers this service has."""
+        if system is None:
+            return True
+        return isinstance(system, str) and rooms is not None and any(room["id"] == system for room in rooms())
+
     async def read_settings(request: Request) -> Response:
         """The settings screen is drawn from this answer (spec 10.2)."""
         if (no := refused(request)) is not None:
             return no
         surface = request.query_params.get("surface", "web")
-        if settings is None or not known_surface(surface):
-            return Response(status_code=404 if settings is None else 400)
-        return JSONResponse(settings.answer(surface))
+        system = request.query_params.get("system")
+        if settings is None:
+            return Response(status_code=404)
+        if not known_surface(surface) or not a_system_or_none(system):
+            return Response(status_code=400)
+        return JSONResponse(settings.answer(surface, system))
 
     async def change_settings(request: Request) -> Response:
         if (no := refused(request)) is not None:
@@ -132,17 +147,95 @@ def create_app(
         asked = await _json_object(request)
         surface = asked.get("surface") if asked is not None else None
         changes = asked.get("changes") if asked is not None else None
+        system = asked.get("system") if asked is not None else None
         if not isinstance(surface, str) or not known_surface(surface) or not isinstance(changes, dict):
             return Response(status_code=400)
+        if not a_system_or_none(system):
+            return Response(status_code=400)
         try:
-            changed = settings.change(surface, changes)
+            changed = settings.change(surface, changes, system)
         except Refused as no_change:
             # Nothing was changed: one refused change refuses them all.
             return JSONResponse({"setting": no_change.setting, "reason": no_change.reason}, status_code=409)
         if changed:
             for session in list(sessions.values()):
                 await session.settings_changed(changed)
-        return JSONResponse(settings.answer(surface))
+            if systems is not None and system is not None:
+                # A browser that was turned on or off is started or ended.
+                await systems.settings_changed(system)
+        return JSONResponse(settings.answer(surface, system))
+
+    def a_system(request: Request) -> str | Response:
+        """The system a request names, or the answer for a request that names none there is."""
+        if (no := refused(request)) is not None:
+            return no
+        system = request.path_params.get("system")
+        if systems is None or not any(told["id"] == system for told in systems.described()):
+            return Response(status_code=404)
+        return str(system)
+
+    async def list_systems(request: Request) -> Response:
+        """The browsers of the window as systems to set up and manage (spec 9.17)."""
+        if (no := refused(request)) is not None:
+            return no
+        if systems is None:
+            return Response(status_code=404)
+        return JSONResponse({"systems": systems.described()})
+
+    async def manage_system(request: Request) -> Response:
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        why_not = await systems.manage(system, request.path_params["action"])
+        if why_not is not None:
+            return JSONResponse({"error": why_not}, status_code=409)
+        return JSONResponse({"systems": systems.described()})
+
+    async def system_log(request: Request) -> Response:
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        return JSONResponse(await asyncio.to_thread(systems.log, system))
+
+    async def system_evals(request: Request) -> Response:
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        return JSONResponse(await asyncio.to_thread(systems.evals, system))
+
+    async def system_trace(request: Request) -> Response:
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        trace = await asyncio.to_thread(systems.trace, system, request.path_params["task"])
+        return Response(status_code=404) if trace is None else JSONResponse(trace)
+
+    async def rate_task(request: Request) -> Response:
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        asked = await _json_object(request)
+        rating = asked.get("rating") if asked is not None else "?"
+        if rating not in ("good", "bad", None):
+            return Response(status_code=400)
+        known = await asyncio.to_thread(systems.rate, system, request.path_params["task"], rating)
+        return JSONResponse({"rating": rating}) if known else Response(status_code=404)
+
+    async def check_system(request: Request) -> Response:
+        """Runs the checklist of one browser: real steps on the demo site (spec 12.6)."""
+        system = a_system(request)
+        if isinstance(system, Response):
+            return system
+        assert systems is not None
+        result = await systems.check(system)
+        if isinstance(result, str):
+            return JSONResponse({"error": result}, status_code=409)
+        return JSONResponse(result)
 
     async def clear_data(request: Request) -> Response:
         """Clear browsing data: the one setting that is an action (spec 10.2)."""
@@ -241,6 +334,13 @@ def create_app(
             Route("/api/settings", change_settings, methods=["PATCH"]),
             Route("/api/config", read_config, methods=["GET"]),
             Route("/api/browsing-data/clear", clear_data, methods=["POST"]),
+            Route("/api/systems", list_systems, methods=["GET"]),
+            Route("/api/systems/{system}/log", system_log, methods=["GET"]),
+            Route("/api/systems/{system}/evals", system_evals, methods=["GET"]),
+            Route("/api/systems/{system}/evals/{task}", system_trace, methods=["GET"]),
+            Route("/api/systems/{system}/evals/{task}/rating", rate_task, methods=["POST"]),
+            Route("/api/systems/{system}/checks", check_system, methods=["POST"]),
+            Route("/api/systems/{system}/{action}", manage_system, methods=["POST"]),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,
