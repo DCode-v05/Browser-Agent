@@ -3245,6 +3245,12 @@ backends of section 4.3, side by side, each with a session and a chat of its own
   and whoever was watching is connected to it. The other pages are not touched.</li>
 <li><strong>Where the browser is, said to the model.</strong> Each task from the chat is handed to the model with the
   address the browser is on, so "sign in on this page" means the page the person is looking at.</li>
+<li><strong>The desktop app, from the window.</strong> Where the desktop app of section 14.3 is installed beside the
+  service (<code>server.desktop_dir</code>: its packages are there and its shell is built), the bar has a button,
+  "Open desktop app". It asks the service to start the app (<code>POST /api/desktop</code>, with the token), which
+  opens in a window of its own with its own browser, its own agent core and its own chat. The app that is
+  open is not started a second time; it is ended when the service stops. <code>GET /api/sessions</code> says whether
+  there is an app to open (<code>desktop</code>), and the button is not shown when there is none.</li>
 <li>The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (<code>/demo-site/members.html</code>).</li>
 </ul>
@@ -4243,6 +4249,16 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>server.token_env</code></td>
 <td><code>BAP_BROWSER_TOKEN</code></td>
 <td>If unset, a token is generated at start</td>
+</tr>
+<tr>
+<td><code>server.desktop_dir</code></td>
+<td><code>desktop</code></td>
+<td>The folder of the desktop app, for the window of three browsers to open it from</td>
+</tr>
+<tr>
+<td><code>server.desktop_close_wait_s</code></td>
+<td>5</td>
+<td>How long the desktop app is given to close before it is ended</td>
 </tr>
 <tr>
 <td><code>server.auth_wait_s</code></td>

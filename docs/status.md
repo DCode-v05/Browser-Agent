@@ -199,6 +199,12 @@ toolbar icon. The desktop app's own checks pass (typecheck, 5 tests, build); its
 | A new session | "Start a new session" on a page whose session was stopped |
 | The model knows where the browser is | Each chat task carries the address the browser is on |
 | A demo page for it | The members' area on the demo site: a sign-in with a human check |
+| The desktop app, from the window | A button in the bar, "Open desktop app", starts the desktop app in a window of its own. Shown only where the app is installed and built beside the service |
+
+The desktop app was opened on this machine on 2026-10-06, from the button and by hand: a task typed in
+its chat ("Open the sign-up page.") moved its browser to the sign-up page, with the real model. In a
+terminal inside an editor built on Electron, `npm --prefix desktop start` opens no window: the editor
+sets `ELECTRON_RUN_AS_NODE`. The button is not caught by this; by hand, start it from another terminal.
 
 Run with the real model on 2026-10-06, cloud page: asked to sign in to the members' area, the agent
 asked for help; the pop-up came up; the person took over, signed in through the live picture and ticked

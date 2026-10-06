@@ -31,6 +31,7 @@ from bap_browser.agent.command import (
 )
 from bap_browser.agent.models import Message, Model
 from bap_browser.config import Config
+from bap_browser.desktop_app import DesktopApp
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.service.server import Service
@@ -39,6 +40,8 @@ from bap_browser.service.session import ServiceSession
 CLOUD, CHROME, BUILT_IN = "cloud", "chrome", "builtin"
 # The folder, inside the data folder, where the built-in browser keeps its sign-ins.
 BUILT_IN_PROFILE = "built-in-browser"
+# Where the core of the desktop app says where it is, beside this service's own such file.
+DESKTOP_STATE_FILE = "desktop-service.json"
 # What a person needs the agent's attention for.
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
 
@@ -87,8 +90,14 @@ async def run_studio(
         Room(CHROME, "takeover_chrome"),
         Room(BUILT_IN, "bundled_chromium"),
     ]
+    desktop = _desktop_app(config)
     service = Service(
-        config, sessions, port=0, bridge=True, rooms=lambda: [room.described(extension) for room in rooms]
+        config,
+        sessions,
+        port=0,
+        bridge=True,
+        rooms=lambda: [room.described(extension) for room in rooms],
+        desktop=desktop,
     )
     await service.start()
     working: list[asyncio.Task[None]] = []
@@ -114,10 +123,21 @@ async def run_studio(
             task.cancel()
         await asyncio.gather(*working, return_exceptions=True)
         browser_extension.forget(extension)
+        await asyncio.to_thread(desktop.close)
         for room in rooms:
             if room.session is not None:
                 await room.session.close()
         await service.stop()
+
+
+def _desktop_app(config: Config) -> DesktopApp:
+    """The desktop app, a program of its own. Its core says where it is in a file beside this
+    service's own."""
+    return DesktopApp(
+        Path(config.server.desktop_dir).expanduser().resolve(),
+        Path(config.server.state_file).resolve().with_name(DESKTOP_STATE_FILE),
+        close_wait_s=config.server.desktop_close_wait_s,
+    )
 
 
 def _cloud(config: Config) -> Config:

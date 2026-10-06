@@ -314,6 +314,10 @@ class Server(Section):
         "Where the extension for Chrome is put, for a person to load it from. Not a hidden folder: "
         "the browser's file chooser must show it",
     )
+    desktop_dir: str = setting(
+        "desktop", "The folder of the desktop app, for the window of three browsers to open it from"
+    )
+    desktop_close_wait_s: int = setting(5, "How long the desktop app is given to close before it is ended")
     auth_wait_s: int = setting(10, "How long a new viewer connection may take to send its token")
     shutdown_wait_s: int = setting(3, "How long stopping waits for open connections to finish")
     command_backlog: int = setting(

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { App, preferencesFrom } from './App';
 import { Studio } from './Studio';
-import { roomsFrom } from './studio/rooms';
+import { desktopFrom, roomsFrom } from './studio/rooms';
 import { socketAddress, takeToken } from './connection/address';
 import type { Connection } from './connection/connection';
 import { DemoConnection } from './connection/demo';
@@ -69,6 +69,7 @@ if (theme === 'light' || theme === 'dark') preferences.colourMode = theme;
 // names a session shows that session alone, as the extension's side panel does.
 const loadRooms = token && !recorded && !query.has('session') ? roomsFrom(location.href, token) : null;
 const rooms = loadRooms ? await loadRooms() : null;
+const openDesktop = rooms && token ? await desktopFrom(location.href, token) : null;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -80,6 +81,7 @@ createRoot(document.getElementById('root')!).render(
         pollMs={ROOMS_MS}
         opensOn={tabStorage.getItem(PAGE_KEY) ?? undefined}
         onPage={(room) => tabStorage.setItem(PAGE_KEY, room)}
+        openDesktop={openDesktop ?? undefined}
         settings={settings}
         surface={surface}
         preferences={preferences}
