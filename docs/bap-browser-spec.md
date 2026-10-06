@@ -575,6 +575,9 @@ boundary (section 17.2).
 - On take-over Chrome the agent sees only the tabs in its own tab group. The person's other tabs do not exist for any operation.
 - Frames, including cross-site frames, appear inside the snapshot under their `iframe` line. Refs inside a frame carry a frame prefix: `f2e7`.
 - Open shadow roots are read as part of the page.
+- A window that one of the agent's tabs opens becomes a tab, and the action that opened it waits for the new tab, so its own result already shows it. A window opened by anyone else in the same browser is left alone.
+- No more than `browser.tabs.max_tabs` tabs are open: a pop-up past the limit is closed at once and the agent is told.
+- Known limits: the address policy is not applied to the address a page opens a window at (it is applied at the network layer, when that is built); on take-over Chrome a window a page opens cannot be reached, and the agent is told so.
 
 ### 5.4 Snapshot
 
@@ -642,6 +645,15 @@ not as the engine.
 - `annotate` draws each interactive element's ref on the image and appends the interactive snapshot.
 - `browser_zoom` returns a region of the last screenshot at full resolution.
 - No screenshot is taken unless a call asks for one.
+- A picture is taken the way the browser's own driver takes one (Playwright's screenshot), never by a
+  capture with a clip and a scale on the core's own DevTools session: that resets the screen the browser
+  emulates (its density and its size). A picture of the page has one pixel to a page pixel on a screen of
+  any density; `browser_zoom` takes every pixel the screen has for its region.
+- A picture whose longest side is over the limit is made smaller by the browser itself, in the page script
+  (`createImageBitmap` and an off-screen canvas). No image library is used. The picture's true size is read
+  from its first bytes.
+- Over MCP a picture is an image beside the text. The reference loop sends the model the newest picture
+  only: an older one has been seen and would be paid for again on every turn.
 
 ### 5.6 Actions and waiting
 
@@ -661,19 +673,25 @@ Page dialogs (alert, confirm, prompt, leave-page) follow `browser.dialogs.policy
 | `auto_accept` | Accepted immediately; prompts get `default_prompt_text` |
 | `auto_dismiss` | Dismissed immediately |
 
+A call that meets an open dialog says what it is, beginning with a capital: "A confirm dialog is open
+('Proceed?') and blocks the page." The time a dialog is open does not count against an action's time limit.
+A dialog that goes away unanswered (its time ran out, or its tab closed) lets the action it interrupted
+finish, and the next result says so.
+
 An unanswered dialog is dismissed after `browser.dialogs.timeout_s`. An open dialog is also shown in the
 viewer as a card, because the live picture cannot show native dialogs.
 
 ### 5.8 Files
 
 - **Uploads** work through file inputs and through custom upload buttons. A path must be inside `browser.uploads.allowed_dirs`. The tool needs approval by default.
-- **Downloads** are saved to `browser.downloads.dir` with duplicate names numbered. A download larger than `max_size_mb` is cancelled while in flight, not after saving.
+- **Downloads** are saved to `browser.downloads.dir` with duplicate names numbered. A download larger than `max_size_mb` is not kept. Its size is checked when it has arrived, not while it arrives: a known limit. A name the page suggests is never used as a path: the file is saved inside the folder under a name of its own.
 - Browser permission prompts are never shown. Permissions come only from `browser.permissions`.
 
 ### 5.9 Console and network logs
 
 The last `max_console_entries` console messages and page errors, and the last `max_network_entries`
-requests (method, status, type, address), are kept per tab in memory for the diagnostic tools.
+requests (method, status, type, address), are kept per tab in memory for the diagnostic tools. One call of
+`browser_console` or `browser_network` returns at most `browser.capture.read_limit` entries.
 
 ### 5.10 Errors
 
@@ -1657,6 +1675,8 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `capture.console` / `capture.network` | `true` / `true` | Keep the logs |
 | `capture.max_console_entries` / `max_network_entries` | 500 / 500 | Per tab |
 | `capture.max_entry_chars` | 2000 | Per message |
+| `capture.read_limit` | 50 | Most entries one call of `browser_console` or `browser_network` returns |
+| `capture.max_state_events` | 20 | Most things that happened by themselves kept for the agent's next result (`[events]`) |
 | `tabs.max_tabs` | 20 | |
 | `tabs.focus_new_tabs` | `true` | Switch to pop-ups |
 | `dialogs.policy` | `agent` | Or `auto_accept`, `auto_dismiss` |

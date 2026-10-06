@@ -1,7 +1,8 @@
 # The ten remaining tools: plan and state
 
-Written on 2026-10-06, when the work was stopped part-way. Branch `wip/remaining-tools`. This branch
-is not ready for `main`: `uv run pytest -q` gives 865 passed, 14 failed.
+Written on 2026-10-06, when the work was stopped part-way, and finished the same day. Branch
+`wip/remaining-tools`: `uv run pytest -q` gives 902 passed. Steps 1 to 8 below are done; step 9, onto
+`main`, is a pull request.
 
 The tools: `browser_screenshot`, `browser_zoom`, `browser_drag`, `browser_handle_dialog`,
 `browser_tabs`, `browser_console`, `browser_network`, `browser_evaluate`, `browser_upload_file`,
@@ -36,7 +37,7 @@ Two new settings: `browser.capture.read_limit` (50) and `browser.capture.max_sta
 
 ## What is left, in order
 
-- [ ] **1. Pictures: take them the way the browser's own driver does.** A capture with a clip and a
+- [x] **1. Pictures: take them the way the browser's own driver does.** A capture with a clip and a
   scale asked for on our own DevTools session makes the browser reset the screen that Playwright
   emulates (device scale, viewport): seen with `browser.device_scale_factor: 2`, where the picture
   came out half size. The cure, designed and not applied:
@@ -54,14 +55,14 @@ Two new settings: `browser.capture.read_limit` (50) and `browser.capture.max_sta
     `tab.pixel = 1 / scale` for a picture of what the browser shows.
   - Add to the dense-screen test: after the picture, `devicePixelRatio`, `innerWidth` and
     `innerHeight` are what they were.
-- [ ] **2. The five failing new tests.**
+- [x] **2. The five failing new tests.**
   - `test_a_region_of_the_last_screenshot_at_full_resolution`: sizes within 2 pixels, not exact.
   - `test_on_a_dense_screen_...`: passes once step 1 is done.
   - `test_files_are_given_...`: wait for the text with `browser_wait` before reading the page.
   - `test_a_download_is_kept_...`: check that three files are in the folder and none is outside it.
   - `test_dragging`: the result names a bare element by its tag: `(div "Knob")`, and a point on a
     plain element as `(255, 270) (div)`. Then see whether the knob and the card really moved.
-- [ ] **3. The nine tests that pass on `main` and fail here.**
+- [x] **3. The nine tests that pass on `main` and fail here.**
   - Six describe 18 tools: `test_registry.py` (1), `test_mcp.py` (2), `test_serve.py` (1),
     `test_agent_loop.py` (1), `test_toolkit.py` (1). The tools offered now come from
     `tools_for(config)` in `tools/toolkit.py`.
@@ -69,20 +70,20 @@ Two new settings: `browser.capture.read_limit` (50) and `browser.capture.max_sta
   - One fault: `test_a_browser_that_went_away_...` in `test_toolkit_in_process.py`. When the browser
     goes away, the result ends with "[events] tab t1 closed". A browser that closed should not also
     report its tabs as closed.
-- [ ] **4. Tests not written yet.** With the stand-in driver (`tests/support/fakes.py`, already
+- [x] **4. Tests not written yet.** With the stand-in driver (`tests/support/fakes.py`, already
   extended): the dialog rule in the toolkit; the `[events]` line and its cap; the timeline sentences
   of the ten tools; what a viewer is told (`dialog_opened`, `dialog_closed`, `download_saved`, a
   tab's `attention`, `select_tab` while a person drives); a picture over MCP; the newest picture
   only to the model; `policy/files.py`; `driver/screenshots.py` for PNG and JPEG.
-- [ ] **5. The spec, which should have come first.** Sections 5.3, 5.5, 5.7, 5.8, 5.9, 6.1, 6.2, 9.7,
+- [x] **5. The spec, which should have come first.** Sections 5.3, 5.5, 5.7, 5.8, 5.9, 6.1, 6.2, 9.7,
   10.3 and 16.5, then the page again. To say there: how pictures are taken and made smaller; the
   sentence for an open dialog begins with a capital; the two new settings; a download's size is
   checked when it has arrived, not while it arrives; a window a page opens in take-over Chrome
   cannot be reached, and the agent is told so; the address policy is not applied to a window a
   page opens.
-- [ ] **6. `uv run ruff format src tests`** (8 files), then `ruff check` and `pyright`, which pass now.
-- [ ] **7. The viewer.** See that the new tool names read well in the timeline and the chat; rebuild.
-- [ ] **8. README and `CLAUDE.md`.** Propose a gotcha: a screenshot with a clip on our own DevTools
+- [x] **6. `uv run ruff format src tests`** (8 files), then `ruff check` and `pyright`, which pass now.
+- [x] **7. The viewer.** See that the new tool names read well in the timeline and the chat; rebuild.
+- [x] **8. README and `CLAUDE.md`.** Propose a gotcha: a screenshot with a clip on our own DevTools
   session resets what Playwright emulates.
 - [ ] **9. Onto `main`** when `uv run pytest` passes, then `/verify` over the whole build.
 
