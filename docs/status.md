@@ -1,6 +1,6 @@
 # bap-browser: Status
 
-Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`) together with this page
+Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`) together with this page · To show it: `docs/demo-guide.md`
 
 ## Where things stand
 
@@ -33,17 +33,21 @@ All 28 tools of milestone 1 are built and tested, and are on `main` (pull reques
 
 ### Proof
 
-Measured on Windows on 2026-10-06, on the files of commit `455c754`, which is `main` without this page.
+Measured on macOS (Python 3.12.5) on 2026-10-06, on `main` at the merge of pull request #6.
 
 | Check | Result |
 |---|---|
-| `uv run pytest -q` | 846 passed in 270 s |
+| `uv run pytest -q` | 958 passed in 209 s |
 | `uv run ruff format --check .`, `uv run ruff check .`, `uv run pyright` | No findings |
 | `npm --prefix viewer run test` | 400 passed |
 | `npm --prefix viewer run typecheck`, `run lint`, `run build` | No findings; it builds |
-| `npm --prefix desktop run typecheck`, `npm --prefix desktop test` | No findings; 5 passed |
-| CI on GitHub (Ubuntu), run 37406191713 on commit `60b9b4b` | Passed on 2026-10-06. It is the first green run on `main`: the two tests that had made it red were fixed |
-| Run by hand, with a made-up key and a token of my own | `agent --demo --show-browser` ended with code 0. `agent --chat --extension` opened the start page and stayed open. `serve`: an outside MCP client listed the 18 tools, the cloud-metadata address was blocked, and a call with no token got 401. The desktop app: the core attached, the chat said "Ready", and the tools read and clicked in the app's browser |
+| CI on GitHub (Ubuntu) | Passed on pull requests #2 to #6. Seen once and not explained: `test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_them` failed on one run and passed when run again |
+| `uv run bap-browser doctor` | Chromium 153, Chrome 154 and Edge 154 launch; everything needed is in place |
+| `uv run bap-browser agent --demo --exit-when-done` | The scripted run ended with the account created |
+| The chat with the real model (`gpt-5.6-luna`), driven through the viewer | Four tasks one after another: it read a page; took a screenshot; was refused the cloud metadata address; asked for help at a CAPTCHA, was taken over, and went on after Done |
+| Not measured again on this machine | The desktop app's own checks (its packages are not installed here) |
+
+How to show all of this to someone is in `docs/demo-guide.md`.
 
 ### Not checked
 
@@ -441,6 +445,7 @@ Added on 2026-10-05, on branch `feature/agent-cursor`. The table at the top was 
 | `docs/bap-browser-spec.md` | The spec, one file: the source of truth |
 | `docs/bap-browser-spec.html` | The same, as a page |
 | `docs/status.md` | This file |
+| `docs/demo-guide.md` | What is built, and how to show it step by step |
 | `docs/adr/0001-stack.md` | The stack decision |
 | `docs/plans/2026-10-03-m1-stage-1-first-path.md` | The engine plan, stage 1 (11 tasks, done) |
 | `docs/plans/2026-10-03-m1-viewer-experience.md` | The viewer plan (11 tasks, done) |

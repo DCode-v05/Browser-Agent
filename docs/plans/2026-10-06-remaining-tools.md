@@ -1,8 +1,7 @@
 # The ten remaining tools: plan and state
 
 Written on 2026-10-06, when the work was stopped part-way, and finished the same day. Branch
-`wip/remaining-tools`: `uv run pytest -q` gives 902 passed. Steps 1 to 8 below are done; step 9, onto
-`main`, is a pull request.
+`wip/remaining-tools`: `uv run pytest -q` gives 902 passed. All nine steps below are done.
 
 The tools: `browser_screenshot`, `browser_zoom`, `browser_drag`, `browser_handle_dialog`,
 `browser_tabs`, `browser_console`, `browser_network`, `browser_evaluate`, `browser_upload_file`,
@@ -85,7 +84,7 @@ Two new settings: `browser.capture.read_limit` (50) and `browser.capture.max_sta
 - [x] **7. The viewer.** See that the new tool names read well in the timeline and the chat; rebuild.
 - [x] **8. README and `CLAUDE.md`.** Propose a gotcha: a screenshot with a clip on our own DevTools
   session resets what Playwright emulates.
-- [ ] **9. Onto `main`** when `uv run pytest` passes, then `/verify` over the whole build.
+- [x] **9. Onto `main`** when `uv run pytest` passes, then `/verify` over the whole build. Done on 2026-10-06: pull request #2 was merged, and the whole build was run by hand on `main` (see "Proof" in `docs/status.md` and the steps of `docs/demo-guide.md`).
 
 ## Check
 

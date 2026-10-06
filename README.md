@@ -2,6 +2,7 @@
 
 A browser that AI agents can use and that a person can watch and control.
 Agents call its tools over MCP. The full description is in `docs/bap-browser-spec.md`.
+What is built and how to show it: `docs/demo-guide.md`.
 
 ## Install
 
