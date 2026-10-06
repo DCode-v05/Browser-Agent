@@ -16,6 +16,8 @@ export interface ViewerOptions {
   pointerHoldMs: number;
   /** The longest task the chat takes, in characters. */
   maxTaskChars: number;
+  /** How long a pressed control shows as working when nothing came of the press, in milliseconds. */
+  workingMs: number;
 }
 
 export const DEFAULT_OPTIONS: ViewerOptions = {
@@ -26,6 +28,7 @@ export const DEFAULT_OPTIONS: ViewerOptions = {
   tickMs: 1000,
   pointerHoldMs: 600,
   maxTaskChars: 4000,
+  workingMs: 8000,
 };
 
 /** True when a key event is the release chord, such as "Ctrl+Alt+Enter". */

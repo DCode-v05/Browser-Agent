@@ -642,6 +642,60 @@ describe('a link that the service refuses', () => {
   });
 });
 
+describe('a control that was pressed and has not taken hold yet (spec 9.4)', () => {
+  /** A session whose agent is in the middle of an action: a command is sent, and nothing comes of it until the test says so. */
+  function midAction() {
+    let handlers: ConnectionHandlers | undefined;
+    const sent: ClientCommand[] = [];
+    const connection: Connection = {
+      start: (given) => {
+        handlers = given;
+        given.onStatus('connected');
+        given.onEvent({ type: 'session_started', session: 'default', agent: 'Agent', backend: 'remote_headless', browser: 'Chromium', viewport: { width: 1280, height: 800 }, ts: 1000 });
+        given.onCaughtUp?.();
+      },
+      send: (command) => void sent.push(command),
+      now: () => 1001,
+      close: () => undefined,
+    };
+    const user = userEvent.setup();
+    render(<App createConnection={() => connection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0, workingMs: 60 }} />);
+    const paused = () => act(() => handlers!.onEvent({ type: 'control_changed', state: 'paused', since: 1002 }));
+    return { sent, user, paused };
+  }
+
+  it('says that it is working, keeps the focus and takes no second press', async () => {
+    const { sent, user, paused } = midAction();
+    await user.click(button('Pause'));
+    const pausing = button('Pausing…');
+    expect(pausing).toHaveAttribute('aria-busy', 'true');
+    // Not disabled: a button that is disabled while it has the focus drops the focus.
+    expect(pausing).toHaveFocus();
+    await user.click(pausing);
+    expect(types(sent)).toEqual(['pause']);
+    // The other controls are still one action away.
+    expect(button('Take over')).not.toHaveAttribute('aria-busy');
+    // The agent's action has finished, and the session is paused.
+    paused();
+    expect(button('Resume')).not.toHaveAttribute('aria-busy');
+    noButton('Pausing…');
+  });
+
+  it('shows the same for a key as for a press', async () => {
+    const { sent, user } = midAction();
+    await user.keyboard('t');
+    expect(button('Taking over…')).toHaveAttribute('aria-busy', 'true');
+    expect(types(sent)).toEqual(['take_over']);
+  });
+
+  it('goes back to what it was when nothing came of the press', async () => {
+    const { user } = midAction();
+    await user.click(button('Pause'));
+    expect(button('Pausing…')).toBeInTheDocument();
+    await waitFor(() => expect(button('Pause')).not.toHaveAttribute('aria-busy'));
+  });
+});
+
 describe('full view keeps what needs a person on screen', () => {
   const fullView = () => expect(document.querySelector('.app')).toHaveAttribute('data-view', 'full');
 
