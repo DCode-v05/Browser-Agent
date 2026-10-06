@@ -32,13 +32,16 @@ async def _within(seconds: float, work: Awaitable[Any]) -> Any:
 
 
 class PageScript:
-    def __init__(self, cdp: CDPSession, reply_ms: int, within: Within = _within) -> None:
+    def __init__(
+        self, cdp: CDPSession, reply_ms: int, within: Within = _within, *, frame_id: str | None = None
+    ) -> None:
         """`within` is how a time limit is kept. The driver gives one that does not count the time a
-        dialog is open, because a page answers nothing while one is."""
+        dialog is open, because a page answers nothing while one is. `frame_id` names a frame inside
+        the page; without it the script runs in the page itself."""
         self._cdp = cdp
         self._reply_ms = reply_ms
         self._within = within
-        self._frame_id: str | None = None
+        self._frame_id: str | None = frame_id
         self._context_id: int | None = None
 
     async def call(self, operation: str, arguments: dict[str, Any], *, wait_ms: int = 0) -> Any:
@@ -85,6 +88,27 @@ class PageScript:
             # A page too busy to draw a frame is still the same document.
             return True
         return True
+
+    async def object_of(self, ref: str) -> str | None:
+        """The browser's own handle on the element a ref names, for a question only the browser can
+        answer about it. None when the ref names nothing."""
+        try:
+            context_id = await self._within(self._reply_ms / 1000, self._context())
+            reply = await self._within(
+                self._reply_ms / 1000,
+                self._cdp.send(
+                    "Runtime.evaluate",
+                    {
+                        "expression": f"globalThis.__bapParts ? __bapParts.resolve({json.dumps(ref)}) : null",
+                        "contextId": context_id,
+                        "returnByValue": False,
+                    },
+                ),
+            )
+        except (PlaywrightError, _DocumentGone, TimeoutError):
+            self._context_id = None
+            return None
+        return reply.get("result", {}).get("objectId")
 
     def forget_document(self) -> None:
         """The driver loaded another document: the next call makes its world in that one."""

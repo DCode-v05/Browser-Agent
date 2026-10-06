@@ -199,12 +199,11 @@ async def test_an_unknown_or_old_ref_is_stale(driver: PlaywrightDriver, site: st
             await read(driver, ref=ref)
 
 
-async def test_a_frame_is_listed_by_name(driver: PlaywrightDriver, site: str) -> None:
+async def test_a_frame_is_listed_by_name_and_read(driver: PlaywrightDriver, site: str) -> None:
     await driver.navigate(f"{site}/welcome.html")
     await driver.page.evaluate(
         "() => { const f = document.createElement('iframe'); f.title = 'Payment'; f.src = 'form.html';"
         " document.body.append(f); return new Promise((done) => { f.onload = () => done(true); }); }"
     )
     snapshot = await read(driver)
-    assert re.search(r'- iframe "Payment" \[ref=e\d+\]', snapshot)
-    assert "Full name" not in snapshot
+    assert re.search(r'- iframe "Payment" \[ref=e\d+\]\n  - heading "Sign up" \[ref=f\d+e\d+\]', snapshot)

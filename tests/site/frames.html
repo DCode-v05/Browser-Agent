@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frames</title>
+<style>
+  body { margin: 0; }
+  iframe { display: block; width: 600px; height: 300px; margin: 20px 0 0 40px; border: 5px solid #456; padding: 10px; }
+  #far { margin-top: 1500px; }
+</style>
+</head>
+<body>
+<h1>Frames</h1>
+<button id="outside">Outside the frames</button>
+<iframe id="same" title="Payment" src="form.html"></iframe>
+<iframe id="nested" title="Outer" src="nested.html"></iframe>
+<iframe id="far" title="Far down" src="welcome.html"></iframe>
+<script>
+// A frame from another site: the same server under its other name. The browser keeps it in a
+// process of its own.
+const other = document.createElement('iframe');
+other.id = 'other';
+other.title = 'Other site';
+other.src = location.origin.replace('127.0.0.1', 'localhost') + '/tools.html';
+document.getElementById('nested').before(other);
+</script>
+</body>
+</html>

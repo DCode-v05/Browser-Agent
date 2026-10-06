@@ -1356,6 +1356,13 @@ boundary (section 17.2).</p>
 <li>Browser-internal pages (settings, downloads hub, DevTools) are never handed to the agent.</li>
 <li>On take-over Chrome the agent sees only the tabs in its own tab group. The person's other tabs do not exist for any operation.</li>
 <li>Frames, including cross-site frames, appear inside the snapshot under their <code>iframe</code> line. Refs inside a frame carry a frame prefix: <code>f2e7</code>.</li>
+<li>What is inside a frame is indented one step under the frame's line and has no heading of its own. A frame keeps its name (<code>f2</code>) for as long as its page lives, and a ref's number is used once across the page and all its frames.</li>
+<li>Frames are read <code>browser.snapshot.max_frame_depth</code> deep, and not at all when <code>include_iframes</code> is off. Everything together stays within the snapshot's size; when a frame is cut short, the notice is said once, at the end.</li>
+<li>A frame from another site lives in a process of its own. The core reaches it through a DevTools session of its own and reads it the same way.</li>
+<li>Every tool that takes a ref takes one inside a frame. A point or a box inside a frame is given as a point or a box of the page: the frame's position, border and padding are added. A frame that is out of sight is brought into view before the pointer goes to it.</li>
+<li><code>browser_find</code> searches the page with its frames. <code>browser_get_text</code> with no ref gives the page's own text, without its frames.</li>
+<li>A ref into a frame that was removed, or into a page that was left, is stale.</li>
+<li>Known limit: an element inside a frame is checked for being covered within its frame only. Something of the page around the frame that lies over it is not seen.</li>
 <li>Open shadow roots are read as part of the page.</li>
 <li>A window that one of the agent's tabs opens becomes a tab, and the action that opened it waits for the new tab, so its own result already shows it. A window opened by anyone else in the same browser is left alone.</li>
 <li>No more than <code>browser.tabs.max_tabs</code> tabs are open: a pop-up past the limit is closed at once and the agent is told.</li>

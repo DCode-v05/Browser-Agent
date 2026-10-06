@@ -4,10 +4,10 @@ Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`
 
 ## Where things stand
 
-All 28 tools of milestone 1 are built and tested. The ten that were unfinished on 2026-10-06 were
-finished the same day on the branch `wip/remaining-tools`, which is in a pull request onto `main`.
+All 28 tools of milestone 1 are built and tested, and are on `main` (pull request #2, merged on
+2026-10-06).
 
-- On that branch `uv run pytest -q` gives 902 passed and none failed (measured on macOS, Python 3.12.5).
+- Before the merge `uv run pytest -q` gave 902 passed and none failed (macOS, Python 3.12.5), and CI passed.
 - What is still not built is listed under "Not completed": it is the work after the tools.
 
 ## Completed (on `main`)
@@ -89,11 +89,18 @@ Known limits, written into the spec: a download's size is checked when it has ar
 arrives; a window that a page opens in take-over Chrome cannot be reached; the address policy is not
 applied to a window a page opens.
 
+### 1b. Finished on 2026-10-06: frames in the snapshot
+
+What is inside a frame is read under the frame's line, with refs such as `f2e7`, for frames of the same
+site, frames of another site (which the browser keeps in another process) and frames inside frames. Every
+tool that takes a ref works inside a frame, and `browser_find` searches the frames too. 12 tests in a real
+browser (`tests/e2e/test_frames.py`). Known limit: something of the outer page that covers an element
+inside a frame is not noticed.
+
 ### 2. Not started
 
 | What | Note |
 |---|---|
-| Frames in the snapshot | A frame is listed by its name; what is inside it is not read |
 | The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
 | The address policy at the network layer | Redirects, link clicks, pop-ups and sub-resources are not checked. Only an address the agent opens itself is |
 | Bench, `perf/budget.json`, `bap-browser doctor`, the verify skill in the repository | None exists |
@@ -108,14 +115,12 @@ applied to a window a page opens.
 
 | # | Question |
 |---|---|
-| 1 | The ten tools are finished and wait in a pull request. Merge it, or say if you want them put on `main` directly |
 | 2 | The font is two files in the repository. Say if you prefer the npm package `@fontsource-variable/hanken-grotesk` |
 | 3 | `CLAUDE.md` says form values never reach a result; the spec shows the model what a field holds in a snapshot (never a password). I kept the spec. The wording in `CLAUDE.md` is yours to change |
 
 ## How to go on
 
-Merge the pull request of `wip/remaining-tools` onto `main`. Then the list under "Not started", in the
-order the spec gives: frames in the snapshot, the settings API, the address policy at the network layer,
+The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
 the bench and `doctor`, then the rest of take-over Chrome, the desktop app and the micro VM.
 
 ## Earlier record
