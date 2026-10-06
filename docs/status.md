@@ -269,7 +269,7 @@ now acts only on a match whose name holds every word, and types into a field bef
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |
 | The micro VM | The image has never been built, started or deployed |
 | The code tool `browser_run`, the rest | Built and off by default (section 1j). Not run yet on a person's own Chrome or in the built-in browser, and its two lines of the budget are not measured |
-| Viewer states the spec lists | Session picker, "saving", "working", "handing back", "failed", address "loading", "limit reached" |
+| Viewer states the spec lists | Session picker, "working", "handing back", "failed", address "loading", "limit reached". ("Saving" is there since 2026-10-06) |
 | The deferred minor findings of the two reviews | Listed further down, unchanged |
 
 ### 3. Waiting for your word

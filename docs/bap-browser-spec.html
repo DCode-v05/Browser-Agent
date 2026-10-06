@@ -3081,7 +3081,7 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <p>Rules:</p>
 <ul>
 <li>The screen is drawn from the settings API. The viewer holds no list of settings of its own.</li>
-<li>A change is saved as soon as it is made. There is no Save button. The row shows "Saved" for a moment, or "Saved. Applies to the next session."</li>
+<li>A change is saved as soon as it is made. There is no Save button. The row shows "Saving…" until the service has answered, then "Saved" for a moment, or "Saved. Applies to the next session." When the service does not answer, the row says the change was not saved.</li>
 <li>A locked setting is shown with its value, disabled, and the words "Set by your organisation". It is never hidden, so a person can see why something is not possible.</li>
 <li>A site list is saved when the focus leaves it and when the screen is closed. An entry that is refused keeps the screen open, so nobody leaves believing a site is blocked when it is not.</li>
 <li>A refused change puts the control back and says why in the row. A site list is the exception: it keeps what was typed, so the entry can be corrected instead of typed again.</li>

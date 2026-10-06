@@ -305,6 +305,10 @@
   animation: arrive var(--duration-enter) var(--ease);
 }
 
+.setting-status[data-tone='saving'] {
+  color: var(--text-muted);
+}
+
 .setting-status[data-tone='saved'] {
   color: var(--success);
 }
