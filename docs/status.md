@@ -581,6 +581,7 @@ Added on 2026-10-05, on branch `feature/agent-cursor`. The table at the top was 
 | `docs/bap-browser-spec.html` | The same, as a page |
 | `docs/status.md` | This file |
 | `docs/demo-guide.md` | What is built, and how to show it step by step |
+| `docs/systems-guide.md` | The Systems page: the configuration of each of the three browsers (what to enable, how to manage it, its log) and its evaluations |
 | `docs/adr/0001-stack.md` | The stack decision |
 | `docs/plans/2026-10-03-m1-stage-1-first-path.md` | The engine plan, stage 1 (11 tasks, done) |
 | `docs/plans/2026-10-03-m1-viewer-experience.md` | The viewer plan (11 tasks, done) |
