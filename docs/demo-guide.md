@@ -132,8 +132,9 @@ uv run bap-browser agent --chat --takeover
 The first time the agent touches a site, the extension asks you: Allow once, Always allow on this
 site, Don't allow. Its own "Stop the agent" takes the agent off the tab at once.
 
-Try this part once before you show it: loading an extension by hand is the step most likely to
-take time in front of people.
+It was run in a browser with a window on 2026-10-06, with the side panel closed: the extension asked
+in a small window of its own, and its Stop worked. Still load the extension once yourself before you
+show it: that step is done by hand, and is the one most likely to take time in front of people.
 
 ### 6. For a technical audience (1 minute, optional)
 
@@ -169,7 +170,7 @@ Say these plainly if asked.
 | An installer for the desktop app | It runs from this folder |
 | The micro VM image | Written, never built or started |
 | The code tool `browser_run` | Planned last |
-| Four tools slower than their target | A click by point, a key press and choosing an option take about 33 ms against 5 to 10. See `docs/status.md` |
+| One tool slower than its target | A click by point takes 17 ms against a target of 5: the browser hands a mouse press to the page with its next frame. See `docs/status.md` |
 
 ## Numbers you can quote
 

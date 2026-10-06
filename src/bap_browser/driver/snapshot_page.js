@@ -330,7 +330,14 @@
     return true;
   }
 
-  const operations = { snapshot, frames };
+  // Lets the page do what an action has just set going: a form it sends, a script that leaves.
+  // Two turns of the page's own queue, with no wait for anything to be drawn.
+  async function turn() {
+    for (let i = 0; i < 2; i++) await new Promise((done) => setTimeout(done, 0));
+    return true;
+  }
+
+  const operations = { snapshot, frames, turn };
 
   globalThis.__bap = (operation, a) => {
     const run = operations[operation];

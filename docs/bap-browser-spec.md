@@ -673,6 +673,7 @@ not as the engine.
 
 - Actions by ref wait until the element is visible, stable, enabled and not covered by another element, up to `browser.timeouts.action_ms`. When the wait runs out, the result says which of these failed and, for a covered element, what covers it.
 - **No fixed pauses.** After an action the engine waits for the page to settle (no navigation in flight, scroll position steady) up to a configured ceiling, and returns as soon as it has.
+- **How an action learns that the page is leaving.** The page says so itself, to whoever listens to it: when it sets out for another page (a link, a form, a script) and when it opens a window. After an action the engine gives the page one turn of its own queue and asks it a question; what the page said arrives before the answer. Only when it did set out does the engine wait for the new page. A page that leaves some time after the action is not seen leaving by that action's result; the next result shows where the browser is.
 - After an action the result states whether the page navigated and to where.
 - Scrolling reports the new position and whether the bottom was reached.
 - Key names are accepted in every common dialect (`ctrl+a`, `Control+A`, `cmd+shift+t`, `Return`, `ESC`, `PageDown`) and normalised.
@@ -697,7 +698,7 @@ viewer as a card, because the live picture cannot show native dialogs.
 
 ### 5.8 Files
 
-- **Uploads** work through file inputs and through custom upload buttons. A path must be inside `browser.uploads.allowed_dirs`. The tool needs approval by default.
+- **Uploads** work through file inputs and through custom upload buttons. Each tab listens for file choosers from its start: one that a plain click opens is closed with nothing chosen, and the agent is told to give files with `browser_upload_file`. A path must be inside `browser.uploads.allowed_dirs`. The tool needs approval by default.
 - **Downloads** are saved to `browser.downloads.dir` with duplicate names numbered. A download larger than `max_size_mb` is not kept. Its size is checked when it has arrived, not while it arrives: a known limit. A name the page suggests is never used as a path: the file is saved inside the folder under a name of its own.
 - Browser permission prompts are never shown. Permissions come only from `browser.permissions`.
 

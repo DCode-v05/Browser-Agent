@@ -147,11 +147,43 @@ Measured on this Mac on 2026-10-06, Chromium, 30 runs after 5 warm-up runs:
 | FAIL | 4: `click.point` (33 ms against 5), `press_key.small` (34 against 5), `press_key.big` (33 against 10), `select_option` (33 against 10) |
 | NOT RUN | 8, which have no scenario yet |
 
-Why the four fail: after every action the driver waits two animation frames, 33 ms, to see whether the
-action started a navigation. A click by ref waits five frames in all (two to see the element hold still,
-one to see it is still under the pointer, two to settle). The budget's targets come from a prototype that
-did not wait. Nothing was changed to make them pass: it is a finding, to be decided. The cure would be to
-learn of a navigation from the browser's own events instead of waiting for frames.
+Why four failed in that first run: after every action the driver waited two animation frames, 33 ms, to
+see whether the action had started a navigation.
+
+**Cured on 2026-10-06.** The page itself says when it sets out for another page or opens a window
+(`Page.frameRequestedNavigation`, `Page.windowOpen`), and what it says arrives before the answer to the
+driver's next question. So after an action the driver gives the page one turn of its own queue and asks;
+nothing is waited for that is not happening. Measured again, Chromium, 30 runs:
+
+| Line | Before | After | Target | State now |
+|---|---|---|---|---|
+| `select_option` | 33 ms | 2.1 ms | 10 | OK |
+| `press_key.small` | 34 ms | 1.7 ms | 5 | OK |
+| `press_key.big` | 33 ms | 17 ms | 10 | WARN |
+| `click.point` | 33 ms | 17 ms | 5 | FAIL |
+| `click.ref.small`, `click.ref.big`, `set_checked` | 83 ms | 67 ms | 50 | WARN |
+
+In all: 25 OK, 6 WARN, 1 FAIL, 8 NOT RUN. `click.point` still fails: the browser hands a mouse press to the
+page with its next frame, 17 ms, and the target of 5 ms came from a prototype that did not go through the
+browser's input. It is left as it is, and is a number to decide on, not a fault to hide. A known cost of
+the cure: a page that leaves only some time after the action (a script that waits, then goes) is no longer
+seen leaving by that action's own result; the next result shows the new address.
+
+### 1f. Fixed on 2026-10-06: the upload test that failed now and then
+
+`test_files_are_given_to_a_file_field…` failed on 2 of about 12 runs on GitHub and never on this Mac. The
+cause: the browser was told that file choosers are wanted only at the moment of an upload, and on a slow
+machine the click could open the chooser before the browser had heard. That chooser was then never seen,
+and no later one opened. Now each tab listens for file choosers from its start. A chooser that a plain
+click opens is closed, and the agent is told to use `browser_upload_file`. Not yet proven on GitHub by
+many runs: it had failed about 1 run in 6.
+
+### 1g. Run by hand on 2026-10-06, in a browser with a window
+
+Take-over Chrome with the side panel closed: the bridge connected by itself, the agent's tab opened, the
+extension asked in a small window of its own ("127.0.0.1", "Opening …/form.html"), "Always allow on this
+site" let the agent go on and type, and "Stop the agent" took it off the tab. Not pressed by hand: the
+toolbar icon. The desktop app's own checks pass (typecheck, 5 tests, build); its window was not opened.
 
 ### 2. Not started
 
