@@ -113,6 +113,25 @@ def create_app(
     def sees(role: Role, what: str) -> bool:
         return role == "admin" or (settings is not None and settings.user_sees(what))
 
+    # The viewers connected now: the token each came with, the browser each is on, and the way to
+    # end the connection. A person is let in when they connect; this is how they stop being let in.
+    watching: dict[WebSocket, tuple[Any, str, asyncio.Future[int]]] = {}
+
+    def must_leave(given: Any, name: str) -> int | None:
+        """Why a viewer may no longer be on a browser, as the code its connection is closed with:
+        the visit is over, or the admin now keeps this browser from users. None while it may stay."""
+        role = role_of(given)
+        if role is None:
+            return REFUSED
+        return None if may_use(role, name) else NO_SUCH_SESSION
+
+    def show_out() -> None:
+        """Ends the connection of every viewer that may no longer be where it is (spec 4.11)."""
+        for given, name, door in list(watching.values()):
+            code = must_leave(given, name)
+            if code is not None and not door.done():
+                door.set_result(code)
+
     async def healthz(request: Request) -> Response:
         return Response()
 
@@ -167,10 +186,13 @@ def create_app(
         """What a sign-in page needs before anyone has signed in: whether there is a password to
         sign in with, and who the page's own token speaks for, when it has one."""
         if accounts is None:
-            return Response(status_code=404)
+            # Nobody signs in to this service: its own token is the one way in. It says so rather
+            # than refuse the question, so that the page that asked shows no error for it.
+            return JSONResponse({"accounts": False})
         given = bearer(request)
         return JSONResponse(
             {
+                "accounts": True,
                 "admin_set": accounts.has("admin"),
                 "user_set": accounts.has("user"),
                 "role": role_of(given),
@@ -210,15 +232,19 @@ def create_app(
         if whose not in ROLES or asked is None:
             return Response(status_code=400)
         try:
-            await asyncio.to_thread(accounts.set_password, whose, asked.get("password"))
+            # The admin who changes their own password stays signed in.
+            await asyncio.to_thread(accounts.set_password, whose, asked.get("password"), bearer(request))
         except BadPassword as bad:
             return JSONResponse({"error": str(bad)}, status_code=400)
+        # Everyone who signed in with the old one signs in again: their open pages are closed too.
+        show_out()
         return JSONResponse({"admin_set": accounts.has("admin"), "user_set": accounts.has("user")})
 
     async def sign_out(request: Request) -> Response:
         if accounts is None:
             return Response(status_code=404)
         accounts.sign_out(bearer(request))
+        show_out()
         return JSONResponse({})
 
     def me_for(role: Role) -> dict[str, Any]:
@@ -280,6 +306,8 @@ def create_app(
         # A setting users may no longer change falls back to the admin's value at once.
         for session in list(sessions.values()):
             await session.settings_changed({})
+        # And a user on a browser that users may no longer use is no longer on it.
+        show_out()
         return JSONResponse(settings.policy())
 
     # Settings (spec 10.2).
@@ -513,15 +541,27 @@ def create_app(
         if session is None:
             await socket.close(NO_SUCH_SESSION)
             return
+        given = first.get("token") if first else None
+        door: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+        watching[socket] = (given, name, door)
         replay, subscriber = session.hub.subscribe()
         try:
             for item in replay:
                 await _send(socket, item)
             await _send(socket, {"type": "caught_up", "ts": time.time()})
-            await _serve_viewer(socket, session, subscriber, config.server.command_backlog)
+            await _serve_viewer(
+                socket,
+                session,
+                subscriber,
+                config.server.command_backlog,
+                door,
+                # A visit also ends by itself, when its time is up: nothing it asks for is done then.
+                lambda: must_leave(given, name),
+            )
         except WebSocketDisconnect:
             pass
         finally:
+            del watching[socket]
             session.hub.unsubscribe(subscriber)
 
     async def extension_socket(socket: WebSocket) -> None:
@@ -601,10 +641,17 @@ def create_app(
 
 
 async def _serve_viewer(
-    socket: WebSocket, session: ServiceSession, subscriber: Subscriber, backlog: int
+    socket: WebSocket,
+    session: ServiceSession,
+    subscriber: Subscriber,
+    backlog: int,
+    shown_out: asyncio.Future[int] | None = None,
+    must_leave: Callable[[], int | None] = lambda: None,
 ) -> None:
-    """Sends the viewer what happens, and does what the person asks, until either side stops."""
+    """Sends the viewer what happens, and does what the person asks, until either side stops, or
+    until the person may no longer be here: `shown_out` is then given the code to close with."""
     waiting: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    door = shown_out if shown_out is not None else asyncio.get_running_loop().create_future()
 
     async def tell() -> None:
         while True:
@@ -615,6 +662,11 @@ async def _serve_viewer(
             command = _command(await socket.receive())
             if command is None:
                 continue
+            leave = must_leave()
+            if leave is not None:
+                if not door.done():
+                    door.set_result(leave)
+                return
             if command.get("type") == "stop":
                 # Stop never waits its turn: a pause or a take-over ahead of it may be waiting for an
                 # action that does not end.
@@ -630,12 +682,18 @@ async def _serve_viewer(
 
     tasks = [asyncio.create_task(work()) for work in (tell, listen, act)]
     try:
-        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait([*tasks, door], return_when=asyncio.FIRST_COMPLETED)
     finally:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-    failure = next((task.exception() for task in done if not task.cancelled() and task.exception()), None)
+    if door.done():
+        await socket.close(door.result())
+        return
+    failure = next(
+        (task.exception() for task in tasks if not task.cancelled() and task.exception()),
+        None,
+    )
     if isinstance(failure, FellBehind):
         # The viewer stopped reading. It connects again and is sent everything from the start.
         await socket.close(START_OVER)

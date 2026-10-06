@@ -76,7 +76,8 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
       onChanged(result.answer);
       setStatus({ id: setting.id, tone: 'saved', text: setting.applies === 'next_session' ? W.settings.savedNext : W.settings.saved });
     } else {
-      setStatus({ id: setting.id, tone: 'refused', text: W.settings.refused[result.reason] });
+      // A user is told it is the admin who holds the setting, not an organisation somewhere.
+      setStatus({ id: setting.id, tone: 'refused', text: (answer?.role === 'user' ? W.systems.user.refused : W.settings.refused)[result.reason] });
     }
     return result.ok;
   }
@@ -200,6 +201,7 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
                   onSave={(value) => save(setting, value)}
                   onAct={() => (setting.confirm ? setAsking(setting) : run(setting))}
                   onToast={onToast}
+                  lockedWords={answer?.role === 'user' ? W.systems.user.fixed : W.settings.locked}
                 />
               ))}
             </div>
@@ -227,9 +229,11 @@ interface RowProps {
   onSave(value: SettingValue): Promise<boolean>;
   onAct(): void;
   onToast(text: string): void;
+  /** Who holds a setting that cannot be changed here. */
+  lockedWords: string;
 }
 
-function SettingRow({ setting, status, source, onSave, onAct, onToast }: RowProps) {
+function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWords }: RowProps) {
   const titleId = useId();
   const descriptionId = useId();
   const footer = (
@@ -237,7 +241,7 @@ function SettingRow({ setting, status, source, onSave, onAct, onToast }: RowProp
       {setting.locked && (
         <p className="setting-locked">
           <Icon name="lock" />
-          {W.settings.locked}
+          {lockedWords}
         </p>
       )}
       {status && (
@@ -268,7 +272,7 @@ function SettingRow({ setting, status, source, onSave, onAct, onToast }: RowProp
               <span className="choice-text">
                 <span className="choice-label">{choice.label}</span>
                 {choice.hint && <span className="choice-hint">{choice.hint}</span>}
-                {choice.disabled && <span className="choice-hint">{W.settings.locked}</span>}
+                {choice.disabled && <span className="choice-hint">{lockedWords}</span>}
               </span>
             </label>
           ))}
@@ -333,20 +337,20 @@ function SettingRow({ setting, status, source, onSave, onAct, onToast }: RowProp
         )}
       </div>
       {setting.control === 'path' && typeof setting.value === 'string' && <p className="setting-path">{setting.value}</p>}
-      {setting.control === 'list' && <SiteList setting={setting} labelledBy={titleId} onSave={onSave} />}
+      {setting.control === 'list' && <SiteList setting={setting} labelledBy={titleId} onSave={onSave} lockedWords={lockedWords} />}
       {footer}
     </div>
   );
 }
 
-function SiteList({ setting, labelledBy, onSave }: { setting: Setting; labelledBy: string; onSave(value: SettingValue): Promise<boolean> }) {
+function SiteList({ setting, labelledBy, onSave, lockedWords }: { setting: Setting; labelledBy: string; onSave(value: SettingValue): Promise<boolean>; lockedWords: string }) {
   const saved = Array.isArray(setting.value) ? setting.value.join('\n') : '';
   const [text, setText] = useState(saved);
   const hintId = useId();
   return (
     <div className="site-list">
       {setting.fixed && setting.fixed.length > 0 && (
-        <ul className="fixed-sites" aria-label={W.settings.locked}>
+        <ul className="fixed-sites" aria-label={lockedWords}>
           {setting.fixed.map((site) => (
             <li key={site} className="fixed-site">
               <Icon name="lock" />

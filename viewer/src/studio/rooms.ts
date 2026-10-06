@@ -45,6 +45,15 @@ export function roomsIn(answer: unknown): Room[] | null {
   return rooms.length > 0 ? rooms : null;
 }
 
+/**
+ * The pages of a window, as the service lists them. A window may have none: a user the admin lets use
+ * no browser (spec 4.11). Null is something else: a service that has one session and no window of pages.
+ */
+function pagesIn(answer: unknown): Room[] | null {
+  const listed = typeof answer === 'object' && answer !== null ? (answer as { rooms?: unknown }).rooms : undefined;
+  return Array.isArray(listed) ? (roomsIn(answer) ?? []) : null;
+}
+
 export type LoadRooms = () => Promise<Room[] | null>;
 /** Asks the service to open the desktop app. True when its window is open. */
 export type OpenDesktop = () => Promise<boolean>;
@@ -69,7 +78,7 @@ export async function factsFrom(pageAddress: string, token: string): Promise<Ser
     const answer = await fetch(new URL('api/sessions', pageAddress).href, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
     if (!answer.ok) return NO_FACTS;
     const told = (await answer.json()) as { desktop?: unknown; settings?: unknown; systems?: unknown };
-    return { rooms: roomsIn(told), desktop: told.desktop === true, settings: told.settings === true, systems: told.systems === true };
+    return { rooms: pagesIn(told), desktop: told.desktop === true, settings: told.settings === true, systems: told.systems === true };
   } catch {
     return NO_FACTS;
   }
@@ -87,13 +96,15 @@ export function desktopOpener(pageAddress: string, token: string): OpenDesktop {
   };
 }
 
-/** Asks the service which pages it has. The token goes in a header, never in the address. */
-export function roomsFrom(pageAddress: string, token: string): LoadRooms {
+/** Asks the service which pages it has. The token goes in a header, never in the address.
+ *  `onEnded` is told when the service no longer knows the token: the visit it was for is over. */
+export function roomsFrom(pageAddress: string, token: string, onEnded?: () => void): LoadRooms {
   const address = new URL('api/sessions', pageAddress).href;
   return async () => {
     try {
       const answer = await fetch(address, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
-      return answer.ok ? roomsIn(await answer.json()) : null;
+      if (answer.status === 401) onEnded?.();
+      return answer.ok ? pagesIn(await answer.json()) : null;
     } catch {
       // The service is not answering just now. What was known stays on screen.
       return null;

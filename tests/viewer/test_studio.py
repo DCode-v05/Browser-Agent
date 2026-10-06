@@ -430,6 +430,8 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         assert [
             await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
         ] == [
+            # What users are allowed comes first: it is the admin's alone (spec 4.11).
+            "Users",
             "Cloud browser",
             "My Chrome",
             "Built-in browser",
@@ -456,12 +458,15 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
             for s in g["settings"]
         }
         assert own["allow_downloads"]["value"] is False and others["allow_downloads"]["value"] is True
-        # What the deployment turned off is shown, and is not the person's to turn on.
+        # What the deployment left off is the admin's to turn on: the switch is a working one.
         scripts = cloud.get_by_role(
             "switch", name="Let the agent run scripts of several steps: Cloud browser"
         )
-        assert await scripts.is_disabled()
-        await cloud.get_by_text("Set by your organisation").first.wait_for()
+        assert await scripts.get_attribute("aria-checked") == "false"
+        assert await scripts.is_enabled()
+        # And the admin says, on the same card, whether users may use this browser at all.
+        for_users = cloud.get_by_role("switch", name="Let users use this browser: Cloud browser")
+        assert await for_users.get_attribute("aria-checked") == "true"
 
         # Its log is a file of its own, and its newest lines are read from here.
         await cloud.get_by_text(str((tmp_path / "logs" / "cloud.jsonl").resolve())).wait_for()
@@ -474,7 +479,7 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         await page.screenshot(path=str(SHOTS / "systems-configuration.png"))
 
         # A browser is turned off from its card, and stopped and started.
-        await built_in.get_by_role("switch", name="Use this browser: Built-in browser").click()
+        await built_in.get_by_role("switch", name="Use this browser: Built-in browser", exact=True).click()
         await opened.room("builtin", "off")
         await built_in.get_by_text("Turned off").wait_for()
         assert await built_in.get_by_role("button", name="Start").is_disabled()
@@ -539,7 +544,8 @@ async def test_each_system_shows_its_configuration_and_its_evaluations_under_its
         # Under the built-in browser's own tab: how it is set up, with what to enable and how to manage it.
         await page.get_by_role("tab", name="Configuration").click()
         card = page.get_by_role("article", name="Built-in browser")
-        await card.get_by_role("switch", name="Use this browser: Built-in browser").wait_for()
+        await card.get_by_role("switch", name="Use this browser: Built-in browser", exact=True).wait_for()
+        await card.get_by_role("switch", name="Let users use this browser: Built-in browser").wait_for()
         await card.get_by_role("switch", name="Let the agent download files: Built-in browser").wait_for()
         await card.get_by_role("button", name="Restart").wait_for()
         await card.get_by_text(str((tmp_path / "logs" / "builtin.jsonl").resolve())).wait_for()

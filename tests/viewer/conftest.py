@@ -24,6 +24,18 @@ class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         """The viewer's file server writes nothing to the test output."""
 
+    def do_GET(self) -> None:
+        """A page opened with no token asks who signs in. This host answers as a service that
+        nobody signs in to does; everything else is a file of the viewer."""
+        if self.path.split("?")[0] != "/api/auth":
+            return super().do_GET()
+        body = b'{"accounts": false}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
 
 @pytest.fixture(scope="session")
 def viewer_url() -> Iterator[str]:
@@ -89,6 +101,12 @@ class View:
 
 
 OpenView = Callable[..., Awaitable[View]]
+
+
+@pytest.fixture
+def view_of() -> Callable[[Page], View]:
+    """For a page a test opened by itself: what went wrong on it, and how it looks."""
+    return View
 
 
 @pytest.fixture

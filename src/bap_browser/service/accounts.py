@@ -59,7 +59,9 @@ class Accounts:
         """Whether a password has been set for this role. Until it has, nobody signs in as it."""
         return role in self._kept
 
-    def set_password(self, role: Role, password: object) -> None:
+    def set_password(self, role: Role, password: object, keep: object = None) -> None:
+        """Sets the password of a role. Whoever signed in with the old one signs in again, except
+        the visit `keep`: the person who changed it stays where they are."""
         if not isinstance(password, str) or len(password) < self._settings.min_chars:
             raise BadPassword(f"Use at least {self._settings.min_chars} characters.")
         if len(password) > self._settings.max_chars:
@@ -69,8 +71,9 @@ class Accounts:
         kept[role] = {"salt": salt.hex(), "hash": _hash(password, salt).hex()}
         self._kept = kept
         _write(self._path, kept)
-        # Whoever signed in with the password before must sign in again with the new one.
-        self._visits = {token: visit for token, visit in self._visits.items() if visit[0] != role}
+        self._visits = {
+            token: visit for token, visit in self._visits.items() if visit[0] != role or token == keep
+        }
         self._wrong.pop(role, None)
         self._locked_until.pop(role, None)
 

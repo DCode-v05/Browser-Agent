@@ -22,7 +22,12 @@ IS_DARK = "document.documentElement.getAttribute('data-theme') === 'dark'"
 async def test_a_person_changes_settings_and_the_service_keeps_them(
     browser: Browser, make_config: Callable[..., Config], tmp_path: Path
 ) -> None:
-    config = make_config(tmp_path, safety={"blocked_domains": ["*.internal.example"]})
+    config = make_config(
+        tmp_path,
+        safety={"blocked_domains": ["*.internal.example"]},
+        # What config.json locks is nobody's to change from a screen, the admin's included.
+        settings={"locked": ["page_scripts"]},
+    )
     settings = SettingsStore(config)
     driver = FakeDriver()
     session = ServiceSession(config, driver, agent="Test agent", settings=settings)

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,8 +9,8 @@ import { createDemoSettings } from './demo/settings';
 import { DEFAULT_OPTIONS } from './options';
 import type { ClientCommand } from './protocol';
 import { moodOf, Studio } from './Studio';
-import { desktopOpener, factsFrom, hasSession, NO_FACTS, roomsIn, type Room } from './studio/rooms';
-import type { SystemsApi } from './systems/api';
+import { desktopOpener, factsFrom, hasSession, NO_FACTS, roomsFrom, roomsIn, type Room } from './studio/rooms';
+import type { Me, SystemsApi } from './systems/api';
 import { W } from './wording';
 
 const cloud: Room = { id: 'cloud', backend: 'remote_headless', state: 'agent', attention: false, working: false };
@@ -163,6 +163,18 @@ describe('what the service says of itself when the window opens', () => {
     expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
   });
 
+  it('says so when the service no longer knows the token: the visit is over', async () => {
+    answering({ ok: true, status: 200, json: async () => ({ rooms: [cloud] }) }, { ok: false, status: 500 }, { ok: false, status: 401 });
+    const onEnded = vi.fn();
+    const load = roomsFrom('http://127.0.0.1:8765/admin', 'a-visit', onEnded);
+    expect(await load()).toEqual([{ ...cloud, note: undefined, extension: undefined }]);
+    // A service that fails for a moment has ended nobody's visit.
+    expect(await load()).toBeNull();
+    expect(onEnded).not.toHaveBeenCalled();
+    expect(await load()).toBeNull();
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the desktop app with the token in a header', async () => {
     const fetched = answering({ ok: true }, { ok: false });
     const open = desktopOpener('http://127.0.0.1:8765/', 'the-token');
@@ -198,6 +210,11 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
         }
         return sources.get(system)!;
       },
+      me: async () => null,
+      prefer: async () => null,
+      policy: async () => null,
+      changePolicy: async () => null,
+      overall: async () => null,
     };
     const user = userEvent.setup();
     render(<Studio rooms={rooms} loadRooms={loadRooms} pollMs={0} systems={systems} connectionFor={() => new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 })} settings={createDemoSettings()} options={options} />);
@@ -281,6 +298,119 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     await user.click(await within(dialog).findByRole('tab', { name: 'Live view' }));
     await user.click(within(dialog).getByRole('switch', { name: 'Show where the agent is acting' }));
     await waitFor(() => expect(changed).toEqual([['cloud', { show_agent_pointer: false }]]));
+  });
+});
+
+describe('the window as the admin and as a user see it (spec 4.11)', () => {
+  const sees = { evaluations: true, cost: true, traces: true, checklist: true, log: false };
+
+  function signedIn(role: 'admin' | 'user', rooms: Room[], me: Me | null, over: Partial<SystemsApi> = {}) {
+    const manage = vi.fn(async () => ({ ok: true }) as const);
+    const prefer = vi.fn(async (system: string) => (me ? { ...me, preferred: system } : null));
+    const systems: SystemsApi = {
+      list: async () => rooms.map((room) => ({ ...room, enabled: true, model: 'model-a' })),
+      manage,
+      log: async () => null,
+      evals: async () => null,
+      trace: async () => null,
+      rate: async () => false,
+      check: async () => ({ ok: false, why: 'not now' }),
+      settings: () => createDemoSettings(),
+      me: async () => me,
+      prefer,
+      policy: async () => null,
+      changePolicy: async () => null,
+      overall: async () => null,
+      ...over,
+    };
+    const onSignOut = vi.fn();
+    const pages: string[] = [];
+    const user = userEvent.setup();
+    render(
+      <Studio
+        rooms={rooms}
+        loadRooms={async () => rooms}
+        pollMs={0}
+        systems={systems}
+        role={role}
+        me={me}
+        onSignOut={onSignOut}
+        onPage={(page) => pages.push(page)}
+        connectionFor={() => new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 })}
+        settings={createDemoSettings()}
+        options={options}
+      />,
+    );
+    return { user, onSignOut, manage, prefer, pages };
+  }
+
+  const views = (browser: string) => within(screen.getByRole('tablist', { name: W.studio.views(browser) })).getAllByRole('tab').map((one) => one.textContent);
+
+  it('gives the admin the configuration of each browser, the Systems page, and a way out', async () => {
+    const { user, onSignOut } = signedIn('admin', [cloud, chrome, builtIn], { role: 'admin', systems: ['cloud', 'chrome', 'builtin'], preferred: 'cloud', sees });
+    expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.configuration, W.studio.view.evaluations]);
+    expect(screen.getByRole('button', { name: W.studio.systems })).toBeInTheDocument();
+    expect(screen.getByText(W.signIn.role.admin)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: W.studio.signOut }));
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives a user their own settings in place of the configuration, and no Systems page', () => {
+    signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
+    expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings, W.studio.view.evaluations]);
+    expect(screen.queryByRole('button', { name: W.studio.systems })).not.toBeInTheDocument();
+    expect(screen.getByText(W.signIn.role.user)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: W.studio.signOut })).toBeInTheDocument();
+    // Only the browsers the admin lets users use are there at all.
+    expect(screen.getAllByRole('tab', { name: /browser/ }).map((one) => one.textContent)).toEqual(['Cloud browserReady', 'Built-in browserReady']);
+  });
+
+  it('shows a user no evaluations where the admin keeps them back', () => {
+    signedIn('user', [cloud], { role: 'user', systems: ['cloud'], preferred: 'cloud', sees: { ...sees, evaluations: false } });
+    expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings]);
+  });
+
+  it('opens a user’s window on the browser they prefer', () => {
+    signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'builtin', sees });
+    expect(tab(/Built-in browser/)).toHaveAttribute('aria-selected', 'true');
+    expect(tab(/Cloud browser/)).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('starts the browser a user prefers when it has stopped, once', async () => {
+    const stopped: Room = { ...builtIn, state: 'ended' };
+    const { manage } = signedIn('user', [cloud, stopped], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'builtin', sees });
+    await waitFor(() => expect(manage).toHaveBeenCalledWith('builtin', 'start'));
+    expect(manage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a stopped browser for the admin, or one a user merely looks at', async () => {
+    const stopped: Room = { ...builtIn, state: 'ended' };
+    const admin = signedIn('admin', [cloud, stopped], { role: 'admin', systems: ['cloud', 'builtin'], preferred: 'builtin', sees });
+    cleanup();
+    const { manage, user } = signedIn('user', [cloud, stopped], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
+    await user.click(tab(/Built-in browser/));
+    expect(admin.manage).not.toHaveBeenCalled();
+    expect(manage).not.toHaveBeenCalled();
+  });
+
+  it('goes to the browser a user has just preferred, and shows the browser itself', async () => {
+    const { user, prefer, pages } = signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
+    await user.click(screen.getByRole('tab', { name: W.studio.view.settings }));
+    const preferred = await screen.findByRole('combobox', { name: new RegExp(`^${W.systems.user.preferred}`) });
+    await user.selectOptions(preferred, 'builtin');
+    expect(prefer).toHaveBeenCalledWith('builtin');
+    await waitFor(() => expect(tab(/Built-in browser/)).toHaveAttribute('aria-selected', 'true'));
+    expect(pages).toEqual(['builtin']);
+    expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: W.studio.view.agent })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('tells a user who may use no browser so, and still lets them sign out', async () => {
+    const { user, onSignOut } = signedIn('user', [], { role: 'user', systems: [], preferred: null, sees });
+    expect(screen.getByRole('heading', { name: W.studio.noBrowser })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: W.studio.signOut }));
+    expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 });
 

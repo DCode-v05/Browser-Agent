@@ -5,7 +5,7 @@ import asyncio
 import json
 import urllib.error
 import urllib.request
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -137,6 +137,31 @@ class Window:
                 return closed.rcvd.code if closed.rcvd else 1006
             return None
 
+    async def closes_after(
+        self, name: str, token: str, then: Callable[[], Awaitable[Any]], *, says: str | None = None
+    ) -> int | None:
+        """A viewer that was let in, and the code its connection is closed with once `then` is
+        done, and once it has said `says` where it says something. None when it stays."""
+        address = self.service.address.replace("http://", "ws://") + f"/api/sessions/{name}/ws"
+        async with connect(address) as socket:
+            await socket.send(json.dumps({"type": "auth", "token": token}))
+            async with asyncio.timeout(5):
+                while True:
+                    heard = await socket.recv()
+                    if isinstance(heard, str) and json.loads(heard)["type"] == "caught_up":
+                        break
+            await then()
+            try:
+                if says is not None:
+                    await socket.send(json.dumps({"type": says}))
+                async with asyncio.timeout(1):
+                    while True:
+                        await socket.recv()
+            except ConnectionClosed as closed:
+                return closed.rcvd.code if closed.rcvd else 1006
+            except TimeoutError:
+                return None
+
 
 Open = Callable[..., Any]
 
@@ -145,11 +170,13 @@ Open = Callable[..., Any]
 async def window(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIterator[Open]:
     opened: list[Window] = []
 
-    async def open_one(*, with_accounts: bool = True, **sections: Any) -> Window:
+    async def open_one(
+        *, with_accounts: bool = True, clock: Callable[[], float] | None = None, **sections: Any
+    ) -> Window:
         config = make_config(tmp_path, **sections)
         settings = SettingsStore(config)
         settings.systems = NAMES
-        accounts = Accounts(config.auth)
+        accounts = Accounts(config.auth, clock) if clock else Accounts(config.auth)
         sessions = {
             name: ServiceSession(config, FakeDriver(), name=name, settings=settings) for name in NAMES
         }
@@ -182,9 +209,10 @@ async def test_the_first_time_the_admins_password_is_made_with_the_services_own_
     # A sign-in page asks this before anyone has signed in.
     assert await one.ask("GET", "/api/auth", token=None) == (
         200,
-        {"admin_set": False, "user_set": False, "role": None, "operator": False},
+        {"accounts": True, "admin_set": False, "user_set": False, "role": None, "operator": False},
     )
     assert (await one.ask("GET", "/api/auth"))[1] == {
+        "accounts": True,
         "admin_set": False,
         "user_set": False,
         "role": "admin",
@@ -220,6 +248,7 @@ async def test_the_admin_and_the_user_each_sign_in_their_own_way(window: Open) -
     )
     assert (await one.ask("GET", "/api/auth", token=admin))[1]["role"] == "admin"
     assert (await one.ask("GET", "/api/auth", token=user))[1] == {
+        "accounts": True,
         "admin_set": True,
         "user_set": True,
         "role": "user",
@@ -308,6 +337,58 @@ async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Ope
     told = (await one.ask("GET", "/api/sessions", token=admin))[1]
     assert told["role"] == "admin" and [room["id"] for room in told["rooms"]] == list(NAMES)
     assert await one.socket_closes_with("builtin", admin) is None
+
+
+async def test_a_viewer_that_may_no_longer_be_on_a_browser_is_shown_out(window: Open) -> None:
+    now = [1000.0]
+    one = await window(clock=lambda: now[0], auth={"session_hours": 1})
+    admin = await one.signed_in("admin")
+
+    async def nothing() -> None:
+        return None
+
+    async def keep_users_out_of(name: str, out: bool = True) -> None:
+        asked = {"systems": {name: not out}}
+        assert (await one.ask("PATCH", "/api/admin/policy", asked, token=admin))[0] == 200
+
+    # While nothing changes, a viewer stays where it is.
+    user = await one.signed_in("user")
+    assert await one.closes_after("builtin", user, nothing) is None
+    # The admin keeps users out of a browser: a user on it is no longer on it, as if it were not there.
+    assert await one.closes_after("builtin", user, lambda: keep_users_out_of("builtin")) == 4404
+    # A user on another browser is left where they are, and so is the admin on that one.
+    await keep_users_out_of("builtin", out=False)
+    assert await one.closes_after("cloud", user, lambda: keep_users_out_of("builtin")) is None
+    await keep_users_out_of("builtin", out=False)
+    assert await one.closes_after("builtin", admin, lambda: keep_users_out_of("builtin")) is None
+    await keep_users_out_of("builtin", out=False)
+
+    # Signing out ends the visit on every page it was open on.
+    assert (
+        await one.closes_after("cloud", user, lambda: one.ask("POST", "/api/auth/sign-out", token=user))
+        == 4401
+    )
+
+    # A new password for users: whoever signed in with the old one signs in again.
+    user = await one.signed_in("user")
+
+    def new_password_for(whose: str) -> Callable[[], Awaitable[Any]]:
+        asked = {"role": whose, "password": "another one altogether"}
+        return lambda: one.ask("POST", "/api/auth/password", asked, token=admin)
+
+    assert await one.closes_after("cloud", user, new_password_for("user")) == 4401
+    # The admin who changes their own password stays where they are.
+    assert await one.closes_after("cloud", admin, new_password_for("admin")) is None
+
+    # A visit ends by itself when its time is up. Nothing it asks for after that is done.
+    async def an_hour_passes() -> None:
+        now[0] += 3601
+
+    late = one.accounts.visit("user")
+    assert await one.closes_after("cloud", late, an_hour_passes, says="pause") == 4401
+    assert one.sessions["cloud"].control == "agent"
+    # The service's own token has no end.
+    assert await one.closes_after("cloud", OPERATOR, an_hour_passes, says="resume") is None
 
 
 async def test_a_user_prefers_a_browser_and_starts_it_when_it_has_stopped(window: Open) -> None:
@@ -421,7 +502,8 @@ async def test_a_policy_that_is_not_one_is_refused(window: Open) -> None:
 
 async def test_a_service_nobody_signs_in_to_has_its_own_token_and_nothing_else(window: Open) -> None:
     one = await window(with_accounts=False)
-    assert (await one.ask("GET", "/api/auth", token=None))[0] == 404
+    # It says so, rather than refuse the question: the page that asks shows no error for it.
+    assert await one.ask("GET", "/api/auth", token=None) == (200, {"accounts": False})
     assert (await one.ask("POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None))[
         0
     ] == 404
