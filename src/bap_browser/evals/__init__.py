@@ -2,6 +2,6 @@
 they ended, the trace of each, and a checklist of real steps."""
 
 from bap_browser.evals.record import Outcome, Rating, Recorder, Trace
-from bap_browser.evals.summary import summarise, trace_of
+from bap_browser.evals.summary import overall, summarise, trace_of
 
-__all__ = ["Outcome", "Rating", "Recorder", "Trace", "summarise", "trace_of"]
+__all__ = ["Outcome", "Rating", "Recorder", "Trace", "overall", "summarise", "trace_of"]

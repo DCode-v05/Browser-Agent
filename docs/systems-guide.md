@@ -1,8 +1,9 @@
 # bap-browser: the Systems page
 
-Written on 2026-10-06 for `main`. It says what was added for the three browsers as **systems**:
-their configuration (what to enable, how to manage each) and their evaluations. The design is in
-`docs/bap-browser-spec.md`, sections 9.17 and 12.6; what else is built is in `docs/demo-guide.md`.
+Written on 2026-10-06 and brought up to date on 2026-10-07 for the admin and the user. It says what
+was added for the three browsers as **systems**: who signs in, their configuration (what to enable,
+how to manage each), a user's own settings, and their evaluations. The design is in
+`docs/bap-browser-spec.md`, sections 4.11, 9.17 and 12.6; what else is built is in `docs/demo-guide.md`.
 
 ## In one paragraph
 
@@ -27,6 +28,90 @@ It is shown in two places:
 The Systems page has the same two views, **Configuration** and **Evaluations**, with one card for
 each system. The card is the same in both places. The view you choose under a browser's tab stays
 as it is when you go to the next browser.
+
+That is the window as **the admin** has it. A **user** signs in on a page of their own and has less:
+Part 0 says who has what.
+
+---
+
+## Part 0. Who signs in: the admin and the user
+
+### 0.1 Two pages, two passwords
+
+| | The admin | A user |
+|---|---|---|
+| The page to open | `http://127.0.0.1:8765/admin` | `http://127.0.0.1:8765/` |
+| Their part of the window | **Configuration**: sets the system up, and says what users are allowed | **Settings**: their own, inside what the admin allows |
+| Under each browser's tab | Browser and chat, Configuration, Evaluations | Browser and chat, Settings, Evaluations |
+| The **Systems** page | Yes | No |
+| The browsers they have | All three | Those the admin lets users use |
+
+The top right of the window says who is signed in, **Admin** or **User**, beside **Sign out**. Each
+sign-in page has a link to the other.
+
+### 0.2 The first time
+
+1. Start the window: `uv run bap-browser studio --open`. The first time, it opens the admin's page
+   with the link that creates the password.
+2. **Create the admin password**: type it twice (8 characters or more) and press "Create the password
+   and sign in". From then on the admin signs in at `/admin` with it.
+3. Press **Systems**. On the card **Users**, under "Sign-in passwords", type the password users sign
+   in with and press **Set it**.
+4. A user opens `/` and signs in with that password.
+
+If the admin's password is lost: start the service again and open the link it prints
+(`…/admin#token=…`). With that link the admin is let in and changes the password on the Users card.
+
+| Rule | As installed | In `config.json` |
+|---|---|---|
+| The shortest password | 8 characters | `auth.min_chars` |
+| How long a sign-in lasts | 12 hours | `auth.session_hours` |
+| Wrong passwords in a row before sign-in waits | 5, then 60 seconds | `auth.max_failures`, `auth.lock_s` |
+| Where the passwords are kept | `.bap-browser/accounts.json`, as salted hashes, for you alone to read | `auth.file` |
+
+A new password signs out everyone who used the old one; their open page goes back to its sign-in page.
+
+### 0.3 What the admin allows users
+
+On the **Systems** page, in **Configuration**. Every line is a working switch.
+
+| Where | Switch | Off means |
+|---|---|---|
+| Each browser's card | **Let users use this browser** | For a user that browser is not there at all: no tab, no address |
+| Users card, "What users may change" | One for each of: Ask before, Wait for my answer, Remember "Allow on this site", Blocked sites, Only allow these sites, Picture quality, Show where the agent is acting, Colour mode | Every user has your value for it, shown to them in words |
+| Users card, "What users may see" | Evaluations of the browsers they use | A user has no Evaluations view |
+| | What the tasks cost | A user sees no tokens-to-dollars and no cost of a task |
+| | The tasks and their traces | A user sees no list of tasks, no trace, and gives no Good or Bad |
+| | Run the checklist | A user sees no checklist and cannot run one |
+| | The log of the agent's steps (off as installed) | A user does not see the log |
+
+Everything else on a card (Use this browser, Start, Stop, Restart, the model, downloads, uploads, the
+log, scripts) is the admin's alone. A user never sees those controls.
+
+### 0.4 A user's Settings
+
+Under a browser's tab, **Settings** shows one card for that browser.
+
+| On the card | What it does |
+|---|---|
+| **Preferred browser** | The browser your window opens on. Choose one and it opens at once, ready for a task. If it has stopped, it is started for you |
+| **Yours to turn on and off** | A switch for each setting that is yours and is a switch |
+| **Yours to choose** | A choice for each setting that is yours and has choices: Ask before, Wait for my answer, Remember "Allow on this site", Colour mode, Picture quality |
+| **Sites** | How many sites you block and allow. **Change these settings** opens the settings screen, where the lists are typed |
+| **Set by your admin** | What the admin holds, with its value |
+
+A user can make a setting stricter than the admin has it, never looser: where the admin asks before
+every action, a user cannot go back to "Risky actions". The looser choice is shown, and cannot be taken.
+
+### 0.5 Who sees which evaluations
+
+| | The admin | A user |
+|---|---|---|
+| Each system's evaluations | All three | Those of the browsers they may use, if the admin lets users see evaluations |
+| **All systems** (every system as one, with a row for each) | Yes, at the top of Systems, Evaluations | No |
+| Cost, tasks and traces, the checklist | Yes | Each only where the admin's switch for it is on |
+
+What a user may not see is not sent to their page at all.
 
 ---
 
@@ -150,8 +235,9 @@ card then says "The log is turned off for this browser."
 
 ### 1.7 Where your choices are kept
 
-In `.bap-browser/settings.json`, for you alone to read. What you set for every browser is at the
-top; each system's own values are under `systems`.
+In `.bap-browser/settings.json`, for you alone to read. What the admin set for every browser is at
+the top; each system's own values are under `systems`; what the admin allows users is under `policy`;
+and a user's own choices are under `user`, laid out the same way.
 
 ```json
 {
@@ -159,6 +245,16 @@ top; each system's own values are under `systems`.
   "systems": {
     "cloud": { "allow_downloads": false, "ask_before": "every_action" },
     "builtin": { "system_enabled": false }
+  },
+  "policy": {
+    "systems": { "cloud": false },
+    "may_change": { "picture_quality": false },
+    "sees": { "cost": false }
+  },
+  "user": {
+    "preferred_browser": "builtin",
+    "show_agent_pointer": false,
+    "systems": { "builtin": { "ask_before": "every_action" } }
   }
 }
 ```
@@ -178,7 +274,11 @@ top; each system's own values are under `systems`.
 | `evals.recent_tasks` | `20` | The tasks listed for a system |
 | `evals.max_tasks_read` | `2000` | The newest records a summary is made from |
 | `evals.step_budget_ms` | `2000` | The checklist's limit for one step |
-| `settings.locked` | `[]` | Settings nobody may change from the window. Was there before; it holds for each system too |
+| `settings.locked` | `[]` | Settings nobody may change from the window, the admin included. Was there before; it holds for each system too |
+| `auth.file` | `.bap-browser/accounts.json` | Where the two sign-in passwords are kept, as salted hashes |
+| `auth.min_chars`, `auth.max_chars` | `8`, `200` | The shortest and the longest password that is taken |
+| `auth.session_hours` | `12` | How long a sign-in lasts |
+| `auth.max_failures`, `auth.lock_s` | `5`, `60` | Wrong passwords in a row before sign-in waits, and for how many seconds |
 
 ---
 
@@ -289,13 +389,23 @@ Those two numbers are an example. Put in your provider's own prices.
 
 ## Part 3. For a program: the addresses
 
-All need the service's token in an `Authorization: Bearer` header. `{name}` is `cloud`, `chrome` or
-`builtin`.
+All but signing in need a token in an `Authorization: Bearer` header: the one a sign-in gave, or the
+service's own, which speaks as the admin. `{name}` is `cloud`, `chrome` or `builtin`. A user is
+answered 403 for what is the admin's, and 404 for a browser they may not use.
 
 | Address | What it does |
 |---|---|
+| `GET /api/auth` | Whether there is a password to sign in with, and who the token speaks for |
+| `POST /api/auth/sign-in` with `{"role": "admin", "password": "…"}` | Signs in: gives the token of the visit. `"user"` for a user |
+| `POST /api/auth/password` with `{"role": "user", "password": "…"}` | Admin: sets a password |
+| `POST /api/auth/sign-out` | Ends the visit |
+| `GET /api/me` | Who you are, the browsers you may use, the one you prefer, what you may see |
+| `PATCH /api/me` with `{"preferred": "{name}"}` | Choose the browser your window opens on |
+| `GET /api/admin/policy` | Admin: what users may use, change and see |
+| `PATCH /api/admin/policy` with `{"systems": {"cloud": false}}` | Admin: change it. Also `"may_change"` and `"sees"` |
+| `GET /api/evals` | Admin: every system as one |
 | `GET /api/systems` | Each system: where it stands, whether it is on, its model, where its log and records are |
-| `POST /api/systems/{name}/start`, `/stop`, `/restart` | Manage it |
+| `POST /api/systems/{name}/start`, `/stop`, `/restart` | Manage it. A user may start one |
 | `GET /api/systems/{name}/log` | Where the log is, and its newest lines |
 | `GET /api/settings?surface=web&system={name}` | That system's settings |
 | `PATCH /api/settings` with `{"surface": "web", "system": "{name}", "changes": {…}}` | Change them |
@@ -310,7 +420,8 @@ A request that cannot be done answers 409 with `{"error": "…"}`, a sentence fo
 
 ## Part 4. To show it
 
-1. Start the window: `uv run bap-browser studio --open`.
+1. Start the window: `uv run bap-browser studio --open`. Sign in as the admin (the first time,
+   create the password; section 0.2).
 2. On the Cloud browser's page, give the agent a task in the chat, and let it finish.
 3. Under the Cloud browser's tab, press **Configuration**, then **Evaluations**: that browser's own
    set-up, and what the task took.
@@ -321,11 +432,22 @@ A request that cannot be done answers 409 with `{"error": "…"}`, a sentence fo
 7. Go to **Evaluations**. The Cloud browser's card shows the task: model, time, tokens.
 8. Press **Run the checklist** on a card, and watch the lines turn to Passed.
 9. Press **Show the trace** on the task, then **Good**.
+10. The admin and the user, side by side. On the **Users** card set the password users sign in with.
+    In another window open `http://127.0.0.1:8765/` and sign in as a user: Browser and chat,
+    **Settings**, Evaluations, and no Systems button.
+11. As the admin, turn **Let users use this browser** off for the Cloud browser: within two seconds
+    its tab is gone from the user's window.
+12. As the user, under **Settings**, choose **Preferred browser**: Built-in browser. It opens at once.
+    Give it a task.
+13. As the admin, turn off "What users may see: What the tasks cost". The user's Evaluations (after
+    a reload) show the task and its time, and no cost.
 
 ## What it does not do
 
 | Not there | Note |
 |---|---|
+| An account for each person | There is one admin, and one password that every user signs in with. Users share their settings and their preferred browser |
+| A user's page that follows the admin's switches by itself | A browser taken from users leaves their window within two seconds. What users may see and change is read when their page loads: they see it after a reload. The service refuses at once either way |
 | A judgement of an answer by another model | Outcome quality is how tasks ended, and your own Good and Bad |
 | Cost without a price | Set the two prices in `config.json` (section 2.6) |
 | Systems outside the three-browser window | The Systems page belongs to `bap-browser studio`. The commands that run one session (`agent`, `mcp`) have one log, `.bap-browser/events.jsonl`, and no evaluations |

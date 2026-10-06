@@ -46,6 +46,8 @@ export interface SettingsAnswer {
   surface: Surface;
   /** The browser these settings are of, where the service has several (spec 9.17). */
   system?: string;
+  /** Whose settings these are: the admin's configuration, or a user's own (spec 4.11). */
+  role?: 'admin' | 'user';
   groups: SettingsGroup[];
 }
 

@@ -1,6 +1,7 @@
 // The browsers of the window as systems (spec 9.17): what the service says of each, and what a
 // person may ask it to do with one. The token goes in a header, never in the address.
 
+import type { Role } from '../auth/api';
 import type { Backend } from '../protocol';
 import { settingsFrom } from '../settings/api';
 import type { SettingsSource } from '../settings/types';
@@ -15,12 +16,40 @@ export interface SystemInfo {
   attention: boolean;
   /** The model that plans the agent's steps on this browser. */
   model: string;
-  /** Where this browser's log is written. Null when a person turned it off. */
-  log: string | null;
-  /** The folder that holds the record of this browser's tasks. */
-  records: string;
+  /** Where this browser's log is written. Null when it is turned off. Not told to a user the admin keeps the log from. */
+  log?: string | null;
+  /** The folder that holds the record of this browser's tasks. The admin's to know. */
+  records?: string;
   note?: string;
 }
+
+/** What of a system's evaluations a person may be shown (spec 12.6). The admin says so for users. */
+export type Seen = 'evaluations' | 'cost' | 'traces' | 'checklist' | 'log';
+
+/** Who is signed in, and what they may use and see (spec 4.11). */
+export interface Me {
+  role: Role;
+  /** The browsers this person may use. */
+  systems: string[];
+  /** The browser their window opens on. Null where they may use none. */
+  preferred: string | null;
+  sees: Record<Seen, boolean>;
+}
+
+export interface PolicyLine {
+  id: string;
+  title?: string;
+  allowed: boolean;
+}
+
+/** What the admin lets users use, change and see. */
+export interface Policy {
+  systems: PolicyLine[];
+  may_change: PolicyLine[];
+  sees: PolicyLine[];
+}
+
+export type PolicyChange = Partial<Record<keyof Policy, Record<string, boolean>>>;
 
 export interface Times {
   count: number;
@@ -110,9 +139,43 @@ export interface Evals {
   };
   latency: { tool: Times; model: Times; by_tool: (Times & { tool: string; failed: number })[] };
   time: { task: Times; model_share: number | null; tool_share: number | null; waiting_share: number | null };
-  cost: { tasks_counted: number; input_tokens: number; output_tokens: number; usd: number | null; usd_per_task: number | null };
+  /** Null for a user the admin keeps the cost from. */
+  cost: Cost | null;
   recent: TaskRow[];
   checklist: Checklist | null;
+  /** What this person may be shown. Without it, everything. */
+  may?: { cost: boolean; traces: boolean; checklist: boolean };
+}
+
+export interface Cost {
+  tasks_counted: number;
+  input_tokens: number;
+  output_tokens: number;
+  usd: number | null;
+  usd_per_task: number | null;
+}
+
+/** One system in the admin's view of the whole. */
+export interface OverallLine {
+  system: string;
+  tasks: number;
+  answered: number;
+  success_rate: number | null;
+  task_p50_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  usd: number | null;
+  checks_passed: number | null;
+  checks: number | null;
+}
+
+/** The tasks of every system as one (spec 12.6). */
+export interface Overall {
+  tasks: Evals['tasks'];
+  latency: Evals['latency'];
+  time: Evals['time'];
+  cost: Cost;
+  systems: OverallLine[];
 }
 
 export interface LogLine {
@@ -145,12 +208,34 @@ export interface SystemsApi {
   check(system: string): Promise<Done<Checklist>>;
   /** The settings of one system: its own values, and its own on and off. */
   settings(system: string): SettingsSource;
+  /** Who is signed in, and what they may use and see. */
+  me(): Promise<Me | null>;
+  /** Sets the browser this person's window opens on. Null when it could not be. */
+  prefer(system: string): Promise<Me | null>;
+  /** For the admin: what users may use, change and see. */
+  policy(): Promise<Policy | null>;
+  changePolicy(changes: PolicyChange): Promise<Policy | null>;
+  /** For the admin: the tasks of every system as one. */
+  overall(): Promise<Overall | null>;
 }
 
 export function systemsFrom(pageAddress: string, token: string, unreachable: string): SystemsApi {
   const headers = { Authorization: `Bearer ${token}` };
   const at = (path: string) => new URL(`api/systems${path}`, pageAddress).href;
+  const beside = (path: string) => new URL(`api/${path}`, pageAddress).href;
   const sources = new Map<string, SettingsSource>();
+
+  /** Asks an address beside the systems' own. Null when the service did not do it. */
+  async function ask<Answer>(path: string, method = 'GET', body?: unknown): Promise<Answer | null> {
+    try {
+      const how: RequestInit = { method, headers, cache: 'no-store' };
+      if (body !== undefined) Object.assign(how, { headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const answer = await fetch(beside(path), how);
+      return answer.ok ? ((await answer.json()) as Answer) : null;
+    } catch {
+      return null;
+    }
+  }
 
   async function read<Answer>(path: string): Promise<Answer | null> {
     try {
@@ -202,5 +287,10 @@ export function systemsFrom(pageAddress: string, token: string, unreachable: str
       }
       return source;
     },
+    me: () => ask<Me>('me'),
+    prefer: (system) => ask<Me>('me', 'PATCH', { preferred: system }),
+    policy: () => ask<Policy>('admin/policy'),
+    changePolicy: (changes) => ask<Policy>('admin/policy', 'PATCH', changes),
+    overall: () => ask<Overall>('evals'),
   };
 }

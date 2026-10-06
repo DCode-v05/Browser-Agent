@@ -332,7 +332,9 @@ Rules:
 
 | Route | Purpose | Access |
 |---|---|---|
-| `GET /` | The viewer's files | None. The files hold no data |
+| `GET /` | The viewer's files. Where people sign in, a user's sign-in page (section 4.11) | None. The files hold no data |
+| `GET /admin` | The admin's sign-in page: the same files | None |
+| `/api/auth` and the routes under it, `/api/me`, `/api/admin/policy` | Signing in, who is signed in, and what the admin allows users (section 4.11) | Section 4.11 |
 | `GET /api/sessions` | List sessions and their states | Token |
 | `POST /api/sessions` | Create a session (`serve` only) | Token |
 | `DELETE /api/sessions/{id}` | End a session | Token |
@@ -508,6 +510,79 @@ a web client, and a core in a micro VM.
 - The viewer address is written to the state file, readable by the current user only, and printed to the error stream. It is never placed in a tool result, where the model would see it.
 - The token, typed text and password values never appear in a log, an event or a tool result.
 - A bridge is accepted only with a valid pairing token (section 4.9).
+- In the window of three browsers people sign in, as the admin or as a user, and each is held to what their role may do (section 4.11). The service's own token is then the admin's.
+
+### 4.11 The admin and the user
+
+The window of three browsers (section 9.16) is used by two kinds of people. Each signs in on a page of
+their own, with a password of their own.
+
+| | The admin | A user |
+|---|---|---|
+| Their page | `/admin` | `/`, the address itself |
+| Their part | **Configuration**. Sets the system up: turns each browser on and off, starts and stops it, says what the agent may do in it, and says what users are allowed | **Settings**. Works with the agent in the browsers the admin lets users use, chooses the browser they prefer, and sets what is theirs to set |
+| Evaluations | All of them: each system's, and every system as one | Those of the browsers they use, and of those what the admin lets users see |
+
+**Signing in.** Each role has one password. It is kept as a salted hash (scrypt) in `auth.file`, which
+only the current user can read. A password is never in `config.json`, a log, an event or a result, and
+the page that asks for it does not keep it.
+
+- **The first time** nobody has a password. The service prints its links when it starts and opens
+  `/admin#token=…` with its own token. That page makes the admin's password, typed twice and at least
+  `auth.min_chars` characters long, and signs the admin in. Opened without that link, the admin's page
+  says the password has not been made, and makes none.
+- **The users' password** is set by the admin, in Configuration. Until then a user's page says so and
+  asks for nothing.
+- A right password gives the page a token for the visit. The page keeps it for the life of the tab and
+  sends it as the bearer token. A visit lasts `auth.session_hours`; "Sign out" ends it sooner.
+- After `auth.max_failures` wrong passwords in a row, signing in to that role waits `auth.lock_s`
+  seconds. The page says how long.
+- A new password ends every visit made with the old one. The admin who changes their own password stays
+  signed in on the page they changed it on.
+- A page whose visit is over goes back to its sign-in page: signed out on another page, a new password,
+  or its time up. The service closes that visit's open connections itself, and does nothing more that
+  the visit asks for.
+- The service's own token, which whoever started the service holds, speaks as the admin. It makes the
+  first password, and it is how an admin who lost theirs makes a new one: they start the service and
+  open the link it prints.
+
+**What the admin allows: the policy.** Three lists, kept in `settings.file` under `"policy"` and changed
+in Configuration, each line with a switch.
+
+| List | A line | Default |
+|---|---|---|
+| `systems` | A browser users may use. Off: for a user it is not there at all, not on a tab, not in an answer, not behind an address | Every browser |
+| `may_change` | A setting users may change for themselves. Section 10.2 says which settings can be a user's. Off: a user has the admin's value, shown to them in words | Every such setting |
+| `sees` | `evaluations` (of the browsers they use), `cost` (what the tasks cost), `traces` (the tasks and their traces), `checklist` (run the checklist), `log` (the log of the agent's steps) | All but `log` |
+
+**Whose value holds.** The admin's configuration takes the place of what `config.json` gives, in either
+direction: it is the admin's to choose. A user's own value is laid over the admin's and may only be
+tighter (section 10.1). A setting in `settings.locked` is nobody's to change from a screen.
+
+**The preferred browser** is the browser a user's window opens on. A user chooses it in Settings, among
+the browsers they may use, and it opens at once. When the browser a user prefers has stopped, their page
+starts it. Starting is all a user may do to a browser: stopping and restarting one are the admin's.
+
+**The API.** Signing in needs no token. Everything else answers 401 to nobody, 403 to a user who asks
+for what is the admin's, and 404 for a browser a user may not use, the same as for one that is not there.
+
+| Route | Purpose | Who |
+|---|---|---|
+| `GET /api/auth` | `accounts`: whether people sign in to this service. `admin_set`, `user_set`: whether there is a password to sign in with. `role` and `operator`: who the page's own token speaks for, and whether it is the service's own | Anyone |
+| `POST /api/auth/sign-in` | `{"role", "password"}` gives `{"token", "role"}`. 401 `wrong`; 409 `not_set`; 429 `locked`, with `wait_s` | Anyone |
+| `POST /api/auth/password` | `{"role", "password"}` sets a password. 400 with a sentence for one that is too short or too long | Admin |
+| `POST /api/auth/sign-out` | Ends the visit | Whoever signed in |
+| `GET /api/me` | `role`, the `systems` this person may use, the one they prefer (`preferred`), and what they see (`sees`) | Admin, user |
+| `PATCH /api/me` | `{"preferred": "{name}"}`. 409 for a browser the person may not use | Admin, user |
+| `GET`, `PATCH /api/admin/policy` | The policy: each line with its words and whether it is allowed. A change names its lines: `{"systems": {"cloud": false}}`, `{"may_change": {…}}`, `{"sees": {…}}` | Admin |
+
+`GET /api/sessions` says `role` where people sign in, and lists for a user only the browsers they may
+use. The viewer's WebSocket is closed with 4401 for a token that speaks for nobody and 4404 for a
+browser the person may not use: when it connects, and whenever that becomes so afterwards.
+
+**A service nobody signs in to.** `bap-browser mcp`, `agent` and `serve` have one session and no
+accounts. Their own token is the one way in, as section 4.10 says, and whoever holds it may do
+everything. `GET /api/auth` answers `{"accounts": false}` there.
 
 ---
 
@@ -1063,7 +1138,7 @@ to the person with `browser_request_human` and never to do one itself.
 
 - The address check and the browser resolve host names separately; a network guard that connects to the checked address is a next-step item.
 - Site rules are two lists, allowed and blocked. Per-site permissions with "ask on first visit" arrive in milestone 2.
-- A deployment can lock a setting so that a person cannot change it (section 10.1). There is no separate admin console.
+- A deployment can lock a setting so that a person cannot change it (section 10.1). In the window of three browsers an admin says what users may use, change and see (section 4.11).
 - Actions are not classified as consequential until milestone 2.
 
 ### 8.8 Permissions on a person's own browser (milestone 2)
@@ -1611,22 +1686,51 @@ its own and keeps a record of its own tasks. The names are those of the pages: `
 **Settings of its own.** Most settings are each system's own (section 10.2 marks them): what the agent
 may do there, what it must ask about, the sites, the log, the picture, the model. A system's own value
 holds for it. Where it has none, the value a person set for every browser holds, and where there is none
-of those, the deployment's. The rule of section 10.1 holds for each system by itself: a person tightens
-and never loosens. The settings that are the person's and not a browser's (Colour mode, Show where the
-agent is acting) are one for the window, whichever system's screen they are changed on.
+of those, the deployment's. The rule of section 10.1 holds for each system by itself: the admin chooses
+its value, and a user tightens it and never loosens it. The settings that are the person's and not a
+browser's (Colour mode, Show where the agent is acting) are one for the window, whichever system's screen
+they are changed on.
 
-| On a page of the window | What it is |
+Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
+beside "Sign out".
+
+| On a page of the window | For the admin | For a user |
+|---|---|---|
+| The tabs | The three browsers | The browsers the admin lets users use. With none, the page says "No browser to use yet" |
+| Under each browser's tab | **Browser and chat** (the browser itself and its chat), **Configuration** and **Evaluations**. The last two show that system's card by itself, the same card as on the Systems page | **Browser and chat**, **Settings** (their own settings of that browser) and **Evaluations**, which is there only where the admin lets users see evaluations |
+| The settings button | Opens the settings of that page's browser. Its first setting is "Use this browser" | Opens the settings that are theirs to change |
+| A browser that is turned off | Its tab says "Turned off". Its page says so, and has "Turn it on" | Its page says so. Turning it on is the admin's |
+| "Systems" in the bar | The Systems page | Not there |
+
+The view stays as it is from one browser to the next, so the browsers are looked at one after the other.
+A user's window opens on the browser they prefer.
+
+**A user's Settings.** One card for the browser, every control on it a working one.
+
+| On the card | What it is |
 |---|---|
-| Under each browser's tab | Three views of that browser: **Browser and chat** (the browser itself and its chat), **Configuration** and **Evaluations**. The last two show that system's card by itself, the same card as on the Systems page. The view stays as it is from one browser to the next, so the three are looked at one after the other |
-| The settings button | Opens the settings of that page's browser. Its first setting is "Use this browser" |
-| A browser that is turned off | Its tab says "Turned off". Its page says so, and has "Turn it on" |
+| Preferred browser | A choice among the browsers they may use. The one chosen opens at once, on its chat |
+| Yours to turn on and off | A switch for each setting that is theirs and is a switch |
+| Yours to choose | A choice for each setting that is theirs and has choices. One that would be looser than the admin has it is shown, and cannot be taken |
+| Sites | How many blocked and allowed sites they have. "Change these settings" opens the settings screen, where the lists are typed |
+| Set by your admin | The settings the admin holds, each with its value in words. They are not drawn as switches that do nothing |
+| Log | The newest lines of the agent's steps, where the admin lets users see the log |
 
-**The Systems page.** "Systems" in the bar opens a page in place of a browser's own, with the three
-systems side by side, each a card, and two views of them.
+A user's card has no Start, Stop or Restart, and nothing of what the agent may do: those are the admin's.
+
+**The Systems page** is the admin's. "Systems" in the bar opens a page in place of a browser's own, with
+the three systems side by side, each a card, and two views of them. Above the cards, Configuration has
+the card **Users** and Evaluations has the card **All systems** (section 12.6).
+
+| On the Users card | What it is |
+|---|---|
+| What users may change | A switch for each setting that can be a user's. Off holds every user at the admin's value |
+| What users may see | A switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist, and the log |
+| Sign-in passwords | The password users sign in with, and the admin's own |
 
 | View | What a card shows |
 |---|---|
-| Configuration | Where the system stands. **Use this browser** (on, off). **Restart** and **Stop** for one that runs, **Start** for one that does not; a person's own Chrome is not started from here, it connects by itself. **What the agent may do here**: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". **How it is set up**: the model and every other setting of this system, in the words of its choices. **All settings** opens the settings screen of this system. **Log file**: where it is, and "Show the log" for its newest lines. **Records of its tasks**: the folder |
+| Configuration | Where the system stands. **Use this browser** (on, off). **Let users use this browser** (on, off: off, it is not there for a user at all). **Restart** and **Stop** for one that runs, **Start** for one that does not; a person's own Chrome is not started from here, it connects by itself. **What the agent may do here**: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". **How it is set up**: the model and every other setting of this system, in the words of its choices. **All settings** opens the settings screen of this system. **Log file**: where it is, and "Show the log" for its newest lines. **Records of its tasks**: the folder |
 | Evaluations | Section 12.6 |
 
 **Turning a system off** ends its session, with "This browser was turned off." as the reason, and takes
@@ -1640,8 +1744,10 @@ form of section 5.9's event log, and nothing goes to the one log of a single ses
 keeps no log (`logging.event_log` is `null`) no system writes one, until a person turns the log on for a
 system. The Systems page reads the newest `logging.shown_lines` lines of the file.
 
-**The API.** All behind the token. A system the service does not have answers 404; a service with one
-session has none of these routes.
+**The API.** All behind the token. A system the service does not have answers 404, and so does one a
+user may not use; a service with one session has none of these routes. A user is told of a system
+without where its files are, may start one and not stop or restart it (403), and reads its log only
+where the admin lets users see it (403).
 
 | Route | Purpose |
 |---|---|
@@ -1667,16 +1773,17 @@ with `config.json`. A person changes the settings they are allowed to in the set
 tunable number is written anywhere else in the code.
 
 ```
-defaults in config.py  <  config.json  <  environment variables  <  user settings  <  per-session options
+defaults in config.py  <  config.json  <  environment variables  <  the admin's configuration  <  a user's settings  <  per-session options
 ```
 
 - Later sources win. Nested sections merge; lists and single values are replaced.
 - `config.json` is found at the path given on the command line, then `$BAP_BROWSER_CONFIG`, then `./config.json`.
 - Environment variables are `BAP_BROWSER__SECTION__KEY=value`, with the value read as JSON: `BAP_BROWSER__BROWSER__HEADLESS=false`.
-- **User settings** are the values a person saves in the settings screen. They are kept in `settings.file` and can change only the keys named in the settings catalogue (section 10.2). Three limits hold:
-    1. A setting listed in `settings.locked` cannot be changed by a person. The screen shows it as "Set by your organisation".
-    2. A person can tighten a safety setting but never loosen it past the deployment's value. They can add blocked sites but not remove the deployment's. They can ask for more approvals but not fewer than the deployment requires. They can narrow the allowed sites but not widen them.
-    3. A setting that does not belong to the surface in use is neither shown nor accepted.
+- **The admin's configuration** and **a user's settings** are the values people save from a screen. Both are kept in `settings.file` and can change only the keys named in the settings catalogue (section 10.2). Who a person is, is section 4.11; where nobody signs in, whoever holds the service's token is the admin. Four limits hold:
+    1. A setting listed in `settings.locked` cannot be changed from a screen by anybody. The screen shows it as "Set by your organisation", and the admin's card as "Locked in config.json".
+    2. The admin chooses any offered value, looser than `config.json` gives or tighter: setting the system up is theirs.
+    3. A user can tighten a safety setting but never loosen it past the admin's value. They can add blocked sites but not remove the admin's. They can ask for more approvals but not fewer than the admin requires. They can narrow the allowed sites but not widen them. And a user changes only the settings that can be a user's, and of those only the ones the admin lets users change.
+    4. A setting that does not belong to the surface in use is neither shown nor accepted.
 - Per-session options come from the service when a session is created and are limited to: `backend.kind`, `browser.channel`, `browser.headless`, `browser.viewport`, `browser.user_data_dir`, `browser.cdp_url`. A session can never loosen a safety setting.
 - An unknown key stops start-up with a message naming it.
 - Secrets (the service token, proxy passwords, the model's key) come only from the environment or `.env`, never from `config.json` and never from user settings. A `.env` file in the folder the command is run from is read at start; a variable already set in the environment wins over it.
@@ -1706,7 +1813,7 @@ app adds what needs the local machine (`docs/research/settings.md`).
 
 | ID | Name in the screen | What it does | Choices (default first) | Web | Mobile | Desktop | Key | Phase |
 |---|---|---|---|---|---|---|---|---|
-| `preferred_browser` | Preferred browser | The browser the agent uses for a new session | Web: Cloud browser, My Chrome. Desktop: Built-in browser, My Chrome, Cloud browser | yes | no | yes | `backend.kind` | M1 shows the one browser there is; the choice arrives with M2 and M3 |
+| `preferred_browser` | Preferred browser | The browser a person's window opens on. It is kept with the person's settings and is not an entry of the settings screen: a user chooses it on their Settings card (sections 4.11 and 9.17) | The browsers of the window the person may use; the first of them until they choose | yes | no | yes | none; kept in `settings.file` | Built, in the window of three browsers |
 | `stay_signed_in` | Stay signed in to sites | Keeps the cloud browser's cookies and site data between sessions | Off, On | yes | yes | yes | `browser.user_data_dir` | M1 |
 | `clear_browsing_data` | Clear browsing data | A button. Deletes cookies and site data in the cloud browser; on desktop also offered for the built-in browser | none | yes | yes | yes | none; an action | M1 for the cloud browser; M3 for the built-in browser |
 | `my_chrome` | My Chrome | Whether the extension is connected; Connect and Disconnect | none | yes | no | yes | none; the bridge's state | M2 |
@@ -1739,14 +1846,22 @@ by the deployment (`settings.locked`); a deployment that must keep its event log
 
 | Kind | Entries | Rule |
 |---|---|---|
-| Free | `preferred_browser` (among `backend.offered`), `stay_signed_in`, `approval_wait` (among `control.approval_timeout_choices_s`), `activity_log`, `picture_quality`, `show_agent_pointer`, `colour_mode`, `notify_when_needed`, `show_builtin_browser`, `download_folder` | Any offered choice |
-| Tighten only | `ask_before`, `remember_site_approval`, `blocked_sites`, `allowed_sites`, `allow_downloads`, `allow_uploads`, `upload_folders`, `page_scripts`, `my_chrome_mode` | The person's value must be at least as strict as the deployment's. A choice that would loosen it is shown but disabled, with "Set by your organisation" |
+| Free | `preferred_browser` (among the browsers the person may use), `stay_signed_in`, `approval_wait` (among `control.approval_timeout_choices_s`), `activity_log`, `picture_quality`, `show_agent_pointer`, `colour_mode`, `notify_when_needed`, `show_builtin_browser`, `download_folder` | Any offered choice |
+| Tighten only | `ask_before`, `remember_site_approval`, `blocked_sites`, `allowed_sites`, `allow_downloads`, `allow_uploads`, `upload_folders`, `page_scripts`, `my_chrome_mode` | A user's value must be at least as strict as the admin's. A choice that would loosen it is shown but disabled, with "Set by your admin". The admin chooses either way (section 10.1) |
 | Kept by the bridge | `approved_sites`, `my_chrome` | Stored on the person's machine by the extension or the desktop app; the core only passes them through |
 
 `clear_browsing_data` and `about` hold no value: one is an action, the other is read-only.
 
-**When a change takes effect.** `preferred_browser`, `stay_signed_in` and `show_builtin_browser` apply
-to the next session; the screen says so. Every other setting applies to the agent's next tool call.
+**When a change takes effect.** `stay_signed_in` and `show_builtin_browser` apply to the next session;
+the screen says so. `preferred_browser` opens that browser at once. Every other setting applies to the
+agent's next tool call.
+
+**A user's own.** Eight settings can be a user's: `ask_before`, `approval_wait`,
+`remember_site_approval`, `blocked_sites`, `allowed_sites`, `picture_quality`, `show_agent_pointer` and
+`colour_mode`. A user is shown these and no others. The rest are the admin's alone: whether a browser is
+used, its model, downloads, uploads, the log, scripts, signing in to sites, clearing browsing data. For
+each of the eight the admin says whether users may change it (`may_change` in section 4.11); one they may
+not is shown to a user as locked, with the admin's value.
 
 **Each system's own.** Where the service has several browsers (section 9.17), these are set for each
 system by itself: `system_enabled` ("Use this browser", which is there only for a system), `agent_model`
@@ -1758,7 +1873,9 @@ steps", `code.enabled`, tighten only). The saved file holds a system's own value
 
 **The settings API.** `GET /api/settings?surface=web` returns the groups and, for each setting, its
 name, kind of control, choices, current value, default, whether it is locked and why, and when a
-change applies. A build returns only the settings whose feature it contains.
+change applies. A build returns only the settings whose feature it contains. The answer is for whoever
+asks and says so in `role`: the admin gets the configuration, a user their own eight settings with their
+own values. A change is saved to the asker's own layer.
 
 ```json
 {"surface":"web","groups":[{"id":"approvals","title":"Approvals","settings":[
@@ -2056,7 +2173,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `max_tokens` | 4096 | The most a single reply may be |
 | `max_task_chars` | 4000 | Longest task a person may send from the viewer's chat |
 
-**`logging`, `bench`**
+**`logging`, `evals`, `auth`, `bench`**
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -2072,6 +2189,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `evals.recent_tasks` | 20 | The tasks the window lists for a browser, newest first |
 | `evals.max_tasks_read` | 2000 | The newest records a summary is made from |
 | `evals.step_budget_ms` | 2000 | The checklist's limit for one step in the browser |
+| `auth.file` | `.bap-browser/accounts.json` | Where the sign-in passwords are kept, as salted hashes (section 4.11) |
+| `auth.min_chars` / `auth.max_chars` | 8 / 200 | The shortest and the longest password that is taken |
+| `auth.session_hours` | 12 | How long a sign-in lasts |
+| `auth.max_failures` | 5 | Wrong passwords in a row before sign-in is held back |
+| `auth.lock_s` | 60 | How long sign-in is held back then |
 | `bench.runs` / `bench.warmup` | 30 / 5 | Samples per line |
 | `bench.budget_file` | `perf/budget.json` | |
 | `bench.results_dir` | `.bap-browser/bench` | |
@@ -2552,6 +2674,25 @@ was. It runs only on a session the agent is driving and that is doing nothing; o
 | Writes its log | The system's log file grew during the run. Skipped where the log is off |
 | A person can be asked | Someone is watching the system's page. Skipped when no one is |
 
+**Every system as one** (`GET /api/evals`, the admin's alone) is the card "All systems", above the three
+on the Systems page: the tasks of all three added up, with the same lines for tasks, latency, time and
+cost, and then a row for each system with its tasks, the share answered, a typical task, its tokens, its
+cost and how its checklist went. It is how the admin compares the browsers.
+
+**Who is shown what** (section 4.11). The admin is shown everything. A user is shown the evaluations of
+the browsers they may use, where the admin lets users see evaluations at all, and of those what the
+admin's policy lets through. What is kept back is taken out by the service, not merely left undrawn.
+
+| The admin's switch | Off, a user |
+|---|---|
+| Evaluations of the browsers they use | Has no Evaluations view; the routes answer 403 |
+| What the tasks cost | Gets no cost: `cost` is `null`, and no task carries what it cost |
+| The tasks and their traces | Gets no list of tasks, no trace and no rating (403) |
+| Run the checklist | Gets no checklist and cannot run one (403) |
+
+The answer says what the asker may see in `may` (`cost`, `traces`, `checklist`), and the page draws from
+that.
+
 Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
 section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.
 
@@ -2692,7 +2833,7 @@ run yet on a person's own Chrome or in the built-in browser; nothing in it is pa
 8. The remaining tools: `browser_pdf`, `browser_storage`, `browser_emulate`, `browser_mouse`, `browser_record`, `browser_network_request`, `browser_extract`.
 9. Cloud depth: provider adapters, a network guard that resolves names itself, WebRTC live view.
 10. A reference task set run with real agents, turned into budget lines for success, steps, time and tokens.
-11. An admin console for organisations, typing with a phone's on-screen keyboard during takeover, one-shot command-line calls with a skill file.
+11. An admin console for organisations with an account for each person (the window of three browsers has one admin and one password for all users, section 4.11), typing with a phone's on-screen keyboard during takeover, one-shot command-line calls with a skill file.
 
 ### 14.6 Later
 
@@ -3013,7 +3154,7 @@ Later = deferred · No = not building.
 | SG-08 | Redaction patterns applied to every result | H | M1 |
 | SG-09 | Per-site rules for access, uploads and downloads | CX | M2 |
 | SG-10 | Ask on the first visit to a site | OAI, CX, ANT | M2 |
-| SG-11 | Admin limits that settings cannot loosen | CX, ANT | M1 for locks and limits set by a deployment; an admin console Next |
+| SG-11 | Admin limits that settings cannot loosen | CX, ANT | M1 for locks and limits set by a deployment. Built for the window of three browsers: the admin's configuration holds users to it (section 4.11). A console for an organisation Next |
 | SG-12 | Confirmation tiers by kind of action | CX, OAI | M2 |
 | SG-13 | A reviewer model for risky actions | CX, ANT | Later |
 | SG-14 | Prompt-injection defences | AB, ANT, CX | Boundaries Next; classifier Later |
@@ -3176,7 +3317,7 @@ Later = deferred · No = not building.
 | SE-17 | Notifications when the agent needs the person, opt-in, with a sound | ANT | Next |
 | SE-18 | Automatic screening of each action in place of approvals | ANT | Later |
 | SE-19 | Site categories blocked by default (financial, adult, pirated) | ANT | Later |
-| SE-20 | An admin console for an organisation: allow and block lists, who may use which browser | ANT | Next |
+| SE-20 | An admin console for an organisation: allow and block lists, who may use which browser | ANT | Built for the window of three browsers, with one admin and one password for all users (section 4.11). An account for each person of an organisation: Next |
 
 ### 15.22 Further ideas
 

@@ -2,15 +2,17 @@
 // browser, each a page with its own session and its own chat. The tabs say where each one stands, so
 // a page that needs the person is seen from any other.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { App, type AppProps } from './App';
+import type { Role } from './auth/api';
 import { Icon, type IconName } from './components/Icon';
 import { Button } from './components/StatusPanel';
 import type { Connection } from './connection/connection';
 import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
-import type { SystemsApi } from './systems/api';
+import type { Passwords } from './systems/Access';
+import type { Me, SystemsApi } from './systems/api';
 import { SystemPanel, SystemsPage } from './systems/SystemsPage';
 import { W } from './wording';
 
@@ -21,8 +23,14 @@ const BACKEND_ICON: Record<Backend, IconName> = {
 };
 
 /** What is shown under a browser's tab: the browser itself with its chat, how it is set up, or what its tasks took. */
-export type RoomView = 'agent' | 'configuration' | 'evaluations';
-const ROOM_VIEWS: RoomView[] = ['agent', 'configuration', 'evaluations'];
+export type RoomView = 'agent' | 'configuration' | 'settings' | 'evaluations';
+
+/** The views under a browser's tab (spec 4.11): the admin has its configuration where a user has their own settings. */
+function viewsFor(role: Role, me: Me | null | undefined): RoomView[] {
+  if (role === 'admin') return ['agent', 'configuration', 'evaluations'];
+  // What its tasks took is a user's to see only where the admin says so.
+  return me?.sees.evaluations ? ['agent', 'settings', 'evaluations'] : ['agent', 'settings'];
+}
 
 export type RoomMood = 'attention' | 'working' | 'ready' | 'person' | 'paused' | 'stopped' | 'off';
 
@@ -43,6 +51,20 @@ export function wordFor(room: Pick<Room, 'state' | 'attention' | 'working'>): st
   return W.studio.off[state === 'failed' || state === 'waiting' || state === 'off' ? state : 'starting'];
 }
 
+/** The browser a user prefers is started for them when it has stopped, once for each time it stops. */
+function useStartsPreferred(systems: SystemsApi | undefined, room: string, state: string | undefined) {
+  const startedFor = useRef('');
+  useEffect(() => {
+    if (!systems || !room) return;
+    if (state !== 'ended') {
+      startedFor.current = '';
+    } else if (startedFor.current !== room) {
+      startedFor.current = room;
+      void systems.manage(room, 'start');
+    }
+  }, [systems, room, state]);
+}
+
 export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedded'> {
   /** The pages as the service listed them when the window opened. */
   rooms: Room[];
@@ -58,16 +80,31 @@ export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedd
   openDesktop?: OpenDesktop;
   /** The browsers as systems to set up, manage and evaluate (spec 9.17), where the service has them so. */
   systems?: SystemsApi;
+  /** Who is signed in (spec 4.11). Without it, whoever holds the service's own link: the admin. */
+  role?: Role;
+  /** What the person signed in may use and see, and the browser they prefer. */
+  me?: Me | null;
+  /** Signs the person out. The window has the button where this is given. */
+  onSignOut?(): void;
+  /** For the admin: sets the two passwords. */
+  passwords?: Passwords;
 }
 
-export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, systems, ...app }: StudioProps) {
+export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, systems, role = 'admin', me: givenMe, onSignOut, passwords, ...app }: StudioProps) {
   const [rooms, setRooms] = useState(given);
-  const [chosen, setChosen] = useState(opensOn);
+  const [me, setMe] = useState(givenMe);
+  // A user's window opens on the browser they prefer.
+  const [chosen, setChosen] = useState(role === 'user' ? (givenMe?.preferred ?? opensOn) : opensOn);
   /** The Systems page is shown in place of a browser's own page. */
   const [onSystems, setOnSystems] = useState(false);
   /** What is shown under the chosen browser's tab. It stays as it is from one browser to the next. */
-  const [view, setView] = useState<RoomView>('agent');
-  const room = rooms.find((one) => one.id === chosen) ?? rooms[0];
+  const [wanted, setView] = useState<RoomView>('agent');
+  const views = viewsFor(role, me);
+  const view = views.includes(wanted) ? wanted : 'agent';
+  // A user the admin lets use no browser has no page at all.
+  const room = rooms.find((one) => one.id === chosen) ?? (rooms[0] as Room | undefined);
+  const roomId = room?.id ?? '';
+  useStartsPreferred(role === 'user' && roomId === me?.preferred ? systems : undefined, roomId, room?.state);
 
   useEffect(() => {
     if (!pollMs) return;
@@ -82,7 +119,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     };
   }, [loadRooms, pollMs]);
 
-  const createConnection = useCallback(() => connectionFor(room.id), [connectionFor, room.id]);
+  const createConnection = useCallback(() => connectionFor(roomId), [connectionFor, roomId]);
   const open = (id: string) => {
     setOnSystems(false);
     setChosen(id);
@@ -93,7 +130,66 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     const now = await loadRooms();
     if (now) setRooms(now);
   }, [loadRooms]);
-  const showingSystems = onSystems && systems !== undefined;
+  const showingSystems = onSystems && systems !== undefined && role === 'admin';
+  // The browser a person prefers is the one their window opens on: it is opened at once, and works.
+  const prefer = async (id: string) => {
+    const told = await systems?.prefer(id);
+    if (!told) return;
+    setMe(told);
+    open(id);
+    setView('agent');
+    await refresh();
+  };
+  const side = (
+    <span className="studio-side">
+      {systems && role === 'admin' && (
+        <Button
+          icon="settings"
+          kind={showingSystems ? 'primary' : 'plain'}
+          onClick={() => {
+            if (showingSystems) void refresh();
+            setOnSystems(!showingSystems);
+          }}
+        >
+          {W.studio.systems}
+        </Button>
+      )}
+      {openDesktop && <DesktopButton open={openDesktop} />}
+      {onSignOut && (
+        <>
+          <span className="studio-role" data-role={role}>
+            <Icon name={role === 'admin' ? 'settings' : 'person'} />
+            {W.signIn.role[role]}
+          </span>
+          <Button icon="close" onClick={onSignOut}>
+            {W.studio.signOut}
+          </Button>
+        </>
+      )}
+    </span>
+  );
+
+  if (!room) {
+    // A user the admin lets use no browser has nothing to open.
+    return (
+      <div className="studio">
+        <header className="studio-bar">
+          <span className="brand">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-name">{W.product}</span>
+          </span>
+          {side}
+        </header>
+        <div className="studio-page">
+          <section className="studio-wait" aria-label={W.studio.noBrowser}>
+            <Icon name="lock" size="large" />
+            <h2 className="studio-wait-title">{W.studio.noBrowser}</h2>
+            <p className="studio-wait-lead">{W.studio.noBrowserLead}</p>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="studio">
@@ -124,27 +220,13 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             </button>
           ))}
         </div>
-        <span className="studio-side">
-          {systems && (
-            <Button
-              icon="settings"
-              kind={showingSystems ? 'primary' : 'plain'}
-              onClick={() => {
-                if (showingSystems) void refresh();
-                setOnSystems(!showingSystems);
-              }}
-            >
-              {W.studio.systems}
-            </Button>
-          )}
-          {openDesktop && <DesktopButton open={openDesktop} />}
-        </span>
+        {side}
       </header>
       {systems && !showingSystems && (
         // Under each browser: the browser itself, how it is set up, and what its tasks took (spec 9.17).
         <nav className="studio-views">
           <div className="systems-views" role="tablist" aria-label={W.studio.views(W.backend[room.backend])}>
-            {ROOM_VIEWS.map((name) => (
+            {views.map((name) => (
               <button
                 key={name}
                 type="button"
@@ -165,14 +247,26 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
       )}
       <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
         {showingSystems ? (
-          <SystemsPage api={systems} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} />
+          <SystemsPage api={systems} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} passwords={passwords} />
         ) : systems && view !== 'agent' ? (
-          <SystemPanel key={room.id} api={systems} system={room.id} view={view} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} onChanged={() => void refresh()} />
+          <SystemPanel
+            key={room.id}
+            api={systems}
+            system={room.id}
+            view={view}
+            role={role}
+            me={me}
+            onPrefer={(id) => void prefer(id)}
+            surface={app.surface ?? 'web'}
+            pollMs={pollMs}
+            wordFor={wordFor}
+            onChanged={() => void refresh()}
+          />
         ) : hasSession(room) ? (
           // A page keeps nothing of the page before it: each has its own session, and settings of its own.
           <App key={room.id} {...app} settings={systems ? systems.settings(room.id) : app.settings} createConnection={createConnection} embedded />
         ) : (
-          <NoSession room={room} onTurnOn={systems ? () => systems.settings(room.id).change(app.surface ?? 'web', { system_enabled: true }).then(refresh, refresh) : undefined} />
+          <NoSession room={room} onTurnOn={systems && role === 'admin' ? () => systems.settings(room.id).change(app.surface ?? 'web', { system_enabled: true }).then(refresh, refresh) : undefined} />
         )}
       </div>
     </div>

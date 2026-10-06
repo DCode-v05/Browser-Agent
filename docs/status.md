@@ -1,6 +1,6 @@
 # bap-browser: Status
 
-Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`) together with this page · To show it: `docs/demo-guide.md`
+Date: 2026-10-07 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`) together with this page · To show it: `docs/demo-guide.md`
 
 ## Where things stand
 
@@ -288,6 +288,39 @@ real model (the tests do it with the built-in and the cloud browser), and the co
 
 What is not in it, and is said in the spec: a judgement of an answer by another model; the eight
 task-level scenarios of the bench; settings of the desktop app's folders.
+
+### 1l. Finished on 2026-10-07: the admin and the user, each with a sign-in page of their own
+
+Asked for on 2026-10-06: a Configuration for the admin, where they allow users the systems; Settings
+for a user, where they choose the browser they prefer and set what is theirs; evaluations in both,
+with the admin deciding what a user sees; a sign-in page for each; working switches for both. Built
+as spec 4.11, with 9.17, 10.1, 10.2 and 12.6 brought in line.
+
+| Part | What it does |
+|---|---|
+| Two sign-in pages | `/admin` for the admin and `/` for a user, each with its own password. The first time, the link the service prints makes the admin's password; the admin sets the one users sign in with. Passwords are kept as salted hashes in `.bap-browser/accounts.json`. Five wrong ones in a row hold sign-in back for a minute; a sign-in lasts 12 hours; a new password signs out whoever used the old one |
+| The admin's Configuration | Everything of section 1k, and the card "Users": which settings users may change, what of the evaluations users may see, and the two passwords. Each browser's card has "Let users use this browser" |
+| A user's Settings | Under each browser's tab, in place of Configuration: the preferred browser, a switch or a choice for every setting that is theirs, and in words what the admin holds |
+| Whose value holds | `config.json`, then the admin's configuration (the admin may choose either way), then a user's own value, which may only be tighter. `settings.locked` is nobody's to change from a screen |
+| The preferred browser | A user's window opens on it. Chosen, it opens at once, ready for a task. When it has stopped, the user's page starts it |
+| Evaluations for each | The admin: every system, and "All systems", the three as one with a row for each. A user: the browsers they may use, and of cost, traces and the checklist only what the admin lets through. What is kept back is not sent |
+| Held by the service, not the page | A browser the admin keeps from users answers 404 to a user, on every address and on the live connection. What is the admin's answers 403. A user already on a browser that is taken away is disconnected, and so is anyone whose visit has ended |
+
+Run in a real Chromium (`tests/viewer/test_roles.py`): the admin creates their password, sets the
+users' one and keeps the cloud browser and the cost from users; a user signs in, is refused a wrong
+password, sees two browsers and no Systems page, prefers the built-in browser, gives it a task and
+gets the answer, makes "Ask before" stricter for themselves while the admin's value stays, sees the
+task in Evaluations with no cost, and has the browser started again after the admin stops it; a new
+password sends the user's page back to sign-in. Tests: 7 for the passwords, 11 for the roles over
+HTTP, 32 for the viewer, 1 in a real browser.
+
+Not checked by me: the two pages on a phone-sized screen (the styles are the tokens' own, and the
+tests are at desktop size), and two people signed in as a user at the same time (they share one
+password, one set of settings and one preferred browser).
+
+What is not in it: an account for each person; a user's page that follows the admin's switches for
+"may change" and "may see" without a reload (the service refuses at once; the page reads them when
+it loads).
 
 ### 2. Not started
 

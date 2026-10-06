@@ -53,6 +53,8 @@ def write_config(folder: Path, **sections: Any) -> Path:
     data["settings"] = {"file": str(folder / "settings.json"), **data.get("settings", {})}
     # And the records of what each browser of the window did, and their logs.
     data["evals"] = {"dir": str(folder / "evals"), **data.get("evals", {})}
+    # And who may sign in: a test never reads or changes the developer's own passwords.
+    data["auth"] = {"file": str(folder / "accounts.json"), **data.get("auth", {})}
     data["logging"] = {"systems_dir": str(folder / "logs"), **data.get("logging", {})}
     path = folder / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")

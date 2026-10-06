@@ -3,26 +3,22 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { Icon, type IconName } from '../components/Icon';
+import type { Role } from '../auth/api';
+import { Icon } from '../components/Icon';
 import { SettingsScreen } from '../components/SettingsScreen';
 import { Button } from '../components/StatusPanel';
-import type { Backend, Surface } from '../protocol';
-import type { Setting, SettingsAnswer } from '../settings/types';
+import type { Surface } from '../protocol';
+import type { SettingsAnswer } from '../settings/types';
 import { W } from '../wording';
-import type { Check, Evals, LogAnswer, SystemAction, SystemInfo, SystemsApi, TaskRow, TaskTrace } from './api';
+import { Access, OverallCard, type Passwords } from './Access';
+import type { Check, Evals, LogAnswer, Me, Overall, Policy, PolicyChange, SystemAction, SystemInfo, SystemsApi, TaskRow, TaskTrace } from './api';
 import { clock, count, dollars, percent, spanOf } from './format';
-
-const BACKEND_ICON: Record<Backend, IconName> = {
-  remote_headless: 'globe',
-  takeover_chrome: 'person',
-  bundled_chromium: 'monitor',
-};
-/** The states in which a system has no session. */
-const NOT_RUNNING = new Set(['starting', 'waiting', 'failed', 'off', 'ended']);
-/** How many lines of a log are shown at once. The file holds the rest. */
-const LOG_LINES_SHOWN = 20;
+import { CardHead, chosen, LogLines, NOT_RUNNING, Switch } from './parts';
+import { UserSettings } from './UserSettings';
 
 type View = 'configuration' | 'evaluations';
+/** Under a browser's own tab a user has their settings where the admin has the configuration. */
+export type PanelView = View | 'settings';
 
 interface Props {
   api: SystemsApi;
@@ -59,17 +55,44 @@ function useSystems(api: SystemsApi, pollMs: number) {
   return { systems, failed, load };
 }
 
+/** What the admin lets users use, change and see: read once, and changed a line at a time. */
+function usePolicy(api: SystemsApi, role: Role) {
+  const [policy, setPolicy] = useState<Policy | null>(null);
+  useEffect(() => {
+    if (role !== 'admin') return;
+    let current = true;
+    void api.policy().then((told) => current && told && setPolicy(told));
+    return () => {
+      current = false;
+    };
+  }, [api, role]);
+  const change = useCallback(
+    async (changes: PolicyChange) => {
+      const told = await api.changePolicy(changes);
+      if (told) setPolicy(told);
+    },
+    [api],
+  );
+  return { policy, change };
+}
+
 interface PanelProps extends Props {
   /** The one system to show. */
   system: string;
-  view: View;
+  view: PanelView;
+  /** Who is looking: the admin has the configuration, a user their own settings. */
+  role: Role;
+  me?: Me | null;
+  /** The person chose the browser their window opens on. */
+  onPrefer?(system: string): void;
   /** Told when the system was changed here, so that its tab follows at once. */
   onChanged?(): void;
 }
 
-/** One system by itself, under its own tab of the window: its configuration, or its evaluations. */
-export function SystemPanel({ api, system: id, view, surface, pollMs, wordFor, onChanged }: PanelProps) {
+/** One system by itself, under its own tab of the window: how it is set up, or what its tasks took. */
+export function SystemPanel({ api, system: id, view, role, me, onPrefer, surface, pollMs, wordFor, onChanged }: PanelProps) {
   const { systems, failed, load } = useSystems(api, pollMs);
+  const { policy, change: changePolicy } = usePolicy(api, role);
   const [said, setSaid] = useState('');
   const system = systems?.find((one) => one.id === id);
   const changed = useCallback(async () => {
@@ -78,7 +101,7 @@ export function SystemPanel({ api, system: id, view, surface, pollMs, wordFor, o
   }, [load, onChanged]);
 
   return (
-    <section className="systems" aria-label={W.systems[view]}>
+    <section className="systems" aria-label={view === 'settings' ? W.systems.user.title : W.systems[view]}>
       {said && (
         <p className="systems-note" role="status">
           {said}
@@ -90,10 +113,12 @@ export function SystemPanel({ api, system: id, view, surface, pollMs, wordFor, o
         </p>
       ) : (
         <div className="systems-grid" data-single="true">
-          {view === 'configuration' ? (
-            <Configuration system={system} api={api} surface={surface} word={wordFor(system)} onChanged={changed} onToast={setSaid} />
-          ) : (
+          {view === 'evaluations' ? (
             <Evaluation system={system} api={api} word={wordFor(system)} />
+          ) : role === 'admin' ? (
+            <Configuration system={system} api={api} surface={surface} word={wordFor(system)} onChanged={changed} onToast={setSaid} policy={policy} onPolicy={(changes) => void changePolicy(changes).then(changed)} />
+          ) : (
+            me && <UserSettings system={system} systems={systems ?? []} api={api} surface={surface} word={wordFor(system)} me={me} onPrefer={(chosenOne) => onPrefer?.(chosenOne)} onToast={setSaid} />
           )}
         </div>
       )}
@@ -101,11 +126,28 @@ export function SystemPanel({ api, system: id, view, surface, pollMs, wordFor, o
   );
 }
 
-export function SystemsPage({ api, surface, pollMs, wordFor }: Props) {
+/** The admin's page of the whole: the three systems side by side, what users are allowed, and all of it as one. */
+export function SystemsPage({ api, surface, pollMs, wordFor, passwords }: Props & { passwords?: Passwords }) {
   const [view, setView] = useState<View>('configuration');
   const { systems, failed, load } = useSystems(api, pollMs);
+  const { policy, change: changePolicy } = usePolicy(api, 'admin');
+  const [overall, setOverall] = useState<Overall | null>(null);
   /** What a settings screen opened from here has to say, such as that data was cleared. */
   const [said, setSaid] = useState('');
+
+  const loadOverall = useCallback(() => void api.overall().then((told) => told && setOverall(told)), [api]);
+  useEffect(() => {
+    if (view !== 'evaluations') return;
+    let current = true;
+    void api.overall().then((told) => current && told && setOverall(told));
+    return () => {
+      current = false;
+    };
+  }, [api, view]);
+  const nameOf = (id: string) => {
+    const system = systems?.find((one) => one.id === id);
+    return system ? W.backend[system.backend] : id;
+  };
 
   return (
     <section className="systems" aria-label={W.systems.title}>
@@ -132,48 +174,23 @@ export function SystemsPage({ api, surface, pollMs, wordFor }: Props) {
           {failed ? W.systems.unreachable : W.systems.loading}
         </p>
       ) : (
-        <div className="systems-grid">
-          {systems.map((system) =>
-            view === 'configuration' ? (
-              <Configuration key={system.id} system={system} api={api} surface={surface} word={wordFor(system)} onChanged={load} onToast={setSaid} />
-            ) : (
-              <Evaluation key={system.id} system={system} api={api} word={wordFor(system)} />
-            ),
-          )}
-        </div>
+        <>
+          {/* What is of every system comes first: the users' access, and the tasks of all as one. */}
+          {view === 'configuration' && policy && <Access policy={policy} onPolicy={(changes) => void changePolicy(changes)} passwords={passwords} />}
+          {view === 'evaluations' && <OverallCard overall={overall} nameOf={nameOf} onRefresh={loadOverall} />}
+          <div className="systems-grid">
+            {systems.map((system) =>
+              view === 'configuration' ? (
+                <Configuration key={system.id} system={system} api={api} surface={surface} word={wordFor(system)} onChanged={load} onToast={setSaid} policy={policy} onPolicy={(changes) => void changePolicy(changes)} />
+              ) : (
+                <Evaluation key={system.id} system={system} api={api} word={wordFor(system)} />
+              ),
+            )}
+          </div>
+        </>
       )}
     </section>
   );
-}
-
-function CardHead({ system, word }: { system: SystemInfo; word: string }) {
-  return (
-    <header className="system-head">
-      <Icon name={BACKEND_ICON[system.backend]} size="large" />
-      <h3 className="system-name">{W.backend[system.backend]}</h3>
-      <span className="system-state" data-on={system.enabled && !NOT_RUNNING.has(system.state)}>
-        <span className="studio-tab-dot" aria-hidden="true" />
-        {word}
-      </span>
-    </header>
-  );
-}
-
-function Switch({ label, on, locked, onChange }: { label: string; on: boolean; locked?: boolean; onChange(next: boolean): void }) {
-  return (
-    <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} disabled={locked} onClick={() => onChange(!on)}>
-      <span className="switch-knob" aria-hidden="true" />
-      <span className="switch-word" aria-hidden="true">
-        {on ? W.settings.on : W.settings.off}
-      </span>
-    </button>
-  );
-}
-
-/** What a setting that is not a switch is set to, in the words its choices use. */
-function chosen(setting: Setting): string {
-  if (Array.isArray(setting.value)) return W.systems.sites(setting.value.length + (setting.fixed?.length ?? 0));
-  return setting.choices?.find((choice) => choice.value === setting.value)?.label ?? String(setting.value ?? '');
 }
 
 interface ConfigurationProps {
@@ -183,9 +200,13 @@ interface ConfigurationProps {
   word: string;
   onChanged(): Promise<void>;
   onToast(text: string): void;
+  /** What the admin lets users use. Null until the service has said. */
+  policy: Policy | null;
+  onPolicy(changes: PolicyChange): void;
 }
 
-function Configuration({ system, api, surface, word, onChanged, onToast }: ConfigurationProps) {
+/** The admin's card of one system: whether it runs, who may use it, and what the agent may do in it. */
+function Configuration({ system, api, surface, word, onChanged, onToast, policy, onPolicy }: ConfigurationProps) {
   const source = api.settings(system.id);
   const [answer, setAnswer] = useState<SettingsAnswer | null>(null);
   const [note, setNote] = useState('');
@@ -230,6 +251,7 @@ function Configuration({ system, api, surface, word, onChanged, onToast }: Confi
   }
 
   const running = !NOT_RUNNING.has(system.state);
+  const forUsers = policy?.systems.find((line) => line.id === system.id);
   // A person's own Chrome is not started from here: its session begins when its extension dials in.
   const waitsForChrome = system.backend === 'takeover_chrome' && system.state === 'waiting';
   const name = W.backend[system.backend];
@@ -240,6 +262,15 @@ function Configuration({ system, api, surface, word, onChanged, onToast }: Confi
         <span className="system-row-name">{W.systems.use}</span>
         <Switch label={`${W.systems.use}: ${name}`} on={system.enabled} onChange={(next) => void change('system_enabled', next)} />
       </div>
+      {forUsers && (
+        <div className="system-row">
+          <span className="system-row-name">
+            {W.systems.access.users}
+            <span className="system-locked">{W.systems.access.usersLead}</span>
+          </span>
+          <Switch label={`${W.systems.access.users}: ${name}`} on={forUsers.allowed} onChange={(next) => onPolicy({ systems: { [system.id]: next } })} />
+        </div>
+      )}
       <div className="system-actions">
         {running ? (
           <>
@@ -302,8 +333,12 @@ function Configuration({ system, api, surface, word, onChanged, onToast }: Confi
       ) : (
         <p className="system-note">{W.systems.logOff}</p>
       )}
-      <h4 className="system-section">{W.systems.records}</h4>
-      <code className="system-path">{system.records}</code>
+      {system.records && (
+        <>
+          <h4 className="system-section">{W.systems.records}</h4>
+          <code className="system-path">{system.records}</code>
+        </>
+      )}
 
       {settingsOpen && (
         <SettingsScreen
@@ -321,28 +356,6 @@ function Configuration({ system, api, surface, word, onChanged, onToast }: Confi
         />
       )}
     </article>
-  );
-}
-
-function LogLines({ log }: { log: LogAnswer }) {
-  const lines = log.lines.slice(-LOG_LINES_SHOWN).reverse();
-  if (lines.length === 0) return <p className="system-note">{W.systems.logEmpty}</p>;
-  return (
-    <div className="system-log">
-      <p className="system-note">{W.systems.logNewest(lines.length)}</p>
-      <ol className="system-log-lines">
-        {lines.map((line, index) => (
-          <li key={`${line.ts}-${index}`} className="system-log-line" data-ok={line.ok}>
-            <span className="system-log-when">{clock(line.ts)}</span>
-            <span className="system-log-tool">{line.tool.replace('browser_', '')}</span>
-            <span className="system-log-took">
-              {line.ok ? W.systems.worked : W.systems.didNot}, {spanOf(line.ms)}
-            </span>
-            <span className="system-log-said">{line.result}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
   );
 }
 
@@ -388,6 +401,8 @@ function Evaluation({ system, api, word }: { system: SystemInfo; api: SystemsApi
 
   const name = W.backend[system.backend];
   const E = W.systems.evals;
+  // What this person may be shown. The admin is shown all of it.
+  const may = evals?.may ?? { cost: true, traces: true, checklist: true };
   return (
     <article className="system-card" aria-label={name}>
       <CardHead system={system} word={word} />
@@ -442,19 +457,21 @@ function Evaluation({ system, api, word }: { system: SystemInfo; api: SystemsApi
                     <span>{E.shares(percent(evals.time.model_share), percent(evals.time.tool_share), percent(evals.time.waiting_share))}</span>
                   </dd>
                 </div>
-                <div className="system-fact">
-                  <dt>{E.cost}</dt>
-                  <dd>
-                    {evals.cost.tasks_counted === 0 ? (
-                      E.noTokens
-                    ) : (
-                      <>
-                        <span>{E.tokens(count(evals.cost.input_tokens), count(evals.cost.output_tokens))}</span>
-                        <span>{evals.cost.usd === null ? E.noPrice : E.dollars(dollars(evals.cost.usd), dollars(evals.cost.usd_per_task ?? 0))}</span>
-                      </>
-                    )}
-                  </dd>
-                </div>
+                {evals.cost && (
+                  <div className="system-fact">
+                    <dt>{E.cost}</dt>
+                    <dd>
+                      {evals.cost.tasks_counted === 0 ? (
+                        E.noTokens
+                      ) : (
+                        <>
+                          <span>{E.tokens(count(evals.cost.input_tokens), count(evals.cost.output_tokens))}</span>
+                          <span>{evals.cost.usd === null ? E.noPrice : E.dollars(dollars(evals.cost.usd), dollars(evals.cost.usd_per_task ?? 0))}</span>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                )}
               </>
             )}
           </dl>
@@ -487,33 +504,37 @@ function Evaluation({ system, api, word }: { system: SystemInfo; api: SystemsApi
             </>
           )}
 
-          <h4 className="system-section">{E.checklist}</h4>
-          <div className="system-actions">
-            <Button kind="primary" icon="check" busy={checking || evals.checking} onClick={() => void run()}>
-              {checking || evals.checking ? E.running : E.run}
-            </Button>
-          </div>
-          {note && (
-            <p className="system-note" role="status">
-              {note}
-            </p>
-          )}
-          {evals.checklist ? (
+          {may.checklist && (
             <>
-              <p className="system-note" data-tone={evals.checklist.failed ? 'danger' : 'success'}>
-                {E.passed(evals.checklist.passed, evals.checklist.checks.length)}. {E.ran(clock(evals.checklist.ran), spanOf(evals.checklist.duration_ms))}
-              </p>
-              <ul className="system-checks">
-                {evals.checklist.checks.map((check) => (
-                  <CheckLine key={check.id} check={check} />
-                ))}
-              </ul>
+              <h4 className="system-section">{E.checklist}</h4>
+              <div className="system-actions">
+                <Button kind="primary" icon="check" busy={checking || evals.checking} onClick={() => void run()}>
+                  {checking || evals.checking ? E.running : E.run}
+                </Button>
+              </div>
+              {note && (
+                <p className="system-note" role="status">
+                  {note}
+                </p>
+              )}
+              {evals.checklist ? (
+                <>
+                  <p className="system-note" data-tone={evals.checklist.failed ? 'danger' : 'success'}>
+                    {E.passed(evals.checklist.passed, evals.checklist.checks.length)}. {E.ran(clock(evals.checklist.ran), spanOf(evals.checklist.duration_ms))}
+                  </p>
+                  <ul className="system-checks">
+                    {evals.checklist.checks.map((check) => (
+                      <CheckLine key={check.id} check={check} />
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="system-note">{E.neverRun}</p>
+              )}
             </>
-          ) : (
-            <p className="system-note">{E.neverRun}</p>
           )}
 
-          {evals.recent.length > 0 && (
+          {may.traces && evals.recent.length > 0 && (
             <>
               <h4 className="system-section">{E.traces}</h4>
               <ul className="system-tasks">

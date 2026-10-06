@@ -8,7 +8,7 @@ settings whose feature it contains.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -25,11 +25,6 @@ EVERYWHERE = SURFACES
 NOT_ON_MOBILE = ("web", "desktop")
 GROUPS = ("Browser", "Agent", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced")
 CLOUD = "remote_headless"
-BACKEND_NAMES = {
-    "remote_headless": ("Cloud browser", "Runs beside the agent. You watch a live picture of it."),
-    "takeover_chrome": ("My Chrome", "A tab of your own Chrome, with your sign-ins."),
-    "bundled_chromium": ("Built-in browser", "The app's own browser. It keeps its sign-ins."),
-}
 # The name of the event log, in the data folder, for a person who turns it on where the deployment has none.
 EVENT_LOG_NAME = "events.jsonl"
 
@@ -67,6 +62,9 @@ class Entry:
     only_per_system: bool = False
     """It is a setting of one browser among several, and of nothing else: it is not there for a
     service with one session."""
+    user: bool = False
+    """A user may set it for themselves (spec 4.11), inside what the admin set and where the admin
+    lets users change it. Every other setting is the admin's alone."""
 
     CONTROL: ClassVar[str] = ""
 
@@ -103,6 +101,11 @@ class Entry:
     def shown(self, value: Value, config: Config) -> Value:
         """The value as the screen shows it."""
         return value
+
+    def free(self) -> Entry:
+        """The setting as the admin has it: with every choice open, the looser ones too. Only
+        a user is held to what stands above them."""
+        return self
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -141,6 +144,9 @@ class Choice(Entry):
     def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {self.key: value}
 
+    def free(self) -> Entry:
+        return replace(self, tighten=False)
+
     def fixed_by_deployment(self, config: Config) -> bool:
         deployed = self.deployed(config)
         return self.tighten and all(
@@ -159,14 +165,6 @@ class Choice(Entry):
                 choice["disabled"] = True
             choices.append(choice)
         return {"choices": choices}
-
-
-@dataclass(frozen=True, kw_only=True)
-class PreferredBrowser(Choice):
-    """The browser a new session uses, among those the deployment offers."""
-
-    def offered(self, config: Config) -> tuple[Option, ...]:
-        return tuple(Option(kind, *BACKEND_NAMES[kind]) for kind in config.backend.offered)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -209,6 +207,9 @@ class Switch(Entry):
     def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         return {self.key: bool(value)}
 
+    def free(self) -> Entry:
+        return replace(self, tighten=False)
+
     def fixed_by_deployment(self, config: Config) -> bool:
         return self.tighten and not self.deployed(config)
 
@@ -247,6 +248,8 @@ class SiteList(Entry):
     adds_to_deployment: bool
     """True: the person's sites are added to the deployment's, which stay (blocked sites). False: the
     person's sites take the place of the deployment's and may only narrow them (allowed sites)."""
+    must_narrow: bool = True
+    """A list that takes the place of the one above it must lie inside it. Not so for the admin."""
 
     CONTROL: ClassVar[str] = "list"
 
@@ -270,9 +273,13 @@ class SiteList(Entry):
             return None
         deployment = self._deployment(config)
         # With a list of the deployment's, a person narrows it: each of their sites lies inside it.
-        if deployment and not all(any(_inside(site, wide) for wide in deployment) for site in sites):
+        inside = all(any(_inside(site, wide) for wide in deployment) for site in sites)
+        if self.must_narrow and deployment and not inside:
             return "would_loosen"
         return None
+
+    def free(self) -> Entry:
+        return replace(self, must_narrow=False)
 
     def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
         sites = value if isinstance(value, list) else []
@@ -374,16 +381,6 @@ ENABLED = Enabled(
 
 CATALOGUE: tuple[Entry, ...] = (
     ENABLED,
-    PreferredBrowser(
-        id="preferred_browser",
-        group="Browser",
-        surfaces=NOT_ON_MOBILE,
-        title="Preferred browser",
-        description="The browser the agent uses for a new session.",
-        key="backend.kind",
-        options=(),
-        applies="next_session",
-    ),
     StaySignedIn(
         id="stay_signed_in",
         group="Browser",
@@ -407,6 +404,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="ask_before",
+        user=True,
         per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
@@ -415,12 +413,13 @@ CATALOGUE: tuple[Entry, ...] = (
         key="safety.ask_before",
         tighten=True,
         options=(
-            Option("risky", "Risky actions", "Uploads, page scripts and whatever your organisation lists"),
+            Option("risky", "Risky actions", "Uploads, page scripts and whatever the admin lists"),
             Option("every_action", "Every action", "Each click, key press and page change"),
         ),
     ),
     ApprovalWait(
         id="approval_wait",
+        user=True,
         per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
@@ -432,6 +431,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="remember_site_approval",
+        user=True,
         per_system=True,
         group="Approvals",
         surfaces=EVERYWHERE,
@@ -444,6 +444,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="blocked_sites",
+        user=True,
         per_system=True,
         group="Sites",
         surfaces=EVERYWHERE,
@@ -454,6 +455,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="allowed_sites",
+        user=True,
         per_system=True,
         group="Sites",
         surfaces=EVERYWHERE,
@@ -503,6 +505,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="picture_quality",
+        user=True,
         per_system=True,
         group="Live view",
         surfaces=EVERYWHERE,
@@ -517,6 +520,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="show_agent_pointer",
+        user=True,
         group="Live view",
         surfaces=EVERYWHERE,
         title="Show where the agent is acting",
@@ -525,6 +529,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="colour_mode",
+        user=True,
         group="Appearance",
         surfaces=EVERYWHERE,
         title="Colour mode",
@@ -562,3 +567,6 @@ CATALOGUE: tuple[Entry, ...] = (
 )
 
 BY_ID: Mapping[str, Entry] = {entry.id: entry for entry in CATALOGUE}
+
+# Each setting as the admin has it: every choice open (spec 4.11).
+FREE: Mapping[str, Entry] = {entry.id: entry.free() for entry in CATALOGUE}

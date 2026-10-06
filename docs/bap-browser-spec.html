@@ -161,6 +161,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#48-viewer-protocol">4.8 Viewer protocol</a></li>
 <li><a href="#49-bridge-channel-milestones-2-and-3">4.9 Bridge channel (milestones 2 and 3)</a></li>
 <li><a href="#410-protecting-the-service">4.10 Protecting the service</a></li>
+<li><a href="#411-the-admin-and-the-user">4.11 The admin and the user</a></li>
 </ul>
 </li>
 <li class="s"><a href="#5-browser-engine">5. Browser engine</a>
@@ -875,8 +876,18 @@ starts once per service, not once per session.</p>
 <tbody>
 <tr>
 <td><code>GET /</code></td>
-<td>The viewer's files</td>
+<td>The viewer's files. Where people sign in, a user's sign-in page (section 4.11)</td>
 <td>None. The files hold no data</td>
+</tr>
+<tr>
+<td><code>GET /admin</code></td>
+<td>The admin's sign-in page: the same files</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/api/auth</code> and the routes under it, <code>/api/me</code>, <code>/api/admin/policy</code></td>
+<td>Signing in, who is signed in, and what the admin allows users (section 4.11)</td>
+<td>Section 4.11</td>
 </tr>
 <tr>
 <td><code>GET /api/sessions</code></td>
@@ -1206,7 +1217,148 @@ a web client, and a core in a micro VM.</p>
 <li>The viewer address is written to the state file, readable by the current user only, and printed to the error stream. It is never placed in a tool result, where the model would see it.</li>
 <li>The token, typed text and password values never appear in a log, an event or a tool result.</li>
 <li>A bridge is accepted only with a valid pairing token (section 4.9).</li>
+<li>In the window of three browsers people sign in, as the admin or as a user, and each is held to what their role may do (section 4.11). The service's own token is then the admin's.</li>
 </ul>
+<h3 id="411-the-admin-and-the-user">4.11 The admin and the user</h3>
+<p>The window of three browsers (section 9.16) is used by two kinds of people. Each signs in on a page of
+their own, with a password of their own.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>The admin</th>
+<th>A user</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Their page</td>
+<td><code>/admin</code></td>
+<td><code>/</code>, the address itself</td>
+</tr>
+<tr>
+<td>Their part</td>
+<td><strong>Configuration</strong>. Sets the system up: turns each browser on and off, starts and stops it, says what the agent may do in it, and says what users are allowed</td>
+<td><strong>Settings</strong>. Works with the agent in the browsers the admin lets users use, chooses the browser they prefer, and sets what is theirs to set</td>
+</tr>
+<tr>
+<td>Evaluations</td>
+<td>All of them: each system's, and every system as one</td>
+<td>Those of the browsers they use, and of those what the admin lets users see</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Signing in.</strong> Each role has one password. It is kept as a salted hash (scrypt) in <code>auth.file</code>, which
+only the current user can read. A password is never in <code>config.json</code>, a log, an event or a result, and
+the page that asks for it does not keep it.</p>
+<ul>
+<li><strong>The first time</strong> nobody has a password. The service prints its links when it starts and opens
+  <code>/admin#token=…</code> with its own token. That page makes the admin's password, typed twice and at least
+  <code>auth.min_chars</code> characters long, and signs the admin in. Opened without that link, the admin's page
+  says the password has not been made, and makes none.</li>
+<li><strong>The users' password</strong> is set by the admin, in Configuration. Until then a user's page says so and
+  asks for nothing.</li>
+<li>A right password gives the page a token for the visit. The page keeps it for the life of the tab and
+  sends it as the bearer token. A visit lasts <code>auth.session_hours</code>; "Sign out" ends it sooner.</li>
+<li>After <code>auth.max_failures</code> wrong passwords in a row, signing in to that role waits <code>auth.lock_s</code>
+  seconds. The page says how long.</li>
+<li>A new password ends every visit made with the old one. The admin who changes their own password stays
+  signed in on the page they changed it on.</li>
+<li>A page whose visit is over goes back to its sign-in page: signed out on another page, a new password,
+  or its time up. The service closes that visit's open connections itself, and does nothing more that
+  the visit asks for.</li>
+<li>The service's own token, which whoever started the service holds, speaks as the admin. It makes the
+  first password, and it is how an admin who lost theirs makes a new one: they start the service and
+  open the link it prints.</li>
+</ul>
+<p><strong>What the admin allows: the policy.</strong> Three lists, kept in <code>settings.file</code> under <code>"policy"</code> and changed
+in Configuration, each line with a switch.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>List</th>
+<th>A line</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>systems</code></td>
+<td>A browser users may use. Off: for a user it is not there at all, not on a tab, not in an answer, not behind an address</td>
+<td>Every browser</td>
+</tr>
+<tr>
+<td><code>may_change</code></td>
+<td>A setting users may change for themselves. Section 10.2 says which settings can be a user's. Off: a user has the admin's value, shown to them in words</td>
+<td>Every such setting</td>
+</tr>
+<tr>
+<td><code>sees</code></td>
+<td><code>evaluations</code> (of the browsers they use), <code>cost</code> (what the tasks cost), <code>traces</code> (the tasks and their traces), <code>checklist</code> (run the checklist), <code>log</code> (the log of the agent's steps)</td>
+<td>All but <code>log</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Whose value holds.</strong> The admin's configuration takes the place of what <code>config.json</code> gives, in either
+direction: it is the admin's to choose. A user's own value is laid over the admin's and may only be
+tighter (section 10.1). A setting in <code>settings.locked</code> is nobody's to change from a screen.</p>
+<p><strong>The preferred browser</strong> is the browser a user's window opens on. A user chooses it in Settings, among
+the browsers they may use, and it opens at once. When the browser a user prefers has stopped, their page
+starts it. Starting is all a user may do to a browser: stopping and restarting one are the admin's.</p>
+<p><strong>The API.</strong> Signing in needs no token. Everything else answers 401 to nobody, 403 to a user who asks
+for what is the admin's, and 404 for a browser a user may not use, the same as for one that is not there.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+<th>Who</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/auth</code></td>
+<td><code>accounts</code>: whether people sign in to this service. <code>admin_set</code>, <code>user_set</code>: whether there is a password to sign in with. <code>role</code> and <code>operator</code>: who the page's own token speaks for, and whether it is the service's own</td>
+<td>Anyone</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/sign-in</code></td>
+<td><code>{"role", "password"}</code> gives <code>{"token", "role"}</code>. 401 <code>wrong</code>; 409 <code>not_set</code>; 429 <code>locked</code>, with <code>wait_s</code></td>
+<td>Anyone</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/password</code></td>
+<td><code>{"role", "password"}</code> sets a password. 400 with a sentence for one that is too short or too long</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td><code>POST /api/auth/sign-out</code></td>
+<td>Ends the visit</td>
+<td>Whoever signed in</td>
+</tr>
+<tr>
+<td><code>GET /api/me</code></td>
+<td><code>role</code>, the <code>systems</code> this person may use, the one they prefer (<code>preferred</code>), and what they see (<code>sees</code>)</td>
+<td>Admin, user</td>
+</tr>
+<tr>
+<td><code>PATCH /api/me</code></td>
+<td><code>{"preferred": "{name}"}</code>. 409 for a browser the person may not use</td>
+<td>Admin, user</td>
+</tr>
+<tr>
+<td><code>GET</code>, <code>PATCH /api/admin/policy</code></td>
+<td>The policy: each line with its words and whether it is allowed. A change names its lines: <code>{"systems": {"cloud": false}}</code>, <code>{"may_change": {…}}</code>, <code>{"sees": {…}}</code></td>
+<td>Admin</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>GET /api/sessions</code> says <code>role</code> where people sign in, and lists for a user only the browsers they may
+use. The viewer's WebSocket is closed with 4401 for a token that speaks for nobody and 4404 for a
+browser the person may not use: when it connects, and whenever that becomes so afterwards.</p>
+<p><strong>A service nobody signs in to.</strong> <code>bap-browser mcp</code>, <code>agent</code> and <code>serve</code> have one session and no
+accounts. Their own token is the one way in, as section 4.10 says, and whoever holds it may do
+everything. <code>GET /api/auth</code> answers <code>{"accounts": false}</code> there.</p>
 <h2 id="5-browser-engine">5. Browser engine</h2>
 <h3 id="51-driver-interface">5.1 Driver interface</h3>
 <p>The tool layer talks to this interface, never to Playwright directly. It is the seam between the core
@@ -2129,7 +2281,7 @@ to the person with <code>browser_request_human</code> and never to do one itself
 <ul>
 <li>The address check and the browser resolve host names separately; a network guard that connects to the checked address is a next-step item.</li>
 <li>Site rules are two lists, allowed and blocked. Per-site permissions with "ask on first visit" arrive in milestone 2.</li>
-<li>A deployment can lock a setting so that a person cannot change it (section 10.1). There is no separate admin console.</li>
+<li>A deployment can lock a setting so that a person cannot change it (section 10.1). In the window of three browsers an admin says what users may use, change and see (section 4.11).</li>
 <li>Actions are not classified as consequential until milestone 2.</li>
 </ul>
 <h3 id="88-permissions-on-a-persons-own-browser-milestone-2">8.8 Permissions on a person's own browser (milestone 2)</h3>
@@ -3310,33 +3462,111 @@ its own and keeps a record of its own tasks. The names are those of the pages: <
 <p><strong>Settings of its own.</strong> Most settings are each system's own (section 10.2 marks them): what the agent
 may do there, what it must ask about, the sites, the log, the picture, the model. A system's own value
 holds for it. Where it has none, the value a person set for every browser holds, and where there is none
-of those, the deployment's. The rule of section 10.1 holds for each system by itself: a person tightens
-and never loosens. The settings that are the person's and not a browser's (Colour mode, Show where the
-agent is acting) are one for the window, whichever system's screen they are changed on.</p>
+of those, the deployment's. The rule of section 10.1 holds for each system by itself: the admin chooses
+its value, and a user tightens it and never loosens it. The settings that are the person's and not a
+browser's (Colour mode, Show where the agent is acting) are one for the window, whichever system's screen
+they are changed on.</p>
+<p>Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
+beside "Sign out".</p>
 <div class="tw"><table>
 <thead>
 <tr>
 <th>On a page of the window</th>
+<th>For the admin</th>
+<th>For a user</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The tabs</td>
+<td>The three browsers</td>
+<td>The browsers the admin lets users use. With none, the page says "No browser to use yet"</td>
+</tr>
+<tr>
+<td>Under each browser's tab</td>
+<td><strong>Browser and chat</strong> (the browser itself and its chat), <strong>Configuration</strong> and <strong>Evaluations</strong>. The last two show that system's card by itself, the same card as on the Systems page</td>
+<td><strong>Browser and chat</strong>, <strong>Settings</strong> (their own settings of that browser) and <strong>Evaluations</strong>, which is there only where the admin lets users see evaluations</td>
+</tr>
+<tr>
+<td>The settings button</td>
+<td>Opens the settings of that page's browser. Its first setting is "Use this browser"</td>
+<td>Opens the settings that are theirs to change</td>
+</tr>
+<tr>
+<td>A browser that is turned off</td>
+<td>Its tab says "Turned off". Its page says so, and has "Turn it on"</td>
+<td>Its page says so. Turning it on is the admin's</td>
+</tr>
+<tr>
+<td>"Systems" in the bar</td>
+<td>The Systems page</td>
+<td>Not there</td>
+</tr>
+</tbody>
+</table></div>
+<p>The view stays as it is from one browser to the next, so the browsers are looked at one after the other.
+A user's window opens on the browser they prefer.</p>
+<p><strong>A user's Settings.</strong> One card for the browser, every control on it a working one.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>On the card</th>
 <th>What it is</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Under each browser's tab</td>
-<td>Three views of that browser: <strong>Browser and chat</strong> (the browser itself and its chat), <strong>Configuration</strong> and <strong>Evaluations</strong>. The last two show that system's card by itself, the same card as on the Systems page. The view stays as it is from one browser to the next, so the three are looked at one after the other</td>
+<td>Preferred browser</td>
+<td>A choice among the browsers they may use. The one chosen opens at once, on its chat</td>
 </tr>
 <tr>
-<td>The settings button</td>
-<td>Opens the settings of that page's browser. Its first setting is "Use this browser"</td>
+<td>Yours to turn on and off</td>
+<td>A switch for each setting that is theirs and is a switch</td>
 </tr>
 <tr>
-<td>A browser that is turned off</td>
-<td>Its tab says "Turned off". Its page says so, and has "Turn it on"</td>
+<td>Yours to choose</td>
+<td>A choice for each setting that is theirs and has choices. One that would be looser than the admin has it is shown, and cannot be taken</td>
+</tr>
+<tr>
+<td>Sites</td>
+<td>How many blocked and allowed sites they have. "Change these settings" opens the settings screen, where the lists are typed</td>
+</tr>
+<tr>
+<td>Set by your admin</td>
+<td>The settings the admin holds, each with its value in words. They are not drawn as switches that do nothing</td>
+</tr>
+<tr>
+<td>Log</td>
+<td>The newest lines of the agent's steps, where the admin lets users see the log</td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>The Systems page.</strong> "Systems" in the bar opens a page in place of a browser's own, with the three
-systems side by side, each a card, and two views of them.</p>
+<p>A user's card has no Start, Stop or Restart, and nothing of what the agent may do: those are the admin's.</p>
+<p><strong>The Systems page</strong> is the admin's. "Systems" in the bar opens a page in place of a browser's own, with
+the three systems side by side, each a card, and two views of them. Above the cards, Configuration has
+the card <strong>Users</strong> and Evaluations has the card <strong>All systems</strong> (section 12.6).</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>On the Users card</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What users may change</td>
+<td>A switch for each setting that can be a user's. Off holds every user at the admin's value</td>
+</tr>
+<tr>
+<td>What users may see</td>
+<td>A switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist, and the log</td>
+</tr>
+<tr>
+<td>Sign-in passwords</td>
+<td>The password users sign in with, and the admin's own</td>
+</tr>
+</tbody>
+</table></div>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -3347,7 +3577,7 @@ systems side by side, each a card, and two views of them.</p>
 <tbody>
 <tr>
 <td>Configuration</td>
-<td>Where the system stands. <strong>Use this browser</strong> (on, off). <strong>Restart</strong> and <strong>Stop</strong> for one that runs, <strong>Start</strong> for one that does not; a person's own Chrome is not started from here, it connects by itself. <strong>What the agent may do here</strong>: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". <strong>How it is set up</strong>: the model and every other setting of this system, in the words of its choices. <strong>All settings</strong> opens the settings screen of this system. <strong>Log file</strong>: where it is, and "Show the log" for its newest lines. <strong>Records of its tasks</strong>: the folder</td>
+<td>Where the system stands. <strong>Use this browser</strong> (on, off). <strong>Let users use this browser</strong> (on, off: off, it is not there for a user at all). <strong>Restart</strong> and <strong>Stop</strong> for one that runs, <strong>Start</strong> for one that does not; a person's own Chrome is not started from here, it connects by itself. <strong>What the agent may do here</strong>: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". <strong>How it is set up</strong>: the model and every other setting of this system, in the words of its choices. <strong>All settings</strong> opens the settings screen of this system. <strong>Log file</strong>: where it is, and "Show the log" for its newest lines. <strong>Records of its tasks</strong>: the folder</td>
 </tr>
 <tr>
 <td>Evaluations</td>
@@ -3364,8 +3594,10 @@ answered with a sentence for the person: "This browser is turned off. Turn it on
 form of section 5.9's event log, and nothing goes to the one log of a single session. Where a deployment
 keeps no log (<code>logging.event_log</code> is <code>null</code>) no system writes one, until a person turns the log on for a
 system. The Systems page reads the newest <code>logging.shown_lines</code> lines of the file.</p>
-<p><strong>The API.</strong> All behind the token. A system the service does not have answers 404; a service with one
-session has none of these routes.</p>
+<p><strong>The API.</strong> All behind the token. A system the service does not have answers 404, and so does one a
+user may not use; a service with one session has none of these routes. A user is told of a system
+without where its files are, may start one and not stop or restart it (403), and reads its log only
+where the admin lets users see it (403).</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -3409,15 +3641,16 @@ page.</p>
 <p>Every tunable value lives in <code>src/bap_browser/config.py</code> with its default. A deployment changes values
 with <code>config.json</code>. A person changes the settings they are allowed to in the settings screen. No
 tunable number is written anywhere else in the code.</p>
-<pre><code>defaults in config.py  &lt;  config.json  &lt;  environment variables  &lt;  user settings  &lt;  per-session options
+<pre><code>defaults in config.py  &lt;  config.json  &lt;  environment variables  &lt;  the admin's configuration  &lt;  a user's settings  &lt;  per-session options
 </code></pre>
 <ul>
 <li>Later sources win. Nested sections merge; lists and single values are replaced.</li>
 <li><code>config.json</code> is found at the path given on the command line, then <code>$BAP_BROWSER_CONFIG</code>, then <code>./config.json</code>.</li>
 <li>Environment variables are <code>BAP_BROWSER__SECTION__KEY=value</code>, with the value read as JSON: <code>BAP_BROWSER__BROWSER__HEADLESS=false</code>.</li>
-<li><strong>User settings</strong> are the values a person saves in the settings screen. They are kept in <code>settings.file</code> and can change only the keys named in the settings catalogue (section 10.2). Three limits hold:<ol>
-<li>A setting listed in <code>settings.locked</code> cannot be changed by a person. The screen shows it as "Set by your organisation".</li>
-<li>A person can tighten a safety setting but never loosen it past the deployment's value. They can add blocked sites but not remove the deployment's. They can ask for more approvals but not fewer than the deployment requires. They can narrow the allowed sites but not widen them.</li>
+<li><strong>The admin's configuration</strong> and <strong>a user's settings</strong> are the values people save from a screen. Both are kept in <code>settings.file</code> and can change only the keys named in the settings catalogue (section 10.2). Who a person is, is section 4.11; where nobody signs in, whoever holds the service's token is the admin. Four limits hold:<ol>
+<li>A setting listed in <code>settings.locked</code> cannot be changed from a screen by anybody. The screen shows it as "Set by your organisation", and the admin's card as "Locked in config.json".</li>
+<li>The admin chooses any offered value, looser than <code>config.json</code> gives or tighter: setting the system up is theirs.</li>
+<li>A user can tighten a safety setting but never loosen it past the admin's value. They can add blocked sites but not remove the admin's. They can ask for more approvals but not fewer than the admin requires. They can narrow the allowed sites but not widen them. And a user changes only the settings that can be a user's, and of those only the ones the admin lets users change.</li>
 <li>A setting that does not belong to the surface in use is neither shown nor accepted.</li>
 </ol>
 </li>
@@ -3461,13 +3694,13 @@ app adds what needs the local machine (<code>docs/research/settings.md</code>).<
 <tr>
 <td><code>preferred_browser</code></td>
 <td>Preferred browser</td>
-<td>The browser the agent uses for a new session</td>
-<td>Web: Cloud browser, My Chrome. Desktop: Built-in browser, My Chrome, Cloud browser</td>
+<td>The browser a person's window opens on. It is kept with the person's settings and is not an entry of the settings screen: a user chooses it on their Settings card (sections 4.11 and 9.17)</td>
+<td>The browsers of the window the person may use; the first of them until they choose</td>
 <td>yes</td>
 <td>no</td>
 <td>yes</td>
-<td><code>backend.kind</code></td>
-<td><span class="ph ph-m1">M1</span>shows the one browser there is; the choice arrives with M2 and M3</td>
+<td>none; kept in <code>settings.file</code></td>
+<td>Built, in the window of three browsers</td>
 </tr>
 <tr>
 <td><code>stay_signed_in</code></td>
@@ -3729,13 +3962,13 @@ by the deployment (<code>settings.locked</code>); a deployment that must keep it
 <tbody>
 <tr>
 <td>Free</td>
-<td><code>preferred_browser</code> (among <code>backend.offered</code>), <code>stay_signed_in</code>, <code>approval_wait</code> (among <code>control.approval_timeout_choices_s</code>), <code>activity_log</code>, <code>picture_quality</code>, <code>show_agent_pointer</code>, <code>colour_mode</code>, <code>notify_when_needed</code>, <code>show_builtin_browser</code>, <code>download_folder</code></td>
+<td><code>preferred_browser</code> (among the browsers the person may use), <code>stay_signed_in</code>, <code>approval_wait</code> (among <code>control.approval_timeout_choices_s</code>), <code>activity_log</code>, <code>picture_quality</code>, <code>show_agent_pointer</code>, <code>colour_mode</code>, <code>notify_when_needed</code>, <code>show_builtin_browser</code>, <code>download_folder</code></td>
 <td>Any offered choice</td>
 </tr>
 <tr>
 <td>Tighten only</td>
 <td><code>ask_before</code>, <code>remember_site_approval</code>, <code>blocked_sites</code>, <code>allowed_sites</code>, <code>allow_downloads</code>, <code>allow_uploads</code>, <code>upload_folders</code>, <code>page_scripts</code>, <code>my_chrome_mode</code></td>
-<td>The person's value must be at least as strict as the deployment's. A choice that would loosen it is shown but disabled, with "Set by your organisation"</td>
+<td>A user's value must be at least as strict as the admin's. A choice that would loosen it is shown but disabled, with "Set by your admin". The admin chooses either way (section 10.1)</td>
 </tr>
 <tr>
 <td>Kept by the bridge</td>
@@ -3745,8 +3978,15 @@ by the deployment (<code>settings.locked</code>); a deployment that must keep it
 </tbody>
 </table></div>
 <p><code>clear_browsing_data</code> and <code>about</code> hold no value: one is an action, the other is read-only.</p>
-<p><strong>When a change takes effect.</strong> <code>preferred_browser</code>, <code>stay_signed_in</code> and <code>show_builtin_browser</code> apply
-to the next session; the screen says so. Every other setting applies to the agent's next tool call.</p>
+<p><strong>When a change takes effect.</strong> <code>stay_signed_in</code> and <code>show_builtin_browser</code> apply to the next session;
+the screen says so. <code>preferred_browser</code> opens that browser at once. Every other setting applies to the
+agent's next tool call.</p>
+<p><strong>A user's own.</strong> Eight settings can be a user's: <code>ask_before</code>, <code>approval_wait</code>,
+<code>remember_site_approval</code>, <code>blocked_sites</code>, <code>allowed_sites</code>, <code>picture_quality</code>, <code>show_agent_pointer</code> and
+<code>colour_mode</code>. A user is shown these and no others. The rest are the admin's alone: whether a browser is
+used, its model, downloads, uploads, the log, scripts, signing in to sites, clearing browsing data. For
+each of the eight the admin says whether users may change it (<code>may_change</code> in section 4.11); one they may
+not is shown to a user as locked, with the admin's value.</p>
 <p><strong>Each system's own.</strong> Where the service has several browsers (section 9.17), these are set for each
 system by itself: <code>system_enabled</code> ("Use this browser", which is there only for a system), <code>agent_model</code>
 ("Model", among <code>agent.model</code> and <code>agent.offered_models</code>), <code>ask_before</code>, <code>approval_wait</code>,
@@ -3756,7 +3996,9 @@ steps", <code>code.enabled</code>, tighten only). The saved file holds a system'
 <code>"systems": {"cloud": {…}}</code>, beside the values for every browser.</p>
 <p><strong>The settings API.</strong> <code>GET /api/settings?surface=web</code> returns the groups and, for each setting, its
 name, kind of control, choices, current value, default, whether it is locked and why, and when a
-change applies. A build returns only the settings whose feature it contains.</p>
+change applies. A build returns only the settings whose feature it contains. The answer is for whoever
+asks and says so in <code>role</code>: the admin gets the configuration, a user their own eight settings with their
+own values. A change is saved to the asker's own layer.</p>
 <pre><code class="language-json">{&quot;surface&quot;:&quot;web&quot;,&quot;groups&quot;:[{&quot;id&quot;:&quot;approvals&quot;,&quot;title&quot;:&quot;Approvals&quot;,&quot;settings&quot;:[
   {&quot;id&quot;:&quot;ask_before&quot;,&quot;title&quot;:&quot;Ask before&quot;,&quot;description&quot;:&quot;When the agent must wait for your approval.&quot;,
    &quot;control&quot;:&quot;choice&quot;,
@@ -4748,7 +4990,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 </tr>
 </tbody>
 </table></div>
-<p><strong><code>logging</code>, <code>bench</code></strong></p>
+<p><strong><code>logging</code>, <code>evals</code>, <code>auth</code>, <code>bench</code></strong></p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -4817,6 +5059,31 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>evals.step_budget_ms</code></td>
 <td>2000</td>
 <td>The checklist's limit for one step in the browser</td>
+</tr>
+<tr>
+<td><code>auth.file</code></td>
+<td><code>.bap-browser/accounts.json</code></td>
+<td>Where the sign-in passwords are kept, as salted hashes (section 4.11)</td>
+</tr>
+<tr>
+<td><code>auth.min_chars</code> / <code>auth.max_chars</code></td>
+<td>8 / 200</td>
+<td>The shortest and the longest password that is taken</td>
+</tr>
+<tr>
+<td><code>auth.session_hours</code></td>
+<td>12</td>
+<td>How long a sign-in lasts</td>
+</tr>
+<tr>
+<td><code>auth.max_failures</code></td>
+<td>5</td>
+<td>Wrong passwords in a row before sign-in is held back</td>
+</tr>
+<tr>
+<td><code>auth.lock_s</code></td>
+<td>60</td>
+<td>How long sign-in is held back then</td>
 </tr>
 <tr>
 <td><code>bench.runs</code> / <code>bench.warmup</code></td>
@@ -6118,6 +6385,41 @@ was. It runs only on a session the agent is driving and that is doing nothing; o
 </tr>
 </tbody>
 </table></div>
+<p><strong>Every system as one</strong> (<code>GET /api/evals</code>, the admin's alone) is the card "All systems", above the three
+on the Systems page: the tasks of all three added up, with the same lines for tasks, latency, time and
+cost, and then a row for each system with its tasks, the share answered, a typical task, its tokens, its
+cost and how its checklist went. It is how the admin compares the browsers.</p>
+<p><strong>Who is shown what</strong> (section 4.11). The admin is shown everything. A user is shown the evaluations of
+the browsers they may use, where the admin lets users see evaluations at all, and of those what the
+admin's policy lets through. What is kept back is taken out by the service, not merely left undrawn.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>The admin's switch</th>
+<th>Off, a user</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Evaluations of the browsers they use</td>
+<td>Has no Evaluations view; the routes answer 403</td>
+</tr>
+<tr>
+<td>What the tasks cost</td>
+<td>Gets no cost: <code>cost</code> is <code>null</code>, and no task carries what it cost</td>
+</tr>
+<tr>
+<td>The tasks and their traces</td>
+<td>Gets no list of tasks, no trace and no rating (403)</td>
+</tr>
+<tr>
+<td>Run the checklist</td>
+<td>Gets no checklist and cannot run one (403)</td>
+</tr>
+</tbody>
+</table></div>
+<p>The answer says what the asker may see in <code>may</code> (<code>cost</code>, <code>traces</code>, <code>checklist</code>), and the page draws from
+that.</p>
 <p>Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
 section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.</p>
 <h2 id="13-testing">13. Testing</h2>
@@ -6431,7 +6733,7 @@ run yet on a person's own Chrome or in the built-in browser; nothing in it is pa
 <li>The remaining tools: <code>browser_pdf</code>, <code>browser_storage</code>, <code>browser_emulate</code>, <code>browser_mouse</code>, <code>browser_record</code>, <code>browser_network_request</code>, <code>browser_extract</code>.</li>
 <li>Cloud depth: provider adapters, a network guard that resolves names itself, WebRTC live view.</li>
 <li>A reference task set run with real agents, turned into budget lines for success, steps, time and tokens.</li>
-<li>An admin console for organisations, typing with a phone's on-screen keyboard during takeover, one-shot command-line calls with a skill file.</li>
+<li>An admin console for organisations with an account for each person (the window of three browsers has one admin and one password for all users, section 4.11), typing with a phone's on-screen keyboard during takeover, one-shot command-line calls with a skill file.</li>
 </ol>
 <h3 id="146-later">14.6 Later</h3>
 <p>A fleet of isolated virtual machines; signed agent identity (Web Bot Auth); raw CDP tool; site-offered
@@ -7976,7 +8278,7 @@ Later = deferred · No = not building.</p>
 <td>SG-11</td>
 <td>Admin limits that settings cannot loosen</td>
 <td>CX, ANT</td>
-<td><span class="ph ph-m1">M1</span>for locks and limits set by a deployment; an admin console Next</td>
+<td><span class="ph ph-m1">M1</span>for locks and limits set by a deployment. Built for the window of three browsers: the admin's configuration holds users to it (section 4.11). A console for an organisation Next</td>
 </tr>
 <tr>
 <td>SG-12</td>
@@ -8835,7 +9137,7 @@ Later = deferred · No = not building.</p>
 <td>SE-20</td>
 <td>An admin console for an organisation: allow and block lists, who may use which browser</td>
 <td>ANT</td>
-<td><span class="ph ph-next">Next</span></td>
+<td>Built for the window of three browsers, with one admin and one password for all users (section 4.11). An account for each person of an organisation: Next</td>
 </tr>
 </tbody>
 </table></div>

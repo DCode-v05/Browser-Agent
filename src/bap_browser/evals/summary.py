@@ -4,7 +4,7 @@ the model, and how the tasks ended."""
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from bap_browser.config import Evals
@@ -13,6 +13,7 @@ from bap_browser.evals.record import OUTCOMES, Recorder
 # A record as the window lists it: everything but the trace, which is asked for by itself.
 LISTED = (
     "id",
+    "system",
     "started",
     "task",
     "answer",
@@ -61,8 +62,43 @@ def _spans(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 def summarise(recorder: Recorder, settings: Evals, model: str) -> dict[str, Any]:
     """Everything the window shows of one browser's tasks. `model` is the one it uses now."""
-    records = recorder.tasks()
-    ratings = recorder.ratings()
+    told = _added_up(recorder.tasks(), recorder.ratings(), settings)
+    return {"system": recorder.system, "model": model, **told, "checklist": recorder.checklist()}
+
+
+def overall(recorders: Iterable[Recorder], settings: Evals) -> dict[str, Any]:
+    """The tasks of every browser as one, and a line for each browser beside it: the admin's
+    view of the whole (spec 12.6)."""
+    records: list[dict[str, Any]] = []
+    ratings: dict[str, Any] = {}
+    lines: list[dict[str, Any]] = []
+    for recorder in recorders:
+        own, rated = recorder.tasks(), recorder.ratings()
+        one = _added_up(own, rated, settings)
+        checklist = recorder.checklist()
+        lines.append(
+            {
+                "system": recorder.system,
+                "tasks": one["tasks"]["count"],
+                "answered": one["tasks"]["answered"],
+                "success_rate": one["tasks"]["success_rate"],
+                "task_p50_ms": one["time"]["task"]["p50_ms"],
+                "input_tokens": one["cost"]["input_tokens"],
+                "output_tokens": one["cost"]["output_tokens"],
+                "usd": one["cost"]["usd"],
+                # The checklist as it was last run there: how many of its checks passed.
+                "checks_passed": checklist.get("passed") if checklist else None,
+                "checks": len(checklist.get("checks", [])) if checklist else None,
+            }
+        )
+        records += own
+        ratings |= rated
+    records.sort(key=lambda record: _number(record, "started"))
+    return {**_added_up(records, ratings, settings), "systems": lines}
+
+
+def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], settings: Evals) -> dict[str, Any]:
+    """What a set of records adds up to."""
     outcomes = {name: sum(record.get("outcome") == name for record in records) for name in OUTCOMES}
     answered = outcomes["answered"]
 
@@ -93,8 +129,6 @@ def summarise(recorder: Recorder, settings: Evals, model: str) -> dict[str, Any]
     rated = [ratings[record["id"]] for record in records if record["id"] in ratings]
 
     return {
-        "system": recorder.system,
-        "model": model,
         "models_used": sorted({str(record.get("model")) for record in records if record.get("model")}),
         "tasks": {
             "count": len(records),
@@ -134,7 +168,6 @@ def summarise(recorder: Recorder, settings: Evals, model: str) -> dict[str, Any]
             {**{name: record.get(name) for name in LISTED}, "rating": ratings.get(record["id"])}
             for record in reversed(records[-settings.recent_tasks :])
         ],
-        "checklist": recorder.checklist(),
     }
 
 

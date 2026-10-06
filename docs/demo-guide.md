@@ -27,6 +27,7 @@ The agent asks the person when it meets a sign-in, a CAPTCHA or a payment.
 | A pop-up when a person is needed | For a sign-in, a human check such as a CAPTCHA, a payment or other help: on every backend, with Take over, Couldn't do it and Look first |
 | The Chrome extension | The chat in Chrome's side panel; for your own Chrome it is the bridge: it pairs with a one-time token, reconnects by itself, asks you site by site what the agent may do, and has its own Stop |
 | Systems: settings, logs and evaluations for each browser | "Systems" in the window: turn each browser on or off, start and stop it, choose what the agent may do in it, read its log file, and see what its tasks took (latency, time, cost, model, how they ended, the trace of each) and its checklist. `docs/systems-guide.md` has all of it |
+| The admin and the user | Two sign-in pages. The admin (`/admin`) has Configuration: which browsers users may use, what they may change and see. A user (`/`) has Settings: the browser they prefer and what is theirs to set. Each sees the evaluations the admin allows. See `docs/systems-guide.md`, Part 0 |
 | A desktop app, first cut | Electron: the agent's browser and the chat in one window. "Open desktop app" in the three-page window starts it |
 | `doctor` and `bench` | Which browsers launch on this machine; how fast each tool is against the budget |
 | Configuration | Every setting has a default in one file and is changed in `config.json` |
@@ -53,6 +54,10 @@ Close every earlier run first (Ctrl+C in its terminal). Each command below opens
 ```bash
 uv run bap-browser studio --open
 ```
+
+The first time, the admin's page opens and asks you to create the admin password. After that you
+sign in at `/admin` with it. (A user signs in at `/`, once you have set the password for users on the
+Systems page; `docs/systems-guide.md`, Part 0, has the two-window show of the admin and a user.)
 
 One window opens with three pages, one for each place a browser can be: **Cloud browser**, **My
 Chrome**, **Built-in browser**. Each has its own session and its own chat.
@@ -189,6 +194,7 @@ Say these plainly if asked.
 | Not built | Note |
 |---|---|
 | Some settings in the settings screen | 16 are there and change a running session. Not yet: the settings of your own Chrome, the desktop app's folders, notifications |
+| An account for each person | One admin, and one password that all users sign in with |
 | The three-page window inside the desktop app | The window runs in your browser. The desktop app shows one browser of its own |
 | More than one agent tab in your own Chrome | One tab, in its own tab group |
 | A core that runs in the cloud with your Chrome at home | The pieces are there (pairing, reconnecting); it has only been run on one machine |

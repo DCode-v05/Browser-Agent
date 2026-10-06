@@ -30,6 +30,10 @@ class Systems(Protocol):
         """What a system's tasks took and cost, how they ended, and its checklist as last run."""
         ...
 
+    def overall(self) -> dict[str, Any]:
+        """What the tasks of every system took, as one: the admin's view of the whole."""
+        ...
+
     def trace(self, system: str, task: str) -> dict[str, Any] | None:
         """One task with every reply of the model and every step, in order. None for no such task."""
         ...
