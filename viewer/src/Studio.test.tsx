@@ -10,6 +10,7 @@ import { DEFAULT_OPTIONS } from './options';
 import type { ClientCommand } from './protocol';
 import { moodOf, Studio } from './Studio';
 import { desktopOpener, factsFrom, hasSession, NO_FACTS, roomsIn, type Room } from './studio/rooms';
+import type { SystemsApi } from './systems/api';
 import { W } from './wording';
 
 const cloud: Room = { id: 'cloud', backend: 'remote_headless', state: 'agent', attention: false, working: false };
@@ -145,8 +146,8 @@ describe('what the service says of itself when the window opens', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('is asked once, with the token in a header and never in the address', async () => {
-    const fetched = answering({ ok: true, json: async () => ({ rooms: [cloud], desktop: true, settings: true }) });
-    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual({ rooms: [{ ...cloud, note: undefined, extension: undefined }], desktop: true, settings: true });
+    const fetched = answering({ ok: true, json: async () => ({ rooms: [cloud], desktop: true, settings: true, systems: true }) });
+    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual({ rooms: [{ ...cloud, note: undefined, extension: undefined }], desktop: true, settings: true, systems: true });
     expect(fetched).toHaveBeenCalledTimes(1);
     const [address, how] = fetched.mock.calls[0];
     expect(address).toBe('http://127.0.0.1:8765/api/sessions');
@@ -154,7 +155,7 @@ describe('what the service says of itself when the window opens', () => {
   });
 
   it('is nothing more than its sessions for a service that has no more', async () => {
-    answering({ ok: true, json: async () => ({ sessions: [], desktop: 'yes', settings: 1 }) });
+    answering({ ok: true, json: async () => ({ sessions: [], desktop: 'yes', settings: 1, systems: 'all' }) });
     expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
     answering({ ok: false });
     expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
@@ -176,6 +177,74 @@ describe('what the service says of itself when the window opens', () => {
   });
 });
 
+describe('the browsers as systems, from the window (spec 9.17)', () => {
+  const off: Room = { ...builtIn, state: 'off' };
+
+  function withSystems(rooms: Room[] = [cloud, chrome, builtIn], loadRooms = vi.fn(async () => null as Room[] | null)) {
+    const sources = new Map<string, ReturnType<typeof createDemoSettings>>();
+    const changed: [string, Record<string, unknown>][] = [];
+    const systems: SystemsApi = {
+      list: async () => [],
+      manage: async () => ({ ok: true }),
+      log: async () => null,
+      evals: async () => null,
+      trace: async () => null,
+      rate: async () => false,
+      check: async () => ({ ok: false, why: 'not now' }),
+      settings: (system) => {
+        if (!sources.has(system)) {
+          const real = createDemoSettings();
+          sources.set(system, { ...real, change: async (surface, changes) => (changed.push([system, changes]), real.change(surface, changes)) });
+        }
+        return sources.get(system)!;
+      },
+    };
+    const user = userEvent.setup();
+    render(<Studio rooms={rooms} loadRooms={loadRooms} pollMs={0} systems={systems} connectionFor={() => new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 })} settings={createDemoSettings()} options={options} />);
+    return { user, changed, loadRooms };
+  }
+
+  it('has no Systems page where the service has no systems', () => {
+    open();
+    expect(screen.queryByRole('button', { name: W.studio.systems })).not.toBeInTheDocument();
+  });
+
+  it('opens the Systems page in place of a browser’s page, and a tab brings the browser back', async () => {
+    const { user } = withSystems();
+    await user.click(screen.getByRole('button', { name: W.studio.systems }));
+    expect(screen.getByRole('region', { name: W.systems.title })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
+    // No browser's tab is the chosen one while the Systems page is shown.
+    expect(screen.getAllByRole('tab', { selected: true }).map((one) => one.textContent)).toEqual([W.systems.configuration]);
+    await user.click(tab(/Cloud browser/));
+    expect(screen.queryByRole('region', { name: W.systems.title })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
+  });
+
+  it('says a browser is turned off, on its tab and on its page, and turns it on from there', async () => {
+    const loadRooms = vi.fn(async () => [cloud, chrome, builtIn] as Room[] | null);
+    const { user, changed } = withSystems([cloud, chrome, off], loadRooms);
+    expect(tab(/Built-in browser/)).toHaveTextContent(W.studio.off.off);
+    await user.click(tab(/Built-in browser/));
+    expect(screen.getByRole('heading', { name: W.studio.turnedOff })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: W.studio.turnOn }));
+    await waitFor(() => expect(changed).toEqual([['builtin', { system_enabled: true }]]));
+    // The window asks at once where the pages stand now, and the browser's own page is back.
+    await waitFor(() => expect(loadRooms).toHaveBeenCalled());
+    expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
+  });
+
+  it('opens, on a browser’s page, the settings of that browser', async () => {
+    const { user, changed } = withSystems();
+    await user.click(screen.getByRole('button', { name: W.buttons.openSettings }));
+    const dialog = await screen.findByRole('dialog', { name: W.settings.title });
+    await user.click(await within(dialog).findByRole('tab', { name: 'Live view' }));
+    await user.click(within(dialog).getByRole('switch', { name: 'Show where the agent is acting' }));
+    await waitFor(() => expect(changed).toEqual([['cloud', { show_agent_pointer: false }]]));
+  });
+});
+
 describe('where a page stands, in a word', () => {
   it.each([
     [{ ...cloud, working: true }, 'working'],
@@ -186,12 +255,13 @@ describe('where a page stands, in a word', () => {
     [{ ...cloud, state: 'person_requested', attention: true }, 'attention'],
     [chrome, 'off'],
     [{ ...cloud, state: 'starting' }, 'off'],
+    [{ ...cloud, state: 'off' }, 'off'],
   ] as const)('%o is %s', (room, mood) => {
     expect(moodOf(room)).toBe(mood);
   });
 
   it('knows which pages have a session', () => {
-    expect([cloud, chrome, { ...cloud, state: 'failed' }, { ...cloud, state: 'ended' }].map(hasSession)).toEqual([true, false, false, true]);
+    expect([cloud, chrome, { ...cloud, state: 'failed' }, { ...cloud, state: 'ended' }, { ...cloud, state: 'off' }].map(hasSession)).toEqual([true, false, false, true, false]);
   });
 });
 

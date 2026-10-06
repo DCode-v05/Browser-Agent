@@ -28,6 +28,8 @@ export interface Setting {
   fixed?: string[];
   locked: boolean;
   applies: 'now' | 'next_session';
+  /** For a browser among several: whether a change is that browser's alone, or every browser's. */
+  scope?: 'system' | 'all';
   /** The label of an action's button. */
   action?: string;
   /** An action that cannot be undone asks first. */
@@ -42,6 +44,8 @@ export interface SettingsGroup {
 
 export interface SettingsAnswer {
   surface: Surface;
+  /** The browser these settings are of, where the service has several (spec 9.17). */
+  system?: string;
   groups: SettingsGroup[];
 }
 

@@ -260,6 +260,34 @@ Found by that last test, and cured: the best match for the words "Full name" is 
 be typed into, and words that match only in part ("No such button") found a button to click. A script
 now acts only on a match whose name holds every word, and types into a field before a label.
 
+### 1k. Finished on 2026-10-06: the three browsers as systems, with settings, logs and evaluations of their own
+
+Asked for on 2026-10-06: separate settings for the three systems with what to enable and how to manage
+each, a log file for each, and evaluations of each. Built as spec 9.17 and 12.6.
+
+| Part | What it does |
+|---|---|
+| Settings of each system | Most settings are each system's own: a system's value, else the one for every browser, else the deployment's. A person still tightens and never loosens. The settings button on a page opens the settings of that page's browser |
+| Turning on and off, and managing | "Use this browser" for each system: off ends its session and takes it off its page, and it stays off the next time. Start, Stop and Restart for each. What cannot be done is said in a sentence |
+| What to enable | For each system, as switches on its card: downloads, uploads, the log, scripts in pages, scripts of several steps. And the model, among `agent.offered_models` |
+| A log file for each | `.bap-browser/logs/cloud.jsonl`, `chrome.jsonl`, `builtin.jsonl`: one line for each tool call. The window shows where the file is and its newest lines |
+| A record of each task | `.bap-browser/evals/<system>/tasks.jsonl`: how it ended, its time and where it went, its steps, its tokens and their cost, and its trace |
+| Evaluations | For each system: the model; outcome quality (share answered, steps failed, the person's Good and Bad); latency (a step, a reply: typical and slow); performance by tool; time (a task, and the shares of model, browser and waiting); cost (tokens, and dollars where a price is set); the trace of each recent task, drawn as bars |
+| The checklist | Eleven checks done as real steps on the demo site, in that system's browser: it answers, opens, reads, finds, clicks, types, takes a picture, refuses the cloud metadata address, stays within the time limit, writes its log, and can ask a person |
+| The Systems page | "Systems" in the window's bar: the three systems side by side, with a Configuration view and an Evaluations view |
+
+Run in a real Chromium (`tests/viewer/test_studio.py`, 5 new tests): the checklist passes all eleven
+checks on the built-in browser; a task done on the cloud browser is on that browser's record and log
+and on no other's; a system is turned off and on, stopped and started; and the Systems page is used as
+a person would use it. Tests in all: 46 new for the service, 34 for the viewer.
+
+Not checked by me: the checklist and the records on a person's own Chrome with a real extension and a
+real model (the tests do it with the built-in and the cloud browser), and the cost with a real price:
+`agent.input_price_per_million` is 0 until you set what your model costs.
+
+What is not in it, and is said in the spec: a judgement of an answer by another model; the eight
+task-level scenarios of the bench; settings of the desktop app's folders.
+
 ### 2. Not started
 
 | What | Note |

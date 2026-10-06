@@ -7,7 +7,8 @@ import type { ChangeResult, ConfigAnswer, SettingsAnswer, SettingsSource, Settin
 /** The service did not answer, or answered with something that is not the settings. */
 export class SettingsUnreachable extends Error {}
 
-export function settingsFrom(pageAddress: string, token: string): SettingsSource {
+/** `system` names one browser of a window that has several: the settings are then that browser's own (spec 9.17). */
+export function settingsFrom(pageAddress: string, token: string, system?: string): SettingsSource {
   const headers = { Authorization: `Bearer ${token}` };
   const at = (path: string) => new URL(path, pageAddress).href;
 
@@ -26,10 +27,10 @@ export function settingsFrom(pageAddress: string, token: string): SettingsSource
   }
 
   return {
-    load: (surface: Surface) => read<SettingsAnswer>(`api/settings?surface=${encodeURIComponent(surface)}`),
+    load: (surface: Surface) => read<SettingsAnswer>(`api/settings?surface=${encodeURIComponent(surface)}${system ? `&system=${encodeURIComponent(system)}` : ''}`),
 
     async change(surface: Surface, changes: Record<string, SettingValue>): Promise<ChangeResult> {
-      const answer = await ask('api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface, changes }) });
+      const answer = await ask('api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(system ? { surface, system, changes } : { surface, changes }) });
       if (answer.ok) return { ok: true, answer: (await answer.json()) as SettingsAnswer };
       // A change the person may not make: the service says which setting, and why.
       if (answer.status === 409) return { ok: false, ...((await answer.json()) as Pick<Extract<ChangeResult, { ok: false }>, 'setting' | 'reason'>) };

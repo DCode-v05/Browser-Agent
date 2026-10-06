@@ -15,7 +15,7 @@ from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings import SettingsStore
 
-GROUPS = ["Browser", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced"]
+GROUPS = ["Browser", "Agent", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced"]
 IS_DARK = "document.documentElement.getAttribute('data-theme') === 'dark'"
 
 

@@ -5,7 +5,7 @@ import type { Backend } from '../protocol';
 export interface Room {
   id: string;
   backend: Backend;
-  /** Who is driving, as the session says it; or, with no session yet, `starting`, `waiting` or `failed`. */
+  /** Who is driving, as the session says it; or, with no session, `starting`, `waiting`, `failed` or `off`. */
   state: string;
   /** The agent waits for the person: a request for help, or an approval. */
   attention: boolean;
@@ -18,9 +18,9 @@ export interface Room {
 
 const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium']);
 /** The states in which a page has no session to show yet. */
-const NO_SESSION = new Set(['starting', 'waiting', 'failed']);
+const NO_SESSION = new Set(['starting', 'waiting', 'failed', 'off']);
 
-export const hasSession = (room: Room): boolean => !NO_SESSION.has(room.state);
+export const hasSession = (room: Pick<Room, 'state'>): boolean => !NO_SESSION.has(room.state);
 
 function roomOf(given: unknown): Room | null {
   if (typeof given !== 'object' || given === null) return null;
@@ -57,17 +57,19 @@ export interface ServiceFacts {
   desktop: boolean;
   /** It has the settings API (spec 10.2). Without it the viewer keeps the settings that are its own. */
   settings: boolean;
+  /** Its browsers are systems to set up, manage and evaluate (spec 9.17). */
+  systems: boolean;
 }
 
-export const NO_FACTS: ServiceFacts = { rooms: null, desktop: false, settings: false };
+export const NO_FACTS: ServiceFacts = { rooms: null, desktop: false, settings: false, systems: false };
 
 /** Asks the service once, so that the window never asks for what the service does not have. */
 export async function factsFrom(pageAddress: string, token: string): Promise<ServiceFacts> {
   try {
     const answer = await fetch(new URL('api/sessions', pageAddress).href, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
     if (!answer.ok) return NO_FACTS;
-    const told = (await answer.json()) as { desktop?: unknown; settings?: unknown };
-    return { rooms: roomsIn(told), desktop: told.desktop === true, settings: told.settings === true };
+    const told = (await answer.json()) as { desktop?: unknown; settings?: unknown; systems?: unknown };
+    return { rooms: roomsIn(told), desktop: told.desktop === true, settings: told.settings === true, systems: told.systems === true };
   } catch {
     return NO_FACTS;
   }

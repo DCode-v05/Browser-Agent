@@ -10,6 +10,8 @@ import { Button } from './components/StatusPanel';
 import type { Connection } from './connection/connection';
 import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
+import type { SystemsApi } from './systems/api';
+import { SystemsPage } from './systems/SystemsPage';
 import { W } from './wording';
 
 const BACKEND_ICON: Record<Backend, IconName> = {
@@ -21,7 +23,7 @@ const BACKEND_ICON: Record<Backend, IconName> = {
 export type RoomMood = 'attention' | 'working' | 'ready' | 'person' | 'paused' | 'stopped' | 'off';
 
 /** Where a page stands, in one word and one colour. */
-export function moodOf(room: Room): RoomMood {
+export function moodOf(room: Pick<Room, 'state' | 'attention' | 'working'>): RoomMood {
   if (room.attention) return 'attention';
   if (!hasSession(room)) return 'off';
   if (room.state === 'ended') return 'stopped';
@@ -30,10 +32,11 @@ export function moodOf(room: Room): RoomMood {
   return room.working ? 'working' : 'ready';
 }
 
-function wordFor(room: Room): string {
+export function wordFor(room: Pick<Room, 'state' | 'attention' | 'working'>): string {
   const mood = moodOf(room);
-  if (mood === 'off') return W.studio.off[room.state === 'failed' ? 'failed' : room.state === 'waiting' ? 'waiting' : 'starting'];
-  return W.studio.mood[mood];
+  if (mood !== 'off') return W.studio.mood[mood];
+  const state = room.state;
+  return W.studio.off[state === 'failed' || state === 'waiting' || state === 'off' ? state : 'starting'];
 }
 
 export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedded'> {
@@ -49,11 +52,15 @@ export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedd
   onPage?(room: string): void;
   /** Opens the desktop app, where the service has one to open. */
   openDesktop?: OpenDesktop;
+  /** The browsers as systems to set up, manage and evaluate (spec 9.17), where the service has them so. */
+  systems?: SystemsApi;
 }
 
-export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, ...app }: StudioProps) {
+export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, systems, ...app }: StudioProps) {
   const [rooms, setRooms] = useState(given);
   const [chosen, setChosen] = useState(opensOn);
+  /** The Systems page is shown in place of a browser's own page. */
+  const [onSystems, setOnSystems] = useState(false);
   const room = rooms.find((one) => one.id === chosen) ?? rooms[0];
 
   useEffect(() => {
@@ -71,9 +78,16 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
 
   const createConnection = useCallback(() => connectionFor(room.id), [connectionFor, room.id]);
   const open = (id: string) => {
+    setOnSystems(false);
     setChosen(id);
     onPage?.(id);
   };
+  // A browser that was turned on or off shows so at once, not at the next time the service is asked.
+  const refresh = useCallback(async () => {
+    const now = await loadRooms();
+    if (now) setRooms(now);
+  }, [loadRooms]);
+  const showingSystems = onSystems && systems !== undefined;
 
   return (
     <div className="studio">
@@ -90,7 +104,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
               role="tab"
               id={`studio-tab-${one.id}`}
               className="studio-tab"
-              aria-selected={one.id === room.id}
+              aria-selected={!showingSystems && one.id === room.id}
               aria-controls="studio-page"
               data-mood={moodOf(one)}
               onClick={() => open(one.id)}
@@ -104,14 +118,30 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             </button>
           ))}
         </div>
-        {openDesktop && <DesktopButton open={openDesktop} />}
+        <span className="studio-side">
+          {systems && (
+            <Button
+              icon="settings"
+              kind={showingSystems ? 'primary' : 'plain'}
+              onClick={() => {
+                if (showingSystems) void refresh();
+                setOnSystems(!showingSystems);
+              }}
+            >
+              {W.studio.systems}
+            </Button>
+          )}
+          {openDesktop && <DesktopButton open={openDesktop} />}
+        </span>
       </header>
-      <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={`studio-tab-${room.id}`}>
-        {hasSession(room) ? (
-          // A page keeps nothing of the page before it: each has its own session.
-          <App key={room.id} {...app} createConnection={createConnection} embedded />
+      <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
+        {showingSystems ? (
+          <SystemsPage api={systems} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} />
+        ) : hasSession(room) ? (
+          // A page keeps nothing of the page before it: each has its own session, and settings of its own.
+          <App key={room.id} {...app} settings={systems ? systems.settings(room.id) : app.settings} createConnection={createConnection} embedded />
         ) : (
-          <NoSession room={room} />
+          <NoSession room={room} onTurnOn={systems ? () => systems.settings(room.id).change(app.surface ?? 'web', { system_enabled: true }).then(refresh, refresh) : undefined} />
         )}
       </div>
     </div>
@@ -140,7 +170,7 @@ function DesktopButton({ open }: { open: OpenDesktop }) {
 }
 
 /** What a page shows while its browser is not there yet. */
-function NoSession({ room }: { room: Room }) {
+function NoSession({ room, onTurnOn }: { room: Room; onTurnOn?(): void }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -150,7 +180,7 @@ function NoSession({ room }: { room: Room }) {
       // No clipboard here: the folder is on screen to be read.
     }
   };
-  if (room.backend === 'takeover_chrome' && room.state !== 'failed') {
+  if (room.backend === 'takeover_chrome' && room.state !== 'failed' && room.state !== 'off') {
     return (
       <section className="studio-wait" aria-label={W.studio.connect.title}>
         <Icon name="plug" size="large" />
@@ -171,6 +201,21 @@ function NoSession({ room }: { room: Room }) {
           <li>{W.studio.connect.icon}</li>
         </ol>
         <p className="studio-wait-note">{room.note ?? W.studio.connect.byItself}</p>
+      </section>
+    );
+  }
+  if (room.state === 'off') {
+    // A person turned this browser off (spec 9.17). It is turned on here, or on the Systems page.
+    return (
+      <section className="studio-wait" aria-label={W.backend[room.backend]}>
+        <Icon name="pause" size="large" />
+        <h2 className="studio-wait-title">{W.studio.turnedOff}</h2>
+        <p className="studio-wait-lead">{W.studio.turnedOffLead}</p>
+        {onTurnOn && (
+          <Button kind="primary" icon="play" onClick={onTurnOn}>
+            {W.studio.turnOn}
+          </Button>
+        )}
       </section>
     );
   }

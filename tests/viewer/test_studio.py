@@ -403,3 +403,120 @@ async def test_a_systems_settings_reach_that_browser_alone(
             "lines": [],
             "size": 0,
         }
+
+
+SHOTS = Path(__file__).parents[2] / ".bap-browser" / "viewer-shots"
+
+
+async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    def answers() -> ScriptedModel:
+        go = ToolCall("a", "browser_snapshot", {})
+        return ScriptedModel(
+            [lambda page: Reply("", (go,)), lambda page: Reply("The page is the start page.")]
+        )
+
+    async with window(make_config, tmp_path, browser, answers) as opened:
+        page = opened.page
+        task = page.get_by_label("Your task")
+        await task.fill("Say which page this is")
+        await task.press("Enter")
+        await page.get_by_text("The page is the start page.").wait_for()
+
+        await page.get_by_role("button", name="Systems").click()
+        systems = page.get_by_role("region", name="Systems")
+        await systems.get_by_role("article").first.wait_for()
+        assert [
+            await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
+        ] == [
+            "Cloud browser",
+            "My Chrome",
+            "Built-in browser",
+        ]
+        cloud = systems.get_by_role("article", name="Cloud browser")
+        built_in = systems.get_by_role("article", name="Built-in browser")
+
+        # Configuration: what the agent may do in one browser is that browser's alone.
+        downloads = cloud.get_by_role("switch", name="Let the agent download files: Cloud browser")
+        await downloads.wait_for()
+        assert await downloads.get_attribute("aria-checked") == "true"
+        await downloads.click()
+        async with asyncio.timeout(10):
+            while await downloads.get_attribute("aria-checked") != "false":
+                await asyncio.sleep(0.1)
+        own = {
+            s["id"]: s
+            for g in (await opened.ask("GET", "/api/settings?system=cloud"))[1]["groups"]
+            for s in g["settings"]
+        }
+        others = {
+            s["id"]: s
+            for g in (await opened.ask("GET", "/api/settings?system=builtin"))[1]["groups"]
+            for s in g["settings"]
+        }
+        assert own["allow_downloads"]["value"] is False and others["allow_downloads"]["value"] is True
+        # What the deployment turned off is shown, and is not the person's to turn on.
+        scripts = cloud.get_by_role(
+            "switch", name="Let the agent run scripts of several steps: Cloud browser"
+        )
+        assert await scripts.is_disabled()
+        await cloud.get_by_text("Set by your organisation").first.wait_for()
+
+        # Its log is a file of its own, and its newest lines are read from here.
+        await cloud.get_by_text(str((tmp_path / "logs" / "cloud.jsonl").resolve())).wait_for()
+        await cloud.get_by_role("button", name="Show the log").click()
+        await cloud.get_by_text("The newest 2 lines, newest first").wait_for()
+        assert await cloud.locator(".system-log-tool").all_inner_texts() == ["snapshot", "navigate"]
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        SHOTS.mkdir(parents=True, exist_ok=True)
+        await page.evaluate("document.querySelector('.systems').scrollTop = 0")
+        await page.screenshot(path=str(SHOTS / "systems-configuration.png"))
+
+        # A browser is turned off from its card, and stopped and started.
+        await built_in.get_by_role("switch", name="Use this browser: Built-in browser").click()
+        await opened.room("builtin", "off")
+        await built_in.get_by_text("Turned off").wait_for()
+        assert await built_in.get_by_role("button", name="Start").is_disabled()
+        await cloud.get_by_role("button", name="Stop").click()
+        await opened.room("cloud", "ended")
+        await cloud.get_by_role("button", name="Start").click()
+        await opened.room("cloud", "agent")
+        await cloud.get_by_role("button", name="Restart").wait_for()
+
+        # Evaluations: what the task took, the checklist, and the trace.
+        await systems.get_by_role("tab", name="Evaluations").click()
+        cloud = systems.get_by_role("article", name="Cloud browser")
+        await cloud.get_by_text("1 task, 1 step").wait_for()
+        await cloud.get_by_text("100% answered (1 of 1)").wait_for()
+        await cloud.get_by_text("The model did not say how many tokens it used.").wait_for()
+        await cloud.get_by_text("Not run yet.").wait_for()
+        await cloud.get_by_role("button", name="Run the checklist").click()
+        # Nobody is watching that browser's own page now, so whether a person can be asked is skipped.
+        await cloud.get_by_text("10 of 11 passed").wait_for(timeout=60_000)
+        assert await cloud.locator('.system-check[data-state="ok"]').count() == 10
+        await cloud.get_by_text("Say which page this is").wait_for()
+        await cloud.get_by_role("button", name="Show the trace").click()
+        trace = cloud.get_by_role("list", name="Trace")
+        await trace.wait_for()
+        assert await trace.locator(".system-span-name").all_inner_texts() == [
+            "The model",
+            "snapshot",
+            "The model",
+        ]
+        await cloud.get_by_role("button", name="Good").click()
+        await cloud.get_by_text("You rated 1 good and 0 bad").wait_for()
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        await page.evaluate("document.querySelector('.systems').scrollTop = 0")
+        await page.screenshot(path=str(SHOTS / "systems-evaluations.png"))
+
+        # Back on a browser's own page: the one turned off says so, and is turned on from there.
+        await opened.open("Built-in browser")
+        await page.get_by_role("heading", name="This browser is turned off").wait_for()
+        await page.get_by_role("button", name="Turn it on").click()
+        await opened.room("builtin", "agent")
+        await page.get_by_label("Your task").wait_for(timeout=20_000)
+        # Each page opens the settings of its own browser.
+        await page.get_by_role("button", name="Open settings").click()
+        dialog = page.get_by_role("dialog", name="Settings")
+        await dialog.get_by_role("switch", name="Use this browser").wait_for()
