@@ -8,7 +8,7 @@ import pytest
 from bap_browser.bench import runner
 from bap_browser.bench.runner import Line, Measured
 from bap_browser.bench.scenarios import SCENARIOS
-from bap_browser.config import Bench, Config
+from bap_browser.config import Config
 from bap_browser.errors import ConfigError
 from bap_browser.tools import TOOLS
 
@@ -93,10 +93,11 @@ def test_a_failure_counts_once_it_is_seen_in_two_runs_one_after_the_other(tmp_pa
     assert runner.blocking([elsewhere], before) == []
 
 
-async def test_lines_are_timed_in_a_real_browser_and_none_is_left_out(tmp_path: Path) -> None:
-    config = Config(
-        data_dir=str(tmp_path), bench=Bench(runs=3, warmup=1, results_dir=str(tmp_path / "bench"))
-    )
+async def test_lines_are_timed_in_a_real_browser_and_none_is_left_out(make_config, tmp_path: Path) -> None:
+    # The configuration is read as a command reads it: a machine that runs the tests may have to
+    # start the browser in its own way.
+    bench = {"runs": 3, "warmup": 1, "results_dir": str(tmp_path / "bench")}
+    config: Config = make_config(tmp_path, bench=bench)
     lines = [
         line
         for line in runner.load_budget(BUDGET)
