@@ -38,6 +38,7 @@ from bap_browser.driver.base import (
     DialogKind,
     Dragged,
     Found,
+    Guard,
     Happened,
     KeyAction,
     LoadState,
@@ -57,7 +58,7 @@ from bap_browser.driver.base import (
 from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.screenshots import size_of
 from bap_browser.driver.snapshot import NOTICE, WHOLE_PAGE, matching_lines, snapshot_arguments
-from bap_browser.errors import BadInput, BrowserError, ConfigError, StaleRef
+from bap_browser.errors import BadInput, BrowserError, ConfigError, PolicyBlocked, StaleRef
 from bap_browser.policy.address import without_credentials
 from bap_browser.results import Picture
 
@@ -243,6 +244,9 @@ class _Tab:
     pixel: float = 1.0
     """Page pixels per pixel of the last screenshot of what the browser shows."""
     shot: _Taken | None = None
+    opening: list[tuple[str, str]] | None = None
+    """While the agent's own navigation is under way: the addresses the policy refused on its way."""
+    main_frame_id: str = ""
     frames: dict[str, _InnerFrame] = field(default_factory=dict[str, "_InnerFrame"])
     """The frames read so far, by name."""
     frame_names: dict[str, str] = field(default_factory=dict[str, str])
@@ -266,6 +270,16 @@ def _frame_ids(tree: dict[str, Any]) -> set[str]:
     return ids
 
 
+def _refused(shown: str, reason: str, where: str) -> Happened:
+    """A navigation the policy stopped. The setting's name is for the agent's result, not for the
+    person watching."""
+    return Happened(
+        "blocked",
+        f"navigation to {shown}{where} blocked: {reason}",
+        {"url": shown, "reason": reason.split(" (")[0]},
+    )
+
+
 class PlaywrightDriver:
     def __init__(self, config: Config, *, cdp_headers: Mapping[str, str] | None = None) -> None:
         """`cdp_headers` go with the request that attaches to a running browser (`browser.cdp_url`),
@@ -286,6 +300,7 @@ class PlaywrightDriver:
         self._next_acknowledgement = 0.0
         self._tasks: set[asyncio.Task[Any]] = set()
         self._on_event: Callable[[Happened], None] | None = None
+        self._guard: Guard | None = None
         # The dialogs that wait for an answer, oldest first.
         self._dialogs: list[_OpenDialog] = []
         self._dialog_count = 0
@@ -304,6 +319,9 @@ class PlaywrightDriver:
         self._closing: set[str] = set()
         # The tab the live picture is of.
         self._pictured: _Tab | None = None
+
+    def guard(self, judge: Guard) -> None:
+        self._guard = judge
 
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         self._on_event = on_event
@@ -449,6 +467,15 @@ class PlaywrightDriver:
         if browser.capture.network:
             page.on("response", lambda response: self._on_response(tab, response))
             page.on("requestfailed", lambda request: self._on_request_failed(tab, request))
+        if self._guard is not None:
+            # Every document this tab sets out to load is judged first, whoever started it: a link, a
+            # redirect, a frame, a script. Only documents are held up, unless the deployment asks for
+            # everything: holding up every request makes a page load much slower (spec 8.1).
+            everything = self._config.safety.enforce_on_subresources
+            wanted = {"urlPattern": "*"} if everything else {"urlPattern": "*", "resourceType": "Document"}
+            cdp.on("Fetch.requestPaused", lambda paused: self._spawn(self._judge_request(tab, paused)))
+            await cdp.send("Fetch.enable", {"patterns": [wanted]})
+            tab.main_frame_id = (await cdp.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
         cdp.on("Page.screencastFrame", lambda frame: self._on_picture(tab, frame))
         cdp.on("Page.windowOpen", lambda _: self._window_opening())
         # The page says when it opens a window only to one who has asked to hear about the page.
@@ -586,6 +613,8 @@ class PlaywrightDriver:
             tab = await self._add_tab(page)
             with contextlib.suppress(PlaywrightError):
                 await page.wait_for_load_state("domcontentloaded", timeout=browser.timeouts.popup_adopt_ms)
+            if await self._closed_as_refused(tab):
+                return
             focus = browser.tabs.focus_new_tabs and tab.id in self._tabs
             if focus:
                 await self._show(tab)
@@ -633,9 +662,58 @@ class PlaywrightDriver:
             size = await tab.page.evaluate("({ width: innerWidth, height: innerHeight })")
         return size["width"], size["height"]
 
+    async def _judge_request(self, tab: _Tab, paused: dict[str, Any]) -> None:
+        """Lets a request the browser is about to make go on, or stops it (spec 8.1)."""
+        request, url = paused["requestId"], str(paused.get("request", {}).get("url", ""))
+        try:
+            allowed, reason = await self._guard(url) if self._guard else (True, "")
+        except Exception:
+            # What cannot be judged is not loaded.
+            allowed, reason = False, "the address could not be checked"
+        try:
+            if allowed:
+                await tab.cdp.send("Fetch.continueRequest", {"requestId": request})
+                return
+            await tab.cdp.send("Fetch.failRequest", {"requestId": request, "errorReason": "BlockedByClient"})
+        except PlaywrightError:
+            # The tab closed, or went elsewhere, while the address was being judged.
+            return
+        if paused.get("resourceType") != "Document":
+            return
+        shown = capped(without_credentials(url), self._config.browser.snapshot.max_text_chars)
+        in_frame = paused.get("frameId") != tab.main_frame_id
+        if tab.opening is not None and not in_frame:
+            # The agent's own navigation ran into it: that call says so itself.
+            tab.opening.append((shown, reason))
+            return
+        self._tell(_refused(shown, reason, " in a frame" if in_frame else ""))
+
+    async def _closed_as_refused(self, tab: _Tab) -> bool:
+        """A window a page opened may have begun to load before anyone could judge where it goes.
+        One that is at an address the policy refuses is closed, and the agent is told."""
+        if self._guard is None:
+            return False
+        url = tab.page.url
+        allowed, reason = await self._guard(url)
+        if allowed:
+            return False
+        self._closing.add(tab.id)
+        with contextlib.suppress(PlaywrightError):
+            await tab.page.close()
+        shown = capped(without_credentials(url), self._config.browser.snapshot.max_text_chars)
+        self._tell(
+            Happened(
+                "blocked",
+                f"a new tab at {shown} was closed: {reason}",
+                {"url": shown, "reason": reason.split(" (")[0]},
+            )
+        )
+        return True
+
     async def navigate(self, url: str) -> str:
         tab = self._active or await self._open_tab()
         navigations, commits = tab.navigations, tab.commits
+        tab.opening = refused = []
         try:
             await tab.page.goto(url, wait_until="domcontentloaded")
         except PlaywrightError as exc:
@@ -643,12 +721,19 @@ class PlaywrightDriver:
                 # The browser shows its own error page for an address it could not load. A
                 # navigation started before that page arrives would be interrupted by it.
                 await self._wait_for_commit(tab, commits, self._config.browser.timeouts.settle_ms)
+            if refused:
+                # The address led, by a redirect, to one the policy refuses.
+                led_to, reason = refused[-1]
+                raise PolicyBlocked(
+                    f"navigation to {led_to} blocked: {reason}", url=led_to, reason=reason.split(" (")[0]
+                ) from exc
             # The browser's own words repeat the address, which may hold a name and password.
             shown = without_credentials(url)
             raise BrowserError(
                 f"Could not open {shown}: {first_line(exc).replace(url, shown)}", reason=load_failure(exc)
             ) from exc
         finally:
+            tab.opening = None
             tab.script.forget_document()
         await self._wait_for_load(tab)
         return tab.page.url

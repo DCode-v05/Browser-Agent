@@ -119,12 +119,20 @@ after the fix).
 me: the toolbar icon and the question window in a Chrome with a visible window, which a test cannot
 press; try them by hand.
 
+### 1d. Finished on 2026-10-06: the address policy at the network
+
+Every document a tab sets out to load is judged by the address policy before the request is made: where
+a redirect goes, where a link or a script leads, what a frame holds. A window a page opens at a refused
+address is closed at once. With `safety.enforce_on_subresources` pictures, scripts and requests are
+judged too. 7 tests (`tests/e2e/test_network_policy.py`), which also check that the refused site was
+never asked for anything. Known limit: the first request of a new window may reach the network before
+the window is closed.
+
 ### 2. Not started
 
 | What | Note |
 |---|---|
 | The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
-| The address policy at the network layer | Redirects, link clicks, pop-ups and sub-resources are not checked. Only an address the agent opens itself is |
 | Bench, `perf/budget.json`, `bap-browser doctor`, the verify skill in the repository | None exists |
 | Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |

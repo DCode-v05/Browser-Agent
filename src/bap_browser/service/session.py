@@ -179,6 +179,8 @@ class ServiceSession:
             self.hub.publish({"type": "dialog_opened", **shown, "ts": self._clock()})
         elif event.kind == "dialog_closed":
             self.hub.publish({"type": "dialog_closed", **event.detail})
+        elif event.kind == "blocked":
+            self.navigation_blocked(str(event.detail["url"]), str(event.detail["reason"]))
         elif event.kind == "download":
             saved = {"name": redact(str(event.detail["name"])), "size": event.detail["size"]}
             self.hub.publish({"type": "download_saved", **saved, "ts": self._clock()})

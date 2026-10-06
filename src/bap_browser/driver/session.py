@@ -57,6 +57,12 @@ class BrowserSession:
         # The same, kept for the agent until its next result.
         self._news: deque[Happened] = deque(maxlen=config.browser.capture.max_state_events)
         self._driver.listen(self._happened)
+        self._driver.guard(self._judge)
+
+    async def _judge(self, url: str) -> tuple[bool, str]:
+        """The address policy, for what the browser sets out to load by itself (spec 8.1)."""
+        decision = await self.policy.check(url)
+        return decision.allowed, decision.reason
 
     def _happened(self, event: Happened) -> None:
         if event.text:
