@@ -47,6 +47,8 @@ def write_config(folder: Path, **sections: Any) -> Path:
     """A config.json in `folder` that keeps every file the engine writes inside that folder."""
     data: dict[str, Any] = {"data_dir": str(folder), "logging": {"event_log": str(folder / "events.jsonl")}}
     data.update(sections)
+    # The file that says where a service is, too: the developer may have a service of their own running.
+    data["server"] = {"state_file": str(folder / "service.json"), **data.get("server", {})}
     path = folder / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
