@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
 import { DemoConnection } from './connection/demo';
@@ -9,7 +9,7 @@ import { createDemoSettings } from './demo/settings';
 import { DEFAULT_OPTIONS } from './options';
 import type { ClientCommand } from './protocol';
 import { moodOf, Studio } from './Studio';
-import { desktopFrom, hasSession, roomsIn, type Room } from './studio/rooms';
+import { desktopOpener, factsFrom, hasSession, NO_FACTS, roomsIn, type Room } from './studio/rooms';
 import { W } from './wording';
 
 const cloud: Room = { id: 'cloud', backend: 'remote_headless', state: 'agent', attention: false, working: false };
@@ -135,35 +135,44 @@ describe('the button that opens the desktop app (spec 9.16)', () => {
   });
 });
 
-describe('asking the service for the desktop app', () => {
-  async function asked(first: unknown, second = { ok: true }) {
+describe('what the service says of itself when the window opens', () => {
+  function answering(...answers: unknown[]) {
     const fetched = vi.fn<(address: string, how?: RequestInit) => Promise<unknown>>();
-    fetched.mockResolvedValueOnce({ ok: true, json: async () => first }).mockResolvedValue(second);
+    for (const answer of answers) fetched.mockResolvedValueOnce(answer);
     vi.stubGlobal('fetch', fetched);
-    try {
-      const open = await desktopFrom('http://127.0.0.1:8765/', 'the-token');
-      return { open, opened: open ? await open() : null, calls: fetched.mock.calls };
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    return fetched;
   }
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('gives no way to open an app the service does not have', async () => {
-    expect((await asked({ rooms: [] })).open).toBeNull();
-    expect((await asked({ rooms: [], desktop: false })).open).toBeNull();
-    expect((await asked({ rooms: [], desktop: 'yes' })).open).toBeNull();
+  it('is asked once, with the token in a header and never in the address', async () => {
+    const fetched = answering({ ok: true, json: async () => ({ rooms: [cloud], desktop: true, settings: true }) });
+    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual({ rooms: [{ ...cloud, note: undefined, extension: undefined }], desktop: true, settings: true });
+    expect(fetched).toHaveBeenCalledTimes(1);
+    const [address, how] = fetched.mock.calls[0];
+    expect(address).toBe('http://127.0.0.1:8765/api/sessions');
+    expect(how).toMatchObject({ headers: { Authorization: 'Bearer the-token' } });
   });
 
-  it('asks with the token in a header, never in the address', async () => {
-    const { opened, calls } = await asked({ rooms: [], desktop: true });
-    expect(opened).toBe(true);
-    const [address, how] = calls[1];
+  it('is nothing more than its sessions for a service that has no more', async () => {
+    answering({ ok: true, json: async () => ({ sessions: [], desktop: 'yes', settings: 1 }) });
+    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
+    answering({ ok: false });
+    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('no network')));
+    expect(await factsFrom('http://127.0.0.1:8765/', 'the-token')).toEqual(NO_FACTS);
+  });
+
+  it('opens the desktop app with the token in a header', async () => {
+    const fetched = answering({ ok: true }, { ok: false });
+    const open = desktopOpener('http://127.0.0.1:8765/', 'the-token');
+    expect(await open()).toBe(true);
+    const [address, how] = fetched.mock.calls[0];
     expect(address).toBe('http://127.0.0.1:8765/api/desktop');
     expect(how).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer the-token' } });
-  });
-
-  it('says the app did not open when the service refused', async () => {
-    expect((await asked({ rooms: [], desktop: true }, { ok: false })).opened).toBe(false);
+    // The service refused, or did not answer: the app did not open.
+    expect(await open()).toBe(false);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('no network')));
+    expect(await open()).toBe(false);
   });
 });
 

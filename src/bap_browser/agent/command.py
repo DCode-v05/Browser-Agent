@@ -16,6 +16,7 @@ from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.store import SettingsStore
 
 AGENT_NAME = "Reference agent"
 
@@ -43,8 +44,9 @@ async def run_with_viewer(
     Raises ModelError when the model could not answer, Unfinished when the run stopped before an
     answer, and Interrupted when the service was stopped first.
     """
-    session = ServiceSession(config, agent=AGENT_NAME)
-    service = Service(config, {session.name: session}, port=0)
+    settings = SettingsStore(config)
+    session = ServiceSession(config, agent=AGENT_NAME, settings=settings)
+    service = Service(config, {session.name: session}, port=0, settings=settings)
     await session.start()
     try:
         await service.start()
@@ -104,8 +106,9 @@ async def chat_with_viewer(
     it. Raises Interrupted when the service was stopped (Ctrl+C).
     """
     tasks: asyncio.Queue[str] = asyncio.Queue()
-    session = ServiceSession(config, agent=AGENT_NAME, on_task=tasks.put_nowait)
-    service = Service(config, {session.name: session}, port=0)
+    settings = SettingsStore(config)
+    session = ServiceSession(config, agent=AGENT_NAME, on_task=tasks.put_nowait, settings=settings)
+    service = Service(config, {session.name: session}, port=0, settings=settings)
     await session.start()
     try:
         await service.start()
@@ -163,7 +166,8 @@ async def chat_in_own_chrome(
     config = browser_extension.may_show_viewer(config)
     tasks: asyncio.Queue[str] = asyncio.Queue()
     sessions: dict[str, ServiceSession] = {}
-    service = Service(config, sessions, port=0, bridge=True)
+    settings = SettingsStore(config)
+    service = Service(config, sessions, port=0, bridge=True, settings=settings)
     session: ServiceSession | None = None
     await service.start()
     try:
@@ -181,7 +185,14 @@ async def chat_in_own_chrome(
         attached = config.model_copy(update={"browser": browser})
         driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
         # The person looks at their own browser: no picture of it is sent across the bridge.
-        session = ServiceSession(attached, driver, agent=AGENT_NAME, on_task=tasks.put_nowait, pictures=False)
+        session = ServiceSession(
+            attached,
+            driver,
+            agent=AGENT_NAME,
+            on_task=tasks.put_nowait,
+            pictures=False,
+            settings=settings,
+        )
         # Which sites the agent may read and act on is decided on the person's machine.
         session.browser.ask_site = bridge.permit
         session.browser.site_done = bridge.permit_done

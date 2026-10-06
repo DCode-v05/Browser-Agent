@@ -187,7 +187,7 @@ Say these plainly if asked.
 
 | Not built | Note |
 |---|---|
-| Settings changed from the viewer on a live session | Only colour mode and the agent's pointer. The rest is changed in `config.json` |
+| Some settings in the settings screen | 15 are there and change a running session. Not yet: Clear browsing data, the settings of your own Chrome, the desktop app's folders, notifications |
 | The three-page window inside the desktop app | The window runs in your browser. The desktop app shows one browser of its own |
 | More than one agent tab in your own Chrome | One tab, in its own tab group |
 | A core that runs in the cloud with your Chrome at home | The pieces are there (pairing, reconnecting); it has only been run on one machine |

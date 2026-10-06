@@ -36,6 +36,7 @@ from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.store import SettingsStore
 
 CLOUD, CHROME, BUILT_IN = "cloud", "chrome", "builtin"
 # The folder, inside the data folder, where the built-in browser keeps its sign-ins.
@@ -91,6 +92,7 @@ async def run_studio(
         Room(BUILT_IN, "bundled_chromium"),
     ]
     desktop = _desktop_app(config)
+    settings = SettingsStore(config)
     service = Service(
         config,
         sessions,
@@ -98,15 +100,20 @@ async def run_studio(
         bridge=True,
         rooms=lambda: [room.described(extension) for room in rooms],
         desktop=desktop,
+        settings=settings,
     )
     await service.start()
     working: list[asyncio.Task[None]] = []
     try:
         cloud, chrome, built_in = rooms
         working = [
-            asyncio.create_task(_own_browser(cloud, _cloud(config), service, sessions, model_for)),
-            asyncio.create_task(_persons_chrome(chrome, config, service, sessions, model_for, extension)),
-            asyncio.create_task(_own_browser(built_in, _built_in(config), service, sessions, model_for)),
+            asyncio.create_task(_own_browser(cloud, _cloud(config), service, sessions, model_for, settings)),
+            asyncio.create_task(
+                _persons_chrome(chrome, config, service, sessions, model_for, extension, settings)
+            ),
+            asyncio.create_task(
+                _own_browser(built_in, _built_in(config), service, sessions, model_for, settings)
+            ),
         ]
         tell(f"Viewer: {service.viewer_address}")
         tell(f"Demo site: {service.address}/demo-site/start.html")
@@ -171,6 +178,7 @@ async def _own_browser(
     service: Service,
     sessions: dict[str, ServiceSession],
     model_for: Callable[[Service], Model],
+    settings: SettingsStore,
 ) -> None:
     """A page whose browser this process starts itself. Each time a person asks for a new session,
     a new browser is started for it."""
@@ -184,6 +192,7 @@ async def _own_browser(
             on_task=tasks.put_nowait,
             backend=room.backend,
             on_restart=room.restart.set,
+            settings=settings,
         )
         try:
             await session.start()
@@ -204,6 +213,7 @@ async def _persons_chrome(
     sessions: dict[str, ServiceSession],
     model_for: Callable[[Service], Model],
     extension: Path,
+    settings: SettingsStore,
 ) -> None:
     """The page for the person's own Chrome. Its session begins when the extension has dialled in."""
     bridge = service.bridge
@@ -227,6 +237,7 @@ async def _persons_chrome(
             pictures=False,
             backend=room.backend,
             on_restart=room.restart.set,
+            settings=settings,
         )
         # Which sites the agent may read and act on is decided on the person's machine.
         session.browser.ask_site = bridge.permit

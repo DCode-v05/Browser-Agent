@@ -132,6 +132,8 @@ class Toolkit:
         gate: Gate = always_open,
     ) -> None:
         self._session = session
+        # None when the tools are those the configuration offers, which a person's settings can change.
+        self._chosen = tools
         offered = tools_for(session.config) if tools is None else tools
         self._tools = {tool.name: tool for tool in offered}
         self._observer = observer
@@ -143,6 +145,12 @@ class Toolkit:
         self._grants: set[tuple[str, str]] = set()
         # The action that a dialog interrupted. It goes on when the dialog has been answered.
         self._held: asyncio.Future[Outcome] | None = None
+
+    def reconfigure(self) -> None:
+        """Takes up a change in the session's configuration: the tools on offer, and the log."""
+        if self._chosen is None:
+            self._tools = {tool.name: tool for tool in tools_for(self._session.config)}
+        self._log = EventLog(self._session.config.logging)
 
     def definitions(self) -> list[ToolDefinition]:
         return list(self._tools.values())

@@ -59,6 +59,13 @@ class BrowserSession:
         self._driver.listen(self._happened)
         self._driver.guard(self._judge)
 
+    def reconfigure(self, config: Config) -> None:
+        """Takes a changed configuration for what is decided call by call: the address policy and
+        what results hide. What the browser was started with stays as it was until the next session."""
+        self.config = config
+        self.policy = UrlPolicy(config.safety)
+        self.redact = Redactor(config.safety.redact_patterns)
+
     async def _judge(self, url: str) -> tuple[bool, str]:
         """The address policy, for what the browser sets out to load by itself (spec 8.1)."""
         decision = await self.policy.check(url)

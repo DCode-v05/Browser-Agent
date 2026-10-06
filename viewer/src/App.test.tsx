@@ -443,6 +443,16 @@ describe('settings', () => {
     return { ...shown, dialog };
   }
 
+  it('says so when the service did not answer, so that nobody believes a change was saved', async () => {
+    const unreachable = { ...createDemoSettings(), change: async () => Promise.reject(new Error('no answer')) };
+    const { user, dialog } = await open('agent', { settings: unreachable });
+    await user.click(within(dialog).getByRole('tab', { name: 'Live view' }));
+    const pointer = within(dialog).getByRole('switch', { name: 'Show where the agent is acting' });
+    await user.click(pointer);
+    expect(await within(dialog).findByText('Not saved: the service did not answer. Try again.')).toBeInTheDocument();
+    expect(pointer).toBeChecked();
+  });
+
   it('opens from the top bar, with a group per kind of setting', async () => {
     const { dialog } = await open();
     expect(within(dialog).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Browser', 'Approvals', 'Sites', 'Files', 'Privacy', 'Live view', 'Appearance', 'Advanced']);

@@ -1685,8 +1685,38 @@ would loosen what the deployment requires carries `disabled`.
 
 `PATCH /api/settings` takes `{"surface":"web","changes":{"ask_before":"every_action"}}` and returns the
 new values. A refused change returns the setting's ID and the reason: `locked`, `not_on_this_surface`,
-`would_loosen` or `not_a_choice`. Nothing is changed when any one change in the request is refused.
-A change is announced to every open viewer with a `settings_changed` event.
+`would_loosen`, `not_a_choice` or, for a site list, `bad_site`. Nothing is changed when any one change in
+the request is refused. A change is announced to every open viewer with a `settings_changed` event.
+
+**Answers.** `GET` and `PATCH` answer 200 with the settings as they are now. A refused change answers 409
+with `{"setting": …, "reason": …}`. A request that is not a change, or that names no surface there is,
+answers 400. A service started without settings answers 404; the viewer then keeps Colour mode and Show
+where the agent is acting by itself, as it did before there was a settings API.
+
+**How a change reaches a running session.** The service lays the person's settings over a session's
+configuration when the session starts, and again after every change. From the agent's next tool call the
+address policy has the new site lists; the tools on offer follow the three switches (`browser_evaluate`,
+`browser_upload_file`, `browser_downloads`); approvals follow Ask before, Wait for my answer and Remember
+"Allow on this site"; the event log is written or not; and the live picture is started again at the new
+quality. What the browser was launched with waits for the next session: its profile, and whether it takes
+a download at all.
+
+**The saved file.** `settings.file` holds the person's values by setting ID, as JSON, for the person alone
+to read. A setting this build does not know is passed over. So is a value that no longer holds: a choice no
+longer offered, a setting the deployment has since locked, a value that would loosen what the deployment
+now requires. The deployment's value holds then. A file that is not valid JSON stops the start with a
+message naming it: passing over it would drop a site a person blocked.
+
+**Site lists.** A person's blocked sites are added to the deployment's, which are shown apart (`fixed`)
+and stay. A person's allowed sites take the place of the deployment's and must lie inside them; with no
+list of their own a person narrows nothing, and the deployment's list holds and is shown.
+
+**In this build.** The catalogue holds 15 settings: `preferred_browser`, `stay_signed_in`, `ask_before`,
+`approval_wait`, `remember_site_approval`, `blocked_sites`, `allowed_sites`, `allow_downloads`,
+`allow_uploads`, `activity_log`, `picture_quality`, `show_agent_pointer`, `colour_mode`, `page_scripts` and
+`about`. Not yet: `clear_browsing_data` and its route; the three the bridge keeps or serves (`my_chrome`,
+`my_chrome_mode`, `approved_sites`); the three of the desktop app (`show_builtin_browser`,
+`download_folder`, `upload_folders`); and `notify_when_needed`.
 
 **Outside this catalogue.** Settings that belong to the desktop app itself (start at sign-in,
 shortcuts, updates, keeping the computer awake) are the desktop client's own. Importing sign-ins from

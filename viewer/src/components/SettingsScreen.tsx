@@ -4,7 +4,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { Surface } from '../protocol';
-import type { ConfigAnswer, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
+import type { ChangeResult, ConfigAnswer, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
 import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button, Confirm } from './StatusPanel';
@@ -61,7 +61,14 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   }
 
   async function change(setting: Setting, value: SettingValue) {
-    const result = await source.change(surface, { [setting.id]: value });
+    let result: ChangeResult;
+    try {
+      result = await source.change(surface, { [setting.id]: value });
+    } catch {
+      // The service did not answer. Nobody may believe the change was saved.
+      setStatus({ id: setting.id, tone: 'refused', text: W.settings.notSaved });
+      return false;
+    }
     if (result.ok) {
       setAnswer(result.answer);
       onChanged(result.answer);
