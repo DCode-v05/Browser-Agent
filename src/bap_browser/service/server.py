@@ -17,6 +17,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
+from bap_browser.service.accounts import Accounts
 from bap_browser.service.app import LARGEST_VIEWER_MESSAGE, create_app
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.session import ServiceSession
@@ -38,13 +39,15 @@ class Service:
         desktop: DesktopApp | None = None,
         settings: SettingsStore | None = None,
         systems: Systems | None = None,
+        accounts: Accounts | None = None,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
         server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
         the place where the extension in a person's own Chrome dials in (spec 4.9). `desktop` is
         the desktop app, for the window to open (spec 9.16). `settings` holds what a person chose in
         the settings screen; with it, the service has the settings API (spec 10.2). `systems` is
-        whoever runs the browsers of a window that has several (spec 9.17)."""
+        whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
+        may sign in as the admin or as a user (spec 4.11)."""
         self._config = config
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
@@ -62,6 +65,7 @@ class Service:
             desktop,
             settings,
             systems,
+            accounts,
         )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s
@@ -117,7 +121,12 @@ class Service:
                 await self._mcp_running
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listener.bind((self._config.server.host, self._wanted_port))
+        try:
+            listener.bind((self._config.server.host, self._wanted_port))
+        except OSError:
+            # The port is taken. Whoever asked may try another; the socket is not left open.
+            listener.close()
+            raise
         self.port = listener.getsockname()[1]
         if self.bridge is not None:
             self.bridge.own_address = self.address

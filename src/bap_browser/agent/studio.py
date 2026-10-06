@@ -35,8 +35,9 @@ from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
-from bap_browser.evals import Rating, Recorder, summarise, trace_of
+from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
 from bap_browser.evals.checks import run_checklist
+from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
@@ -112,6 +113,8 @@ class Studio:
             Room(BUILT_IN, "bundled_chromium"),
         ]
         self._recorders = {room.id: Recorder(config.evals, room.id, room.backend) for room in self.rooms}
+        # The settings know which browsers there are: a user's preferred one is among them.
+        settings.systems = tuple(room.id for room in self.rooms)
         # A checklist runs on one browser at a time, and not on one that is being checked already.
         self._checking: set[str] = set()
         self.service: Service | None = None
@@ -211,6 +214,9 @@ class Studio:
         assert room is not None
         told = summarise(self._recorders[system], self._config.evals, self._configured(room).agent.model)
         return {**told, "backend": room.backend, "checking": system in self._checking}
+
+    def overall(self) -> dict[str, Any]:
+        return overall(self._recorders.values(), self._config.evals)
 
     def trace(self, system: str, task: str) -> dict[str, Any] | None:
         return trace_of(self._recorders[system], task)
@@ -411,20 +417,34 @@ async def run_studio(
     config = browser_extension.may_show_viewer(config)
     desktop = _desktop_app(config)
     settings = SettingsStore(config)
+    accounts = Accounts(config.auth)
     studio = Studio(config, settings, model_for, extension)
-    service = Service(
-        config,
-        studio.sessions,
-        port=0,
-        bridge=True,
-        rooms=studio.pages,
-        desktop=desktop,
-        settings=settings,
-        systems=studio,
-    )
-    await service.start()
+
+    def serving(port: int | None) -> Service:
+        return Service(
+            config,
+            studio.sessions,
+            port=port,
+            bridge=True,
+            rooms=studio.pages,
+            desktop=desktop,
+            settings=settings,
+            systems=studio,
+            accounts=accounts,
+        )
+
+    # The configured port, so that the two sign-in pages keep their addresses from one start to
+    # the next. Where it is taken, any free port.
+    service = serving(None)
+    try:
+        await service.start()
+    except OSError:
+        service = serving(0)
+        await service.start()
     try:
         tell(f"Viewer: {service.viewer_address}")
+        tell(f"Sign in as a user: {service.address}/")
+        tell(f"Sign in as the admin: {service.address}/admin")
         tell(f"Demo site: {service.address}/demo-site/start.html")
         tell(
             'For the page "My Chrome", load the extension into your Chrome, once: open chrome://extensions, '
@@ -432,7 +452,10 @@ async def run_studio(
         )
         tell("Press Ctrl+C to end.")
         if open_viewer:
-            webbrowser.open(service.viewer_address)
+            # The first time, the admin's page with this start's own link, which creates the
+            # admin's password. After that, the page where people sign in.
+            first_time = f"{service.address}/admin#token={service.token}"
+            webbrowser.open(f"{service.address}/" if accounts.has("admin") else first_time)
         await studio.run(service)
     finally:
         browser_extension.forget(extension)

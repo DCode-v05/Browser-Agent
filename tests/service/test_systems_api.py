@@ -58,6 +58,9 @@ class Asked:
         self.asked.append(("rate", system, task, rating))
         return task == "t1"
 
+    def overall(self) -> dict[str, Any]:
+        return {"tasks": {"count": 4}, "systems": []}
+
     async def check(self, system: str) -> dict[str, Any] | str:
         self.asked.append(("check", system))
         return self.why_not or {"passed": 9, "failed": 0, "checks": []}
@@ -175,9 +178,14 @@ async def test_a_systems_log_and_what_its_tasks_took_are_read(window: Open) -> N
         200,
         {"path": "/logs/cloud.jsonl", "lines": [{"tool": "browser_navigate", "ok": True}], "size": 40},
     )
+    # Whoever holds the service's own token is the admin, and may see all of it.
     assert await one.ask("GET", "/api/systems/builtin/evals") == (
         200,
-        {"system": "builtin", "tasks": {"count": 2}},
+        {
+            "system": "builtin",
+            "tasks": {"count": 2},
+            "may": {"cost": True, "traces": True, "checklist": True},
+        },
     )
     assert await one.ask("GET", "/api/systems/cloud/evals/t1") == (200, {"id": "t1", "spans": []})
     assert (await one.ask("GET", "/api/systems/cloud/evals/no-such-task"))[0] == 404

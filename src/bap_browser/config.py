@@ -457,6 +457,17 @@ class Code(Section):
     max_memory_mb: int = setting(512, "What the worker may hold, on a system that enforces such a limit")
 
 
+class Auth(Section):
+    file: str = setting(
+        ".bap-browser/accounts.json", "Where the sign-in passwords are kept, as salted hashes"
+    )
+    min_chars: int = setting(8, "The shortest password that is taken")
+    max_chars: int = setting(200, "The longest password that is taken")
+    session_hours: int = setting(12, "How long a sign-in lasts")
+    max_failures: int = setting(5, "Wrong passwords in a row before sign-in is held back")
+    lock_s: int = setting(60, "How long sign-in is held back then, in seconds")
+
+
 class Evals(Section):
     enabled: bool = setting(
         True, "Keep a record of each task a browser of the window does: its time, its steps, its tokens"
@@ -493,6 +504,7 @@ class Config(Section):
     settings: Settings = Settings()
     logging: Logging = Logging()
     code: Code = Code()
+    auth: Auth = Auth()
     evals: Evals = Evals()
     bench: Bench = Bench()
     # For each key a layer set, the layer: a file, the environment or the session. Not a setting.

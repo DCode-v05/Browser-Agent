@@ -132,9 +132,9 @@ async def test_a_refused_change_says_which_setting_and_why_and_changes_nothing(s
         409,
         {"setting": "activity_log", "reason": "locked"},
     )
-    assert await served.change(page_scripts=True) == (
+    assert await served.change(picture_quality="finest") == (
         409,
-        {"setting": "page_scripts", "reason": "would_loosen"},
+        {"setting": "picture_quality", "reason": "not_a_choice"},
     )
     assert await served.change(blocked_sites=["not a site"]) == (
         409,

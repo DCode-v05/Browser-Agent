@@ -50,7 +50,7 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
             {
                 "value": "risky",
                 "label": "Risky actions",
-                "hint": "Uploads, page scripts and whatever your organisation lists",
+                "hint": "Uploads, page scripts and whatever the admin lists",
             },
             {
                 "value": "every_action",
@@ -72,13 +72,10 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
     ]
     assert settings["approval_wait"]["value"] == "180"
     assert settings["stay_signed_in"]["applies"] == "next_session"
-    assert settings["preferred_browser"]["choices"] == [
-        {
-            "value": "remote_headless",
-            "label": "Cloud browser",
-            "hint": "Runs beside the agent. You watch a live picture of it.",
-        }
-    ]
+    # A person's preferred browser is one of the browsers the service has: it is asked for by
+    # itself, and is no setting of this screen.
+    assert "preferred_browser" not in settings
+    assert answer["role"] == "admin"
     assert settings["blocked_sites"] == {
         "id": "blocked_sites",
         "title": "Blocked sites",
@@ -113,7 +110,7 @@ def test_a_surface_shows_only_what_it_can_act_on(make_config: MakeConfig, tmp_pa
     store = SettingsStore(make_config(tmp_path))
     web, mobile = settings_in(store.answer("web")), settings_in(store.answer("mobile"))
     assert set(mobile) < set(web)
-    assert set(web) - set(mobile) == {"preferred_browser", "page_scripts", "code_tool", "about"}
+    assert set(web) - set(mobile) == {"page_scripts", "code_tool", "about"}
     assert "advanced" not in [group["id"] for group in store.answer("mobile")["groups"]]
     assert settings_in(store.answer("desktop")).keys() == web.keys()
     # A setting of another surface is neither shown nor accepted.
@@ -208,60 +205,80 @@ def test_a_locked_setting_is_shown_and_cannot_be_changed(make_config: MakeConfig
     assert again.apply_to(config).logging.event_log == config.logging.event_log
 
 
-def test_a_person_asks_for_more_approvals_and_never_for_fewer(
+def test_a_user_asks_for_more_approvals_and_never_for_fewer_than_the_admin(
     make_config: MakeConfig, tmp_path: Path
 ) -> None:
-    lenient = make_config(tmp_path)
-    store = SettingsStore(lenient)
-    store.change("web", {"ask_before": "every_action", "remember_site_approval": "none"})
-    made = store.apply_to(lenient)
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    # A user tightens what the admin has: more approvals, and an answer that is not remembered.
+    store.change("web", {"ask_before": "every_action", "remember_site_approval": "none"}, role="user")
+    made = store.apply_to(config)
     assert made.safety.ask_before == "every_action" and made.control.site_grant_lifetime == "none"
-    # Back to what the deployment has is no loosening.
-    store.change("web", {"ask_before": "risky"})
-    assert store.apply_to(lenient).safety.ask_before == "risky"
+    # Back to what the admin has is no loosening.
+    store.change("web", {"ask_before": "risky"}, role="user")
+    assert store.apply_to(config).safety.ask_before == "risky"
 
-    strict = make_config(
-        tmp_path, safety={"ask_before": "every_action"}, control={"site_grant_lifetime": "none"}
-    )
-    held = SettingsStore(strict)
-    shown = settings_in(held.answer("web"))
-    # The looser choice is shown, so a person sees why it is not possible, and cannot be taken.
+    # The admin now requires more. The user is shown the looser choice, and cannot take it.
+    store.change("web", {"ask_before": "every_action", "remember_site_approval": "none"})
+    shown = settings_in(store.answer("web", role="user"))
     assert shown["ask_before"]["choices"][0] == {
         "value": "risky",
         "label": "Risky actions",
-        "hint": "Uploads, page scripts and whatever your organisation lists",
+        "hint": "Uploads, page scripts and whatever the admin lists",
         "disabled": True,
     }
     assert shown["ask_before"]["locked"] is True and shown["ask_before"]["value"] == "every_action"
     assert shown["remember_site_approval"]["locked"] is True
-    assert refused(held, "web", ask_before="risky") == ("ask_before", "would_loosen")
-    assert refused(held, "web", remember_site_approval="session") == (
-        "remember_site_approval",
-        "would_loosen",
-    )
-    # The person's looser value, saved under the lenient deployment, does not hold under the strict one.
-    assert held.apply_to(strict).safety.ask_before == "every_action"
+    with pytest.raises(Refused) as no:
+        store.change("web", {"ask_before": "risky"}, role="user")
+    assert (no.value.setting, no.value.reason) == ("ask_before", "would_loosen")
+    # The user's looser value, saved while the admin allowed it, no longer holds.
+    assert store.apply_to(config).safety.ask_before == "every_action"
+    # The admin is not held so: every choice is the admin's, the looser one too.
+    admins = settings_in(store.answer("web"))["ask_before"]
+    assert admins["locked"] is False and "disabled" not in admins["choices"][0]
+    store.change("web", {"ask_before": "risky"})
+    assert store.apply_to(config).safety.ask_before == "risky"
 
 
-def test_what_the_deployment_turned_off_stays_off(make_config: MakeConfig, tmp_path: Path) -> None:
-    config = make_config(tmp_path, browser={"downloads": {"enabled": False}})
+def test_the_admin_turns_on_what_the_agent_may_do_and_a_user_cannot(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path)
     store = SettingsStore(config)
+    # As installed, scripts are off. The admin turns them on from the window, and off again.
     shown = settings_in(store.answer("web"))
-    assert shown["allow_downloads"]["locked"] is True and shown["allow_downloads"]["value"] is False
-    assert refused(store, "web", allow_downloads=True) == ("allow_downloads", "would_loosen")
-    # Page scripts are off unless the deployment turns them on, so a person cannot.
-    assert shown["page_scripts"]["locked"] is True
-    assert refused(store, "web", page_scripts=True) == ("page_scripts", "would_loosen")
-    # What is on, a person may turn off.
-    assert shown["allow_uploads"]["locked"] is False
-    store.change("web", {"allow_uploads": False})
-    assert store.apply_to(config).browser.uploads.enabled is False
+    assert shown["page_scripts"]["value"] is False and shown["page_scripts"]["locked"] is False
+    store.change("web", {"page_scripts": True, "code_tool": True, "allow_downloads": False})
+    made = store.apply_to(config)
+    assert made.browser.javascript.allow_evaluate is True and made.code.enabled is True
+    assert made.browser.downloads.enabled is False
+    store.change("web", {"page_scripts": False})
+    assert store.apply_to(config).browser.javascript.allow_evaluate is False
+    # What the agent may do is the admin's alone: a user is not shown it, and cannot change it.
+    assert "page_scripts" not in settings_in(store.answer("web", role="user"))
+    for setting in ("page_scripts", "code_tool", "allow_downloads", "system_enabled", "agent_model"):
+        with pytest.raises(Refused) as no:
+            store.change("web", {setting: True}, "cloud", role="user")
+        assert no.value.reason == "not_on_this_surface", setting
 
-    scripts_on = make_config(tmp_path, browser={"javascript": {"allow_evaluate": True}})
-    allowed = SettingsStore(scripts_on)
-    assert settings_in(allowed.answer("web"))["page_scripts"]["locked"] is False
-    allowed.change("web", {"page_scripts": False})
-    assert allowed.apply_to(scripts_on).browser.javascript.allow_evaluate is False
+
+def test_what_the_deployment_locked_not_even_the_admin_changes(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config = make_config(
+        tmp_path, settings={"locked": ["page_scripts", "ask_before"], "file": str(tmp_path / "s.json")}
+    )
+    store = SettingsStore(config)
+    assert settings_in(store.answer("web"))["page_scripts"]["locked"] is True
+    for role in ("admin", "user"):
+        assert settings_in(store.answer("web", role=role))["ask_before"]["locked"] is True
+        with pytest.raises(Refused) as no:
+            store.change("web", {"ask_before": "every_action"}, role=role)  # type: ignore[arg-type]
+        assert no.value.reason == "locked"
+    with pytest.raises(Refused) as no:
+        store.change("web", {"page_scripts": True})
+    assert (no.value.setting, no.value.reason) == ("page_scripts", "locked")
 
 
 def test_a_persons_blocked_sites_are_added_to_the_deployments(
@@ -278,29 +295,34 @@ def test_a_persons_blocked_sites_are_added_to_the_deployments(
     assert store.apply_to(config).safety.blocked_domains == ["*.internal.example"]
 
 
-def test_a_person_narrows_the_allowed_sites_and_never_widens_them(
+def test_a_user_narrows_the_allowed_sites_and_never_widens_them(
     make_config: MakeConfig, tmp_path: Path
 ) -> None:
-    anywhere = make_config(tmp_path)
-    free = SettingsStore(anywhere)
-    free.change("web", {"allowed_sites": ["example.com"]})
-    assert free.apply_to(anywhere).safety.allowed_domains == ["example.com"]
-
-    config = make_config(tmp_path, safety={"allowed_domains": ["example.com", "*.example.org"]})
-    Path(config.settings.file).unlink()
+    config = make_config(tmp_path)
     store = SettingsStore(config)
-    assert settings_in(store.answer("web"))["allowed_sites"]["value"] == ["example.com", "*.example.org"]
-    assert refused(store, "web", allowed_sites=["example.com", "elsewhere.test"]) == (
-        "allowed_sites",
-        "would_loosen",
-    )
-    assert refused(store, "web", allowed_sites=["ample.com"]) == ("allowed_sites", "would_loosen")
-    store.change("web", {"allowed_sites": ["shop.example.com", "docs.example.org"]})
+    # With no list above them, a user's list is theirs to make.
+    store.change("web", {"allowed_sites": ["example.com"]}, role="user")
+    assert store.apply_to(config).safety.allowed_domains == ["example.com"]
+
+    # The admin makes a list. It takes the place of the deployment's, which had none.
+    store.change("web", {"allowed_sites": ["example.com", "*.example.org"]})
+    store.change("web", {"allowed_sites": []}, role="user")
+    assert settings_in(store.answer("web", role="user"))["allowed_sites"]["value"] == [
+        "example.com",
+        "*.example.org",
+    ]
+    for outside in (["example.com", "elsewhere.test"], ["ample.com"]):
+        with pytest.raises(Refused) as no:
+            store.change("web", {"allowed_sites": outside}, role="user")
+        assert (no.value.setting, no.value.reason) == ("allowed_sites", "would_loosen")
+    store.change("web", {"allowed_sites": ["shop.example.com", "docs.example.org"]}, role="user")
     assert store.apply_to(config).safety.allowed_domains == ["shop.example.com", "docs.example.org"]
-    # With no list of their own a person narrows nothing: the deployment's list holds, and is shown.
-    store.change("web", {"allowed_sites": []})
+    # With no list of their own a user narrows nothing: the admin's list holds, and is shown.
+    store.change("web", {"allowed_sites": []}, role="user")
     assert store.apply_to(config).safety.allowed_domains == ["example.com", "*.example.org"]
-    assert settings_in(store.answer("web"))["allowed_sites"]["value"] == ["example.com", "*.example.org"]
+    # The admin widens the list: only the admin may.
+    store.change("web", {"allowed_sites": ["elsewhere.test"]})
+    assert store.apply_to(config).safety.allowed_domains == ["elsewhere.test"]
 
 
 def test_staying_signed_in_is_for_the_cloud_browser_alone(make_config: MakeConfig, tmp_path: Path) -> None:
@@ -467,22 +489,24 @@ def test_a_browser_of_the_window_is_turned_off_and_on(make_config: MakeConfig, t
     assert refused(store, "web", system_enabled=False) == ("system_enabled", "not_on_this_surface")
 
 
-def test_a_system_cannot_loosen_what_the_deployment_requires_either(
+def test_the_admin_sets_what_the_agent_may_do_for_each_system(
     make_config: MakeConfig, tmp_path: Path
 ) -> None:
     config = make_config(tmp_path)
     store = SettingsStore(config)
-    for setting in ("page_scripts", "code_tool"):
-        assert settings_in(store.answer("web", "cloud"))[setting]["locked"] is True
-        with pytest.raises(Refused) as no:
-            store.change("web", {setting: True}, "cloud")
-        assert (no.value.setting, no.value.reason) == (setting, "would_loosen")
-    # Where the deployment offers the script tool, a person turns it off for one browser.
-    offered = make_config(tmp_path, code={"enabled": True})
-    choosing = SettingsStore(offered)
-    choosing.change("web", {"code_tool": False}, "chrome")
-    assert choosing.apply_to(offered, system="chrome").code.enabled is False
-    assert choosing.apply_to(offered, system="cloud").code.enabled is True
+    store.change("web", {"code_tool": True, "page_scripts": True}, "builtin")
+    assert store.apply_to(config, system="builtin").code.enabled is True
+    assert store.apply_to(config, system="cloud").code.enabled is False
+    assert store.apply_to(config, system="builtin").browser.javascript.allow_evaluate is True
+    assert settings_in(store.answer("web", "builtin"))["code_tool"]["value"] is True
+    assert settings_in(store.answer("web", "cloud"))["code_tool"]["value"] is False
+    # A user's own value is held against the admin's for that system, not for another.
+    store.change("web", {"ask_before": "every_action"}, "cloud")
+    with pytest.raises(Refused):
+        store.change("web", {"ask_before": "risky"}, "cloud", role="user")
+    store.change("web", {"ask_before": "every_action"}, "builtin", role="user")
+    assert store.apply_to(config, system="builtin").safety.ask_before == "every_action"
+    assert store.apply_to(config, system="chrome").safety.ask_before == "risky"
 
 
 def test_the_model_is_chosen_for_each_browser_among_those_offered(
@@ -541,3 +565,170 @@ def test_saved_settings_of_systems_are_read_with_care(make_config: MakeConfig, t
     # A file whose systems are no object is still a person's settings for every browser.
     Path(config.settings.file).write_text('{"colour_mode": "light", "systems": []}', encoding="utf-8")
     assert settings_in(SettingsStore(config).answer("web"))["colour_mode"]["value"] == "light"
+
+
+# Two people save here (spec 4.11): the admin sets the system up, and a user sets a part of it for
+# themselves, inside what the admin set and where the admin lets users change it.
+
+
+def test_a_user_is_shown_only_the_settings_that_are_a_users(make_config: MakeConfig, tmp_path: Path) -> None:
+    store = SettingsStore(make_config(tmp_path))
+    answer = store.answer("web", "cloud", role="user")
+    assert answer["role"] == "user" and answer["system"] == "cloud"
+    assert list(settings_in(answer)) == [
+        "ask_before",
+        "approval_wait",
+        "remember_site_approval",
+        "blocked_sites",
+        "allowed_sites",
+        "picture_quality",
+        "show_agent_pointer",
+        "colour_mode",
+    ]
+    assert [group["id"] for group in answer["groups"]] == ["approvals", "sites", "live_view", "appearance"]
+
+
+def test_the_two_layers_are_kept_apart_in_the_file(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.change("web", {"ask_before": "every_action"}, "cloud")
+    store.change("web", {"colour_mode": "dark", "picture_quality": "data_saver"}, "cloud", role="user")
+    assert json.loads(Path(config.settings.file).read_text(encoding="utf-8")) == {
+        "systems": {"cloud": {"ask_before": "every_action"}},
+        "user": {"colour_mode": "dark", "systems": {"cloud": {"picture_quality": "data_saver"}}},
+    }
+    again = SettingsStore(config)
+    made = again.apply_to(config, system="cloud")
+    assert (made.safety.ask_before, made.viewer.quality, made.viewer.theme) == (
+        "every_action",
+        "data_saver",
+        "dark",
+    )
+    # What the user chose is theirs: the admin's screen shows the admin's own value.
+    assert settings_in(again.answer("web", "cloud"))["picture_quality"]["value"] == "standard"
+    assert settings_in(again.answer("web", "cloud", role="user"))["picture_quality"]["value"] == "data_saver"
+
+
+def test_the_admin_says_which_settings_users_may_change(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.systems = ("cloud", "chrome", "builtin")
+    told = store.policy()
+    assert [line["id"] for line in told["may_change"]] == [
+        "ask_before",
+        "approval_wait",
+        "remember_site_approval",
+        "blocked_sites",
+        "allowed_sites",
+        "picture_quality",
+        "show_agent_pointer",
+        "colour_mode",
+    ]
+    assert told["may_change"][0] == {"id": "ask_before", "title": "Ask before", "allowed": True}
+    store.change("web", {"approval_wait": "60"}, role="user")
+    assert store.apply_to(config).control.approval_timeout_s == 60
+
+    store.change_policy({"may_change": {"approval_wait": False}})
+    assert not store.user_may_change("approval_wait") and store.user_may_change("ask_before")
+    # What the user had chosen no longer holds, and they are shown the setting as fixed.
+    assert store.apply_to(config).control.approval_timeout_s == 180
+    shown = settings_in(store.answer("web", role="user"))["approval_wait"]
+    assert shown["locked"] is True and shown["value"] == "180"
+    with pytest.raises(Refused) as no:
+        store.change("web", {"approval_wait": "300"}, role="user")
+    assert (no.value.setting, no.value.reason) == ("approval_wait", "locked")
+    # The admin is not held by their own policy, and it is still there the next time.
+    store.change("web", {"approval_wait": "300"})
+    assert SettingsStore(config).apply_to(config).control.approval_timeout_s == 300
+    assert not SettingsStore(config).user_may_change("approval_wait")
+    store.change_policy({"may_change": {"approval_wait": True}})
+    assert store.apply_to(config).control.approval_timeout_s == 60, "the user's own value holds again"
+
+
+def test_the_admin_says_which_browsers_users_may_use(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.systems = ("cloud", "chrome", "builtin")
+    assert store.allowed_systems("user") == ["cloud", "chrome", "builtin"]
+    assert store.policy()["systems"] == [
+        {"id": "cloud", "allowed": True},
+        {"id": "chrome", "allowed": True},
+        {"id": "builtin", "allowed": True},
+    ]
+    store.change_policy({"systems": {"chrome": False}})
+    assert store.allowed_systems("user") == ["cloud", "builtin"]
+    assert store.allowed_systems("admin") == ["cloud", "chrome", "builtin"]
+    assert not store.users_may_use("chrome") and store.enabled("chrome"), "kept from users, and still running"
+    # A browser the admin turned off is no user's either, whatever the policy says.
+    store.change("web", {"system_enabled": False}, "builtin")
+    assert store.allowed_systems("user") == ["cloud"]
+    assert SettingsStore(config).users_may_use("chrome") is False
+
+
+def test_a_person_prefers_a_browser_among_those_they_may_use(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.systems = ("cloud", "chrome", "builtin")
+    assert store.preferred() == "cloud", "the first they may use, until they choose"
+    assert store.prefer("builtin") == "builtin"
+    assert store.preferred() == "builtin"
+    assert json.loads(Path(config.settings.file).read_text(encoding="utf-8")) == {
+        "user": {"preferred_browser": "builtin"}
+    }
+    again = SettingsStore(config)
+    again.systems = store.systems
+    assert again.preferred() == "builtin"
+    # The admin keeps that browser from users: the window opens on one they may still use.
+    again.change_policy({"systems": {"builtin": False}})
+    assert again.preferred() == "cloud"
+    with pytest.raises(Refused) as no:
+        again.prefer("builtin")
+    assert (no.value.setting, no.value.reason) == ("preferred_browser", "not_a_choice")
+    for not_a_browser in ("fridge", None, 7):
+        with pytest.raises(Refused):
+            again.prefer(not_a_browser)
+    again.change_policy({"systems": {"cloud": False, "chrome": False}})
+    assert again.preferred() is None, "a user who may use no browser has none to open"
+
+
+def test_the_admin_says_what_of_the_evaluations_users_see(make_config: MakeConfig, tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    assert {line["id"]: line["allowed"] for line in store.policy()["sees"]} == {
+        "evaluations": True,
+        "cost": True,
+        "traces": True,
+        "checklist": True,
+        # The log holds every step: it is the admin's until the admin says otherwise.
+        "log": False,
+    }
+    store.change_policy({"sees": {"cost": False, "log": True}})
+    assert not store.user_sees("cost") and store.user_sees("log") and store.user_sees("traces")
+    assert not store.user_sees("salaries")
+    assert json.loads(Path(config.settings.file).read_text(encoding="utf-8")) == {
+        "policy": {"sees": {"cost": False, "log": True}}
+    }
+    assert not SettingsStore(config).user_sees("cost")
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"sees": {"salaries": True}},
+        {"sees": {"cost": "no"}},
+        {"may_change": {"page_scripts": True}},
+        {"systems": {"fridge": True}},
+        {"colours": {"cost": True}},
+        {"sees": ["cost"]},
+    ],
+)
+def test_a_policy_that_is_not_one_changes_nothing(
+    make_config: MakeConfig, tmp_path: Path, changes: Any
+) -> None:
+    config = make_config(tmp_path)
+    store = SettingsStore(config)
+    store.systems = ("cloud",)
+    with pytest.raises(Refused) as no:
+        store.change_policy({"sees": {"cost": False}, **changes})
+    assert no.value.reason == "not_a_choice"
+    assert store.user_sees("cost") and not Path(config.settings.file).exists()
