@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -201,9 +201,51 @@ describe('controls', () => {
   });
 });
 
-describe('approval card', () => {
-  it('says what, where and how long is left', () => {
+describe('approval pop-up (spec 9.16)', () => {
+  const popup = () => screen.getByRole('dialog', { name: 'The agent needs your approval' });
+
+  it('comes up when the agent asks, and says what and how long is left', () => {
     show('waiting_approval');
+    expect(within(popup()).getByText('Upload cv.pdf to example.com')).toBeInTheDocument();
+    expect(within(popup()).getByText(/^\d:\d\d left, then this is denied$/)).toBeInTheDocument();
+    // The answers are in the pop-up, and are not offered a second time behind it.
+    expect(screen.queryByRole('group', { name: 'Approval needed' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Allow once' })).toHaveLength(1);
+    expect(within(popup()).getByRole('button', { name: 'Allow on this site' })).toBeInTheDocument();
+    expect(within(popup()).getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+  });
+
+  it('takes the focus, and none of its buttons does: a stray key allows nothing', async () => {
+    const { sent, user } = show('waiting_approval');
+    expect(popup()).toHaveFocus();
+    await user.keyboard('{Enter}a');
+    expect(sent).toEqual([]);
+    expect(popup()).toBeInTheDocument();
+  });
+
+  it('is answered from the keyboard, and the focus goes to what the session is doing now', async () => {
+    const { sent, user } = show('waiting_approval');
+    // Look first, Deny, Allow on this site, Allow once.
+    await user.tab();
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(sent).toEqual([{ type: 'deny', id: 'a1' }]);
+    expect(screen.getByRole('heading', { name: 'Agent is working' })).toHaveFocus();
+  });
+
+  it('steps aside for a person who wants to look first, and leaves the request open as a card', async () => {
+    const { sent, user } = show('waiting_approval');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(sent).toEqual([]);
+    expect(within(screen.getByRole('group', { name: 'Approval needed' })).getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+  });
+});
+
+describe('approval card', () => {
+  it('says what, where and how long is left', async () => {
+    const { user } = show('waiting_approval');
+    await user.click(button('Look first'));
     const card = screen.getByRole('group', { name: 'Approval needed' });
     expect(within(card).getByText('Upload cv.pdf to example.com')).toBeInTheDocument();
     expect(within(card).getByText(/^\d:\d\d left, then this is denied$/)).toBeInTheDocument();
@@ -216,17 +258,24 @@ describe('approval card', () => {
     ['Allow once', { type: 'approve', id: 'a1', scope: 'once' }, 'Allowed once'],
     ['Allow on this site', { type: 'approve', id: 'a1', scope: 'site' }, 'Allowed on this site'],
     ['Deny', { type: 'deny', id: 'a1' }, 'Denied'],
-  ])('%s sends the answer, closes the card and confirms it', async (name, command, toast) => {
-    const { sent, user } = show('waiting_approval');
-    await user.click(button(name));
-    expect(sent).toEqual([command]);
-    expect(screen.queryByRole('group', { name: 'Approval needed' })).not.toBeInTheDocument();
-    expect(await screen.findByText(toast)).toBeInTheDocument();
+  ])('%s sends the answer, closes what asked and confirms it', async (name, command, toast) => {
+    // From the pop-up, and from the card of a person who looked first.
+    for (const looksFirst of [false, true]) {
+      const { sent, user } = show('waiting_approval');
+      if (looksFirst) await user.click(button('Look first'));
+      await user.click(button(name));
+      expect(sent).toEqual([command]);
+      expect(screen.queryByRole('group', { name: 'Approval needed' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(await screen.findByText(toast)).toBeInTheDocument();
+      cleanup();
+    }
   });
 
-  it('does not steal focus when it arrives; A moves to it', async () => {
+  it('does not take the focus; A moves to it', async () => {
     const { user } = show('waiting_approval');
-    expect(document.body).toHaveFocus();
+    await user.click(button('Look first'));
+    expect(button('Allow once')).not.toHaveFocus();
     await user.keyboard('a');
     expect(button('Allow once')).toHaveFocus();
   });
@@ -484,7 +533,8 @@ describe('settings', () => {
     const { user } = await open('waiting_approval');
     await user.keyboard('a');
     expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument();
-    expect(button('Allow once')).toHaveFocus();
+    // The settings screen kept the pop-up back. It asks now.
+    expect(screen.getByRole('dialog', { name: 'The agent needs your approval' })).toHaveFocus();
   });
 });
 
@@ -572,6 +622,7 @@ describe('full view keeps what needs a person on screen', () => {
 
   it('an approval can be reached with A and answered without leaving full view', async () => {
     const { sent, user } = show('waiting_approval');
+    await user.click(button('Look first'));
     await user.keyboard('f');
     fullView();
     expect(screen.getByRole('group', { name: 'Approval needed' })).toBeInTheDocument();
@@ -649,6 +700,7 @@ describe('focus is never left nowhere', () => {
 
   it('after an approval is answered from the keyboard, focus goes to what the session is doing now', async () => {
     const { user } = show('waiting_approval');
+    await user.click(button('Look first'));
     await user.keyboard('a');
     await user.keyboard('{Enter}');
     expect(screen.getByRole('heading', { name: 'Agent is working' })).toHaveFocus();

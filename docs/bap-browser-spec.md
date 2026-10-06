@@ -1197,7 +1197,7 @@ column is unchanged.
 | Target highlight and pointer | Where the agent is about to act and where it has just acted; drawn over the picture by the viewer, never inside the page | targeting, acted, failed |
 | Status line | State, current action, elapsed time | one per state in 9.3 |
 | Control buttons | Pause or Resume, Take over or Hand back, Stop | enabled, disabled, working |
-| Approval card | One pending approval, pinned above the timeline | pending, allowed, denied, expired |
+| Approval card | One pending approval, pinned above the timeline, once the person has put its pop-up away (section 9.16) | pending, allowed, denied, expired |
 | Help card | An agent's request for a person | requested, person active, done, could not, timed out |
 | Dialog card | A page dialog the agent must answer | open, answered, timed out |
 | Takeover bar | Shown while a person drives | active, handing back, failed |
@@ -1544,6 +1544,12 @@ backends of section 4.3, side by side, each with a session and a chat of its own
   which puts the pop-up away and leaves the request open as the card of section 9.4. While the pop-up is
   open, the same answers are not offered a second time behind it. After taking over, the person does the
   step in the live picture (or in their own Chrome) and answers Done.
+- **The pop-up for an approval.** An approval (section 8.2) comes up the same way, on every backend: "The
+  agent needs your approval", what the agent wants to do, and the time left. Its buttons: Allow once, Allow
+  on this site (not for a step that is asked about every time), Deny, and Look first, which puts the pop-up
+  away and leaves the approval open as the card of section 9.4. The pop-up takes the focus and none of its
+  buttons does: a key pressed for something else, in the moment the pop-up arrives, allows nothing. While
+  the settings screen or the question before Stop is open, the pop-up waits behind it.
 - **Noticing such a page.** The engine never tries a human check or a sign-in. When a page it shows the
   agent has a CAPTCHA or other human check ("I'm not a robot", "Verify you are human"), or is a sign-in page
   (a password field, and a title, heading or button that says sign in or log in), the result ends with a

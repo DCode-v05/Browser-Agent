@@ -213,9 +213,30 @@ async def test_on_a_narrow_screen_the_keyboard_never_falls_out_of_settings(open_
     assert view.errors == []
 
 
+async def test_an_approval_pops_up_and_is_answered_there(open_view: OpenView) -> None:
+    view = await open_view("state=waiting_approval")
+    page = view.page
+    popup = page.get_by_role("dialog", name="The agent needs your approval")
+    await popup.wait_for()
+    # The pop-up holds the focus and none of its buttons does: a stray key allows nothing.
+    assert await page.evaluate("document.activeElement?.getAttribute('role')") == "dialog"
+    await page.keyboard.press("Enter")
+    assert await popup.is_visible()
+    # The answers are in the pop-up, and are not offered a second time behind it.
+    assert await page.get_by_role("button", name="Allow once").count() == 1
+    assert await view.sideways_overflow() <= 0
+    assert await view.accessibility_violations() == []
+    await view.shot("approval-popup")
+    await popup.get_by_role("button", name="Allow once").click()
+    await page.get_by_text("Allowed once").wait_for()
+    assert view.errors == []
+
+
 async def test_in_full_view_an_approval_fits_and_can_be_answered(open_view: OpenView) -> None:
     view = await open_view("state=waiting_approval")
     page = view.page
+    # The person looks at the page first: the request stays open as a card.
+    await page.get_by_role("button", name="Look first").click()
     await page.keyboard.press("f")
     await page.locator('.app[data-view="full"]').wait_for()
     await page.get_by_role("button", name="Allow once").wait_for()

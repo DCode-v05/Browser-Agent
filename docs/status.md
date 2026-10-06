@@ -195,6 +195,7 @@ toolbar icon. The desktop app's own checks pass (typecheck, 5 tests, build); its
 | The built-in browser | A browser of the app's own that keeps its sign-ins in a profile of its own |
 | My Chrome as a page | Says how to load the extension, then becomes the chat for that Chrome when the extension dials in |
 | The pop-up | When the agent asks for a sign-in, a human check, a payment or other help, a pop-up comes up on every backend, with Take over, Couldn't do it and Look first |
+| The pop-up for an approval | An approval pops up the same way, with Allow once, Allow on this site, Deny and Look first. No button of it holds the focus, so a stray key allows nothing |
 | Noticing a human check or a sign-in | The result that shows such a page tells the agent to ask the person |
 | A new session | "Start a new session" on a page whose session was stopped |
 | The model knows where the browser is | Each chat task carries the address the browser is on |

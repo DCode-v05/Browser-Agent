@@ -20,7 +20,7 @@ The agent asks the person when it meets a sign-in, a CAPTCHA or a payment.
 | The viewer | A web page with the live browser, the agent's pointer and click marks, a glow while it works, the steps it took, and the controls: Pause, Take over, Hand back, Stop |
 | The chat | Give tasks one after another, read the answers, stop a task without ending the session |
 | Help from a person | The agent asks for a sign-in, a CAPTCHA or a code and waits; the person takes over, does it, and answers Done |
-| Approvals | A tool can be allowed, asked about or denied; an action that pays, sends or deletes is asked about every time |
+| Approvals | A tool can be allowed, asked about or denied; an action that pays, sends or deletes is asked about every time. An approval pops up over the page, like a request for a sign-in |
 | Safety | An address policy checked for every page the browser loads, also after a redirect, a link or inside a frame; the cloud metadata address is always refused; typed text and passwords never reach a log |
 | Three ways for an agent to use it | The built-in agent loop (OpenAI `gpt-5.6-luna`, or a scripted demo with no key); MCP over stdio; MCP over HTTP with the viewer |
 | Three places for the browser, in one window | `bap-browser studio`: the cloud browser, your own Chrome and the built-in browser as three pages, each with its session and chat; a tab says when one needs you |
@@ -189,7 +189,6 @@ Say these plainly if asked.
 |---|---|
 | Settings changed from the viewer on a live session | Only colour mode and the agent's pointer. The rest is changed in `config.json` |
 | The three-page window inside the desktop app | The window runs in your browser. The desktop app shows one browser of its own |
-| A pop-up for an approval | Approvals are cards beside the browser; only requests for a person's step pop up |
 | More than one agent tab in your own Chrome | One tab, in its own tab group |
 | A core that runs in the cloud with your Chrome at home | The pieces are there (pairing, reconnecting); it has only been run on one machine |
 | An installer for the desktop app | It runs from this folder |
