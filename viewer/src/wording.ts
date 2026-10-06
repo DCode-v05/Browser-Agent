@@ -164,6 +164,7 @@ export const W = {
       lead: 'The agent works in a tab of your own Chrome, with your sign-ins, and asks you site by site what it may do.',
       open: 'In your Chrome, open chrome://extensions and switch on Developer mode.',
       load: 'Press "Load unpacked" and choose this folder:',
+      paste: 'To get there quickly, copy the folder and paste it into the file chooser: on a Mac press Cmd+Shift+G first; on Windows use its address bar.',
       icon: 'Click the BAP icon in the toolbar. It opens the chat beside your pages.',
       byItself: 'This page connects by itself, a moment after the extension is loaded.',
       copy: 'Copy the folder',

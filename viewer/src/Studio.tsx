@@ -142,6 +142,7 @@ function NoSession({ room }: { room: Room }) {
                 <Button onClick={copy}>{copied ? W.studio.connect.copied : W.studio.connect.copy}</Button>
               </span>
             )}
+            {room.extension && <span className="studio-tip">{W.studio.connect.paste}</span>}
           </li>
           <li>{W.studio.connect.icon}</li>
         </ol>

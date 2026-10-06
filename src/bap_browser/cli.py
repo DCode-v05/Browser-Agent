@@ -251,6 +251,12 @@ def _serve(args: argparse.Namespace) -> int:
     return 130
 
 
+def _extension_folder(config: Config) -> Path:
+    """Where the extension is put for a person to load into their Chrome. A folder a file chooser
+    shows: one whose name begins with a dot is hidden from it."""
+    return Path(config.server.extension_dir).expanduser().resolve()
+
+
 def _key_for_the_model(config: Config) -> str:
     """The key of the hosted model, from the environment or from `.env`. Without one, says how to set it."""
     if config.agent.provider == "scripted":
@@ -274,7 +280,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser.agent.openai_model import OpenAIModel
     from bap_browser.agent.studio import run_studio
 
-    extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+    extension = browser_extension.install(_extension_folder(config))
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(Interrupted, KeyboardInterrupt):
         asyncio.run(
@@ -300,14 +306,14 @@ def _agent(args: argparse.Namespace) -> int:
             )
         from bap_browser import browser_extension
 
-        extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+        extension = browser_extension.install(_extension_folder(config))
     elif args.extension:
         if not args.chat:
             raise ConfigError("the extension shows the chat. Use --extension together with --chat")
         from bap_browser import browser_extension
 
         # Beside the file that says where the service is: both are this machine's own state.
-        extension = browser_extension.install(Path(config.server.state_file).resolve().parent / "extension")
+        extension = browser_extension.install(_extension_folder(config))
         config = browser_extension.with_extension(with_visible_browser(config), extension)
     elif args.show_browser:
         config = with_visible_browser(config)

@@ -461,7 +461,7 @@ machine, and it is the first cut of the design above, not all of it.
 | Pictures | None are sent: the person is looking at the browser. The viewer is the chat in the side panel (section 9.14), and the page shows who is driving (section 9.15) |
 | Safety | The address policy, the approvals of section 8.2 and the consequential-action rule of 8.6 are the core's, as everywhere. Which sites the agent may read and act on is decided by the extension (section 8.8, "As it is built now") |
 | Stop | The extension's own "Stop the agent" takes it off the tab at once and hangs up; the bridge does not dial again in that session |
-| Loading it | By hand, once: `chrome://extensions`, Developer mode, Load unpacked, the folder the command names |
+| Loading it | By hand, once: `chrome://extensions`, Developer mode, Load unpacked, the folder the command names (`server.extension_dir`). The folder is not a hidden one: a file chooser does not show a folder whose name begins with a dot |
 
 Not built yet, from the design above and from section 8.8: one message per driver operation (the
 channel carries the driver's many small commands, which is slow across the internet and fine on one
@@ -1842,6 +1842,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `server.shutdown_wait_s` | 3 | How long stopping waits for open connections to finish |
 | `server.command_backlog` | 256 | How many of a viewer's commands may wait their turn. More than that are dropped |
 | `server.state_file` | `.bap-browser/service.json` | Holds the viewer address for the local user |
+| `server.extension_dir` | `bap-browser-extension` | Where the extension for Chrome is put, for a person to load it from. Not a hidden folder: the browser's file chooser must show it |
 | `mcp.server_name` | `bap-browser` | |
 | `mcp.http_path` | `/mcp` | |
 
