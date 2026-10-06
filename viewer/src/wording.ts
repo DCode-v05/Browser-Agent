@@ -301,6 +301,7 @@ export const W = {
       question: 'Clear cookies and site data in the cloud browser?',
       consequence: "You'll be signed out of sites there, and open sessions will end.",
       done: 'Browsing data cleared.',
+      failed: 'The browsing data was not cleared: the service did not do it. Try again.',
     },
     about: {
       version: 'Version',

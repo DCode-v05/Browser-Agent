@@ -131,6 +131,11 @@ class ServiceSession:
             await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
         self._heartbeat = asyncio.create_task(self._keep_viewers_current())
 
+    @property
+    def backend(self) -> str:
+        """Where this session's browser is (spec 4.3)."""
+        return self._backend or self.config.backend.kind
+
     async def settings_changed(self, changes: Mapping[str, Any]) -> None:
         """A person changed their settings (spec 10.2). What is decided call by call follows at the
         agent's next call; what the browser was started with waits for the next session."""

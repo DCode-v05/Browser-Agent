@@ -32,6 +32,7 @@ from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.errors import BapError, ConfigError
 from bap_browser.service.bridge import Bridge
+from bap_browser.service.browsing_data import CLEAR, clear_browsing_data
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import Refused, SettingsStore, known_surface
@@ -143,6 +144,16 @@ def create_app(
                 await session.settings_changed(changed)
         return JSONResponse(settings.answer(surface))
 
+    async def clear_data(request: Request) -> Response:
+        """Clear browsing data: the one setting that is an action (spec 10.2)."""
+        if (no := refused(request)) is not None:
+            return no
+        if settings is None:
+            return Response(status_code=404)
+        if CLEAR in config.settings.locked:
+            return JSONResponse({"setting": CLEAR, "reason": "locked"}, status_code=409)
+        return JSONResponse(await clear_browsing_data(config, sessions, settings))
+
     async def read_config(request: Request) -> Response:
         """What "About this deployment" lists."""
         if (no := refused(request)) is not None:
@@ -229,6 +240,7 @@ def create_app(
             Route("/api/settings", read_settings, methods=["GET"]),
             Route("/api/settings", change_settings, methods=["PATCH"]),
             Route("/api/config", read_config, methods=["GET"]),
+            Route("/api/browsing-data/clear", clear_data, methods=["POST"]),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,

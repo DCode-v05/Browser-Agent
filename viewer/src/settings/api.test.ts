@@ -50,6 +50,18 @@ describe('the settings of a live session (spec 10.2)', () => {
     await expect(settingsFrom(PAGE, 'the-token').load('web')).rejects.toBeInstanceOf(SettingsUnreachable);
   });
 
+  it('ask the service to clear the browsing data, and do not say it is gone when it is not', async () => {
+    const fetched = answering({ status: 200, body: { sessions_ended: 1, profile_cleared: true } }, { status: 409, body: { setting: 'clear_browsing_data', reason: 'locked' } });
+    await settingsFrom(PAGE, 'the-token').run('web', 'clear_browsing_data');
+    const [address, how] = fetched.mock.calls[0];
+    expect(address).toBe('http://127.0.0.1:8765/api/browsing-data/clear');
+    expect(how).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer the-token' } });
+    await expect(settingsFrom(PAGE, 'the-token').run('web', 'clear_browsing_data')).rejects.toBeInstanceOf(SettingsUnreachable);
+    // An action this build does not know asks for nothing.
+    await settingsFrom(PAGE, 'the-token').run('web', 'something_else');
+    expect(fetched).toHaveBeenCalledTimes(2);
+  });
+
   it('read what About this deployment lists', async () => {
     const about = { version: '0.1.0', browser: 'Chromium 153', changed: [] };
     const fetched = answering({ status: 200, body: about });

@@ -83,7 +83,13 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
 
   async function run(setting: Setting) {
     setAsking(null);
-    await source.run(surface, setting.id);
+    try {
+      await source.run(surface, setting.id);
+    } catch {
+      // Nobody may believe the data is gone when it is not.
+      setStatus({ id: setting.id, tone: 'refused', text: W.settings.clear.failed });
+      return;
+    }
     if (setting.id === 'clear_browsing_data') onToast(W.settings.clear.done);
   }
 

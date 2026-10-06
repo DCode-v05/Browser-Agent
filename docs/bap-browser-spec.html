@@ -3678,12 +3678,20 @@ message naming it: passing over it would drop a site a person blocked.</p>
 <p><strong>Site lists.</strong> A person's blocked sites are added to the deployment's, which are shown apart (<code>fixed</code>)
 and stay. A person's allowed sites take the place of the deployment's and must lie inside them; with no
 list of their own a person narrows nothing, and the deployment's list holds and is shown.</p>
-<p><strong>In this build.</strong> The catalogue holds 15 settings: <code>preferred_browser</code>, <code>stay_signed_in</code>, <code>ask_before</code>,
+<p><strong>Clear browsing data.</strong> <code>POST /api/browsing-data/clear</code> ends the open sessions of the cloud browser, with
+"It was ended to clear the browsing data." as the reason their summary gives, and then deletes that
+browser's kept profile. A session with a fresh profile holds its data only while it runs, so ending it is
+all there is to do. The answer says how many sessions ended and whether a profile was deleted. A folder is
+deleted only when it is a browser's profile (it holds <code>Local State</code> or <code>Default</code>): the configuration names
+the folder, and a wrong name must not cost a person their files. The other browsers are not touched. A
+deployment that locks <code>clear_browsing_data</code> gets 409.</p>
+<p><strong>In this build.</strong> The catalogue holds 16 settings: <code>preferred_browser</code>, <code>stay_signed_in</code>, <code>ask_before</code>,
 <code>approval_wait</code>, <code>remember_site_approval</code>, <code>blocked_sites</code>, <code>allowed_sites</code>, <code>allow_downloads</code>,
-<code>allow_uploads</code>, <code>activity_log</code>, <code>picture_quality</code>, <code>show_agent_pointer</code>, <code>colour_mode</code>, <code>page_scripts</code> and
-<code>about</code>. Not yet: <code>clear_browsing_data</code> and its route; the three the bridge keeps or serves (<code>my_chrome</code>,
-<code>my_chrome_mode</code>, <code>approved_sites</code>); the three of the desktop app (<code>show_builtin_browser</code>,
-<code>download_folder</code>, <code>upload_folders</code>); and <code>notify_when_needed</code>.</p>
+<code>allow_uploads</code>, <code>activity_log</code>, <code>clear_browsing_data</code>, <code>picture_quality</code>, <code>show_agent_pointer</code>,
+<code>colour_mode</code>, <code>page_scripts</code> and <code>about</code>: the 16 of milestone 1 on the web. Not yet: the three the bridge
+keeps or serves (<code>my_chrome</code>, <code>my_chrome_mode</code>, <code>approved_sites</code>); the three of the desktop app
+(<code>show_builtin_browser</code>, <code>download_folder</code>, <code>upload_folders</code>), with Clear browsing data for the built-in
+browser; and <code>notify_when_needed</code>.</p>
 <p><strong>Outside this catalogue.</strong> Settings that belong to the desktop app itself (start at sign-in,
 shortcuts, updates, keeping the computer awake) are the desktop client's own. Importing sign-ins from
 a person's browser into the built-in browser, site by site, is a later item (section 15.3).</p>

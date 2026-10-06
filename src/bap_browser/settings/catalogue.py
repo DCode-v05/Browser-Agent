@@ -313,6 +313,21 @@ class About(Entry):
         return {}
 
 
+@dataclass(frozen=True, kw_only=True)
+class Action(About):
+    """A button. It holds no value: what it does is a route of the service's own, and it asks first."""
+
+    button: str
+    question: str
+    consequence: str
+
+    CONTROL: ClassVar[str] = "action"
+
+    def described(self, config: Config) -> dict[str, Any]:
+        asks = {"question": self.question, "consequence": self.consequence, "button": self.button}
+        return {"action": self.button, "confirm": asks}
+
+
 CATALOGUE: tuple[Entry, ...] = (
     PreferredBrowser(
         id="preferred_browser",
@@ -411,6 +426,16 @@ CATALOGUE: tuple[Entry, ...] = (
         title="Keep a log of the agent's steps",
         description="What you type is never logged, only how many characters.",
         key="logging.event_log",
+    ),
+    Action(
+        id="clear_browsing_data",
+        group="Privacy",
+        surfaces=EVERYWHERE,
+        title="Clear browsing data",
+        description="Deletes cookies and site data in the cloud browser.",
+        button="Clear data",
+        question="Clear cookies and site data in the cloud browser?",
+        consequence="You'll be signed out of sites there, and open sessions will end.",
     ),
     Choice(
         id="picture_quality",
