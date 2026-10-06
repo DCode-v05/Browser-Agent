@@ -303,6 +303,8 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
 
 describe('the window as the admin and as a user see it (spec 4.11)', () => {
   const sees = { evaluations: true, cost: true, traces: true, checklist: true, log: false };
+  /** The settings the service gives a user: those that can be a user's, and no others (spec 10.2). */
+  const A_USERS = ['ask_before', 'approval_wait', 'remember_site_approval', 'blocked_sites', 'allowed_sites', 'picture_quality', 'show_agent_pointer', 'colour_mode'];
 
   function signedIn(role: 'admin' | 'user', rooms: Room[], me: Me | null, over: Partial<SystemsApi> = {}) {
     const manage = vi.fn(async () => ({ ok: true }) as const);
@@ -315,7 +317,7 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
       trace: async () => null,
       rate: async () => false,
       check: async () => ({ ok: false, why: 'not now' }),
-      settings: () => createDemoSettings(),
+      settings: () => createDemoSettings(role === 'user' ? A_USERS : undefined),
       me: async () => me,
       prefer,
       policy: async () => null,
@@ -396,7 +398,9 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
   it('goes to the browser a user has just preferred, and shows the browser itself', async () => {
     const { user, prefer, pages } = signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
     await user.click(screen.getByRole('tab', { name: W.studio.view.settings }));
-    const preferred = await screen.findByRole('combobox', { name: new RegExp(`^${W.systems.user.preferred}`) });
+    // Their own settings are on the card by now, each a working control, beside the browser they prefer.
+    expect(await screen.findByRole('combobox', { name: 'Ask before' })).toBeInTheDocument();
+    const preferred = screen.getByRole('combobox', { name: new RegExp(`^${W.systems.user.preferred}`) });
     await user.selectOptions(preferred, 'builtin');
     expect(prefer).toHaveBeenCalledWith('builtin');
     await waitFor(() => expect(tab(/Built-in browser/)).toHaveAttribute('aria-selected', 'true'));

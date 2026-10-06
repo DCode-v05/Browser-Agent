@@ -1822,6 +1822,8 @@
   flex: none;
   display: flex;
   padding: var(--space-3) var(--space-4) 0;
+  /* On a narrow screen the views are scrolled sideways, not broken in the middle of a word. */
+  overflow-x: auto;
 }
 
 /* The Systems page (spec 9.17, 12.6): the three browsers side by side, each a card. */
@@ -1873,6 +1875,7 @@
   color: var(--text-muted);
   font: inherit;
   font-weight: var(--weight-medium);
+  white-space: nowrap;
   cursor: pointer;
 }
 
