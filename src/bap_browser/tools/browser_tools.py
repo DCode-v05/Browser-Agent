@@ -17,6 +17,9 @@ from bap_browser.policy.files import allowed_file
 from bap_browser.tools.human_checks import notice_for
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition
 
+# The code tool (spec 7). The toolkit runs it: its steps are tool calls of their own.
+RUN_A_SCRIPT = "browser_run"
+
 Modifier = Literal["Alt", "Control", "Meta", "Shift"]
 # What a person is shown in place of an address that could not be read.
 UNREADABLE = "That address"
@@ -699,6 +702,16 @@ async def downloads(session: BrowserSession, args: NoArgs) -> str:
     return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + "\n".join(lines)
 
 
+class RunArgs(Args):
+    code: str = Field(min_length=1)
+    timeout_s: int | None = Field(default=None, ge=1)
+
+
+async def run(session: BrowserSession, args: RunArgs) -> str:
+    """The toolkit runs a script itself: its steps are tool calls, which no single tool makes."""
+    raise BrowserError("browser_run is run by the toolkit.", reason="it cannot run here")
+
+
 TOOLS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         "browser_navigate",
@@ -856,5 +869,13 @@ TOOLS: tuple[ToolDefinition, ...] = (
         "check, a code, a payment. Waits until they answer. Never try to solve such a step yourself.",
         RequestHumanArgs,
         request_human,
+    ),
+    ToolDefinition(
+        RUN_A_SCRIPT,
+        "Do several steps in one call with a short Python script. `browser` has the tools as async "
+        'methods (`await browser.click(find="Next")`); print() and the last expression come back; '
+        "`state` is kept between scripts. No imports. Each step is checked like a single call.",
+        RunArgs,
+        run,
     ),
 )

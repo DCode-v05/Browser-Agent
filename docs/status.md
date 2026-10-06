@@ -235,6 +235,30 @@ as a person does (`tests/viewer/test_live_settings.py`), 7 for the viewer's side
 Seen on the way, and left as it is: with "Ask before: Every action", opening a blocked site first asks for
 approval and is refused only after the answer. The refusal could come first.
 
+### 1j. Finished on 2026-10-06: the code tool `browser_run`
+
+One call does several steps with a short Python script the agent writes (spec 7):
+
+| Part | What it does |
+|---|---|
+| The check before a script runs | No import, no class, no name or attribute beginning with an underscore, no name outside the list, none of the attributes that lead to the frames behind a value; each refusal names the line |
+| The worker | A process of its own, started with an empty environment and the standard library alone, used again from script to script, ended when a script computes too long |
+| `browser`, `state`, `print`, `re`, `json`, `math` | The tools as methods; `find="…"` on click and type; values kept from script to script |
+| Every step is a tool call | The same address policy, approvals, log and timeline row as a single call; a person pauses or takes over between two steps |
+| The result | What came of it in the first line, what was printed, the value, each step, and where it stopped |
+
+**It is off by default, and that is a decision for you.** The spec says "on by default once it exists",
+and also says the check is no security boundary: the boundary is the micro VM, which is not built. On your
+own machine there is nothing around the core, so I left `code.enabled` at `false` and wrote the reason
+into the spec (7.4). To turn it on: `{"code": {"enabled": true}}` in `config.json`.
+
+Tests: 44 for the check and the worker, 12 for the tool on a fake browser, 1 on a real Chromium that fills
+a form and collects from three pages in one call.
+
+Found by that last test, and cured: the best match for the words "Full name" is the label, which cannot
+be typed into, and words that match only in part ("No such button") found a button to click. A script
+now acts only on a match whose name holds every word, and types into a field before a label.
+
 ### 2. Not started
 
 | What | Note |
@@ -244,7 +268,7 @@ approval and is refused only after the answer. The refusal could come first.
 | Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |
 | The micro VM | The image has never been built, started or deployed |
-| The code tool `browser_run` (milestone 4) | Not begun |
+| The code tool `browser_run`, the rest | Built and off by default (section 1j). Not run yet on a person's own Chrome or in the built-in browser, and its two lines of the budget are not measured |
 | Viewer states the spec lists | Session picker, "saving", "working", "handing back", "failed", address "loading", "limit reached" |
 | The deferred minor findings of the two reviews | Listed further down, unchanged |
 

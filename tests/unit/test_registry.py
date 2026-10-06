@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from bap_browser.config import Browser, Config
+from bap_browser.config import Browser, Code, Config
 from bap_browser.tools import TOOLS, tools_for
 
 
@@ -39,17 +39,19 @@ def test_the_tools_of_this_stage() -> None:
         "browser_upload_file",
         "browser_downloads",
         "browser_request_human",
+        "browser_run",
     ]
 
 
-def test_three_tools_exist_only_where_their_feature_is_on() -> None:
+def test_four_tools_exist_only_where_their_feature_is_on() -> None:
     def offered(**browser: Any) -> set[str]:
         return {tool.name for tool in tools_for(Config(browser=Browser(**browser)))}
 
     everything = {tool.name for tool in TOOLS}
-    assert len(everything) == 28
-    # A script in the page is off unless a deployment turns it on.
-    assert everything - offered() == {"browser_evaluate"}
+    assert len(everything) == 29
+    # A script in the page, and a script of the agent's own, are off unless a deployment turns them on.
+    assert everything - offered() == {"browser_evaluate", "browser_run"}
+    assert "browser_run" in {tool.name for tool in tools_for(Config(code=Code(enabled=True)))}
     assert "browser_evaluate" in offered(javascript={"allow_evaluate": True})
     assert "browser_downloads" not in offered(downloads={"enabled": False})
     assert "browser_upload_file" not in offered(uploads={"enabled": False})

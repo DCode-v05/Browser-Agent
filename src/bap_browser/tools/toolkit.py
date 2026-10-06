@@ -13,13 +13,14 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
+from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
 from bap_browser.policy.address import presentable_address
 from bap_browser.results import Picture, ToolResult
-from bap_browser.tools.browser_tools import TOOLS
+from bap_browser.tools.browser_tools import RUN_A_SCRIPT, TOOLS, RunArgs
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
 from bap_browser.tools.observer import StepObserver
@@ -112,13 +113,14 @@ NOT_APPROVED = {
 
 
 def tools_for(config: Config) -> tuple[ToolDefinition, ...]:
-    """The tools a deployment offers. Three of them exist only when their feature is turned on."""
+    """The tools a deployment offers. Four of them exist only when their feature is turned on."""
     browser = config.browser
     absent = {
         "browser_evaluate": not browser.javascript.allow_evaluate,
         # With no folder to upload from, no upload could ever be allowed.
         "browser_upload_file": not (browser.uploads.enabled and browser.uploads.allowed_dirs),
         "browser_downloads": not browser.downloads.enabled,
+        RUN_A_SCRIPT: not config.code.enabled,
     }
     return tuple(tool for tool in TOOLS if not absent.get(tool.name, False))
 
@@ -145,6 +147,9 @@ class Toolkit:
         self._grants: set[tuple[str, str]] = set()
         # The action that a dialog interrupted. It goes on when the dialog has been answered.
         self._held: asyncio.Future[Outcome] | None = None
+        # The code tool's worker (spec 7). It starts with the first script, and ends with the session.
+        self._scripts = ScriptRunner(lambda: self._session.config.code, self.call, self._in_a_script)
+        session.at_close(self._scripts.close)
 
     def reconfigure(self) -> None:
         """Takes up a change in the session's configuration: the tools on offer, and the log."""
@@ -155,9 +160,58 @@ class Toolkit:
     def definitions(self) -> list[ToolDefinition]:
         return list(self._tools.values())
 
+    def _in_a_script(self) -> dict[str, list[str]]:
+        """The tools a script has as methods of `browser`, each with the names of its arguments in order."""
+        return {
+            name: list(tool.args.model_fields)
+            for name in IN_A_SCRIPT
+            if (tool := self._tools.get(f"browser_{name}")) is not None
+        }
+
+    async def _run_script(self, arguments: dict[str, Any]) -> ToolResult:
+        """`browser_run` (spec 7). Each step of the script is a tool call of its own, so this call
+        holds neither the turn nor the browser while the script runs: a person pauses, takes over
+        or stops between two steps, as between any two calls."""
+        redact = self._session.redact
+        waiting_since = time.perf_counter()
+        # The script itself is never kept: it can hold what it types.
+        logged = names_only(arguments)
+        async with self._gate() as admission:
+            refused, note = admission.refused, admission.note
+        if refused is not None:
+            held = ToolResult(redact(refused))
+            self._log.write(RUN_A_SCRIPT, logged, held, (time.perf_counter() - waiting_since) * 1000)
+            return held
+        self._steps += 1
+        step = self._steps
+        if self._observer:
+            self._observer.step_started(step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None), None)
+        started = time.perf_counter()
+        checked = self._check(RUN_A_SCRIPT, arguments)
+        if isinstance(checked, CannotRun):
+            ran = Ran(checked.text, checked.reason)
+        else:
+            args = checked[1]
+            assert isinstance(args, RunArgs)
+            ran = await self._scripts.run(args.code, args.timeout_s)
+        tabs = await self.tabs()
+        text = note + ran.text + self._state_block(tabs, self._session.take_news())
+        result = ToolResult(redact(text), ran.failure is not None)
+        ms = (time.perf_counter() - started) * 1000
+        self._log.write(RUN_A_SCRIPT, logged, result, ms)
+        if self._observer:
+            summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure)
+            if ran.failure is None:
+                # Each step is a row of its own. This row says how many there were.
+                summary += f": {ran.steps} step{'' if ran.steps == 1 else 's'}"
+            self._observer.step_finished(step, ran.failure is None, ms, len(result.text), summary, tabs)
+        return result
+
     async def call(self, name: str, arguments: Mapping[str, Any] | None = None) -> ToolResult:
         """Runs one tool. Calls run one at a time, in order. Every failure comes back as a result."""
         arguments = dict(arguments or {})
+        if name == RUN_A_SCRIPT and name in self._tools:
+            return await self._run_script(arguments)
         redact = self._session.redact
         waiting_since = time.perf_counter()
         async with self._turn, self._gate() as admission:

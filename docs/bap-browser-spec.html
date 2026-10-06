@@ -1831,7 +1831,8 @@ default). <code>browser_fill_form</code> already covers the most common multi-st
 </tr>
 </tbody>
 </table></div>
-<p>With it there are 29 tools. It is on by default once it exists.</p>
+<p>With it there are 29 tools. It is offered where a deployment turns it on (<code>code.enabled</code>); section 7.4
+says why it is off until then.</p>
 <h3 id="64-next-tools">6.4 Next tools</h3>
 <p><code>browser_sign_in</code>, <code>browser_pdf</code>, <code>browser_storage</code>, <code>browser_emulate</code>, <code>browser_mouse</code>,
 <code>browser_record</code>, <code>browser_network_request</code>, <code>browser_extract</code>. Also an optional <code>tab_id</code> on every tool,
@@ -1888,13 +1889,26 @@ this style of tool than with one call per action.</p>
 </tr>
 </tbody>
 </table></div>
+<p><code>browser</code> also has <code>go_back</code>, <code>go_forward</code> and <code>reload</code>. It has no method for a tool the deployment does
+not offer, none for <code>browser_request_human</code> and <code>browser_zoom</code>, and none for <code>browser_run</code> itself: a script
+cannot run a script. Values given without a name go to the tool's arguments in their order
+(<code>browser.navigate("https://…")</code>); the others are given by name.</p>
 <p><code>browser.click</code> and <code>browser.type</code> accept <code>find="…"</code> as well as <code>ref=…</code>: the best match for that text
-is resolved first, and the call fails if nothing matches. Each method returns the same text the tool
-returns and raises <code>StepError</code> on failure.</p>
+is resolved first, and the call fails if nothing matches. The match is looked up with <code>browser_find</code>, which
+is a step of its own, and is taken only when its name holds every word asked for: <code>browser_find</code> also
+lists what matches in part, for an agent to read and choose from, and a script must not act on a guess. For
+<code>browser.type</code> a field is taken before a label with the same words. Each method returns the same text the
+tool returns and raises <code>StepError</code> on failure. <code>Exception</code>, <code>ValueError</code>, <code>KeyError</code>, <code>IndexError</code> and
+<code>TypeError</code> are there too, to tell one failure from another.</p>
+<p><code>re</code>, <code>json</code> and <code>math</code> are a few functions of those modules, not the modules: a module holds other
+modules, and through those the whole machine. <code>re</code> has <code>findall</code>, <code>finditer</code>, <code>search</code>, <code>match</code>,
+<code>fullmatch</code>, <code>sub</code>, <code>split</code>, <code>escape</code>, <code>compile</code> and the flags; <code>json</code> has <code>loads</code> and <code>dumps</code>.</p>
 <h3 id="73-result">7.3 Result</h3>
 <ul>
+<li>First, in one line, what came of it: "Ran the script: 4 steps.", or which step failed, or why the script
+  stopped. What a script printed can hold anything a page says, so it never comes first.</li>
 <li>Everything printed, capped at <code>code.max_output_chars</code>.</li>
-<li>The value of the script's last expression, as JSON.</li>
+<li>The value of the script's last expression, as JSON, capped the same way.</li>
 <li>The steps performed, one short line each, with success or failure.</li>
 <li>If a step failed: which one, its message, and "earlier steps were carried out and are not undone".</li>
 <li>The usual state block.</li>
@@ -1922,7 +1936,15 @@ returns and raises <code>StepError</code> on failure.</p>
 </tr>
 <tr>
 <td>Bounded</td>
-<td>Time (<code>code.timeout_s</code>), steps per run (<code>code.max_steps</code>), output size</td>
+<td>Time (<code>code.timeout_s</code>), steps per run (<code>code.max_steps</code>), output size, the size of the script (<code>code.max_code_chars</code>), what it hands the core at once (<code>code.max_message_chars</code>) and, where the system enforces it, memory (<code>code.max_memory_mb</code>). The time is the script's own computing: a step in the browser has the limits of the tool, and a wait for a person's approval is not held against the script</td>
+</tr>
+<tr>
+<td>A person stays in charge</td>
+<td>The call that runs a script holds neither the browser nor the agent's turn: each step is a tool call of its own. Pause, Take over and Stop take hold between two steps, as between any two calls, and each step is a row of the timeline</td>
+</tr>
+<tr>
+<td>Nothing typed is kept</td>
+<td>The script is never logged: it holds what it types. Its steps are logged as the single calls they are</td>
 </tr>
 <tr>
 <td>Clean environment</td>
@@ -1932,8 +1954,20 @@ returns and raises <code>StepError</code> on failure.</p>
 <td>Honest limit</td>
 <td>The pre-run check is defence in depth, not a security boundary; Python offers none inside a process. The boundary is the micro VM, in which the whole core runs (section 17.2)</td>
 </tr>
+<tr>
+<td>Off until there is a boundary</td>
+<td><code>code.enabled</code> is <code>false</code>. Where the core runs on a person's own machine there is no micro VM around it, and a page could talk an agent into writing a script. A deployment that runs the core in a micro VM, or in a container of its own, turns it on</td>
+</tr>
 </tbody>
 </table></div>
+<p>What the check refuses, each with the line: an import; a class, <code>global</code>, <code>nonlocal</code>, <code>with</code>, <code>match</code>,
+<code>del</code>, <code>async for</code>, a decorator; a name or an attribute that begins with an underscore; a name that is
+neither in section 7.2 nor made by the script; the attributes that reach the frames and the code behind a
+value (<code>gi_frame</code>, <code>cr_frame</code>, <code>f_globals</code>, <code>tb_frame</code>, <code>co_consts</code> and their like); and <code>format</code>,
+<code>format_map</code> and <code>mro</code>, which read an attribute by a name held in a string or climb to <code>object</code>. A script
+uses an f-string where it would have used <code>format</code>.</p>
+<p><code>state</code> lives in the worker. When the worker is ended, because a script computed too long or handed over
+too much, the next script gets a new worker with an empty <code>state</code>, and its result says so.</p>
 <p>A mode that hands the script the real Playwright page is a next-step item, off by default, for trusted
 deployments.</p>
 <h2 id="8-safety">8. Safety</h2>
@@ -4117,13 +4151,13 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <tbody>
 <tr>
 <td><code>enabled</code></td>
-<td><code>true</code></td>
-<td>Offer <code>browser_run</code></td>
+<td><code>false</code></td>
+<td>Offer <code>browser_run</code>. Off until the core runs in its micro VM (section 7.4)</td>
 </tr>
 <tr>
 <td><code>timeout_s</code> / <code>max_timeout_s</code></td>
 <td>60 / 300</td>
-<td>Per script</td>
+<td>How long a script may compute. The time its steps take in the browser is not counted</td>
 </tr>
 <tr>
 <td><code>max_steps</code></td>
@@ -4133,7 +4167,22 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <tr>
 <td><code>max_output_chars</code></td>
 <td>12000</td>
-<td>Printed output and final value</td>
+<td>Printed output and final value, each</td>
+</tr>
+<tr>
+<td><code>max_code_chars</code></td>
+<td>20000</td>
+<td>The longest script that is taken</td>
+</tr>
+<tr>
+<td><code>max_message_chars</code></td>
+<td>1000000</td>
+<td>The most a script may hand the core at once</td>
+</tr>
+<tr>
+<td><code>max_memory_mb</code></td>
+<td>512</td>
+<td>What the worker may hold, on a system that enforces such a limit</td>
 </tr>
 </tbody>
 </table></div>
@@ -6045,6 +6094,9 @@ and the page shows no glow or pointer of the agent, which the extension has (sec
 <p><code>browser_run</code> as section 7 describes it: the checker, the worker process, the <code>browser</code> object and its
 limits. Accepted when the agent completes a three-page data collection in one <code>browser_run</code> call on
 each of the three backends, and the milestone 4 checklist items are ticked.</p>
+<p>Built on 2026-10-06, and off by default (section 7.4). One call fills a form by the words on it and
+collects from three pages, in a real Chromium on the cloud backend (<code>tests/e2e/test_code_tool.py</code>). Not
+run yet on a person's own Chrome or in the built-in browser; nothing in it is particular to a backend.</p>
 <h3 id="145-next-in-order">14.5 Next, in order</h3>
 <ol>
 <li>Connect Codex and Hermes and run the acceptance task with each; publish their setup recipes.</li>

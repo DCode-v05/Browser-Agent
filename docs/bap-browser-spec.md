@@ -832,7 +832,8 @@ default). `browser_fill_form` already covers the most common multi-step case, fi
 |---|---|---|
 | ◐ `browser_run` | `code`; `timeout_s` (60, up to 300) | What the script printed, its final value, and the list of steps it performed. See section 7 |
 
-With it there are 29 tools. It is on by default once it exists.
+With it there are 29 tools. It is offered where a deployment turns it on (`code.enabled`); section 7.4
+says why it is off until then.
 
 ### 6.4 Next tools
 
@@ -884,14 +885,29 @@ this style of tool than with one call per action.
 | `re`, `json`, `math` | The standard modules of those names |
 | Basic built-ins | `len`, `range`, `str`, `int`, `float`, `bool`, `list`, `dict`, `set`, `tuple`, `sorted`, `min`, `max`, `sum`, `abs`, `round`, `enumerate`, `zip`, `any`, `all`, `isinstance`, `repr` |
 
+`browser` also has `go_back`, `go_forward` and `reload`. It has no method for a tool the deployment does
+not offer, none for `browser_request_human` and `browser_zoom`, and none for `browser_run` itself: a script
+cannot run a script. Values given without a name go to the tool's arguments in their order
+(`browser.navigate("https://…")`); the others are given by name.
+
 `browser.click` and `browser.type` accept `find="…"` as well as `ref=…`: the best match for that text
-is resolved first, and the call fails if nothing matches. Each method returns the same text the tool
-returns and raises `StepError` on failure.
+is resolved first, and the call fails if nothing matches. The match is looked up with `browser_find`, which
+is a step of its own, and is taken only when its name holds every word asked for: `browser_find` also
+lists what matches in part, for an agent to read and choose from, and a script must not act on a guess. For
+`browser.type` a field is taken before a label with the same words. Each method returns the same text the
+tool returns and raises `StepError` on failure. `Exception`, `ValueError`, `KeyError`, `IndexError` and
+`TypeError` are there too, to tell one failure from another.
+
+`re`, `json` and `math` are a few functions of those modules, not the modules: a module holds other
+modules, and through those the whole machine. `re` has `findall`, `finditer`, `search`, `match`,
+`fullmatch`, `sub`, `split`, `escape`, `compile` and the flags; `json` has `loads` and `dumps`.
 
 ### 7.3 Result
 
+- First, in one line, what came of it: "Ran the script: 4 steps.", or which step failed, or why the script
+  stopped. What a script printed can hold anything a page says, so it never comes first.
 - Everything printed, capped at `code.max_output_chars`.
-- The value of the script's last expression, as JSON.
+- The value of the script's last expression, as JSON, capped the same way.
 - The steps performed, one short line each, with success or failure.
 - If a step failed: which one, its message, and "earlier steps were carried out and are not undone".
 - The usual state block.
@@ -903,9 +919,22 @@ returns and raises `StepError` on failure.
 | Separate process | Scripts run in a worker process, not in the service. The worker starts on first use and is reused; it is killed and restarted when a script exceeds its time limit |
 | Checked before running | A script is parsed and rejected if it imports anything, uses a name or attribute starting with an underscore, or calls a name outside the list in 7.2 |
 | Same rules as single tools | Every `browser.` call goes through the same policy check, approvals and control state as a direct tool call. A script cannot do what the single tools cannot |
-| Bounded | Time (`code.timeout_s`), steps per run (`code.max_steps`), output size |
+| Bounded | Time (`code.timeout_s`), steps per run (`code.max_steps`), output size, the size of the script (`code.max_code_chars`), what it hands the core at once (`code.max_message_chars`) and, where the system enforces it, memory (`code.max_memory_mb`). The time is the script's own computing: a step in the browser has the limits of the tool, and a wait for a person's approval is not held against the script |
+| A person stays in charge | The call that runs a script holds neither the browser nor the agent's turn: each step is a tool call of its own. Pause, Take over and Stop take hold between two steps, as between any two calls, and each step is a row of the timeline |
+| Nothing typed is kept | The script is never logged: it holds what it types. Its steps are logged as the single calls they are |
 | Clean environment | The worker receives no secrets and no access to the service's token |
 | Honest limit | The pre-run check is defence in depth, not a security boundary; Python offers none inside a process. The boundary is the micro VM, in which the whole core runs (section 17.2) |
+| Off until there is a boundary | `code.enabled` is `false`. Where the core runs on a person's own machine there is no micro VM around it, and a page could talk an agent into writing a script. A deployment that runs the core in a micro VM, or in a container of its own, turns it on |
+
+What the check refuses, each with the line: an import; a class, `global`, `nonlocal`, `with`, `match`,
+`del`, `async for`, a decorator; a name or an attribute that begins with an underscore; a name that is
+neither in section 7.2 nor made by the script; the attributes that reach the frames and the code behind a
+value (`gi_frame`, `cr_frame`, `f_globals`, `tb_frame`, `co_consts` and their like); and `format`,
+`format_map` and `mro`, which read an attribute by a name held in a string or climb to `object`. A script
+uses an f-string where it would have used `format`.
+
+`state` lives in the worker. When the worker is ended, because a script computed too long or handed over
+too much, the next script gets a new worker with an empty `state`, and its result says so.
 
 A mode that hands the script the real Playwright page is a next-step item, off by default, for trusted
 deployments.
@@ -1839,10 +1868,13 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 
 | Key | Default | Meaning |
 |---|---|---|
-| `enabled` | `true` | Offer `browser_run` |
-| `timeout_s` / `max_timeout_s` | 60 / 300 | Per script |
+| `enabled` | `false` | Offer `browser_run`. Off until the core runs in its micro VM (section 7.4) |
+| `timeout_s` / `max_timeout_s` | 60 / 300 | How long a script may compute. The time its steps take in the browser is not counted |
 | `max_steps` | 50 | `browser.` calls per script |
-| `max_output_chars` | 12000 | Printed output and final value |
+| `max_output_chars` | 12000 | Printed output and final value, each |
+| `max_code_chars` | 20000 | The longest script that is taken |
+| `max_message_chars` | 1000000 | The most a script may hand the core at once |
+| `max_memory_mb` | 512 | What the worker may hold, on a system that enforces such a limit |
 
 **`safety`**
 
@@ -2505,6 +2537,10 @@ and the page shows no glow or pointer of the agent, which the extension has (sec
 `browser_run` as section 7 describes it: the checker, the worker process, the `browser` object and its
 limits. Accepted when the agent completes a three-page data collection in one `browser_run` call on
 each of the three backends, and the milestone 4 checklist items are ticked.
+
+Built on 2026-10-06, and off by default (section 7.4). One call fills a form by the words on it and
+collects from three pages, in a real Chromium on the cloud backend (`tests/e2e/test_code_tool.py`). Not
+run yet on a person's own Chrome or in the built-in browser; nothing in it is particular to a backend.
 
 ### 14.5 Next, in order
 
