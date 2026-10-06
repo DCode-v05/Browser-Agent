@@ -123,6 +123,7 @@ SPEC_DEFAULTS: dict[str, Any] = {
     "server.port": 8765,
     "server.token_env": "BAP_BROWSER_TOKEN",
     "server.state_file": ".bap-browser/service.json",
+    "server.extension_dir": "bap-browser-extension",
     "server.auth_wait_s": 10,
     "server.shutdown_wait_s": 3,
     "server.command_backlog": 256,

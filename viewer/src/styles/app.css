@@ -1628,6 +1628,13 @@
   margin-top: var(--space-2);
 }
 
+.studio-tip {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
 .studio-folder code {
   flex: 1;
   min-width: 0;

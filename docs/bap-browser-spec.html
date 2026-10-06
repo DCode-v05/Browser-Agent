@@ -1155,7 +1155,7 @@ machine, and it is the first cut of the design above, not all of it.</p>
 </tr>
 <tr>
 <td>Loading it</td>
-<td>By hand, once: <code>chrome://extensions</code>, Developer mode, Load unpacked, the folder the command names</td>
+<td>By hand, once: <code>chrome://extensions</code>, Developer mode, Load unpacked, the folder the command names (<code>server.extension_dir</code>). The folder is not a hidden one: a file chooser does not show a folder whose name begins with a dot</td>
 </tr>
 </tbody>
 </table></div>
@@ -4263,6 +4263,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td><code>server.state_file</code></td>
 <td><code>.bap-browser/service.json</code></td>
 <td>Holds the viewer address for the local user</td>
+</tr>
+<tr>
+<td><code>server.extension_dir</code></td>
+<td><code>bap-browser-extension</code></td>
+<td>Where the extension for Chrome is put, for a person to load it from. Not a hidden folder: the browser's file chooser must show it</td>
 </tr>
 <tr>
 <td><code>mcp.server_name</code></td>
