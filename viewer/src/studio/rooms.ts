@@ -46,6 +46,27 @@ export function roomsIn(answer: unknown): Room[] | null {
 }
 
 export type LoadRooms = () => Promise<Room[] | null>;
+/** Asks the service to open the desktop app. True when its window is open. */
+export type OpenDesktop = () => Promise<boolean>;
+
+/** The way to open the desktop app from the window (spec 9.16). Null when the service has none to open. */
+export async function desktopFrom(pageAddress: string, token: string): Promise<OpenDesktop | null> {
+  const headers = { Authorization: `Bearer ${token}` };
+  try {
+    const answer = await fetch(new URL('api/sessions', pageAddress).href, { headers, cache: 'no-store' });
+    if (!answer.ok || ((await answer.json()) as { desktop?: unknown }).desktop !== true) return null;
+  } catch {
+    return null;
+  }
+  const address = new URL('api/desktop', pageAddress).href;
+  return async () => {
+    try {
+      return (await fetch(address, { method: 'POST', headers, cache: 'no-store' })).ok;
+    } catch {
+      return false;
+    }
+  };
+}
 
 /** Asks the service which pages it has. The token goes in a header, never in the address. */
 export function roomsFrom(pageAddress: string, token: string): LoadRooms {

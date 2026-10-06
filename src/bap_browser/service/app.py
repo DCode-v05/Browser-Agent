@@ -29,7 +29,8 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from bap_browser import browser_extension
 from bap_browser.config import Config
-from bap_browser.errors import ConfigError
+from bap_browser.desktop_app import DesktopApp
+from bap_browser.errors import BapError, ConfigError
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
@@ -56,9 +57,11 @@ def create_app(
     mcp: ASGIApp | None = None,
     bridge: Bridge | None = None,
     rooms: Callable[[], list[dict[str, Any]]] | None = None,
+    desktop: DesktopApp | None = None,
 ) -> Starlette:
     """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
-    Chrome dials in. Without them the service has no such endpoints."""
+    Chrome dials in. Without them the service has no such endpoints. `desktop` is the desktop app,
+    for the window to open."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -75,17 +78,36 @@ def create_app(
     async def healthz(request: Request) -> Response:
         return Response()
 
-    async def list_sessions(request: Request) -> Response:
+    def refused(request: Request) -> Response | None:
         scheme, _, given = request.headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not signed_in(given):
             return Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+        return None
+
+    async def list_sessions(request: Request) -> Response:
+        if (no := refused(request)) is not None:
+            return no
         listed: dict[str, Any] = {
             "sessions": [{"id": name, "state": session.control} for name, session in sessions.items()]
         }
         if rooms is not None:
             # One window, several browsers: each is a page of it (spec 9.16).
             listed["rooms"] = rooms()
+        if desktop is not None:
+            # Whether the window has a desktop app to open (spec 9.16).
+            listed["desktop"] = desktop.there
         return JSONResponse(listed)
+
+    async def open_desktop(request: Request) -> Response:
+        if (no := refused(request)) is not None:
+            return no
+        if desktop is None:
+            return Response(status_code=404)
+        try:
+            opened = await asyncio.to_thread(desktop.start)
+        except BapError as failed:
+            return JSONResponse({"error": str(failed)}, status_code=409)
+        return JSONResponse({"state": "opened" if opened else "open"})
 
     async def viewer_socket(socket: WebSocket) -> None:
         origin = socket.headers.get("origin")
@@ -159,6 +181,7 @@ def create_app(
         routes=[
             Route("/healthz", healthz),
             Route("/api/sessions", list_sessions),
+            Route("/api/desktop", open_desktop, methods=["POST"]),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,

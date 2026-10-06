@@ -1628,6 +1628,20 @@
   margin-top: var(--space-2);
 }
 
+.studio-desktop {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-inline-start: auto;
+}
+
+.studio-desktop-note {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
 .studio-tip {
   display: block;
   margin-top: var(--space-2);

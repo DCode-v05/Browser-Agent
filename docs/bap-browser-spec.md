@@ -1554,6 +1554,12 @@ backends of section 4.3, side by side, each with a session and a chat of its own
   and whoever was watching is connected to it. The other pages are not touched.
 - **Where the browser is, said to the model.** Each task from the chat is handed to the model with the
   address the browser is on, so "sign in on this page" means the page the person is looking at.
+- **The desktop app, from the window.** Where the desktop app of section 14.3 is installed beside the
+  service (`server.desktop_dir`: its packages are there and its shell is built), the bar has a button,
+  "Open desktop app". It asks the service to start the app (`POST /api/desktop`, with the token), which
+  opens in a window of its own with its own browser, its own agent core and its own chat. The app that is
+  open is not started a second time; it is ended when the service stops. `GET /api/sessions` says whether
+  there is an app to open (`desktop`), and the button is not shown when there is none.
 - The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (`/demo-site/members.html`).
 
@@ -1838,6 +1844,8 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `server.public_url` | none | The address clients use to reach the service in the micro VM. None on a developer's machine |
 | `server.port` | 8765 | `bap-browser mcp` uses a free port instead |
 | `server.token_env` | `BAP_BROWSER_TOKEN` | If unset, a token is generated at start |
+| `server.desktop_dir` | `desktop` | The folder of the desktop app, for the window of three browsers to open it from |
+| `server.desktop_close_wait_s` | 5 | How long the desktop app is given to close before it is ended |
 | `server.auth_wait_s` | 10 | How long a new viewer connection may take to send its token |
 | `server.shutdown_wait_s` | 3 | How long stopping waits for open connections to finish |
 | `server.command_backlog` | 256 | How many of a viewer's commands may wait their turn. More than that are dropped |

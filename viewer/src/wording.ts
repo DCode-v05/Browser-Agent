@@ -159,6 +159,12 @@ export const W = {
     },
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
+    desktop: {
+      open: 'Open desktop app',
+      opening: 'Opening…',
+      opened: 'The desktop app is open in its own window.',
+      failed: 'The desktop app could not be opened.',
+    },
     connect: {
       title: 'Connect your Chrome',
       lead: 'The agent works in a tab of your own Chrome, with your sign-ins, and asks you site by site what it may do.',

@@ -9,7 +9,7 @@ import { Icon, type IconName } from './components/Icon';
 import { Button } from './components/StatusPanel';
 import type { Connection } from './connection/connection';
 import type { Backend } from './protocol';
-import { hasSession, type LoadRooms, type Room } from './studio/rooms';
+import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
 import { W } from './wording';
 
 const BACKEND_ICON: Record<Backend, IconName> = {
@@ -47,9 +47,11 @@ export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedd
   /** The page to open on. */
   opensOn?: string;
   onPage?(room: string): void;
+  /** Opens the desktop app, where the service has one to open. */
+  openDesktop?: OpenDesktop;
 }
 
-export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, ...app }: StudioProps) {
+export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, ...app }: StudioProps) {
   const [rooms, setRooms] = useState(given);
   const [chosen, setChosen] = useState(opensOn);
   const room = rooms.find((one) => one.id === chosen) ?? rooms[0];
@@ -102,6 +104,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             </button>
           ))}
         </div>
+        {openDesktop && <DesktopButton open={openDesktop} />}
       </header>
       <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={`studio-tab-${room.id}`}>
         {hasSession(room) ? (
@@ -112,6 +115,27 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         )}
       </div>
     </div>
+  );
+}
+
+/** Opens the desktop app: a window of its own, with its own browser and its own chat (spec 14.3). */
+function DesktopButton({ open }: { open: OpenDesktop }) {
+  const [state, setState] = useState<'idle' | 'opening' | 'opened' | 'failed'>('idle');
+  const press = async () => {
+    setState('opening');
+    setState((await open()) ? 'opened' : 'failed');
+  };
+  return (
+    <span className="studio-desktop">
+      {state !== 'idle' && (
+        <span className="studio-desktop-note" role="status">
+          {W.studio.desktop[state]}
+        </span>
+      )}
+      <Button icon="monitor" onClick={press} disabled={state === 'opening'}>
+        {W.studio.desktop.open}
+      </Button>
+    </span>
   );
 }
 

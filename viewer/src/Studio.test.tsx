@@ -9,7 +9,7 @@ import { createDemoSettings } from './demo/settings';
 import { DEFAULT_OPTIONS } from './options';
 import type { ClientCommand } from './protocol';
 import { moodOf, Studio } from './Studio';
-import { hasSession, roomsIn, type Room } from './studio/rooms';
+import { desktopFrom, hasSession, roomsIn, type Room } from './studio/rooms';
 import { W } from './wording';
 
 const cloud: Room = { id: 'cloud', backend: 'remote_headless', state: 'agent', attention: false, working: false };
@@ -104,6 +104,66 @@ describe('the window of three pages (spec 9.16)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('the button that opens the desktop app (spec 9.16)', () => {
+  function withApp(openDesktop?: () => Promise<boolean>) {
+    const user = userEvent.setup();
+    render(<Studio rooms={[cloud, chrome, builtIn]} loadRooms={async () => null} pollMs={0} openDesktop={openDesktop} connectionFor={() => new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 })} settings={createDemoSettings()} options={options} />);
+    return user;
+  }
+
+  it('is not there when the service has no app to open', () => {
+    withApp();
+    expect(screen.queryByRole('button', { name: W.studio.desktop.open })).not.toBeInTheDocument();
+  });
+
+  it('asks the service to open the app, and says it is open', async () => {
+    const openDesktop = vi.fn(async () => true);
+    const user = withApp(openDesktop);
+    await user.click(screen.getByRole('button', { name: W.studio.desktop.open }));
+    expect(openDesktop).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(W.studio.desktop.opened)).toHaveAttribute('role', 'status');
+  });
+
+  it('says so when the app could not be opened, and can be pressed again', async () => {
+    const user = withApp(async () => false);
+    await user.click(screen.getByRole('button', { name: W.studio.desktop.open }));
+    expect(await screen.findByText(W.studio.desktop.failed)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: W.studio.desktop.open })).toBeEnabled();
+  });
+});
+
+describe('asking the service for the desktop app', () => {
+  async function asked(first: unknown, second = { ok: true }) {
+    const fetched = vi.fn<(address: string, how?: RequestInit) => Promise<unknown>>();
+    fetched.mockResolvedValueOnce({ ok: true, json: async () => first }).mockResolvedValue(second);
+    vi.stubGlobal('fetch', fetched);
+    try {
+      const open = await desktopFrom('http://127.0.0.1:8765/', 'the-token');
+      return { open, opened: open ? await open() : null, calls: fetched.mock.calls };
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  it('gives no way to open an app the service does not have', async () => {
+    expect((await asked({ rooms: [] })).open).toBeNull();
+    expect((await asked({ rooms: [], desktop: false })).open).toBeNull();
+    expect((await asked({ rooms: [], desktop: 'yes' })).open).toBeNull();
+  });
+
+  it('asks with the token in a header, never in the address', async () => {
+    const { opened, calls } = await asked({ rooms: [], desktop: true });
+    expect(opened).toBe(true);
+    const [address, how] = calls[1];
+    expect(address).toBe('http://127.0.0.1:8765/api/desktop');
+    expect(how).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer the-token' } });
+  });
+
+  it('says the app did not open when the service refused', async () => {
+    expect((await asked({ rooms: [], desktop: true }, { ok: false })).opened).toBe(false);
   });
 });
 

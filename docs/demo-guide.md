@@ -26,7 +26,7 @@ The agent asks the person when it meets a sign-in, a CAPTCHA or a payment.
 | Three places for the browser, in one window | `bap-browser studio`: the cloud browser, your own Chrome and the built-in browser as three pages, each with its session and chat; a tab says when one needs you |
 | A pop-up when a person is needed | For a sign-in, a human check such as a CAPTCHA, a payment or other help: on every backend, with Take over, Couldn't do it and Look first |
 | The Chrome extension | The chat in Chrome's side panel; for your own Chrome it is the bridge: it pairs with a one-time token, reconnects by itself, asks you site by site what the agent may do, and has its own Stop |
-| A desktop app, first cut | Electron: the agent's browser and the chat in one window |
+| A desktop app, first cut | Electron: the agent's browser and the chat in one window. "Open desktop app" in the three-page window starts it |
 | `doctor` and `bench` | Which browsers launch on this machine; how fast each tool is against the budget |
 | Configuration | Every setting has a default in one file and is changed in `config.json` |
 
