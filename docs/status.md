@@ -44,6 +44,7 @@ Measured on Windows on 2026-10-06, on the files of commit `455c754`, which is `m
 | `npm --prefix viewer run test` | 400 passed |
 | `npm --prefix viewer run typecheck`, `run lint`, `run build` | No findings; it builds |
 | `npm --prefix desktop run typecheck`, `npm --prefix desktop test` | No findings; 5 passed |
+| CI on GitHub (Ubuntu), run 37406191713 on commit `60b9b4b` | Passed on 2026-10-06. It is the first green run on `main`: the two tests that had made it red were fixed |
 | Run by hand, with a made-up key and a token of my own | `agent --demo --show-browser` ended with code 0. `agent --chat --extension` opened the start page and stayed open. `serve`: an outside MCP client listed the 18 tools, the cloud-metadata address was blocked, and a call with no token got 401. The desktop app: the core attached, the chat said "Ready", and the tools read and clicked in the app's browser |
 
 ### Not checked
@@ -53,7 +54,6 @@ Measured on Windows on 2026-10-06, on the files of commit `455c754`, which is `m
 | A task with the real model key, by me | I never read `.env`. The notes of pull request #1 say your teammate ran `gpt-5.6-luna` with a key and it worked |
 | The extension's toolbar icon | The side panel was tested as a tab; a click on the icon cannot be made from a test |
 | The container image | The Docker engine was not running on this machine. The image has never been built or started |
-| CI on Linux | The two tests that made CI red were fixed and pass on Windows. The first CI run with the fix is the one this push starts |
 | `/verify` over the whole build | You asked for it at the end of the build. The build was stopped before its end, so it was not run |
 | A review by a fresh reviewer of the work since pull request #1 | Not done. The third review of 2026-10-04 was cut off by a usage limit and reported nothing |
 
