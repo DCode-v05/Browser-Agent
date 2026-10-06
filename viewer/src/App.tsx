@@ -7,6 +7,7 @@ import { BrowserPane } from './components/BrowserPane';
 import { Conversation } from './components/Conversation';
 import { agentStatus, ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
+import { ApprovalPopup } from './components/ApprovalPopup';
 import { HelpPopup } from './components/HelpPopup';
 import { Icon } from './components/Icon';
 import { SettingsScreen } from './components/SettingsScreen';
@@ -78,6 +79,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const [confirmingStop, setConfirmingStop] = useState(false);
   /** The request for help the person chose to look at first, before answering its pop-up. */
   const [lookingFirst, setLookingFirst] = useState<string | null>(null);
+  /** The approval the person chose to look at first, in the same way. */
+  const [approvalLookedAt, setApprovalLookedAt] = useState<string | null>(null);
   const [preferences, setPreferences] = useState(given);
   const [ownToasts, setOwnToasts] = useState<Toast[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
@@ -232,6 +235,15 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   // person answers it or chooses to look at the page first (spec 9.16).
   const askingForHelp = state.help !== null && state.control === 'person_requested' && lookingFirst !== state.help.id && !settingsOpen && !confirmingStop;
 
+  // An approval pops up in the same way: the agent does nothing until it is answered.
+  const askingToApprove = state.approval !== null && approvalLookedAt !== state.approval.id && !settingsOpen && !confirmingStop;
+  const answerApproval = (answer: 'once' | 'site' | 'deny') => {
+    const id = state.approval?.id ?? '';
+    send(answer === 'deny' ? { type: 'deny', id } : { type: 'approve', id, scope: answer });
+    // What asked is about to go, and the focus with it.
+    statusTitle.current?.focus();
+  };
+
   const status = (
     <StatusPanel
       // While the pop-up asks, it holds the answers: the same buttons are not offered twice.
@@ -253,19 +265,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   // What needs a person's answer or attention. It is on screen in both views.
   const cards = (
     <>
-      {state.approval && (
-        <ApprovalCard
-          approval={state.approval}
-          now={now}
-          firstRef={approvalButton}
-          onAnswer={(answer) => {
-            const id = state.approval?.id ?? '';
-            send(answer === 'deny' ? { type: 'deny', id } : { type: 'approve', id, scope: answer });
-            // The card is about to go, and the focus with it.
-            statusTitle.current?.focus();
-          }}
-        />
-      )}
+      {/* While the pop-up asks, it holds the answers: they are not offered twice. */}
+      {state.approval && !askingToApprove && <ApprovalCard approval={state.approval} now={now} firstRef={approvalButton} onAnswer={answerApproval} />}
       {state.help && <HelpCard help={state.help} now={now} cardRef={helpCard} />}
       {state.dialog && <DialogCard dialog={state.dialog} />}
       {blocked && <BlockedNotice url={blocked.url} reason={blocked.reason} />}
@@ -416,6 +417,10 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           onCouldNot={() => send({ type: 'could_not' })}
           onLater={() => setLookingFirst(state.help?.id ?? null)}
         />
+      )}
+
+      {askingToApprove && state.approval && (
+        <ApprovalPopup approval={state.approval} now={now} onAnswer={answerApproval} onLater={() => setApprovalLookedAt(state.approval?.id ?? null)} />
       )}
 
       {confirmingStop && (

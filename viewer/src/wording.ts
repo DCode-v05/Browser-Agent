@@ -69,6 +69,12 @@ export const W = {
     title: 'Approval needed',
     on: (site: string) => `On ${site}`,
     left: (time: string) => `${time} left, then this is denied`,
+    popup: {
+      title: 'The agent needs your approval',
+      hint: 'The agent waits. Nothing is done until you answer.',
+      hintEveryTime: 'The agent waits. This step is asked about every time: it is allowed once, or not at all.',
+      later: 'Look first',
+    },
     outcome: {
       allowed: 'Allowed once',
       allowed_site: 'Allowed on this site',
