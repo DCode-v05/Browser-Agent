@@ -259,16 +259,17 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
       )}
       {view.working && view.frame === 'live' && <span className="frame-glow" aria-hidden="true" />}
       {dimmed && <div className="frame-veil">{view.frame === 'connecting' && <span>{W.frame.connecting}</span>}</div>}
-      {view.label && <FrameLabel tone={view.tone} label={view.label} />}
+      {/* An agent that waits for a task is not paused: it keeps its own mark. */}
+      {view.label && <FrameLabel tone={view.tone} label={view.label} icon={view.key === 'agent' ? 'agent' : undefined} />}
       {driving && <p className="frame-hint">{W.takeover.release(options.releaseChord)}</p>}
     </div>
   );
 }
 
-function FrameLabel({ tone, label }: { tone: Tone; label: string }) {
+function FrameLabel({ tone, label, icon }: { tone: Tone; label: string; icon?: IconName }) {
   return (
     <div className="frame-label" data-tone={tone}>
-      <Icon name={TONE_ICON[tone]} />
+      <Icon name={icon ?? TONE_ICON[tone]} />
       {label}
     </div>
   );

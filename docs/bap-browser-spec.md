@@ -1502,7 +1502,9 @@ and a box to write the next task in.
   the session goes on.
 - The conversation continues from one task to the next. The pages a finished task read are dropped from it,
   so the next task reads the page as it is then and pays for none of the old ones.
-- The session ends only when a person stops it. After that the box is disabled.
+- The session ends only when a person stops it. After that the box is disabled, and the chat says how to go on: start a new session where this one was started.
+- The chat takes two parts of the column's height to the steps' one: it is what a person works in.
+- On the live picture, an agent that waits for a task carries the agent's own mark, not the pause mark: it is not paused.
 - The top of the chat says what the agent is doing in one word, with a dot and a colour: Working, Ready,
   Paused, You're in control, Waiting for you, Stopped, Not connected. While it works, the line under the
   messages names the step under way.

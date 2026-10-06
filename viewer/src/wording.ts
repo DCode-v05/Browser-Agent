@@ -149,6 +149,7 @@ export const W = {
     placeholder: 'Give the agent a task',
     placeholderWorking: 'Add the next task',
     closed: 'The session has ended',
+    startAgain: 'To work with the agent again, start a new session where you started this one.',
     send: 'Send the task',
     stopTask: 'Stop this task',
     stepsFailed: (count: number) => (count === 1 ? '1 failed' : `${count} failed`),

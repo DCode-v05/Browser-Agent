@@ -1013,7 +1013,8 @@
 /* Chat: the tasks a person gives and the agent's answers, oldest on top; the box to write in is under them. */
 
 .chat {
-  flex: 1;
+  /* The conversation is what a person works in: it gets two parts of the column to the steps' one. */
+  flex: 2;
   min-height: var(--chat-min-height);
   display: flex;
   flex-direction: column;
@@ -1151,6 +1152,11 @@
 .chat-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.chat-ended {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
 }
 
 .chat-working {

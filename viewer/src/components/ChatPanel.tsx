@@ -94,6 +94,7 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
               {status === 'working' ? doing || W.chat.working : W.chat.status[status]}
             </p>
           )}
+          {!open && status === 'stopped' && <p className="chat-ended">{W.chat.startAgain}</p>}
           <div ref={end} />
         </div>
       </div>
