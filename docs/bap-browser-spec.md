@@ -568,7 +568,11 @@ Inside the micro VM, Chromium's own sandbox stays on where the VM allows it. Whe
 `browser.chromium_sandbox` is turned off in `deploy/config.vm.json` and the micro VM itself is the
 boundary (section 17.2).
 
-`bap-browser doctor` tries each channel and reports which launch and their versions.
+`bap-browser doctor` tries each channel and reports which launch and their versions. It also says
+whether the rest of what bap-browser needs is in place: the Python version, the configuration, the built
+viewer, the extension's files, a data folder that can be written to, and whether a model key is set (it
+never shows the key). The browser the configuration uses must launch; any other that is not installed is
+only noted. It ends with code 1 when something that stops bap-browser is wrong.
 
 ### 5.3 Tabs, frames and shadow DOM
 
@@ -2168,7 +2172,16 @@ fails, run again, and report with evidence.
 ### 12.3 Bench output
 
 One row per line and browser: `line id | browser | median | p95 | target | fail | OK, WARN or FAIL`,
-then a count of each state. Results are also written to `.bap-browser/bench/<timestamp>.json`, so two runs
+then a count of each state. A line that has no scenario yet is `NOT RUN`, and one whose scenario could
+not be played is `ERROR`: neither is left out and neither passes.
+
+**As it is built now.** `bap-browser bench` reads `perf/budget.json`, which holds the 40 per-tool lines of
+section 11.3, and times 32 of them through the tool layer against small pages that ship with the bench,
+each line in a browser of its own. `--browsers chromium,chrome,msedge` runs it on several; `--only <line>`
+runs one line. It ends with code 1 only for a line that failed in this run and in the one before
+(section 11.2, rule 6). Not timed yet: `drag.refs`, `type.slowly`, `handle_dialog.confirm`,
+`evaluate.sum`, `upload.small`, `downloads.click` and the two `request_human` lines. The page-size,
+system and output-size lines (11.4 to 11.6) are not in the budget file yet. Results are also written to `.bap-browser/bench/<timestamp>.json`, so two runs
 can be compared as before and after.
 
 ### 12.4 The verify skill

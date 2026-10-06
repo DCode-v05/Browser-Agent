@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Bench big</title></head>
+<body>
+<h1>A thousand elements</h1>
+<p><label for="note">Note</label> <input id="note"></p>
+<ul id="list"></ul>
+<script>
+const list = document.getElementById('list');
+for (let i = 1; i <= 1000; i++) {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.textContent = 'Item ' + i;
+  item.append(button);
+  list.append(item);
+}
+</script>
+</body>
+</html>

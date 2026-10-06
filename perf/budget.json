@@ -1,0 +1,286 @@
+{
+  "about": "The per-tool lines of the performance budget (spec 11.3), as data. Median milliseconds. A number is changed only with a date and a reason, written into `changes`.",
+  "changes": [],
+  "lines": [
+    {
+      "id": "navigate.small",
+      "tool": "browser_navigate",
+      "scenario": "Small local page, snapshot included",
+      "target_ms": 40.0,
+      "fail_ms": 80.0
+    },
+    {
+      "id": "go_back",
+      "tool": "browser_go_back",
+      "scenario": "",
+      "target_ms": 40.0,
+      "fail_ms": 80.0
+    },
+    {
+      "id": "go_forward",
+      "tool": "browser_go_forward",
+      "scenario": "",
+      "target_ms": 40.0,
+      "fail_ms": 80.0
+    },
+    {
+      "id": "reload",
+      "tool": "browser_reload",
+      "scenario": "",
+      "target_ms": 40.0,
+      "fail_ms": 80.0
+    },
+    {
+      "id": "snapshot.small",
+      "tool": "browser_snapshot",
+      "scenario": "Small form, either mode",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "get_text.small",
+      "tool": "browser_get_text",
+      "scenario": "Small form",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "find.small",
+      "tool": "browser_find",
+      "scenario": "Small form",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "screenshot.visible",
+      "tool": "browser_screenshot",
+      "scenario": "Visible area",
+      "target_ms": 100.0,
+      "fail_ms": 200.0
+    },
+    {
+      "id": "screenshot.full",
+      "tool": "browser_screenshot",
+      "scenario": "Full page, 3,000 px tall",
+      "target_ms": 200.0,
+      "fail_ms": 400.0
+    },
+    {
+      "id": "screenshot.labels",
+      "tool": "browser_screenshot",
+      "scenario": "With ref labels",
+      "target_ms": 150.0,
+      "fail_ms": 300.0
+    },
+    {
+      "id": "zoom.region",
+      "tool": "browser_zoom",
+      "scenario": "Region of the last screenshot",
+      "target_ms": 60.0,
+      "fail_ms": 120.0
+    },
+    {
+      "id": "click.ref.small",
+      "tool": "browser_click",
+      "scenario": "By ref, small page",
+      "target_ms": 50.0,
+      "fail_ms": 100.0
+    },
+    {
+      "id": "click.ref.big",
+      "tool": "browser_click",
+      "scenario": "By ref, 1,000-element page",
+      "target_ms": 50.0,
+      "fail_ms": 100.0
+    },
+    {
+      "id": "click.point",
+      "tool": "browser_click",
+      "scenario": "By point",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "hover.ref",
+      "tool": "browser_hover",
+      "scenario": "By ref",
+      "target_ms": 50.0,
+      "fail_ms": 100.0
+    },
+    {
+      "id": "drag.refs",
+      "tool": "browser_drag",
+      "scenario": "Ref to ref",
+      "target_ms": 120.0,
+      "fail_ms": 240.0
+    },
+    {
+      "id": "type.small",
+      "tool": "browser_type",
+      "scenario": "Fill a field, small page",
+      "target_ms": 10.0,
+      "fail_ms": 25.0
+    },
+    {
+      "id": "type.big",
+      "tool": "browser_type",
+      "scenario": "Fill a field, 1,000-element page",
+      "target_ms": 15.0,
+      "fail_ms": 30.0
+    },
+    {
+      "id": "type.slowly",
+      "tool": "browser_type",
+      "scenario": "slowly: time beyond the per-key delay, 5 characters",
+      "target_ms": 80.0,
+      "fail_ms": 160.0
+    },
+    {
+      "id": "fill_form.per_field",
+      "tool": "browser_fill_form",
+      "scenario": "Per field, four fields",
+      "target_ms": 10.0,
+      "fail_ms": 20.0
+    },
+    {
+      "id": "select_option",
+      "tool": "browser_select_option",
+      "scenario": "",
+      "target_ms": 10.0,
+      "fail_ms": 25.0
+    },
+    {
+      "id": "set_checked",
+      "tool": "browser_set_checked",
+      "scenario": "",
+      "target_ms": 50.0,
+      "fail_ms": 100.0
+    },
+    {
+      "id": "press_key.small",
+      "tool": "browser_press_key",
+      "scenario": "Small page",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "press_key.big",
+      "tool": "browser_press_key",
+      "scenario": "1,000-element page",
+      "target_ms": 10.0,
+      "fail_ms": 30.0
+    },
+    {
+      "id": "scroll.step",
+      "tool": "browser_scroll",
+      "scenario": "One step",
+      "target_ms": 60.0,
+      "fail_ms": 120.0
+    },
+    {
+      "id": "scroll_to.far",
+      "tool": "browser_scroll_to",
+      "scenario": "Element 3,000 px below",
+      "target_ms": 50.0,
+      "fail_ms": 100.0
+    },
+    {
+      "id": "wait.true",
+      "tool": "browser_wait",
+      "scenario": "Condition already true (overhead only)",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "handle_dialog.confirm",
+      "tool": "browser_handle_dialog",
+      "scenario": "Accept a confirm",
+      "target_ms": 15.0,
+      "fail_ms": 40.0
+    },
+    {
+      "id": "tabs.list",
+      "tool": "browser_tabs",
+      "scenario": "List",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "tabs.new",
+      "tool": "browser_tabs",
+      "scenario": "New blank tab",
+      "target_ms": 60.0,
+      "fail_ms": 120.0
+    },
+    {
+      "id": "tabs.switch",
+      "tool": "browser_tabs",
+      "scenario": "Switch",
+      "target_ms": 20.0,
+      "fail_ms": 60.0
+    },
+    {
+      "id": "tabs.close",
+      "tool": "browser_tabs",
+      "scenario": "Close",
+      "target_ms": 20.0,
+      "fail_ms": 60.0
+    },
+    {
+      "id": "console.read",
+      "tool": "browser_console",
+      "scenario": "Read the buffer",
+      "target_ms": 2.0,
+      "fail_ms": 10.0
+    },
+    {
+      "id": "network.read",
+      "tool": "browser_network",
+      "scenario": "Read the buffer",
+      "target_ms": 2.0,
+      "fail_ms": 10.0
+    },
+    {
+      "id": "evaluate.sum",
+      "tool": "browser_evaluate",
+      "scenario": "1+1",
+      "target_ms": 5.0,
+      "fail_ms": 15.0
+    },
+    {
+      "id": "upload.small",
+      "tool": "browser_upload_file",
+      "scenario": "One small file",
+      "target_ms": 30.0,
+      "fail_ms": 80.0
+    },
+    {
+      "id": "downloads.list",
+      "tool": "browser_downloads",
+      "scenario": "List",
+      "target_ms": 2.0,
+      "fail_ms": 10.0
+    },
+    {
+      "id": "downloads.click",
+      "tool": "browser_downloads",
+      "scenario": "Click until a small file is on disk",
+      "target_ms": 200.0,
+      "fail_ms": 500.0
+    },
+    {
+      "id": "request_human.raise",
+      "tool": "browser_request_human",
+      "scenario": "Raise the request in the viewer",
+      "target_ms": 20.0,
+      "fail_ms": 50.0
+    },
+    {
+      "id": "request_human.resume",
+      "tool": "browser_request_human",
+      "scenario": "Resume the agent after hand-back",
+      "target_ms": 100.0,
+      "fail_ms": 250.0
+    }
+  ]
+}

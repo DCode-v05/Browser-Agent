@@ -22,6 +22,8 @@ uv run bap-browser agent --chat --extension               # the same, with the c
 uv run bap-browser agent --chat --takeover                # the agent works in a tab of your own Chrome (load the extension it names, once)
 uv run bap-browser mcp                    # an MCP server over stdio, for an agent to start
 uv run bap-browser serve                  # the same tools over MCP on HTTP (port 8765), with the viewer, for an agent elsewhere
+uv run bap-browser doctor                 # which browsers launch here, and whether everything needed is in place
+uv run bap-browser bench                  # time each line of the performance budget (perf/budget.json)
 uv run bap-browser config show --sources  # the effective configuration
 uv run bap-browser config init            # write a starter config.json
 ```
