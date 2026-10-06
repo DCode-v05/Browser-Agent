@@ -20,6 +20,7 @@ from bap_browser.desktop_app import DesktopApp
 from bap_browser.service.app import LARGEST_VIEWER_MESSAGE, create_app
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.store import SettingsStore
 
 
 class Service:
@@ -34,11 +35,13 @@ class Service:
         bridge: bool = False,
         rooms: Callable[[], list[dict[str, Any]]] | None = None,
         desktop: DesktopApp | None = None,
+        settings: SettingsStore | None = None,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
         server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
         the place where the extension in a person's own Chrome dials in (spec 4.9). `desktop` is
-        the desktop app, for the window to open (spec 9.16)."""
+        the desktop app, for the window to open (spec 9.16). `settings` holds what a person chose in
+        the settings screen; with it, the service has the settings API (spec 10.2)."""
         self._config = config
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
@@ -54,6 +57,7 @@ class Service:
             self.bridge,
             rooms,
             desktop,
+            settings,
         )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s

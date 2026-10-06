@@ -34,6 +34,7 @@ from bap_browser.errors import BapError, ConfigError
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.store import Refused, SettingsStore, known_surface
 
 # The first byte of a binary message says what it carries.
 PICTURE = b"\x01"
@@ -58,10 +59,11 @@ def create_app(
     bridge: Bridge | None = None,
     rooms: Callable[[], list[dict[str, Any]]] | None = None,
     desktop: DesktopApp | None = None,
+    settings: SettingsStore | None = None,
 ) -> Starlette:
     """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
     Chrome dials in. Without them the service has no such endpoints. `desktop` is the desktop app,
-    for the window to open."""
+    for the window to open. `settings` holds what a person chose in the settings screen."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -96,6 +98,9 @@ def create_app(
         if desktop is not None:
             # Whether the window has a desktop app to open (spec 9.16).
             listed["desktop"] = desktop.there
+        if settings is not None:
+            # The settings screen is this service's to draw (spec 10.2).
+            listed["settings"] = True
         return JSONResponse(listed)
 
     async def open_desktop(request: Request) -> Response:
@@ -108,6 +113,45 @@ def create_app(
         except BapError as failed:
             return JSONResponse({"error": str(failed)}, status_code=409)
         return JSONResponse({"state": "opened" if opened else "open"})
+
+    async def read_settings(request: Request) -> Response:
+        """The settings screen is drawn from this answer (spec 10.2)."""
+        if (no := refused(request)) is not None:
+            return no
+        surface = request.query_params.get("surface", "web")
+        if settings is None or not known_surface(surface):
+            return Response(status_code=404 if settings is None else 400)
+        return JSONResponse(settings.answer(surface))
+
+    async def change_settings(request: Request) -> Response:
+        if (no := refused(request)) is not None:
+            return no
+        if settings is None:
+            return Response(status_code=404)
+        asked = await _json_object(request)
+        surface = asked.get("surface") if asked is not None else None
+        changes = asked.get("changes") if asked is not None else None
+        if not isinstance(surface, str) or not known_surface(surface) or not isinstance(changes, dict):
+            return Response(status_code=400)
+        try:
+            changed = settings.change(surface, changes)
+        except Refused as no_change:
+            # Nothing was changed: one refused change refuses them all.
+            return JSONResponse({"setting": no_change.setting, "reason": no_change.reason}, status_code=409)
+        if changed:
+            for session in list(sessions.values()):
+                await session.settings_changed(changed)
+        return JSONResponse(settings.answer(surface))
+
+    async def read_config(request: Request) -> Response:
+        """What "About this deployment" lists."""
+        if (no := refused(request)) is not None:
+            return no
+        if settings is None:
+            return Response(status_code=404)
+        drivers = (session.browser.started_driver for session in sessions.values())
+        browser = next((driver.description() for driver in drivers if driver is not None), "")
+        return JSONResponse(settings.about(browser))
 
     async def viewer_socket(socket: WebSocket) -> None:
         origin = socket.headers.get("origin")
@@ -182,6 +226,9 @@ def create_app(
             Route("/healthz", healthz),
             Route("/api/sessions", list_sessions),
             Route("/api/desktop", open_desktop, methods=["POST"]),
+            Route("/api/settings", read_settings, methods=["GET"]),
+            Route("/api/settings", change_settings, methods=["PATCH"]),
+            Route("/api/config", read_config, methods=["GET"]),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,
@@ -243,6 +290,20 @@ async def _send(socket: WebSocket, item: dict[str, Any] | bytes) -> None:
         await socket.send_bytes(PICTURE + item)
     else:
         await socket.send_text(json.dumps(item, ensure_ascii=False, separators=(",", ":")))
+
+
+async def _json_object(request: Request) -> dict[str, Any] | None:
+    """What a request carries, when that is a JSON object no larger than a person's command."""
+    body = b""
+    async for part in request.stream():
+        body += part
+        if len(body) > LARGEST_VIEWER_MESSAGE:
+            return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _command(message: Message) -> dict[str, Any] | None:

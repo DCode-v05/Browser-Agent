@@ -12,7 +12,7 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator
 
 from bap_browser.errors import ConfigError
 from bap_browser.policy.address import site_pattern
@@ -449,6 +449,13 @@ class Config(Section):
     settings: Settings = Settings()
     logging: Logging = Logging()
     bench: Bench = Bench()
+    # For each key a layer set, the layer: a file, the environment or the session. Not a setting.
+    _sources: dict[str, str] = PrivateAttr(default_factory=dict[str, str])
+
+    @property
+    def sources(self) -> Mapping[str, str]:
+        """Where each value that was set came from, for a person who asks (spec 9.12)."""
+        return self._sources
 
 
 def defaults() -> Config:
@@ -496,7 +503,9 @@ def load_config_with_sources(
         data = deep_merge(data, layer)
         for key in _leaf_keys(layer):
             sources[key] = name
-    return _validate(data, sources), sources
+    config = _validate(data, sources)
+    config._sources = dict(sources)  # pyright: ignore[reportPrivateUsage]
+    return config, sources
 
 
 def _find_file(path: str | Path | None, env: Mapping[str, str]) -> Path | None:

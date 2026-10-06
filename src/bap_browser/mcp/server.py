@@ -24,6 +24,7 @@ from bap_browser.config import Config
 from bap_browser.driver import open_session
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.store import SettingsStore
 from bap_browser.tools import Toolkit
 
 INSTRUCTIONS = (
@@ -76,9 +77,13 @@ AGENT_OVER_HTTP = "Agent over MCP"
 async def run_http(config: Config, *, open_viewer: bool) -> None:
     """Serves one session until the service is stopped: the tools over MCP on HTTP for an agent in
     another process, and the viewer for a person to watch and control what it does."""
-    session = ServiceSession(config, agent=AGENT_OVER_HTTP)
+    settings = SettingsStore(config)
+    session = ServiceSession(config, agent=AGENT_OVER_HTTP, settings=settings)
     service = Service(
-        config, {session.name: session}, mcp=build_server(session.toolkit, config.mcp.server_name)
+        config,
+        {session.name: session},
+        mcp=build_server(session.toolkit, config.mcp.server_name),
+        settings=settings,
     )
     await session.start()
     try:

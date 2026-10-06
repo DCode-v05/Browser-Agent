@@ -49,6 +49,8 @@ def write_config(folder: Path, **sections: Any) -> Path:
     data.update(sections)
     # The file that says where a service is, too: the developer may have a service of their own running.
     data["server"] = {"state_file": str(folder / "service.json"), **data.get("server", {})}
+    # And what a person saved in the settings screen: the developer's own must not reach a test.
+    data["settings"] = {"file": str(folder / "settings.json"), **data.get("settings", {})}
     path = folder / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     return path

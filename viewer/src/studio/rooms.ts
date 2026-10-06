@@ -49,19 +49,36 @@ export type LoadRooms = () => Promise<Room[] | null>;
 /** Asks the service to open the desktop app. True when its window is open. */
 export type OpenDesktop = () => Promise<boolean>;
 
-/** The way to open the desktop app from the window (spec 9.16). Null when the service has none to open. */
-export async function desktopFrom(pageAddress: string, token: string): Promise<OpenDesktop | null> {
-  const headers = { Authorization: `Bearer ${token}` };
+/** What a service says of itself when the window opens: its pages, and what it has besides. */
+export interface ServiceFacts {
+  /** Null when it shows one session, not a window of pages. */
+  rooms: Room[] | null;
+  /** It has a desktop app to open (spec 9.16). */
+  desktop: boolean;
+  /** It has the settings API (spec 10.2). Without it the viewer keeps the settings that are its own. */
+  settings: boolean;
+}
+
+export const NO_FACTS: ServiceFacts = { rooms: null, desktop: false, settings: false };
+
+/** Asks the service once, so that the window never asks for what the service does not have. */
+export async function factsFrom(pageAddress: string, token: string): Promise<ServiceFacts> {
   try {
-    const answer = await fetch(new URL('api/sessions', pageAddress).href, { headers, cache: 'no-store' });
-    if (!answer.ok || ((await answer.json()) as { desktop?: unknown }).desktop !== true) return null;
+    const answer = await fetch(new URL('api/sessions', pageAddress).href, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    if (!answer.ok) return NO_FACTS;
+    const told = (await answer.json()) as { desktop?: unknown; settings?: unknown };
+    return { rooms: roomsIn(told), desktop: told.desktop === true, settings: told.settings === true };
   } catch {
-    return null;
+    return NO_FACTS;
   }
+}
+
+/** The way to open the desktop app from the window (spec 9.16). */
+export function desktopOpener(pageAddress: string, token: string): OpenDesktop {
   const address = new URL('api/desktop', pageAddress).href;
   return async () => {
     try {
-      return (await fetch(address, { method: 'POST', headers, cache: 'no-store' })).ok;
+      return (await fetch(address, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })).ok;
     } catch {
       return false;
     }

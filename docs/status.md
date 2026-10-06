@@ -216,11 +216,30 @@ Not checked by me: the My Chrome page with a Chrome that has a visible window in
 (the extension itself was run that way, section 1g), and the pop-up on the My Chrome page with a real
 model.
 
+### 1i. Finished on 2026-10-06: the settings API, and the pop-up for an approval
+
+The settings screen of a live session is now the service's own (spec 10.2):
+
+| Part | What it does |
+|---|---|
+| The catalogue | 15 settings, each defined once: its group, the surfaces it is on, the configuration key it changes, and how a person's value is limited by the deployment's |
+| `GET /api/settings`, `PATCH /api/settings`, `GET /api/config` | The screen is drawn from the answer; a change is saved as it is made; a refused change says which setting and why (409) |
+| A person tightens, never loosens | More approvals but not fewer; blocked sites added to the deployment's; allowed sites only narrowed; what the deployment turned off stays off; a locked setting is shown and cannot be changed |
+| A change reaches the running session | From the agent's next tool call: the site lists, the tools on offer, approvals, the event log, the picture quality |
+| Kept | In `settings.file`, for the person alone to read; a value that no longer holds is passed over |
+| The pop-up for an approval | "The agent needs your approval", over the page, on every backend |
+
+Tests: 28 for the store, 18 for the API on a running service, 1 in a real browser that changes settings
+as a person does (`tests/viewer/test_live_settings.py`), 7 for the viewer's side.
+
+Seen on the way, and left as it is: with "Ask before: Every action", opening a blocked site first asks for
+approval and is refused only after the answer. The refusal could come first.
+
 ### 2. Not started
 
 | What | Note |
 |---|---|
-| The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
+| Settings, the rest | Clear browsing data; My Chrome, In my Chrome and Approved sites (the bridge's); the desktop app's three; notifications |
 | Bench, the rest | 8 of the 40 per-tool lines have no scenario yet; the page-size, system and output-size lines (spec 11.4 to 11.6) are not in the budget file; the verify skill is not in the repository |
 | Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |

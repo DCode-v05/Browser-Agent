@@ -281,6 +281,7 @@ export const W = {
     locked: 'Set by your organisation',
     loading: 'Loading settings…',
     failed: 'The settings could not be loaded.',
+    notSaved: 'Not saved: the service did not answer. Try again.',
     refused: {
       locked: "This can't be changed here: your organisation requires it.",
       would_loosen: "This can't be loosened here: your organisation requires it.",

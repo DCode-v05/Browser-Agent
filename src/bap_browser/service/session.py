@@ -15,6 +15,7 @@ from bap_browser.driver.base import Box, Driver, Happened, MouseButton, TabInfo
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession
 from bap_browser.errors import BapError
 from bap_browser.service.events import EventHub
+from bap_browser.settings.store import SettingsStore
 from bap_browser.tools.gate import Admission
 from bap_browser.tools.toolkit import Toolkit
 
@@ -48,10 +49,17 @@ class ServiceSession:
         pictures: bool = True,
         backend: str | None = None,
         on_restart: Callable[[], None] | None = None,
+        settings: SettingsStore | None = None,
     ) -> None:
         """`backend` names where the browser is, when that is not what the configuration says: a
         person's own Chrome, or the browser built into the app (spec 4.3). `on_restart` is told when
-        a person asks, after this session has ended, for a new one in its place."""
+        a person asks, after this session has ended, for a new one in its place. `settings` holds
+        what a person chose in the settings screen: it is laid over `config` (spec 10.1)."""
+        # What the deployment and this session's own options give, before a person's settings.
+        self._given = config
+        self._settings = settings
+        if settings is not None:
+            config = settings.apply_to(config, backend)
         self.config = config
         self.name = name
         self.hub = EventHub(config.viewer.history_events)
@@ -122,6 +130,23 @@ class ServiceSession:
         if self._pictures:
             await driver.start_frames(self._picture, getattr(viewer.quality_levels, viewer.quality))
         self._heartbeat = asyncio.create_task(self._keep_viewers_current())
+
+    async def settings_changed(self, changes: Mapping[str, Any]) -> None:
+        """A person changed their settings (spec 10.2). What is decided call by call follows at the
+        agent's next call; what the browser was started with waits for the next session."""
+        if self._settings is None or self.control == "ended":
+            return
+        before = self.config
+        self.config = config = self._settings.apply_to(self._given, self._backend)
+        self.browser.reconfigure(config)
+        self.toolkit.reconfigure()
+        self.hub.publish({"type": "settings_changed", "changes": dict(changes)})
+        driver = self.browser.started_driver
+        if self._pictures and driver is not None and config.viewer.quality != before.viewer.quality:
+            await driver.stop_frames()
+            await driver.start_frames(
+                self._picture, getattr(config.viewer.quality_levels, config.viewer.quality)
+            )
 
     async def close(self, reason: EndReason = "agent", detail: str | None = None) -> None:
         """Ends the session at once: viewers are told, waiting calls are let go, the browser closes."""
