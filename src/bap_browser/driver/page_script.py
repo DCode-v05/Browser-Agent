@@ -89,6 +89,19 @@ class PageScript:
             return True
         return True
 
+    async def turn_passed(self) -> bool:
+        """Lets the page do what an action has just set going, without waiting for anything to be
+        drawn. False means the document went away: a navigation."""
+        try:
+            await self._within(self._reply_ms / 1000, self._call("turn", {}))
+        except _DocumentGone:
+            self._context_id = None
+            return False
+        except TimeoutError:
+            # A page too busy to answer is still the same document.
+            return True
+        return True
+
     async def object_of(self, ref: str) -> str | None:
         """The browser's own handle on the element a ref names, for a question only the browser can
         answer about it. None when the ref names nothing."""

@@ -188,6 +188,7 @@ class Happened:
         "dialog_closed",
         "download",
         "blocked",
+        "file_chooser",
     ]
     text: str
     """As the agent is told, in the state block of its next result."""

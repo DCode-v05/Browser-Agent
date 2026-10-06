@@ -1454,6 +1454,7 @@ not as the engine.</p>
 <ul>
 <li>Actions by ref wait until the element is visible, stable, enabled and not covered by another element, up to <code>browser.timeouts.action_ms</code>. When the wait runs out, the result says which of these failed and, for a covered element, what covers it.</li>
 <li><strong>No fixed pauses.</strong> After an action the engine waits for the page to settle (no navigation in flight, scroll position steady) up to a configured ceiling, and returns as soon as it has.</li>
+<li><strong>How an action learns that the page is leaving.</strong> The page says so itself, to whoever listens to it: when it sets out for another page (a link, a form, a script) and when it opens a window. After an action the engine gives the page one turn of its own queue and asks it a question; what the page said arrives before the answer. Only when it did set out does the engine wait for the new page. A page that leaves some time after the action is not seen leaving by that action's result; the next result shows where the browser is.</li>
 <li>After an action the result states whether the page navigated and to where.</li>
 <li>Scrolling reports the new position and whether the bottom was reached.</li>
 <li>Key names are accepted in every common dialect (<code>ctrl+a</code>, <code>Control+A</code>, <code>cmd+shift+t</code>, <code>Return</code>, <code>ESC</code>, <code>PageDown</code>) and normalised.</li>
@@ -1490,7 +1491,7 @@ finish, and the next result says so.</p>
 viewer as a card, because the live picture cannot show native dialogs.</p>
 <h3 id="58-files">5.8 Files</h3>
 <ul>
-<li><strong>Uploads</strong> work through file inputs and through custom upload buttons. A path must be inside <code>browser.uploads.allowed_dirs</code>. The tool needs approval by default.</li>
+<li><strong>Uploads</strong> work through file inputs and through custom upload buttons. Each tab listens for file choosers from its start: one that a plain click opens is closed with nothing chosen, and the agent is told to give files with <code>browser_upload_file</code>. A path must be inside <code>browser.uploads.allowed_dirs</code>. The tool needs approval by default.</li>
 <li><strong>Downloads</strong> are saved to <code>browser.downloads.dir</code> with duplicate names numbered. A download larger than <code>max_size_mb</code> is not kept. Its size is checked when it has arrived, not while it arrives: a known limit. A name the page suggests is never used as a path: the file is saved inside the folder under a name of its own.</li>
 <li>Browser permission prompts are never shown. Permissions come only from <code>browser.permissions</code>.</li>
 </ul>

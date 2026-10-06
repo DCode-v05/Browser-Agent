@@ -20,6 +20,7 @@ from playwright.async_api import (
     ConsoleMessage,
     Dialog,
     Download,
+    FileChooser,
     Frame,
     Page,
     Request,
@@ -244,6 +245,8 @@ class _Tab:
     pixel: float = 1.0
     """Page pixels per pixel of the last screenshot of what the browser shows."""
     shot: _Taken | None = None
+    choosing: asyncio.Future[FileChooser] | None = None
+    """Set while an upload waits for the file chooser its click opens."""
     opening: list[tuple[str, str]] | None = None
     """While the agent's own navigation is under way: the addresses the policy refused on its way."""
     main_frame_id: str = ""
@@ -461,6 +464,10 @@ class PlaywrightDriver:
         page.on("framenavigated", lambda frame: self._on_frame_navigated(tab, frame))
         page.on("close", lambda _: self._forget(tab))
         page.on("download", lambda download: self._spawn(self._save(download)))
+        # Listened for from the start, so that the browser hands every file chooser to this driver.
+        # One that is asked for only at the moment of an upload can open before the browser has
+        # heard that it is wanted, and is then never seen (and no later one opens).
+        page.on("filechooser", lambda chooser: self._on_file_chooser(tab, chooser))
         if browser.capture.console:
             page.on("console", lambda message: self._on_console(tab, message))
             page.on("pageerror", lambda error: self._on_page_error(tab, error))
@@ -475,11 +482,13 @@ class PlaywrightDriver:
             wanted = {"urlPattern": "*"} if everything else {"urlPattern": "*", "resourceType": "Document"}
             cdp.on("Fetch.requestPaused", lambda paused: self._spawn(self._judge_request(tab, paused)))
             await cdp.send("Fetch.enable", {"patterns": [wanted]})
-            tab.main_frame_id = (await cdp.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
         cdp.on("Page.screencastFrame", lambda frame: self._on_picture(tab, frame))
         cdp.on("Page.windowOpen", lambda _: self._window_opening())
-        # The page says when it opens a window only to one who has asked to hear about the page.
+        cdp.on("Page.frameRequestedNavigation", lambda asked: self._on_leaving(tab, asked))
+        # The page says when it opens a window, or sets out for another page, only to one who has
+        # asked to hear about the page.
         await cdp.send("Page.enable")
+        tab.main_frame_id = (await cdp.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
         self._tabs[tab_id] = tab
         return tab
 
@@ -1627,21 +1636,25 @@ class PlaywrightDriver:
         tab = self._current()
         point = await self._point_under_pointer(tab, ref)
         described = point["describe"]
+        waiting: asyncio.Future[FileChooser] = asyncio.get_running_loop().create_future()
+        tab.choosing = waiting
         try:
             # The element is clicked as a person would click it, and the file chooser that opens is
             # given the files. No chooser is ever shown on a screen.
-            async with tab.page.expect_file_chooser(
-                timeout=self._config.browser.timeouts.settle_ms
-            ) as opening:
-                await self._click(tab, point["x"], point["y"], ref, "left", 1, ())
-            chooser = await opening.value
-        except PlaywrightTimeoutError:
+            await self._click(tab, point["x"], point["y"], ref, "left", 1, ())
+            chooser = await asyncio.wait_for(waiting, self._config.browser.timeouts.settle_ms / 1000)
+        except TimeoutError:
             raise BadInput(
                 f"Clicked {ref} ({described}) and no file chooser opened. Give the ref of a file field, "
                 "or of the button that opens the file chooser.",
                 reason="no file chooser opened",
             ) from None
+        finally:
+            tab.choosing = None
         if len(paths) > 1 and not chooser.is_multiple():
+            # The chooser is closed with nothing chosen: one left open would keep the next from opening.
+            with contextlib.suppress(PlaywrightError):
+                await chooser.set_files([])
             raise BadInput(
                 f"{ref} ({described}) takes one file, and {len(paths)} were given.",
                 reason="it takes one file",
@@ -1654,6 +1667,25 @@ class PlaywrightDriver:
                 reason="the browser did not take the files",
             ) from exc
         return ActionOutcome(described)
+
+    def _on_file_chooser(self, tab: _Tab, chooser: FileChooser) -> None:
+        if tab.choosing is not None and not tab.choosing.done():
+            tab.choosing.set_result(chooser)
+            return
+        # Nobody asked for it: a click opened it. It is closed with nothing chosen, and the agent
+        # is told how a file is given.
+        self._spawn(self._close_chooser(chooser))
+        self._tell(
+            Happened(
+                "file_chooser",
+                "a file chooser opened and was closed: give files with browser_upload_file",
+            )
+        )
+
+    @staticmethod
+    async def _close_chooser(chooser: FileChooser) -> None:
+        with contextlib.suppress(PlaywrightError):
+            await chooser.set_files([])
 
     def downloads(self) -> list[SavedFile]:
         return list(self._downloads)
@@ -1835,7 +1867,10 @@ class PlaywrightDriver:
         """Waits for a navigation the action started, and for a window it opened. Returns the new
         address of the tab, or None if it went nowhere."""
         timeouts = self._config.browser.timeouts
-        document_alive = await tab.script.frames_passed(SETTLE_FRAMES, timeouts.frame_ms)
+        # The page is given its turn to do what the action set going. It says at once when it sets
+        # out for another page or opens a window, and what it says arrives here before the answer
+        # to this question does: so nothing has to be waited for that is not happening (spec 11.3).
+        document_alive = await tab.script.turn_passed()
         if tab.id not in self._tabs:
             # The action closed its own tab.
             return None
@@ -1862,6 +1897,15 @@ class PlaywrightDriver:
         # Some pages never fire the load event. The wait has a ceiling, and reaching it is not a failure.
         with contextlib.suppress(PlaywrightTimeoutError):
             await tab.page.wait_for_load_state("load", timeout=self._config.browser.timeouts.load_wait_ms)
+
+    @staticmethod
+    def _on_leaving(tab: _Tab, asked: dict[str, Any]) -> None:
+        """The page has set out for another page in this tab: a link, a form, a script."""
+        if (
+            asked.get("frameId") == tab.main_frame_id
+            and asked.get("disposition", "currentTab") == "currentTab"
+        ):
+            tab.navigations += 1
 
     @staticmethod
     def _on_request(tab: _Tab, request: Request) -> None:

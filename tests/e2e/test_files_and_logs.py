@@ -80,6 +80,15 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
         )
         assert wrong.is_error and "no file chooser opened" in wrong.text
 
+        # A plain click on a file field opens a chooser nobody asked for. It is closed, the agent is
+        # told how a file is given, and the next upload finds the field as free as before.
+        clicked = await tools.call("browser_click", {"ref": field})
+        told = clicked.text + (await tools.call("browser_wait", {"seconds": 0.3})).text
+        assert "[events] a file chooser opened and was closed: give files with browser_upload_file" in told
+        again = await tools.call("browser_upload_file", {"ref": field, "paths": ["photo.txt"]})
+        assert again.text.startswith(f"Uploaded photo.txt via {field}"), again.text
+        assert "Chosen: photo.txt (my photo)" in (await tools.call("browser_get_text", {})).text
+
 
 async def test_an_upload_waits_for_a_person_and_is_not_offered_where_it_could_never_be_allowed(
     make_config: Callable[..., Config], tmp_path: Path, site: str
