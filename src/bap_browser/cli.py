@@ -75,6 +75,25 @@ def _parser() -> argparse.ArgumentParser:
     )
     serve.set_defaults(run=_serve)
 
+    doctor = commands.add_parser(
+        "doctor", help="check that this machine has what bap-browser needs, and which browsers launch here"
+    )
+    doctor.add_argument("--config", help="path of config.json")
+    doctor.set_defaults(run=_doctor)
+
+    bench = commands.add_parser(
+        "bench", help="time each line of the performance budget and say how it stands (spec 11)"
+    )
+    bench.add_argument("--config", help="path of config.json")
+    bench.add_argument(
+        "--browsers",
+        default=None,
+        help="the browsers to run on, by channel and with commas: chromium,chrome,msedge "
+        "(default: the configured one)",
+    )
+    bench.add_argument("--only", action="append", default=[], help="run this line only; may be repeated")
+    bench.set_defaults(run=_bench)
+
     agent = commands.add_parser(
         "agent", help="run the reference agent on a task, with the viewer to watch and control it"
     )
@@ -163,6 +182,39 @@ def _config_init(args: argparse.Namespace) -> int:
 def _config_doc(args: argparse.Namespace) -> int:
     print(reference_markdown(), end="")
     return 0
+
+
+def _doctor(args: argparse.Namespace) -> int:
+    config, sources = load_config_with_sources(args.config)
+    # Imported here so that the config commands start without loading the browser library.
+    from bap_browser import doctor
+
+    found = asyncio.run(doctor.examine(config, sources, os.environ))
+    print(doctor.report(found))
+    return 0 if doctor.healthy(found) else 1
+
+
+def _bench(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    # Imported here so that the config commands start without loading the browser library.
+    from bap_browser.bench import runner
+
+    lines = runner.load_budget(Path(config.bench.budget_file))
+    unknown = [name for name in args.only if name not in {line.id for line in lines}]
+    if unknown:
+        raise ConfigError(f"the budget has no line {', '.join(unknown)}")
+    browsers = args.browsers.split(",") if args.browsers else [config.browser.channel]
+    results = Path(config.bench.results_dir)
+    before = runner.failed_before(results)
+    measured = asyncio.run(runner.run(config, lines, browsers, args.only))
+    print(runner.report(measured))
+    print(f"Written to {runner.save(measured, results)}", file=sys.stderr)
+    counted = runner.blocking(measured, before)
+    if counted:
+        # A failure counts once it has been seen in two runs one after the other (spec 11.2).
+        named = ", ".join(f"{m.line} on {m.browser}" for m in counted)
+        print(f"Failed in this run and the one before: {named}", file=sys.stderr)
+    return 1 if counted else 0
 
 
 def _mcp(args: argparse.Namespace) -> int:

@@ -128,12 +128,33 @@ judged too. 7 tests (`tests/e2e/test_network_policy.py`), which also check that 
 never asked for anything. Known limit: the first request of a new window may reach the network before
 the window is closed.
 
+### 1e. Finished on 2026-10-06: `doctor`, and a first bench
+
+`uv run bap-browser doctor` says which browsers launch on this machine and whether the rest is in
+place. On this Mac: Chromium 153, Chrome 154 and Edge 154 launch; everything else is in place.
+
+`uv run bap-browser bench` times 32 of the 40 per-tool lines of the budget (`perf/budget.json`).
+Measured on this Mac on 2026-10-06, Chromium, 30 runs after 5 warm-up runs:
+
+| State | Lines |
+|---|---|
+| OK | 23 |
+| WARN (over the target, under the fail limit) | 5: `click.ref.small`, `click.ref.big`, `hover.ref`, `set_checked` (83 ms against 50), `scroll.step` (67 against 60) |
+| FAIL | 4: `click.point` (33 ms against 5), `press_key.small` (34 against 5), `press_key.big` (33 against 10), `select_option` (33 against 10) |
+| NOT RUN | 8, which have no scenario yet |
+
+Why the four fail: after every action the driver waits two animation frames, 33 ms, to see whether the
+action started a navigation. A click by ref waits five frames in all (two to see the element hold still,
+one to see it is still under the pointer, two to settle). The budget's targets come from a prototype that
+did not wait. Nothing was changed to make them pass: it is a finding, to be decided. The cure would be to
+learn of a navigation from the browser's own events instead of waiting for frames.
+
 ### 2. Not started
 
 | What | Note |
 |---|---|
 | The settings API | The settings screen of a live session still offers only colour mode and the agent's pointer |
-| Bench, `perf/budget.json`, `bap-browser doctor`, the verify skill in the repository | None exists |
+| Bench, the rest | 8 of the 40 per-tool lines have no scenario yet; the page-size, system and output-size lines (spec 11.4 to 11.6) are not in the budget file; the verify skill is not in the repository |
 | Take-over Chrome, the rest | One message per driver operation, the extension's own check of the element before a consequential action, more than one tab, pairing from a web client, a core that runs in a micro VM |
 | Desktop app, the rest | An installer, settings, running without `uv` and this folder |
 | The micro VM | The image has never been built, started or deployed |
