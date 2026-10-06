@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logs</title>
+</head>
+<body>
+<h1>Logs</h1>
+<button id="fetch">Fetch the welcome page</button>
+<button id="break">Break</button>
+<button id="chatter">Chatter</button>
+<img src="missing.png" alt="A picture that is not there">
+<script>
+window.answer = { total: 42, items: ['a', 'b'] };
+console.debug('starting up');
+console.log('page ready');
+console.warn('careful now');
+console.error('went wrong');
+document.getElementById('fetch').addEventListener('click', async () => {
+  await fetch('welcome.html?name=Fetched');
+  console.info('fetched');
+});
+document.getElementById('break').addEventListener('click', () => { null.nothing; });
+document.getElementById('chatter').addEventListener('click', () => {
+  for (let line = 1; line <= 80; line++) console.log('chatter ' + line);
+});
+</script>
+</body>
+</html>

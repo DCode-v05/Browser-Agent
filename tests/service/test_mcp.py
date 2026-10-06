@@ -10,9 +10,10 @@ from mcp import Client, StdioServerParameters
 from bap_browser.config import Config
 from bap_browser.driver import open_session
 from bap_browser.mcp.server import INSTRUCTIONS, build_server
-from bap_browser.tools import TOOLS, Toolkit
+from bap_browser.tools import Toolkit, tools_for
 
-TOOL_NAMES = [tool.name for tool in TOOLS]
+# What a deployment with the default configuration offers: every tool but browser_evaluate.
+TOOL_NAMES = [tool.name for tool in tools_for(Config())]
 
 
 def ref_of(text: str, element: str) -> str:

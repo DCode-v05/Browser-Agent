@@ -46,6 +46,7 @@ def test_default_context() -> None:
         "viewport": {"width": 1280, "height": 800},
         "ignore_https_errors": False,
         "java_script_enabled": True,
+        "accept_downloads": True,
     }
 
 
@@ -64,6 +65,7 @@ def test_context_passes_the_emulation_settings_through() -> None:
         "no_viewport": True,
         "ignore_https_errors": False,
         "java_script_enabled": True,
+        "accept_downloads": True,
         "locale": "en-IN",
         "timezone_id": "Asia/Kolkata",
         "color_scheme": "dark",

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -64,6 +65,26 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
             return f"Waiting{_awaited(arguments)}"
         case "browser_request_human":
             return _row("Asking for help: ", _reason(arguments), "")
+        case "browser_screenshot":
+            return "Taking a screenshot"
+        case "browser_zoom":
+            return "Looking closer at the screenshot"
+        case "browser_drag":
+            return _row("Dragging ", _dragged(arguments, target), "")
+        case "browser_handle_dialog":
+            return "Dismissing the dialog" if arguments.get("action") == "dismiss" else "Accepting the dialog"
+        case "browser_tabs":
+            return _fit(_TABS_DOING.get(_tab_action(arguments), "Looking at the tabs") + _tab(arguments))
+        case "browser_console":
+            return "Reading the console"
+        case "browser_network":
+            return "Reading the network log"
+        case "browser_evaluate":
+            return "Running a script in the page"
+        case "browser_upload_file":
+            return _row("Uploading ", _files(arguments), "")
+        case "browser_downloads":
+            return "Listing the downloads"
     return _fit(tool)
 
 
@@ -108,6 +129,26 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
             return f"Waited{_awaited(arguments)}"
         case "browser_request_human":
             return _row("Asked for help: ", _reason(arguments), "")
+        case "browser_screenshot":
+            return "Took a screenshot"
+        case "browser_zoom":
+            return "Looked closer at the screenshot"
+        case "browser_drag":
+            return _row("Dragged ", _dragged(arguments, target), "")
+        case "browser_handle_dialog":
+            return "Dismissed the dialog" if arguments.get("action") == "dismiss" else "Accepted the dialog"
+        case "browser_tabs":
+            return _fit(_TABS_DONE.get(_tab_action(arguments), "Looked at the tabs") + _tab(arguments))
+        case "browser_console":
+            return "Read the console"
+        case "browser_network":
+            return "Read the network log"
+        case "browser_evaluate":
+            return "Ran a script in the page"
+        case "browser_upload_file":
+            return _row("Uploaded ", _files(arguments), "")
+        case "browser_downloads":
+            return "Listed the downloads"
     return _fit(tool)
 
 
@@ -149,7 +190,64 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
             return f"wait{_awaited(arguments)}" if _awaited(arguments) else "finish waiting"
         case "browser_request_human":
             return "get help"
+        case "browser_screenshot":
+            return "take a screenshot"
+        case "browser_zoom":
+            return "look closer at the screenshot"
+        case "browser_drag":
+            return f"drag {_dragged(arguments, target)}".rstrip()
+        case "browser_handle_dialog":
+            return "answer the dialog"
+        case "browser_tabs":
+            return _TABS_TO_DO.get(_tab_action(arguments), "look at the tabs") + _tab(arguments)
+        case "browser_console":
+            return "read the console"
+        case "browser_network":
+            return "read the network log"
+        case "browser_evaluate":
+            return "run a script in the page"
+        case "browser_upload_file":
+            return f"upload {_files(arguments)}"
+        case "browser_downloads":
+            return "list the downloads"
     return f"run {tool}"
+
+
+_TABS_DOING = {
+    "list": "Listing the tabs",
+    "new": "Opening a tab",
+    "switch": "Switching to",
+    "close": "Closing",
+}
+_TABS_DONE = {"list": "Listed the tabs", "new": "Opened a tab", "switch": "Switched to", "close": "Closed"}
+_TABS_TO_DO = {"list": "list the tabs", "new": "open a tab", "switch": "switch to", "close": "close"}
+
+
+def _tab_action(arguments: Mapping[str, Any]) -> str:
+    action = arguments.get("action")
+    return action if isinstance(action, str) else ""
+
+
+def _tab(arguments: Mapping[str, Any]) -> str:
+    """The tab a switch or a close names, to follow the verb."""
+    if arguments.get("action") not in ("switch", "close"):
+        return ""
+    tab = arguments.get("tab_id")
+    return f" {tab}" if isinstance(tab, str) and re.fullmatch(r"t\d+", tab) else " the tab"
+
+
+def _dragged(arguments: Mapping[str, Any], target: Located | None) -> str:
+    """What a drag picks up: the element it starts on."""
+    return _element({"ref": arguments.get("from_ref")}, target)
+
+
+def _files(arguments: Mapping[str, Any]) -> str:
+    """The files of an upload by name, without their folders."""
+    paths = arguments.get("paths")
+    if not isinstance(paths, list) or not paths or not all(isinstance(path, str) for path in paths):
+        return "a file"
+    first = PurePosixPath(paths[0].replace("\\", "/")).name or "a file"
+    return first if len(paths) == 1 else f"{first} and {len(paths) - 1} more"
 
 
 def _reason(arguments: Mapping[str, Any]) -> str:

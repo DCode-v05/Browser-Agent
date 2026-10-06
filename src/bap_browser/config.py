@@ -133,6 +133,10 @@ class Capture(Section):
     max_console_entries: int = setting(500, "Per tab")
     max_network_entries: int = setting(500, "Per tab")
     max_entry_chars: int = setting(2000, "Per message")
+    read_limit: int = setting(50, "Most entries one call of `browser_console` or `browser_network` returns")
+    max_state_events: int = setting(
+        20, "What happened in the browser by itself is told in the next result: the newest so many"
+    )
 
 
 class Tabs(Section):

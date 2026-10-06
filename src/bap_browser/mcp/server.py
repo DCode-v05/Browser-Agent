@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import sys
 import webbrowser
 
@@ -10,6 +11,8 @@ from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolRequestParams,
     CallToolResult,
+    ContentBlock,
+    ImageContent,
     ListToolsResult,
     PaginatedRequestParams,
     TextContent,
@@ -42,7 +45,12 @@ def build_server(toolkit: Toolkit, name: str) -> Server:
 
     async def call_tool(ctx: ServerRequestContext, params: CallToolRequestParams) -> CallToolResult:
         result = await toolkit.call(params.name, params.arguments)
-        return CallToolResult(content=[TextContent(type="text", text=result.text)], is_error=result.is_error)
+        content: list[ContentBlock] = [TextContent(type="text", text=result.text)]
+        if result.picture is not None:
+            # Only a call that asked for a picture has one.
+            data = base64.b64encode(result.picture.data).decode("ascii")
+            content.append(ImageContent(type="image", data=data, mime_type=result.picture.mime))
+        return CallToolResult(content=content, is_error=result.is_error)
 
     return Server(
         name,

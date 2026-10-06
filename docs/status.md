@@ -4,20 +4,18 @@ Date: 2026-10-06 · Branch `main` · pushed to GitHub (`DCode-v05/Browser-Agent`
 
 ## Where things stand
 
-Work was stopped on 2026-10-06, at your word, in the middle of the ten remaining tools.
+All 28 tools of milestone 1 are built and tested. The ten that were unfinished on 2026-10-06 were
+finished the same day on the branch `wip/remaining-tools`, which is in a pull request onto `main`.
 
-- **`main` holds everything that is finished and tested.** It is the state to run and to show.
-- **The branch `wip/remaining-tools` holds the ten remaining tools, unfinished.** On it 14 tests
-  fail, 9 of them tests that pass on `main`. It is kept apart from `main` for that reason alone, and
-  goes onto `main` when its tests pass. Its plan, with what is left step by step, is on that branch:
-  `docs/plans/2026-10-06-remaining-tools.md`.
+- On that branch `uv run pytest -q` gives 902 passed and none failed (measured on macOS, Python 3.12.5).
+- What is still not built is listed under "Not completed": it is the work after the tools.
 
 ## Completed (on `main`)
 
 | # | Part | What it does | How to run it |
 |---|---|---|---|
 | 1 | Engine | Settings in one file, the address policy, redaction, the browser driver, the page as text with refs | `uv run pytest` |
-| 2 | 18 of the 28 tools | `browser_navigate`, `go_back`, `go_forward`, `reload`, `snapshot`, `get_text`, `find`, `click`, `hover`, `type`, `fill_form`, `select_option`, `set_checked`, `press_key`, `scroll`, `scroll_to`, `wait`, `request_human` | Through any of the commands below |
+| 2 | 18 of the 28 tools on `main`; all 28 on `wip/remaining-tools` | `browser_navigate`, `go_back`, `go_forward`, `reload`, `snapshot`, `get_text`, `find`, `click`, `hover`, `type`, `fill_form`, `select_option`, `set_checked`, `press_key`, `scroll`, `scroll_to`, `wait`, `request_human`; on the branch also `screenshot`, `zoom`, `drag`, `handle_dialog`, `tabs`, `console`, `network`, `evaluate`, `upload_file`, `downloads` | Through any of the commands below |
 | 3 | MCP over stdio | An outside agent starts the browser tools as a process | `uv run bap-browser mcp` |
 | 4 | MCP over HTTP, with the viewer | An agent in another process calls the tools with a bearer token while a person watches | `uv run bap-browser serve --open` |
 | 5 | Viewer | Live picture, timeline of steps, Pause, Take over, Hand back, Stop, in the BAP product's colours and typeface | `--open` on any command |
@@ -59,37 +57,35 @@ Measured on Windows on 2026-10-06, on the files of commit `455c754`, which is `m
 
 ## Not completed
 
-### 1. Started, not finished: the ten remaining tools
+### 1. Finished on 2026-10-06: the ten remaining tools
 
-On the branch `wip/remaining-tools`. The code for all ten is written. Measured there on 2026-10-06:
-`uv run pytest -q`: 865 passed, 14 failed. `ruff check` and `pyright`: no findings. `ruff format`: 8
-files not yet formatted. Nothing of it is in the spec yet, which should have come first.
+On the branch `wip/remaining-tools`. Measured there on macOS on 2026-10-06: `uv run pytest -q`: 902
+passed. `ruff format --check`, `ruff check`, `pyright`: no findings. Viewer: 400 passed.
 
-| Tool | State | Its new tests |
-|---|---|---|
-| `browser_tabs`, and pop-ups that become tabs | Works in a real browser | 7 pass |
-| `browser_handle_dialog`: alert, confirm, prompt, "leave this page?" | Works in a real browser: a dialog interrupts the action, other tools are refused until it is answered, the action then finishes | 9 pass |
-| `browser_console`, `browser_network` | Work | 2 pass |
-| `browser_evaluate` | Works; offered only when turned on, and asks first | 1 passes |
-| `browser_screenshot`, `browser_zoom` | **A real fault.** A picture that is made smaller is taken in a way that resets the screen the browser emulates (seen with a screen of double density). The cure is designed and written down in the plan, not applied | 7 pass, 2 fail |
-| `browser_upload_file` | The files reach the page. Its test reads the page before the page has read the file | 1 passes, 1 fails |
-| `browser_downloads` | Files are saved in the folder, numbered when the name is taken, refused over the size limit. One check in its test is stricter than it should be | 1 passes, 1 fails |
-| `browser_drag` | Not seen working yet: its test stops at the wording of the result before it reaches the page's answer | 1 fails |
+| Tool | State |
+|---|---|
+| `browser_tabs`, and pop-ups that become tabs | Works in a real browser |
+| `browser_handle_dialog` | Works: a dialog interrupts the action, other tools are refused until it is answered, the action then finishes |
+| `browser_console`, `browser_network` | Work |
+| `browser_evaluate` | Works; offered only when turned on, and asks first |
+| `browser_screenshot`, `browser_zoom` | Work. The fault with a dense screen is cured: a picture is taken the way Playwright takes one, and a picture that is too large is made smaller by the browser itself |
+| `browser_upload_file`, `browser_downloads` | Work |
+| `browser_drag` | Works: a slider's knob and a card dropped on a column, in a real browser |
 
-The 9 tests that pass on `main` and fail on the branch:
+What was done to finish them: the cure for pictures; the 13 failing tests; 22 new tests with the
+stand-in driver (the dialog rule, `[events]` and its cap, the timeline sentences, what a viewer is told,
+a picture over MCP and to the model, which files may be uploaded, a picture's size); the spec (5.3, 5.5,
+5.7, 5.8, 5.9, 10.3) and its page; `ruff format`. One fault was found and fixed on the way: when the
+browser had gone away, the result also said "tab t1 closed".
 
-- Six still describe a list of 18 tools: one in `test_registry.py`, two in `test_mcp.py`, one each in
-  `test_serve.py`, `test_agent_loop.py` and `test_toolkit.py`. Expected; the tests are to be brought up
-  to date.
-- Two in `test_driver_options.py` describe the browser's options without the new switch for
-  downloads. Expected, likewise.
-- One is a small fault: when the browser has gone away, the result now also says "tab t1 closed"
-  (`test_toolkit_in_process.py`).
+Run once with the real model (`gpt-5.6-luna`) on 2026-10-06: it took a screenshot, zoomed into a
+region, opened a second tab, listed and closed it, and read the console.
 
-Still to do for these tools, in order: the cure for pictures; the 14 tests; the tests not yet written
-(the dialog rule with the stand-in driver, the new timeline sentences, what a viewer is told, a
-picture over MCP and to the model, which files may be uploaded); the spec; `ruff format`; the README.
-Known limits to write into the spec: a download's size is checked when it has arrived, not while it
+The spec's page is made again with `uv run --no-project --with markdown python docs/spec_to_html.py`.
+The script is in the repository now, so it cannot be lost again. From `main`'s spec it gives the page
+that was there, byte for byte apart from empty lines.
+
+Known limits, written into the spec: a download's size is checked when it has arrived, not while it
 arrives; a window that a page opens in take-over Chrome cannot be reached; the address policy is not
 applied to a window a page opens.
 
@@ -112,19 +108,15 @@ applied to a window a page opens.
 
 | # | Question |
 |---|---|
-| 1 | The unfinished tools are on a branch, not on `main`, although you asked for one `main` branch: on `main` they would turn 9 passing tests red. Say if you want them on `main` as they are |
+| 1 | The ten tools are finished and wait in a pull request. Merge it, or say if you want them put on `main` directly |
 | 2 | The font is two files in the repository. Say if you prefer the npm package `@fontsource-variable/hanken-grotesk` |
 | 3 | `CLAUDE.md` says form values never reach a result; the spec shows the model what a field holds in a snapshot (never a password). I kept the spec. The wording in `CLAUDE.md` is yours to change |
 
 ## How to go on
 
-```bash
-git switch wip/remaining-tools
-uv run pytest tests/e2e/test_tabs.py tests/e2e/test_dialogs.py tests/e2e/test_pictures.py tests/e2e/test_files_and_logs.py -q
-```
-
-Then follow `docs/plans/2026-10-06-remaining-tools.md` on that branch from its first open box. When
-`uv run pytest` passes there, the branch goes onto `main`, and `/verify` is run over the whole build.
+Merge the pull request of `wip/remaining-tools` onto `main`. Then the list under "Not started", in the
+order the spec gives: frames in the snapshot, the settings API, the address policy at the network layer,
+the bench and `doctor`, then the rest of take-over Chrome, the desktop app and the micro VM.
 
 ## Earlier record
 

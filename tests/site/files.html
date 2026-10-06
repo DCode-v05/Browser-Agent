@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Files</title>
+</head>
+<body>
+<h1>Files</h1>
+<label>Your CV <input type="file" id="cv"></label>
+<input type="file" id="hidden" multiple style="display: none">
+<button id="attach">Attach files</button>
+<button id="plain">Not a chooser</button>
+<p id="chosen">Nothing chosen</p>
+<a href="report.txt" download>Download the report</a>
+<a href="report.txt" download="../../escape.txt">Download with a strange name</a>
+<script>
+const hidden = document.getElementById('hidden');
+document.getElementById('attach').addEventListener('click', () => hidden.click());
+for (const input of document.querySelectorAll('input[type=file]')) {
+  input.addEventListener('change', async () => {
+    const files = Array.from(input.files);
+    const texts = await Promise.all(files.map((file) => file.text()));
+    document.getElementById('chosen').textContent =
+      'Chosen: ' + files.map((file, index) => file.name + ' (' + texts[index].trim() + ')').join(', ');
+  });
+}
+</script>
+</body>
+</html>

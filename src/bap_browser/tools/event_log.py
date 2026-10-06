@@ -13,7 +13,8 @@ from bap_browser.config import Logging
 from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
-TYPED_ARGUMENTS = frozenset({"text"})
+# What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.
+TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression"})
 ADDRESS_ARGUMENTS = frozenset({"url"})
 # A key press that types a character is typed text. A named key, such as Enter, is not.
 KEYS_ARGUMENT = "keys"

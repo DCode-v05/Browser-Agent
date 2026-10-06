@@ -379,7 +379,6 @@ one place Chromium can run. A <strong>bridge</strong> is the piece on the person
 there (the extension, or the desktop app). The <strong>micro VM</strong> is the small virtual machine, one per user
 session, in which the agent and the core run. A <strong>surface</strong> is a client a person uses: web, mobile or
 desktop.</p>
-
 <h2 id="2-principles">2. Principles</h2>
 <h3 id="21-how-the-agent-sees-a-page">2.1 How the agent sees a page</h3>
 <ol>
@@ -409,7 +408,6 @@ desktop.</p>
 <li><strong>One contract, built once.</strong> The browser logic lives in one library. A backend is a thin adapter under it, and every backend gives the agent the same tools, results and events.</li>
 <li><strong>A person's own browser is protected on that person's machine.</strong> For take-over Chrome the permission checks run in the extension, and the micro VM cannot switch them off.</li>
 </ol>
-
 <h2 id="3-stack-and-project-layout">3. Stack and project layout</h2>
 <h3 id="31-stack">3.1 Stack</h3>
 <div class="tw"><table>
@@ -555,7 +553,6 @@ against its documentation for the pinned version before it is used. The stack is
     site/                      local test pages
 </code></pre>
 <p>Each folder has one purpose and a small interface, so it can be understood and tested alone.</p>
-
 <h2 id="4-architecture">4. Architecture</h2>
 <h3 id="41-shape">4.1 Shape</h3>
 <p>There is one contract: browser-MCP. The agent always speaks it to the core, and the core is one
@@ -1190,7 +1187,6 @@ and a core in a micro VM.</p>
 <li>The token, typed text and password values never appear in a log, an event or a tool result.</li>
 <li>A bridge is accepted only with a valid pairing token (section 4.9).</li>
 </ul>
-
 <h2 id="5-browser-engine">5. Browser engine</h2>
 <h3 id="51-driver-interface">5.1 Driver interface</h3>
 <p>The tool layer talks to this interface, never to Playwright directly. It is the seam between the core
@@ -1361,6 +1357,9 @@ boundary (section 17.2).</p>
 <li>On take-over Chrome the agent sees only the tabs in its own tab group. The person's other tabs do not exist for any operation.</li>
 <li>Frames, including cross-site frames, appear inside the snapshot under their <code>iframe</code> line. Refs inside a frame carry a frame prefix: <code>f2e7</code>.</li>
 <li>Open shadow roots are read as part of the page.</li>
+<li>A window that one of the agent's tabs opens becomes a tab, and the action that opened it waits for the new tab, so its own result already shows it. A window opened by anyone else in the same browser is left alone.</li>
+<li>No more than <code>browser.tabs.max_tabs</code> tabs are open: a pop-up past the limit is closed at once and the agent is told.</li>
+<li>Known limits: the address policy is not applied to the address a page opens a window at (it is applied at the network layer, when that is built); on take-over Chrome a window a page opens cannot be reached, and the agent is told so.</li>
 </ul>
 <h3 id="54-snapshot">5.4 Snapshot</h3>
 <p>The snapshot is the page as text: one line per element that matters, each with a ref.</p>
@@ -1418,6 +1417,15 @@ not as the engine.</p>
 <li><code>annotate</code> draws each interactive element's ref on the image and appends the interactive snapshot.</li>
 <li><code>browser_zoom</code> returns a region of the last screenshot at full resolution.</li>
 <li>No screenshot is taken unless a call asks for one.</li>
+<li>A picture is taken the way the browser's own driver takes one (Playwright's screenshot), never by a
+  capture with a clip and a scale on the core's own DevTools session: that resets the screen the browser
+  emulates (its density and its size). A picture of the page has one pixel to a page pixel on a screen of
+  any density; <code>browser_zoom</code> takes every pixel the screen has for its region.</li>
+<li>A picture whose longest side is over the limit is made smaller by the browser itself, in the page script
+  (<code>createImageBitmap</code> and an off-screen canvas). No image library is used. The picture's true size is read
+  from its first bytes.</li>
+<li>Over MCP a picture is an image beside the text. The reference loop sends the model the newest picture
+  only: an older one has been seen and would be paid for again on every turn.</li>
 </ul>
 <h3 id="56-actions-and-waiting">5.6 Actions and waiting</h3>
 <ul>
@@ -1451,17 +1459,22 @@ not as the engine.</p>
 </tr>
 </tbody>
 </table></div>
+<p>A call that meets an open dialog says what it is, beginning with a capital: "A confirm dialog is open
+('Proceed?') and blocks the page." The time a dialog is open does not count against an action's time limit.
+A dialog that goes away unanswered (its time ran out, or its tab closed) lets the action it interrupted
+finish, and the next result says so.</p>
 <p>An unanswered dialog is dismissed after <code>browser.dialogs.timeout_s</code>. An open dialog is also shown in the
 viewer as a card, because the live picture cannot show native dialogs.</p>
 <h3 id="58-files">5.8 Files</h3>
 <ul>
 <li><strong>Uploads</strong> work through file inputs and through custom upload buttons. A path must be inside <code>browser.uploads.allowed_dirs</code>. The tool needs approval by default.</li>
-<li><strong>Downloads</strong> are saved to <code>browser.downloads.dir</code> with duplicate names numbered. A download larger than <code>max_size_mb</code> is cancelled while in flight, not after saving.</li>
+<li><strong>Downloads</strong> are saved to <code>browser.downloads.dir</code> with duplicate names numbered. A download larger than <code>max_size_mb</code> is not kept. Its size is checked when it has arrived, not while it arrives: a known limit. A name the page suggests is never used as a path: the file is saved inside the folder under a name of its own.</li>
 <li>Browser permission prompts are never shown. Permissions come only from <code>browser.permissions</code>.</li>
 </ul>
 <h3 id="59-console-and-network-logs">5.9 Console and network logs</h3>
 <p>The last <code>max_console_entries</code> console messages and page errors, and the last <code>max_network_entries</code>
-requests (method, status, type, address), are kept per tab in memory for the diagnostic tools.</p>
+requests (method, status, type, address), are kept per tab in memory for the diagnostic tools. One call of
+<code>browser_console</code> or <code>browser_network</code> returns at most <code>browser.capture.read_limit</code> entries.</p>
 <h3 id="510-errors">5.10 Errors</h3>
 <p>Every failure is returned to the agent as a result with a message written for the model. The service
 never crashes on a bad call.</p>
@@ -1507,7 +1520,6 @@ never crashes on a bad call.</p>
 </tr>
 </tbody>
 </table></div>
-
 <h2 id="6-tools">6. Tools</h2>
 <h3 id="61-conventions">6.1 Conventions</h3>
 <ul>
@@ -1804,7 +1816,6 @@ and snapshot options for "only what changed" and "only what is visible".</p>
 actions), <code>browser_vision</code> (questions about a screenshot), <code>browser_clipboard</code>.</p>
 <h3 id="66-not-building">6.6 Not building</h3>
 <p>Any tool that solves a CAPTCHA or hides that the browser is automated.</p>
-
 <h2 id="7-code-tool">7. Code tool</h2>
 <p>Phase: milestone 4. It is built after the three backends are stable. It sits above the tool layer, so
 it works on every backend without change.</p>
@@ -1900,7 +1911,6 @@ returns and raises <code>StepError</code> on failure.</p>
 </table></div>
 <p>A mode that hands the script the real Playwright page is a next-step item, off by default, for trusted
 deployments.</p>
-
 <h2 id="8-safety">8. Safety</h2>
 <h3 id="81-address-policy">8.1 Address policy</h3>
 <p>Checked for every navigation the agent asks for and enforced again at the network layer, so redirects,
@@ -2090,7 +2100,6 @@ sign-ins live inside the desktop app, and the person signs in again there. The s
 and the same consequential-action confirmation apply, shown by the desktop app. From milestone 2 the
 same classification also applies to remote headless, where the confirmation is an approval card in the
 viewer.</p>
-
 <h2 id="9-viewer-ui-ux-and-design-system">9. Viewer: UI, UX and design system</h2>
 <h3 id="91-principles">9.1 Principles</h3>
 <ol>
@@ -2949,7 +2958,6 @@ sites from milestone 2; Show the built-in browser and the two folder settings fr
 <h3 id="913-later-in-the-viewer">9.13 Later in the viewer</h3>
 <p>Next: sign-in form, replay player, notifications, a note to the agent, typing with a phone's on-screen
 keyboard during takeover. Later: a plan card to approve before a run.</p>
-
 <h3 id="915-the-extension-the-chat-in-the-browsers-side-panel">9.15 The extension: the chat in the browser's side panel</h3>
 <p>A first step towards take-over Chrome (section 4.9), built to be shown. It gives the look of that
 backend, not its plumbing: the extension carries no browser commands, and the agent still drives the
@@ -3781,6 +3789,16 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>Per message</td>
 </tr>
 <tr>
+<td><code>capture.read_limit</code></td>
+<td>50</td>
+<td>Most entries one call of <code>browser_console</code> or <code>browser_network</code> returns</td>
+</tr>
+<tr>
+<td><code>capture.max_state_events</code></td>
+<td>20</td>
+<td>Most things that happened by themselves kept for the agent's next result (<code>[events]</code>)</td>
+</tr>
+<tr>
 <td><code>tabs.max_tabs</code></td>
 <td>20</td>
 <td></td>
@@ -4396,7 +4414,6 @@ a person's browser into the built-in browser, site by site, is a later item (sec
   &quot;settings&quot;: { &quot;locked&quot;: [&quot;page_scripts&quot;] }
 }
 </code></pre>
-
 <h2 id="11-performance-budget">11. Performance budget</h2>
 <h3 id="111-where-the-numbers-come-from">11.1 Where the numbers come from</h3>
 <p>Three kinds, never mixed in one column.</p>
@@ -5317,7 +5334,6 @@ figure exists for them; the first bench run of milestone 2 records the reference
 <p>Over a real network, the time a tool call takes on a bridged backend is the local figure plus the
 network's round-trip time for each trip. That part depends on the person's connection and is reported
 by the bench, not judged.</p>
-
 <h2 id="12-verification-loop-and-checklist">12. Verification loop and checklist</h2>
 <p>Claude runs this loop after every change: do the work, run the checks, read the results, fix what
 fails, run again, and report with evidence.</p>
@@ -5502,7 +5518,6 @@ the evidence before a change is called done.</p>
 <li class="ck"><span class="box" aria-hidden="true"></span>A script run by <code>browser_run</code> completes a multi-step task in one call, on every backend. Proof: test output.</li>
 <li class="ck"><span class="box" aria-hidden="true"></span>A script cannot import, reach underscore names, or bypass the policy. Proof: checker tests.</li>
 </ul>
-
 <h2 id="13-testing">13. Testing</h2>
 <div class="tw"><table>
 <thead>
@@ -5592,7 +5607,6 @@ the evidence before a change is called done.</p>
 </table></div>
 <p>Rules: tests use the real browser and the real service. Only the model is replaced, by a scripted
 client. Logic is written test first. Test output stays clean: expected errors are asserted, not printed.</p>
-
 <h2 id="14-delivery">14. Delivery</h2>
 <p>The order is one backend at a time: the core, the browser-MCP server and the remote headless adapter
 first; then the take-over Chrome adapter; then the bundled Chromium adapter; then the code tool. Each
@@ -5822,7 +5836,6 @@ ad blocking; native Anthropic and OpenAI toolset formats; a built-in agent loop;
 <p>CAPTCHA solving; fingerprint spoofing or any disguise of automation; proxy rotation; Firefox and WebKit;
 a browser engine or fork of our own; code under AGPL or GPL licences; Lightpanda, Camofox and Firecrawl
 back ends; developer-tooling audits (performance traces, Lighthouse, heap snapshots).</p>
-
 <h2 id="15-feature-surface">15. Feature surface</h2>
 <p>Every browser-use feature found in existing systems, plus the new ones this product adds, each with the
 phase it belongs to.</p>
@@ -8300,7 +8313,6 @@ Later = deferred · No = not building.</p>
 </tr>
 </tbody>
 </table></div>
-
 <h2 id="16-connecting-agents">16. Connecting agents</h2>
 <h3 id="161-what-the-agent-is-told">16.1 What the agent is told</h3>
 <p>The MCP server's instructions:</p>
@@ -8496,7 +8508,6 @@ configuration was wrong, and 130 on Ctrl+C.</p>
 </tr>
 </tbody>
 </table></div>
-
 <h2 id="17-running-it-windows-and-the-micro-vm">17. Running it: Windows and the micro VM</h2>
 <h3 id="171-on-windows">17.1 On Windows</h3>
 <div class="tw"><table>
@@ -8585,7 +8596,6 @@ the same file stands in for it.</p>
 </table></div>
 <p>What the image does not contain: the agent core's own code (the product adds it), any account data,
 and any credential.</p>
-
 <h2 id="18-sources">18. Sources</h2>
 <p>Research reports in <code>docs/research/</code>, each with a path and line or a URL for every claim:
 <code>hermes.md</code>, <code>betterwright.md</code>, <code>performance.md</code>, <code>uiux.md</code>, <code>video.md</code>, <code>settings.md</code>.

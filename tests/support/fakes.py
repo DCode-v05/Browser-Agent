@@ -11,13 +11,24 @@ from bap_browser.driver.base import (
     ActionOutcome,
     Box,
     Checked,
+    ConsoleLine,
+    Dragged,
     Found,
+    Happened,
     Located,
+    NetworkLine,
+    PageDialog,
+    Place,
+    SavedFile,
     ScrollPosition,
     Selected,
+    Shot,
     TabInfo,
 )
-from bap_browser.errors import StaleRef
+from bap_browser.errors import BadInput, StaleRef
+from bap_browser.results import Picture
+
+PICTURE = Picture(b"not really a picture", "image/png")
 
 SNAPSHOT = (
     'Page: Fake\nURL: https://example.com/\nScroll: 0px of 800px (viewport 800px)\n- button "Go" [ref=e1]'
@@ -41,6 +52,102 @@ class FakeDriver:
         """When set, a click waits for it: an action in progress, for as long as a test needs."""
         self.alive = True
         """Where the next navigation ends up, when that is not where it was sent."""
+        self.tell: Callable[[Happened], None] = lambda event: None
+        """Call it to say what happened in the browser by itself, as the browser would."""
+        self.open_tabs = ["t1"]
+        self.active_tab = "t1"
+        self.dialog: PageDialog | None = None
+        self._dialog_open = asyncio.Event()
+        self.pixel = 1.0
+        """Page pixels per pixel of the last screenshot."""
+        self.console_lines: list[ConsoleLine] = []
+        self.requests: list[NetworkLine] = []
+        self.saved: list[SavedFile] = []
+        self.value: Any = None
+        """What the next script gives."""
+
+    def listen(self, on_event: Callable[[Happened], None]) -> None:
+        self.tell = on_event
+
+    def open_dialog(self, dialog: PageDialog) -> None:
+        """A page opens a dialog, as it would in the middle of an action."""
+        self.dialog = dialog
+        self._dialog_open.set()
+
+    def pending_dialog(self) -> PageDialog | None:
+        return self.dialog
+
+    async def dialog_opened(self) -> None:
+        await self._dialog_open.wait()
+
+    async def answer_dialog(self, accept: bool, text: str | None) -> PageDialog:
+        if self.dialog is None:
+            raise BadInput("No dialog is open.", reason="no dialog is open")
+        answered, self.dialog = self.dialog, None
+        self._dialog_open.clear()
+        self.calls.append(("answer_dialog", {"accept": accept, "text": text}))
+        if self.hold is not None:
+            # The page goes on with what the dialog had interrupted.
+            self.hold.set()
+        return answered
+
+    def page_point(self, x: float, y: float) -> tuple[float, float]:
+        return x * self.pixel, y * self.pixel
+
+    async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
+        self.calls.append(("screenshot", {"full_page": full_page, "annotate": annotate}))
+        return Shot(PICTURE, 1280, 3000 if full_page else 800)
+
+    async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
+        self.calls.append(("zoom", region))
+        return Shot(PICTURE, round(region[2] - region[0]), round(region[3] - region[1]))
+
+    async def drag(self, start: Place, end: Place) -> Dragged:
+        self.calls.append(("drag", (start, end)))
+        return Dragged('clickable "Card A"', 'clickable "Done column"')
+
+    async def new_tab(self) -> str:
+        tab = f"t{len(self.open_tabs) + 1}"
+        self.open_tabs.append(tab)
+        self.active_tab = tab
+        self.calls.append(("new_tab", tab))
+        return tab
+
+    async def switch_tab(self, tab_id: str) -> None:
+        if tab_id not in self.open_tabs:
+            raise BadInput(f"There is no tab {tab_id}.", reason="there is no such tab")
+        self.active_tab = tab_id
+        self.calls.append(("switch_tab", tab_id))
+
+    async def close_tab(self, tab_id: str | None) -> str:
+        closed = tab_id or self.active_tab
+        self.open_tabs.remove(closed)
+        self.active_tab = self.open_tabs[-1] if self.open_tabs else ""
+        self.calls.append(("close_tab", closed))
+        return closed
+
+    def console(self, *, clear: bool) -> list[ConsoleLine]:
+        lines = list(self.console_lines)
+        if clear:
+            self.console_lines.clear()
+        return lines
+
+    def network(self, *, clear: bool) -> list[NetworkLine]:
+        lines = list(self.requests)
+        if clear:
+            self.requests.clear()
+        return lines
+
+    async def evaluate(self, expression: str) -> Any:
+        self.calls.append(("evaluate", expression))
+        return self.value
+
+    async def upload(self, ref: str, paths: Sequence[str]) -> ActionOutcome:
+        self.calls.append(("upload", {"ref": ref, "paths": list(paths)}))
+        return ActionOutcome('button "Attach files"')
+
+    def downloads(self) -> list[SavedFile]:
+        return list(self.saved)
 
     async def start(self) -> None:
         self.started += 1
@@ -56,7 +163,11 @@ class FakeDriver:
         return "Fake 1.0"
 
     async def tabs(self) -> list[TabInfo]:
-        return [TabInfo("t1", self.url, self.title, True)]
+        asking = self.dialog.tab if self.dialog else ""
+        return [
+            TabInfo(tab, self.url, self.title, tab == self.active_tab, tab == asking)
+            for tab in self.open_tabs
+        ]
 
     async def viewport(self) -> tuple[int, int]:
         return 1280, 800

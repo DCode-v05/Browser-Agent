@@ -8,6 +8,7 @@ included, as the provider's guide for stateless use asks.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import urllib.error
 import urllib.request
@@ -80,11 +81,21 @@ class OpenAIModel:
     def _input(self, messages: Sequence[Message]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         turn = 0
+        # The conversation is sent again on every turn. Only the newest picture goes with it: an
+        # older one has been seen, and would be paid for again each time.
+        newest = next(
+            (m for m in reversed(messages) if isinstance(m, ToolOutput) and m.picture is not None), None
+        )
         for message in messages:
             if isinstance(message, ToolOutput):
-                items.append(
-                    {"type": "function_call_output", "call_id": message.call.id, "output": message.text}
-                )
+                output: str | list[dict[str, str]] = message.text
+                if message is newest and message.picture is not None:
+                    data = base64.b64encode(message.picture.data).decode("ascii")
+                    output = [
+                        {"type": "input_text", "text": message.text},
+                        {"type": "input_image", "image_url": f"data:{message.picture.mime};base64,{data}"},
+                    ]
+                items.append({"type": "function_call_output", "call_id": message.call.id, "output": output})
             elif message.role == "user":
                 items.append({"role": "user", "content": message.text})
             else:
