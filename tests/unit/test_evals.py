@@ -108,7 +108,8 @@ async def test_a_task_is_kept_with_its_time_its_steps_its_tokens_and_its_trace(
     assert done["tokens_known"] is True and (done["input_tokens"], done["output_tokens"]) == (2000, 100)
     # 2,000 tokens in at 2 dollars a million, 100 out at 10.
     assert done["cost_usd"] == pytest.approx(0.005)
-    assert done["duration_ms"] >= done["model_ms"] + done["tool_ms"] > 0
+    # Each time is kept to a tenth of a millisecond, so the parts may add up a hair over the whole.
+    assert done["duration_ms"] + 1 >= done["model_ms"] + done["tool_ms"] > 0
     # The trace: every reply of the model and every step, in the order they happened.
     assert [(span["kind"], span["name"], span["ok"]) for span in done["spans"]] == [
         ("model", "model-a", True),
@@ -217,7 +218,8 @@ async def test_the_records_add_up_to_latency_time_cost_and_how_tasks_ended(
 
     latency = told["latency"]
     assert latency["tool"]["count"] == 6 and latency["model"]["count"] == 7
-    assert 15 <= latency["tool"]["p50_ms"] <= latency["tool"]["p95_ms"] <= latency["tool"]["max_ms"] < 500
+    # How fast the machine is does not matter here: only that the three are in their order.
+    assert 15 <= latency["tool"]["p50_ms"] <= latency["tool"]["p95_ms"] <= latency["tool"]["max_ms"]
     # The tool most used comes first, each with how often it failed.
     assert [(row["tool"], row["count"], row["failed"]) for row in latency["by_tool"]] == [
         ("browser_navigate", 3, 0),
@@ -227,7 +229,9 @@ async def test_the_records_add_up_to_latency_time_cost_and_how_tasks_ended(
     ]
     # What a step waited for a person is taken out of that step's time.
     upload = next(row for row in latency["by_tool"] if row["tool"] == "browser_upload_file")
-    assert upload["p50_ms"] < 35
+    waited = next(span for span in last["spans"] if span["name"] == "browser_upload_file")
+    assert waited["waited_ms"] == pytest.approx(15, abs=1)
+    assert upload["p50_ms"] == pytest.approx(waited["ms"] - waited["waited_ms"], abs=0.2)
 
     time = told["time"]
     assert time["task"]["count"] == 4 and time["task"]["p95_ms"] >= time["task"]["p50_ms"] > 0
