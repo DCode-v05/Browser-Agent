@@ -11,7 +11,7 @@ import type { Connection } from './connection/connection';
 import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
 import type { SystemsApi } from './systems/api';
-import { SystemsPage } from './systems/SystemsPage';
+import { SystemPanel, SystemsPage } from './systems/SystemsPage';
 import { W } from './wording';
 
 const BACKEND_ICON: Record<Backend, IconName> = {
@@ -19,6 +19,10 @@ const BACKEND_ICON: Record<Backend, IconName> = {
   takeover_chrome: 'person',
   bundled_chromium: 'monitor',
 };
+
+/** What is shown under a browser's tab: the browser itself with its chat, how it is set up, or what its tasks took. */
+export type RoomView = 'agent' | 'configuration' | 'evaluations';
+const ROOM_VIEWS: RoomView[] = ['agent', 'configuration', 'evaluations'];
 
 export type RoomMood = 'attention' | 'working' | 'ready' | 'person' | 'paused' | 'stopped' | 'off';
 
@@ -61,6 +65,8 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   const [chosen, setChosen] = useState(opensOn);
   /** The Systems page is shown in place of a browser's own page. */
   const [onSystems, setOnSystems] = useState(false);
+  /** What is shown under the chosen browser's tab. It stays as it is from one browser to the next. */
+  const [view, setView] = useState<RoomView>('agent');
   const room = rooms.find((one) => one.id === chosen) ?? rooms[0];
 
   useEffect(() => {
@@ -134,9 +140,34 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           {openDesktop && <DesktopButton open={openDesktop} />}
         </span>
       </header>
+      {systems && !showingSystems && (
+        // Under each browser: the browser itself, how it is set up, and what its tasks took (spec 9.17).
+        <nav className="studio-views">
+          <div className="systems-views" role="tablist" aria-label={W.studio.views(W.backend[room.backend])}>
+            {ROOM_VIEWS.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                className="systems-view"
+                aria-selected={view === name}
+                onClick={() => {
+                  // Back on the browser's own page, it shows where the browser stands now.
+                  if (name === 'agent') void refresh();
+                  setView(name);
+                }}
+              >
+                {W.studio.view[name]}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
       <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
         {showingSystems ? (
           <SystemsPage api={systems} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} />
+        ) : systems && view !== 'agent' ? (
+          <SystemPanel key={room.id} api={systems} system={room.id} view={view} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} onChanged={() => void refresh()} />
         ) : hasSession(room) ? (
           // A page keeps nothing of the page before it: each has its own session, and settings of its own.
           <App key={room.id} {...app} settings={systems ? systems.settings(room.id) : app.settings} createConnection={createConnection} embedded />

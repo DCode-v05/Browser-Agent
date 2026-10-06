@@ -9,8 +9,14 @@ their configuration (what to enable, how to manage each) and their evaluations. 
 The window has three browsers the agent can work in: **Cloud browser**, **My Chrome** and
 **Built-in browser**. Each is now a system of its own. It has its own settings, it can be turned on
 and off and started and stopped by itself, it writes its own log file, and everything its tasks took
-is recorded and shown for it alone. All of this is on one page: press **Systems** at the top right
-of the window.
+is recorded and shown for it alone.
+
+It is shown in two places:
+
+| Where | What you see |
+|---|---|
+| Under each browser's own tab | Three views of that browser: **Browser and chat**, **Configuration** and **Evaluations** |
+| **Systems**, at the top right of the window | The three browsers side by side, to compare them |
 
 | System | Name in files and addresses | What it is |
 |---|---|---|
@@ -18,8 +24,9 @@ of the window.
 | My Chrome | `chrome` | A tab of your own Chrome, through the extension |
 | Built-in browser | `builtin` | The app's own browser, which keeps its sign-ins |
 
-The Systems page has two views, **Configuration** and **Evaluations**. Each shows the three
-systems side by side, one card for each.
+The Systems page has the same two views, **Configuration** and **Evaluations**, with one card for
+each system. The card is the same in both places. The view you choose under a browser's tab stays
+as it is when you go to the next browser.
 
 ---
 
@@ -305,13 +312,15 @@ A request that cannot be done answers 409 with `{"error": "…"}`, a sentence fo
 
 1. Start the window: `uv run bap-browser studio --open`.
 2. On the Cloud browser's page, give the agent a task in the chat, and let it finish.
-3. Press **Systems**. In **Configuration**, turn "Let the agent download files" off for the Cloud
-   browser: the other two cards keep it on.
-4. Press **Show the log** on the Cloud browser's card: the steps of the task are there.
-5. Turn **Use this browser** off for the Built-in browser: its tab says "Turned off". Turn it on again.
-6. Go to **Evaluations**. The Cloud browser's card shows the task: model, time, tokens.
-7. Press **Run the checklist** on a card, and watch the lines turn to Passed.
-8. Press **Show the trace** on the task, then **Good**.
+3. Under the Cloud browser's tab, press **Configuration**, then **Evaluations**: that browser's own
+   set-up, and what the task took.
+4. Press **Systems** to see the three side by side. In **Configuration**, turn "Let the agent
+   download files" off for the Cloud browser: the other two cards keep it on.
+5. Press **Show the log** on the Cloud browser's card: the steps of the task are there.
+6. Turn **Use this browser** off for the Built-in browser: its tab says "Turned off". Turn it on again.
+7. Go to **Evaluations**. The Cloud browser's card shows the task: model, time, tokens.
+8. Press **Run the checklist** on a card, and watch the lines turn to Passed.
+9. Press **Show the trace** on the task, then **Good**.
 
 ## What it does not do
 

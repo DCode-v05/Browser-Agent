@@ -1617,6 +1617,7 @@ agent is acting) are one for the window, whichever system's screen they are chan
 
 | On a page of the window | What it is |
 |---|---|
+| Under each browser's tab | Three views of that browser: **Browser and chat** (the browser itself and its chat), **Configuration** and **Evaluations**. The last two show that system's card by itself, the same card as on the Systems page. The view stays as it is from one browser to the next, so the three are looked at one after the other |
 | The settings button | Opens the settings of that page's browser. Its first setting is "Use this browser" |
 | A browser that is turned off | Its tab says "Turned off". Its page says so, and has "Turn it on" |
 

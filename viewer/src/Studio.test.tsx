@@ -184,7 +184,7 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     const sources = new Map<string, ReturnType<typeof createDemoSettings>>();
     const changed: [string, Record<string, unknown>][] = [];
     const systems: SystemsApi = {
-      list: async () => [],
+      list: async () => rooms.map((room) => ({ ...room, enabled: room.state !== 'off', model: 'model-a', log: null, records: '/records' })),
       manage: async () => ({ ok: true }),
       log: async () => null,
       evals: async () => null,
@@ -207,6 +207,45 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
   it('has no Systems page where the service has no systems', () => {
     open();
     expect(screen.queryByRole('button', { name: W.studio.systems })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: W.studio.view.configuration })).not.toBeInTheDocument();
+  });
+
+  it('shows, under each browser’s own tab, the browser itself, how it is set up and what its tasks took', async () => {
+    const { user } = withSystems();
+    const views = screen.getByRole('tablist', { name: W.studio.views('Cloud browser') });
+    expect(within(views).getAllByRole('tab').map((one) => one.textContent)).toEqual([W.studio.view.agent, W.studio.view.configuration, W.studio.view.evaluations]);
+    expect(within(views).getByRole('tab', { name: W.studio.view.agent })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
+
+    // Configuration: that browser's card, and no other's, in place of its page.
+    await user.click(within(views).getByRole('tab', { name: W.studio.view.configuration }));
+    expect((await screen.findAllByRole('article')).map((card) => card.getAttribute('aria-label'))).toEqual(['Cloud browser']);
+    expect(screen.getByRole('region', { name: W.systems.configuration })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: `${W.systems.use}: Cloud browser` })).toBeChecked();
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
+
+    // The view stays from one browser to the next, so the three are looked at one after the other.
+    await user.click(tab(/Built-in browser/));
+    expect(screen.getByRole('tablist', { name: W.studio.views('Built-in browser') })).toBeInTheDocument();
+    expect((await screen.findAllByRole('article')).map((card) => card.getAttribute('aria-label'))).toEqual(['Built-in browser']);
+
+    await user.click(screen.getByRole('tab', { name: W.studio.view.evaluations }));
+    expect(await screen.findByRole('region', { name: W.systems.evaluations })).toBeInTheDocument();
+    expect((await screen.findAllByRole('article')).map((card) => card.getAttribute('aria-label'))).toEqual(['Built-in browser']);
+
+    await user.click(screen.getByRole('tab', { name: W.studio.view.agent }));
+    expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+  });
+
+  it('turns a browser off from under its own tab, and its tab follows at once', async () => {
+    const loadRooms = vi.fn(async () => [cloud, chrome, { ...builtIn, state: 'off' }] as Room[] | null);
+    const { user, changed } = withSystems([cloud, chrome, builtIn], loadRooms);
+    await user.click(tab(/Built-in browser/));
+    await user.click(screen.getByRole('tab', { name: W.studio.view.configuration }));
+    await user.click(await screen.findByRole('switch', { name: `${W.systems.use}: Built-in browser` }));
+    await waitFor(() => expect(changed).toEqual([['builtin', { system_enabled: false }]]));
+    await waitFor(() => expect(tab(/Built-in browser/)).toHaveTextContent(W.studio.off.off));
   });
 
   it('opens the Systems page in place of a browser’s page, and a tab brings the browser back', async () => {

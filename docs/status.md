@@ -275,6 +275,7 @@ each, a log file for each, and evaluations of each. Built as spec 9.17 and 12.6.
 | Evaluations | For each system: the model; outcome quality (share answered, steps failed, the person's Good and Bad); latency (a step, a reply: typical and slow); performance by tool; time (a task, and the shares of model, browser and waiting); cost (tokens, and dollars where a price is set); the trace of each recent task, drawn as bars |
 | The checklist | Eleven checks done as real steps on the demo site, in that system's browser: it answers, opens, reads, finds, clicks, types, takes a picture, refuses the cloud metadata address, stays within the time limit, writes its log, and can ask a person |
 | The Systems page | "Systems" in the window's bar: the three systems side by side, with a Configuration view and an Evaluations view |
+| Under each browser's own tab | Browser and chat, Configuration, Evaluations: that system's card by itself, where a person is already looking at that browser |
 
 Run in a real Chromium (`tests/viewer/test_studio.py`, 5 new tests): the checklist passes all eleven
 checks on the built-in browser; a task done on the cloud browser is on that browser's record and log

@@ -1709,6 +1709,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Under a browser's tab: the browser itself, how it is set up, what its tasks took. */
+.studio-views {
+  flex: none;
+  display: flex;
+  padding: var(--space-3) var(--space-4) 0;
+}
+
 /* The Systems page (spec 9.17, 12.6): the three browsers side by side, each a card. */
 
 .systems {
@@ -1771,6 +1778,12 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--activity-width)), 1fr));
   align-items: start;
   gap: var(--space-4);
+}
+
+/* One system by itself, under its own tab: one card, no wider than is good to read. */
+.systems-grid[data-single='true'] {
+  grid-template-columns: minmax(0, var(--dialog-width));
+  justify-content: center;
 }
 
 .system-card {
