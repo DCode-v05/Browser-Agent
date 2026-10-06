@@ -69,6 +69,9 @@ class FakeDriver:
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         self.tell = on_event
 
+    def guard(self, judge: Any) -> None:
+        self.judge = judge
+
     def open_dialog(self, dialog: PageDialog) -> None:
         """A page opens a dialog, as it would in the middle of an action."""
         self.dialog = dialog

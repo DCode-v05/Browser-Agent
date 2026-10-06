@@ -1378,7 +1378,7 @@ boundary (section 17.2).</p>
 <li>Open shadow roots are read as part of the page.</li>
 <li>A window that one of the agent's tabs opens becomes a tab, and the action that opened it waits for the new tab, so its own result already shows it. A window opened by anyone else in the same browser is left alone.</li>
 <li>No more than <code>browser.tabs.max_tabs</code> tabs are open: a pop-up past the limit is closed at once and the agent is told.</li>
-<li>Known limits: the address policy is not applied to the address a page opens a window at (it is applied at the network layer, when that is built); on take-over Chrome a window a page opens cannot be reached, and the agent is told so.</li>
+<li>A window a page opens at an address the policy refuses is closed at once (section 8.1). Known limit: on take-over Chrome a window a page opens cannot be reached, and the agent is told so.</li>
 </ul>
 <h3 id="54-snapshot">5.4 Snapshot</h3>
 <p>The snapshot is the page as text: one line per element that matters, each with a ref.</p>
@@ -1971,6 +1971,41 @@ block list, allow list, private addresses and names, then name resolution to a p
 </tr>
 </tbody>
 </table></div>
+<p><strong>At the network.</strong> Each tab's own DevTools session holds up every document the tab sets out to load
+(<code>Fetch</code>, for the resource type Document), whoever started it: the agent, a link, a redirect, a script, a
+frame. The address is judged by the same policy, and a refused one is stopped before the request is
+made.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>What was stopped</th>
+<th>What the agent is told</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The agent's own navigation, at its first address or after a redirect</td>
+<td>The call fails: "navigation to … blocked: …"</td>
+</tr>
+<tr>
+<td>Where a link, a script or a redirect led</td>
+<td>In the state block of its next result: <code>[events] navigation to … blocked: …</code></td>
+</tr>
+<tr>
+<td>What a frame was to hold</td>
+<td>The same, with "in a frame". The frame stays empty</td>
+</tr>
+<tr>
+<td>A new window</td>
+<td>A window a page opens can begin to load before its tab is taken in. One found at a refused address is closed at once: <code>[events] a new tab at … was closed: …</code>. Its later navigations are judged like any tab's</td>
+</tr>
+</tbody>
+</table></div>
+<p>A person watching is told the same (<code>navigation_blocked</code>), without the setting's name. An address that
+cannot be judged is not loaded. With <code>enforce_on_subresources</code> every request is held up and judged;
+a picture or a script that was stopped is not news for the agent.</p>
+<p>Known limit: the first request of a window a page opens may reach the network before the window is
+closed. What it loads is never shown to the agent.</p>
 <p>Performance requirement: only document requests are intercepted unless sub-resource enforcement is on,
 and decisions are cached per host for a short time. Sending every request through Python was measured
 to add 84% to the load time of a 150-request page.</p>

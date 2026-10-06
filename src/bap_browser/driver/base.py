@@ -6,7 +6,7 @@ sent as one message over the bridge channel.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -181,12 +181,22 @@ class Happened:
     was answered, a file was saved."""
 
     kind: Literal[
-        "tab_opened", "tab_closed", "tab_out_of_reach", "dialog_opened", "dialog_closed", "download"
+        "tab_opened",
+        "tab_closed",
+        "tab_out_of_reach",
+        "dialog_opened",
+        "dialog_closed",
+        "download",
+        "blocked",
     ]
     text: str
     """As the agent is told, in the state block of its next result."""
     detail: Mapping[str, Any] = field(default_factory=dict[str, Any])
     """What a person watching is shown. Empty when there is nothing to show them."""
+
+
+Guard = Callable[[str], Awaitable[tuple[bool, str]]]
+"""Judges an address: whether it may be loaded, and when not, why in a few words."""
 
 
 class Driver(Protocol):
@@ -276,6 +286,12 @@ class Driver(Protocol):
 
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         """Names who is told what happens in the browser by itself."""
+        ...
+
+    def guard(self, judge: Guard) -> None:
+        """Names who decides, at the network, whether the browser may load an address (spec 8.1).
+        Every document the browser sets out to load is put to it first: where a link leads, where a
+        redirect goes, what a frame holds, what a page opens in a new window."""
         ...
 
     # Pictures. None is taken unless a call asks for one.
