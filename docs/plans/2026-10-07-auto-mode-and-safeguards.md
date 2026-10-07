@@ -69,7 +69,7 @@ only what local rules flag goes to a model.
 - [x] **0. Spec.** Section 18 changed for every flag above; page regenerated; committed.
 - [x] **1. Model client** `safeguards/model.py`: time limit, tries with uneven waits, a breaker for each use, counted cost. The reference loop (`agent/openai_model.py`) uses it.
 - [x] **2. Limits and loops** (the viewer's bar is with the viewer helper) `safeguards/limits.py`: steps and minutes of a task, calls a minute, spend, repeated acting calls, "Nothing on the page changed", unknown outcome, questions nobody answers. Viewer: the limit bar and "Allow more".
-- [ ] **3. Site identity** `policy/sites.py`: the Public Suffix List, registrable name, same site; own pages by origin.
+- [x] **3. Site identity** `policy/sites.py`: the Public Suffix List, registrable name, same site; own pages by origin.
 - [ ] **4. The task** `safeguards/task.py`: `browser_begin_task`, the grades, domains in a message, events `task_set` and `sites_changed`. Viewer: the task line and site chips.
 - [ ] **5. The check** `safeguards/check.py` and `findings.py`: the stages in order; today's rules (tool policy, consequential words, site grants) moved in as the first findings; the action classifier (H1); x/y and key presses resolved to elements; findings refused with nobody watching (H8); one line per decision in the log. No reviewer yet: unsure goes to the person.
 - [ ] **6. What goes out** `safeguards/outgoing.py`: sensitive fields, the copy memory and short secrets, long addresses, files that arrive (after-step path), grant-access screens, money (amounts, caps).
