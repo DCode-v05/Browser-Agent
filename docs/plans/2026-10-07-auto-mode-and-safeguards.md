@@ -90,6 +90,44 @@ Attack pages of a slice are written with it, before its code.
 | 2026-10-07 | Slice 0 done: section 18 of the spec says every resolution above. Next: slice 1, the model client |
 | 2026-10-07 | Slices 1 and 2 done and committed. `safeguards/actions.py`, `task.py`, `reviewer.py` are written with unit tests and not yet wired in. Next: the check (`safeguards/check.py`) and its wiring into `tools/toolkit.py` |
 
+## STOPPED HERE (2026-10-07, usage limit): read this before anything else
+
+Committed and pushed: slices 0, 1, 2 (`da95e51`, `4da03bd`, `df4a47b`). Committed, not pushed: slice 3
+and the task, classifier and reviewer modules (`3c113fd`).
+
+**In the working tree, NOT committed** (unit and service tests pass with it; `tests/e2e` and
+`tests/viewer` had failures that were not yet looked at, so it was not committed):
+
+- The check wired in: `safeguards/check.py`, `safeguards/outgoing.py`, `tools/toolkit.py`,
+  `service/session.py`, `driver/*` (`Located` facts, `locate_point`, `locate_focus`, `gist`, `where`),
+  `snapshot_page.js` (`facts`, `gist`), `browser_begin_task`, settings entries in
+  `settings/catalogue.py`, tests `test_check.py`, `test_auto_mode.py`, `test_begin_task.py` (not run
+  yet), `test_outgoing.py`.
+- From helpers, tested by themselves: `safeguards/incoming.py`, `safeguards/scan.py` and their tests;
+  everything under `viewer/` (599 viewer tests passed for the helper; built into `viewer_dist` once).
+- `safeguards/reading.py` is written and **not wired**: it calls `Check.flag` / `Check.unflag`, which
+  do not exist yet. The script that wires it is in the session scratchpad as `slice7_reading.py`; if
+  the scratchpad is gone, do by hand what the module's docstring says: `from_page()` around the page
+  text in `tools/browser_tools.py` (snapshot, get_text, find, tab list, downloads), `Reader.given`
+  after a step ran in `tools/toolkit.py`, `flag` / `unflag` / `now_at` in `check.py`, `page_flagged`
+  in the observers, `scan` in the log line, marks off in `tests/conftest.py`.
+
+Next, in order: (1) run `uv run pytest tests/e2e tests/viewer -q` and mend what the check changed
+(expect: `Located` compared whole, passwords typed on the test site, "Submit" buttons); (2) run
+`tests/unit/test_begin_task.py`; (3) commit the check; (4) wire `reading.py`; (5) unseen text in
+`snapshot_page.js`; (6) files that arrive (`judged_file`, after the step); (7) slice 10; (8) the attack
+pages; (9) the spec for what changed (below), README, `docs/status.md`, `/verify`, pull request.
+
+Decided while building, and the spec is to say so: a bare-number site (`ip_host`) and a young domain
+are for the reviewer in Auto Mode only, no person is asked; `step_on_sensitive_site` is raised in
+Auto Mode only, and refuses when nobody watches; site findings are settled once for a site and task;
+`outgoing.decode_min_chars` is 8; new settings `money.around_chars`, `outgoing.consent_texts`,
+`limits.max_calls_choices`, `sites.sensitive.more`; new setting groups "Safety" and "Limits"; a
+budget line for `browser_begin_task`.
+
+To tell the user: a helper ran `taskkill /F /IM node.exe`, which closes every Node program on the
+machine. Typing a password now asks the person in every mode, except on the core's own pages.
+
 ## Shapes fixed while building (the spec's 18.10 is to say these; the viewer is built against them)
 
 Events: `task_set {task, from, sites:[{host, grade: named|added_read|added_act}], ts}`, `task_ended {ts}`,
