@@ -66,7 +66,7 @@ only what local rules flag goes to a model.
 
 ## Order of building (the review's order: guards before the reviewer)
 
-- [ ] **0. Spec.** Section 18 changed for every flag above; page regenerated; committed.
+- [x] **0. Spec.** Section 18 changed for every flag above; page regenerated; committed.
 - [ ] **1. Model client** `safeguards/model.py`: time limit, tries with uneven waits, a breaker for each use, counted cost. The reference loop (`agent/openai_model.py`) uses it.
 - [ ] **2. Limits and loops** `safeguards/limits.py`: steps and minutes of a task, calls a minute, spend, repeated acting calls, "Nothing on the page changed", unknown outcome, questions nobody answers. Viewer: the limit bar and "Allow more".
 - [ ] **3. Site identity** `policy/sites.py`: the Public Suffix List, registrable name, same site; own pages by origin.
@@ -87,6 +87,7 @@ Attack pages of a slice are written with it, before its code.
 | When | What |
 |---|---|
 | 2026-10-07 | Plan written. Nothing built yet. Next: slice 0, the spec |
+| 2026-10-07 | Slice 0 done: section 18 of the spec says every resolution above. Next: slice 1, the model client |
 
 ## Where things are (found while reading; keep short)
 
