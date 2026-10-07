@@ -316,12 +316,14 @@
   }
 
   // Resolves at the next animation frame, or after `ms` on a page that is not being painted.
+  // Waits for the browser's next frame, and no longer than `ms`: a page that is not being drawn
+  // has no frames. Says whether a frame was drawn.
   const nextFrame = (ms) =>
     new Promise((done) => {
-      const timer = setTimeout(done, ms);
+      const timer = setTimeout(() => done(false), ms);
       requestAnimationFrame(() => {
         clearTimeout(timer);
-        done();
+        done(true);
       });
     });
 
@@ -410,10 +412,16 @@
     if (!el) return { error: 'stale' };
     const described = describe(el, a);
     const deadline = performance.now() + a.timeoutMs;
+    // Whether the browser drew a frame during the last wait.
+    let drawn = true;
     let lastBox = '';
+    // The frame the element was last looked at in. The page's own clock moves on with each frame
+    // the browser draws, and stands still between them.
+    let lastFrame = null;
     let broughtIntoView = false;
     for (;;) {
       if (!el.isConnected) return { error: 'stale' };
+      const frame = document.timeline.currentTime;
       let reason;
       if (visibility(el) !== SHOWN) reason = 'it is not visible';
       else if (disabled(el)) reason = 'it is disabled';
@@ -426,6 +434,12 @@
         if (!point) reason = 'it has no size';
         else if (point.box !== lastBox) {
           lastBox = point.box;
+          lastFrame = frame;
+          reason = 'it is still moving';
+        } else if (drawn && frame !== null && frame === lastFrame) {
+          // The element is where it was, but this is still the frame it was last looked at in: the
+          // wait ended inside a frame that was already under way. The page has not moved on, so
+          // looking twice told nothing. The next frame tells.
           reason = 'it is still moving';
         } else {
           const hit = elementAt(point.x, point.y);
@@ -441,7 +455,9 @@
         }
       }
       if (performance.now() >= deadline) return { error: 'not_ready', reason, describe: described };
-      await nextFrame(a.frameMs);
+      // On a page that is not being drawn no frame comes, its clock stands still, and nothing in
+      // it moves: there the wait ends by its time, and the same place twice is holding still.
+      drawn = await nextFrame(a.frameMs);
     }
   }
 

@@ -751,6 +751,7 @@ not as the engine.
 ### 5.6 Actions and waiting
 
 - Actions by ref wait until the element is visible, stable, enabled and not covered by another element, up to `browser.timeouts.action_ms`. When the wait runs out, the result says which of these failed and, for a covered element, what covers it.
+- "Stable" means the element is in the same place in two frames that follow each other. The page's own clock (`document.timeline.currentTime`) tells one frame from the next: a second look inside the frame of the first says nothing, and waits for the next frame. On a page that is not being drawn no frame comes and nothing moves; there the wait ends after `browser.timeouts.frame_ms`, and the same place twice is stable.
 - **No fixed pauses.** After an action the engine waits for the page to settle (no navigation in flight, scroll position steady) up to a configured ceiling, and returns as soon as it has.
 - **How an action learns that the page is leaving.** The page says so itself, to whoever listens to it: when it sets out for another page (a link, a form, a script) and when it opens a window. After an action the engine gives the page one turn of its own queue and asks it a question; what the page said arrives before the answer. Only when it did set out does the engine wait for the new page. A page that leaves some time after the action is not seen leaving by that action's result; the next result shows where the browser is.
 - After an action the result states whether the page navigated and to where.

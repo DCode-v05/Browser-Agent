@@ -1,8 +1,11 @@
 import re
 import time
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
+from bap_browser.config import Config
 from bap_browser.driver.base import ActionOutcome
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BadInput, BrowserError, StaleRef
@@ -173,6 +176,29 @@ async def test_an_element_that_never_stops_moving_fails_within_the_time_limit(
     with pytest.raises(BrowserError, match="it is still moving"):
         await impatient_driver.click(target)
     assert time.perf_counter() - started < 3
+
+
+async def test_a_browser_that_has_just_started_does_not_take_a_moving_element_for_still(
+    make_config: Callable[..., Config], tmp_path: Path, site: str
+) -> None:
+    """The first look at an element can fall inside a frame that is already under way. The wait for
+    the next frame then ends within that same frame: the page has not moved on, and finding the
+    element where it was says nothing. A browser that has just started draws its first frames far
+    apart, which is where this was seen."""
+    config = make_config(tmp_path, browser={"timeouts": {"action_ms": 600}})
+    for _ in range(3):
+        driver = PlaywrightDriver(config)
+        await driver.start()
+        try:
+            await driver.navigate(f"{site}/moving.html")
+            await driver.page.wait_for_function(
+                "document.getAnimations().some((animation) => animation.currentTime > 0)", timeout=10_000
+            )
+            target = ref_of(await read(driver), 'button "Catch me"')
+            with pytest.raises(BrowserError, match="it is still moving"):
+                await driver.click(target)
+        finally:
+            await driver.close()
 
 
 async def test_a_disabled_element_is_not_clicked(impatient_driver: PlaywrightDriver, site: str) -> None:

@@ -29,8 +29,11 @@ async def finished(tools: Toolkit, count: int) -> tuple[str, str]:
         while True:
             listed = (await tools.call("browser_downloads", {})).text
             news += listed.partition("\n[events] ")[2]
-            if listed.count(" saved at ") + listed.count(" failed: ") >= count:
-                return body(listed), news
+            # The list itself, and not the news beside it: a download's end can be told a moment
+            # before the list that was already being written says so.
+            told = body(listed)
+            if told.count(" saved at ") + told.count(" failed: ") >= count:
+                return told, news
             await asyncio.sleep(0.1)
 
 
