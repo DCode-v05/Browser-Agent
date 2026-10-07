@@ -458,6 +458,7 @@ function About({ setting, source, onToast }: { setting: Setting; source: Setting
           )}
           <Button
             icon="copy"
+            hint={W.buttons.hint.copyConfig}
             onClick={() => {
               void navigator.clipboard?.writeText(asText);
               onToast(W.settings.about.copied);

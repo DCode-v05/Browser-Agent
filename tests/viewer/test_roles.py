@@ -142,6 +142,9 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
                 "Configuration",
                 "Evaluations",
             ]
+            # Every control of the page says what it does: the bar, the views, the session's controls.
+            await admin.get_by_label("Your task").wait_for(timeout=20_000)
+            assert await admin_view.silent_controls() == []
 
             # A user's page is the address itself. Until the admin sets a password, nobody signs in there.
             await user.goto(f"{running.service}/")
@@ -165,6 +168,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             ).wait_for()
             assert await admin.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert await admin_view.accessibility_violations() == []
+            assert await admin_view.silent_controls() == []
             await admin.evaluate("document.querySelector('.systems').scrollTop = 0")
             await admin_view.shot("admin-users")
 
@@ -179,6 +183,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             ).wait_for()
             assert await admin.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert await admin_view.accessibility_violations() == []
+            assert await admin_view.silent_controls() == []
             await admin_view.shot("admin-configuration")
 
             # A user signs in on their own page. A wrong password is said to be wrong, and opens nothing.
@@ -229,6 +234,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await task.fill("Say which page this is")
             await task.press("Enter")
             await user.get_by_text("The page is the start page.").wait_for()
+            assert await user_view.silent_controls() == []
 
             # What is theirs to change is a working control, with a line saying what it does. What
             # the admin holds is said in words. The settings button on the chat goes there.
@@ -256,6 +262,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             assert await card.get_by_role("switch", name="Let the agent download files").count() == 0
             assert await user.evaluate("document.documentElement.scrollWidth <= innerWidth")
             assert await user_view.accessibility_violations() == []
+            assert await user_view.silent_controls() == []
             await user_view.shot("user-settings")
 
             # The colour mode is the user's own. It holds on every page of their window, and is not the admin's.
@@ -275,6 +282,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await card.get_by_role("button", name="Run the checklist").wait_for()
             assert await card.get_by_text("Cost", exact=True).count() == 0
             assert await user.get_by_role("article").count() == 1, "their browser's card, and not the whole"
+            assert await user_view.silent_controls() == []
             await user_view.shot("user-evaluations")
 
             # The admin sees all of it: every system as one, and under a browser's tab what its tasks cost.
@@ -286,11 +294,13 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             browsers = systems.get_by_role("article", name="The browsers")
             await browsers.get_by_role("row", name="Cloud browser").get_by_text("Kept from them").wait_for()
             assert await admin_view.accessibility_violations() == []
+            assert await admin_view.silent_controls() == []
             await admin_view.shot("admin-all-systems")
             await browsers.get_by_role("button", name="Evaluations of Built-in browser").click()
             await admin.get_by_role("heading", name="Evaluations of Built-in browser").wait_for()
             built_in = admin.get_by_role("article", name="Built-in browser")
             await built_in.get_by_text("Cost", exact=True).wait_for()
+            assert await admin_view.silent_controls() == []
             await admin.evaluate("document.querySelector('.systems').scrollTop = 0")
             await admin_view.shot("admin-evaluations")
 

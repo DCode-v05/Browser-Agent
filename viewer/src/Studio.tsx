@@ -167,6 +167,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         <Button
           icon="settings"
           kind={showingSystems ? 'primary' : 'plain'}
+          hint={W.studio.hint.systems}
           onClick={() => {
             if (showingSystems) void refresh();
             setOnSystems(!showingSystems);
@@ -182,7 +183,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             <Icon name={role === 'admin' ? 'settings' : 'person'} />
             {W.signIn.role[role]}
           </span>
-          <Button icon="close" onClick={onSignOut}>
+          <Button icon="close" hint={W.studio.hint.signOut} onClick={onSignOut}>
             {W.studio.signOut}
           </Button>
         </>
@@ -230,6 +231,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
               aria-selected={!showingSystems && one.id === room.id}
               aria-controls="studio-page"
               data-mood={moodOf(one)}
+              title={W.studio.hint.backend[one.backend]}
               onClick={() => open(one.id)}
             >
               <Icon name={BACKEND_ICON[one.backend]} />
@@ -254,6 +256,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
                 role="tab"
                 className="systems-view"
                 aria-selected={view === name}
+                title={W.studio.hint.view[name]}
                 onClick={() => {
                   // Back on the browser's own page, it shows where the browser stands now.
                   if (name === 'agent') void refresh();
@@ -331,7 +334,7 @@ function DesktopButton({ open }: { open: OpenDesktop }) {
           {W.studio.desktop[state]}
         </span>
       )}
-      <Button icon="monitor" onClick={press} disabled={state === 'opening'}>
+      <Button icon="monitor" hint={W.studio.hint.desktop} onClick={press} disabled={state === 'opening'}>
         {W.studio.desktop.open}
       </Button>
     </span>
@@ -362,7 +365,9 @@ function NoSession({ room, onTurnOn }: { room: Room; onTurnOn?(): void }) {
             {room.extension && (
               <span className="studio-folder">
                 <code>{room.extension}</code>
-                <Button onClick={copy}>{copied ? W.studio.connect.copied : W.studio.connect.copy}</Button>
+                <Button hint={W.buttons.hint.copyFolder} onClick={copy}>
+                  {copied ? W.studio.connect.copied : W.studio.connect.copy}
+                </Button>
               </span>
             )}
             {room.extension && <span className="studio-tip">{W.studio.connect.paste}</span>}

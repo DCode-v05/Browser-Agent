@@ -60,6 +60,29 @@ export const W = {
     viewStep: 'View step',
     dismiss: 'Dismiss',
     newSession: 'Start a new session',
+    /** What a button does, shown when the pointer rests on it. */
+    hint: {
+      pause: 'Holds the agent after the step it is on. Resume lets it go on.',
+      resume: 'Lets the agent go on from where it was held.',
+      takeOver: 'You drive the browser yourself, with your mouse and keyboard. The agent waits until you hand back.',
+      handBack: 'Gives the browser back to the agent, which goes on with its task.',
+      done: 'Tells the agent you have done the step it asked you for.',
+      couldNot: 'Tells the agent you could not do the step it asked you for.',
+      stop: 'Ends this session and closes its browser. A new session can be started afterwards.',
+      stopTask: 'Stops the task the agent is on. The session and its browser stay.',
+      send: 'Sends the task to the agent. The Enter key does the same.',
+      task: 'Type what the agent should do in this browser, then press Enter.',
+      step: 'Shows what this step did, and the browser as it was then.',
+      tab: "A tab open in the agent's browser. Press it to bring that tab to the front.",
+      allowOnce: 'Lets the agent do this one step. It asks again the next time.',
+      allowSite: 'Lets the agent do such steps on this site without asking again.',
+      deny: 'The step is not done. The agent is told, and can try another way.',
+      lookFirst: 'Closes this box so that you can look at the page first. The agent keeps waiting.',
+      dismiss: 'Takes this note off the page.',
+      newSession: 'Starts a new browser and a new conversation on this page.',
+      copyConfig: 'Copies the version, the browser and the changed configuration, as text.',
+      copyFolder: "Copies the folder's path, to paste into Chrome's file chooser.",
+    },
   },
 
   ended: {
@@ -180,6 +203,23 @@ export const W = {
       evaluations: 'Evaluations',
     },
     signOut: 'Sign out',
+    /** What each part of the window's bar is, shown when the pointer rests on it. */
+    hint: {
+      systems: 'For the admin: what users are allowed, and the three browsers compared.',
+      desktop: 'Opens the desktop app in a window of its own, with its own browser and its own chat.',
+      signOut: 'Ends your visit on this page. You sign in again to come back.',
+      view: {
+        agent: 'The browser itself, live, and the chat with the agent.',
+        configuration: 'For the admin: how this one browser is set up.',
+        settings: 'Your own settings for this browser.',
+        evaluations: 'What the tasks done in this browser took.',
+      },
+      backend: {
+        remote_headless: "A browser of the service's own. Nothing is kept from one session to the next.",
+        takeover_chrome: 'A tab of your own Chrome, with your sign-ins. The extension connects it.',
+        bundled_chromium: "The app's own browser. It keeps its sign-ins from one session to the next.",
+      },
+    },
     noBrowser: 'No browser to use yet',
     noBrowserLead: 'Your admin has not let users use any browser. Ask them to turn one on for users in Configuration.',
     starting: 'Starting the browser…',
@@ -234,6 +274,10 @@ export const W = {
     lead: "For the admin: what is not one browser's alone. What users are allowed, and the three browsers compared. Each browser's own configuration and evaluations are under its tab, at the top.",
     views: 'What to show of the systems',
     view: { users: 'Users', overview: 'All systems' },
+    viewHint: {
+      users: 'What a user is allowed: to change, to see, and the two passwords.',
+      overview: 'Where each browser stands, and the tasks of all three as one.',
+    },
     configuration: 'Configuration',
     evaluations: 'Evaluations',
     panel: {

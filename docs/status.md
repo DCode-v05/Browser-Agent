@@ -333,6 +333,7 @@ users; every control saying what it does; a change by the admin showing on the u
 | Choices and site lists were shown as words on the card, changed only in that screen | Every setting has its working control on the page: switch, choice, list of sites, button. A change is saved as it is made and the row says "Saved" |
 | A switch said only its name | Every setting has a line saying what it does (each under 110 characters, held by a test); every line of what users may change and see says what it lets a user do; the buttons and the lines of the evaluations say what they are |
 | Nothing said which settings reach users | On the admin's Configuration, a setting that is also on the user's page says so, and whether users may set their own or are held at the admin's value. Every page says whose it is and what it is for |
+| The bar, the views and the session's own buttons (Pause, Take over, Stop session, the icons) worked and said nothing of what they do: 94 such controls over the eleven pages of the two roles | Each says what it does when the pointer rests on it. The count is 0, and a real-browser test fails on any control that says nothing |
 | The colour mode held only on "Browser and chat": every other view fell back to the device's colours | The window keeps it: it holds on every page |
 | A user saw the admin's changes to "may change" and "may see" only after a reload | A user's window follows the admin within two seconds: browsers, views, and settings now held |
 | My Chrome's page showed "Protocol error (Target.setAutoAttach): No current window" | "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it." |
@@ -343,8 +344,8 @@ choice and list of a browser's Configuration is changed and read back from the s
 turned off and on from its Configuration with the page staying put; the Systems page is walked in
 both views; and a user's page is watched following the admin with no reload.
 
-Not checked by me: My Chrome's new sentence with a real Chrome that has no window (the wording is
-tested, the case was seen once in the log of the running service).
+Checked on the running service on 2026-10-07: My Chrome's page shows the new sentence with the
+person's real Chrome, which had no window open.
 
 ### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
 

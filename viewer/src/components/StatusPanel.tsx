@@ -48,7 +48,7 @@ export function Button({ kind = 'plain', icon, onClick, children, ref, disabled,
       ref={ref}
       disabled={disabled}
       aria-label={label}
-      title={hint}
+      title={hint ?? label}
       // Not `disabled`: a button that is disabled while it has the focus drops the focus.
       aria-busy={busy || undefined}
       aria-disabled={busy || undefined}
@@ -88,43 +88,43 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
     switch (name) {
       case 'pause':
         return (
-          <Button key={name} icon="pause" busy={working === name} onClick={() => onCommand({ type: 'pause' })}>
+          <Button key={name} icon="pause" busy={working === name} hint={W.buttons.hint.pause} onClick={() => onCommand({ type: 'pause' })}>
             {working === name ? W.buttons.pausing : W.buttons.pause}
           </Button>
         );
       case 'resume':
         return (
-          <Button key={name} icon="play" kind="primary" busy={working === name} onClick={() => onCommand({ type: 'resume' })}>
+          <Button key={name} icon="play" kind="primary" busy={working === name} hint={W.buttons.hint.resume} onClick={() => onCommand({ type: 'resume' })}>
             {working === name ? W.buttons.resuming : W.buttons.resume}
           </Button>
         );
       case 'take_over':
         return (
-          <Button key={name} icon="hand" busy={working === name} onClick={() => onCommand({ type: 'take_over' })}>
+          <Button key={name} icon="hand" busy={working === name} hint={W.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
             {working === name ? W.buttons.takingOver : W.buttons.takeOver}
           </Button>
         );
       case 'hand_back':
         return (
-          <Button key={name} kind="person" busy={working === name} onClick={onHandBack} ref={primaryRef}>
+          <Button key={name} kind="person" busy={working === name} hint={W.buttons.hint.handBack} onClick={onHandBack} ref={primaryRef}>
             {working === name ? W.buttons.handingBack : W.buttons.handBack}
           </Button>
         );
       case 'done':
         return (
-          <Button key={name} icon="check" kind="person" onClick={() => onCommand({ type: 'done' })} ref={primaryRef}>
+          <Button key={name} icon="check" kind="person" hint={W.buttons.hint.done} onClick={() => onCommand({ type: 'done' })} ref={primaryRef}>
             {W.buttons.done}
           </Button>
         );
       case 'could_not':
         return (
-          <Button key={name} onClick={() => onCommand({ type: 'could_not' })}>
+          <Button key={name} hint={W.buttons.hint.couldNot} onClick={() => onCommand({ type: 'could_not' })}>
             {W.buttons.couldNot}
           </Button>
         );
       case 'stop':
         return (
-          <Button key={name} icon="stop" kind="danger" onClick={onStop} ref={stopRef}>
+          <Button key={name} icon="stop" kind="danger" hint={W.buttons.hint.stop} onClick={onStop} ref={stopRef}>
             {W.buttons.stop}
           </Button>
         );
