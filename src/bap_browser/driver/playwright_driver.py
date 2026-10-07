@@ -463,6 +463,7 @@ class PlaywrightDriver:
         page.on("request", lambda request: self._on_request(tab, request))
         page.on("framenavigated", lambda frame: self._on_frame_navigated(tab, frame))
         page.on("close", lambda _: self._forget(tab))
+        page.on("crash", lambda _: self._crashed(tab))
         page.on("download", lambda download: self._spawn(self._save(download)))
         # Listened for from the start, so that the browser hands every file chooser to this driver.
         # One that is asked for only at the moment of an upload can open before the browser has
@@ -572,7 +573,20 @@ class PlaywrightDriver:
         with contextlib.suppress(BrowserError):
             await self._begin_pictures(self._frames[1])
 
-    def _forget(self, tab: _Tab) -> None:
+    def _crashed(self, tab: _Tab) -> None:
+        """A tab's page has crashed. Nothing more can be done in it, so it is told and closed like
+        any tab that goes away (spec 18.8)."""
+        if tab.id not in self._tabs:
+            return
+        self._forget(tab, "crashed")
+        self._spawn(self._close_quietly(tab.page))
+
+    @staticmethod
+    async def _close_quietly(page: Page) -> None:
+        with contextlib.suppress(PlaywrightError):
+            await page.close()
+
+    def _forget(self, tab: _Tab, how: str = "closed") -> None:
         """A tab has closed. The one opened last becomes the active one."""
         if self._tabs.pop(tab.id, None) is None:
             return
@@ -584,7 +598,7 @@ class PlaywrightDriver:
         if tab.id in self._closing:
             return
         now = f"; {self._active.id} is now the active tab" if was_active and self._active else ""
-        self._tell(Happened("tab_closed", f"tab {tab.id} closed{now}"))
+        self._tell(Happened("tab_closed", f"tab {tab.id} {how}{now}"))
         if was_active and self._active is not None:
             self._spawn(self._show(self._active))
 
@@ -749,6 +763,18 @@ class PlaywrightDriver:
 
     async def locate(self, ref: str) -> Located:
         return await self._locate(self._current(), ref)
+
+    async def change_mark(self) -> str | None:
+        tab = self._active
+        if tab is None:
+            return None
+        wait_ms = self._config.browser.timeouts.change_wait_ms
+        in_the_page = await tab.script.stamp(wait_ms)
+        if in_the_page is None:
+            return None
+        # A frame that has gone away says nothing, and its going was a change of the page around it.
+        in_frames = [await frame.script.stamp(wait_ms) for frame in list(tab.frames.values())]
+        return f"{tab.id} {tab.commits} {tab.page.url} {in_the_page} {in_frames}"
 
     async def _locate(self, tab: _Tab, ref: str) -> Located:
         found = await self._ask(

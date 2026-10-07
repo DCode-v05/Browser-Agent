@@ -67,8 +67,8 @@ only what local rules flag goes to a model.
 ## Order of building (the review's order: guards before the reviewer)
 
 - [x] **0. Spec.** Section 18 changed for every flag above; page regenerated; committed.
-- [ ] **1. Model client** `safeguards/model.py`: time limit, tries with uneven waits, a breaker for each use, counted cost. The reference loop (`agent/openai_model.py`) uses it.
-- [ ] **2. Limits and loops** `safeguards/limits.py`: steps and minutes of a task, calls a minute, spend, repeated acting calls, "Nothing on the page changed", unknown outcome, questions nobody answers. Viewer: the limit bar and "Allow more".
+- [x] **1. Model client** `safeguards/model.py`: time limit, tries with uneven waits, a breaker for each use, counted cost. The reference loop (`agent/openai_model.py`) uses it.
+- [x] **2. Limits and loops** (the viewer's bar is with the viewer helper) `safeguards/limits.py`: steps and minutes of a task, calls a minute, spend, repeated acting calls, "Nothing on the page changed", unknown outcome, questions nobody answers. Viewer: the limit bar and "Allow more".
 - [ ] **3. Site identity** `policy/sites.py`: the Public Suffix List, registrable name, same site; own pages by origin.
 - [ ] **4. The task** `safeguards/task.py`: `browser_begin_task`, the grades, domains in a message, events `task_set` and `sites_changed`. Viewer: the task line and site chips.
 - [ ] **5. The check** `safeguards/check.py` and `findings.py`: the stages in order; today's rules (tool policy, consequential words, site grants) moved in as the first findings; the action classifier (H1); x/y and key presses resolved to elements; findings refused with nobody watching (H8); one line per decision in the log. No reviewer yet: unsure goes to the person.
@@ -88,6 +88,7 @@ Attack pages of a slice are written with it, before its code.
 |---|---|
 | 2026-10-07 | Plan written. Nothing built yet. Next: slice 0, the spec |
 | 2026-10-07 | Slice 0 done: section 18 of the spec says every resolution above. Next: slice 1, the model client |
+| 2026-10-07 | Slices 1 and 2 done and committed. `safeguards/actions.py`, `task.py`, `reviewer.py` are written with unit tests and not yet wired in. Next: the check (`safeguards/check.py`) and its wiring into `tools/toolkit.py` |
 
 ## Shapes fixed while building (the spec's 18.10 is to say these; the viewer is built against them)
 
@@ -107,6 +108,17 @@ parts of 18.10 (everything under `viewer/`, no build).
 Module names as built: `safeguards/model.py` (`ModelClient`, `Spend`), `safeguards/limits.py` (`Limits`).
 `ModelError` is in `errors.py`. All settings of 18.11 are in `config.py` (`safeguards.*`, `limits.*`,
 `safety.auto_mode.*`, `agent.retries`, `logging.retention_days`).
+
+## The spec is to be changed for these (found while building; do it before the slice's commit)
+
+- 18.4 classifier: the sending words are send, sent, sending, post, submit, publish, tweet and the Hindi
+  ones; reply, share, forward, invite, comment and apply are gone (they open a form more often than
+  they send). A link is classed only as paying, deleting or granting. A phrase outweighs a single
+  word ("Cancel order" deletes); between words of the same length the graver class wins.
+- 18.10: the events and commands under "Shapes fixed while building" above.
+- 18.8: what counts as a change of the page (structure, typed or chosen values, scrolling, focus
+  moved by the keyboard); the notice is not added after `browser_hover`; a failed step counts
+  towards the repeats but is not told "Nothing on the page changed."
 
 ## Where things are (found while reading; keep short)
 

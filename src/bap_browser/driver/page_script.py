@@ -102,6 +102,17 @@ class PageScript:
             return True
         return True
 
+    async def stamp(self, wait_ms: int) -> int | None:
+        """How often the document has changed since the script was put in it (spec 18.8). None
+        when the page is too busy to say within `wait_ms`, or the document went away."""
+        try:
+            return await self._within(wait_ms / 1000, self._call("stamp", {}))
+        except _DocumentGone:
+            self._context_id = None
+            return None
+        except (TimeoutError, BrowserError):
+            return None
+
     async def object_of(self, ref: str) -> str | None:
         """The browser's own handle on the element a ref names, for a question only the browser can
         answer about it. None when the ref names nothing."""

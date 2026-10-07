@@ -2035,6 +2035,7 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 | `settle_ms` | 3000 | Longest wait for the page to settle after an action |
 | `frame_ms` | 100 | Longest wait for the next animation frame, on a page that is not being painted |
 | `popup_adopt_ms` | 3000 | Longest wait for a new tab to load before it is reported |
+| `change_wait_ms` | 300 | Longest wait for the page to say, after a step, whether anything in it changed (section 18.8) |
 | `wait_max_s` | 30 | Ceiling for `browser_wait` |
 | `idle_session_s` | 900 | Close a session unused for this long; 0 means never |
 
@@ -3728,13 +3729,16 @@ into.
 | Class | The control's name holds one of these, as a whole word or phrase | Or |
 |---|---|---|
 | `pays` | pay, pays, paying, payment, buy, buying, purchase, order, checkout, check out, place order, book now, reserve, donate, subscribe, transfer, top up, भुगतान, खरीदें, ऑर्डर करें, बुक करें | |
-| `sends` | send, sent, sending, post, reply, share, submit, forward, invite, comment, publish, tweet, apply, भेजें, पोस्ट करें, जमा करें, सबमिट, साझा करें, शेयर करें | Enter or Ctrl+Enter pressed in a message box; a typing step with `submit: true` there; the submit button of a form that holds a message box |
+| `sends` | send, sent, sending, post, submit, publish, tweet, भेजें, पोस्ट करें, जमा करें, सबमिट | Enter or Ctrl+Enter pressed in a message box; a typing step with `submit: true` there; the submit button of a form that holds a message box |
 | `deletes` | delete, deleting, remove, erase, discard, clear all, cancel order, unsubscribe, deactivate, close account, हटाएं, हटाएँ, मिटाएं, रद्द करें | |
 | `grants` | authorize, authorise, grant, grant access, allow access | The page is a grant-access screen (18.6) and the control agrees to it |
 | `commits` | confirm, finish, complete, proceed, पुष्टि करें | A word of `permissions.consequential_words` that is in no class above |
 
 - A message box is a text area, an editable block, or a field whose name or label holds message, comment, reply, review, post, body, subject, to or recipient. A search box (a `search` field, or the one text field of its form) is not.
 - A word in Latin letters is matched whole and without regard to case. A word in another script is looked for anywhere in the name.
+- A phrase says more than a word: "Cancel order" deletes, though "order" alone pays. Between words of the same length the graver class wins, in the order of the table: "Confirm and pay" pays.
+- A link goes somewhere. It is classed only when it pays, deletes or grants: links that send are rare, and a link named "Blog post" sends nothing.
+- Reply, share, forward, invite, comment and apply are not in the list: such a control opens a form far more often than it sends one, and a person asked at every "Apply filters" stops reading the questions. What they lead to is caught where it is sent: by the form's own button, or by Enter in the message box.
 - The words are settings, one list for each class (`safeguards.actions`). `permissions.consequential_words` stays, as the deployment's own extra words.
 - A name in a language that is in none of the lists is not classified. That is a known limit, and one reason why the layers of 18.6 and 18.7 do not rest on a control's name.
 
@@ -4312,7 +4316,18 @@ watching, the task stays stopped.
 |---|---|
 | The same acting call with nothing changed | An acting call with the same tool and the same arguments as the one before it, with no change of the page between them. The 3rd time (`limits.repeat_notice`) the result gains: `[notice] This is the 3rd identical step and the page has not changed. Something else is needed.` The 6th time (`limits.repeat_refuse`) it is not run: `repeated_call`. Reading calls in between do not begin the count again. A change of the page, or another acting call, does |
 | The same reading call with the same result | The 3rd time in a row the result gains the same notice. A reading call is never refused for this: waiting for a page is honest work |
-| Nothing changed | After an acting step, when the tab did not move to another address and the page's change counter did not move, the result gains: "Nothing on the page changed." |
+| Nothing changed | After an acting step, when the tab did not move to another document and the page's change counter did not move, the result gains: "Nothing on the page changed." Not after `browser_hover`: what a hover brings up is often drawn by a style, which the counter cannot see. A step that failed has said so, and is not told this as well; it still counts towards the repeats |
+| A script in the page | `browser_evaluate` is mostly a way to read. It is treated as a reading call here: told by its result, never refused |
+
+**What counts as a change of the page.** The page script keeps a counter for its document. It goes up
+when the structure of the document changes (in the page, in a frame that was read, in an open shadow
+tree that was read), when something is typed or chosen, when the page or a box in it is scrolled, and
+when the keyboard moves the focus. A focus that a press of the pointer brought is not counted: a dead
+button pressed twice changes nothing the second time. Another document in the tab is always a change.
+The page is asked after each acting step, for at most `browser.timeouts.change_wait_ms`; a page too
+busy to answer in that time is taken to have changed, so that no step is held back on a guess. What
+is drawn on a canvas and what is inside a closed shadow tree are not seen: there the notice can be
+wrong, and the refusal says how to go on (read the page, choose a different step).
 
 **4. A step whose outcome is not known.** When the answer to an acting step is lost (the bridge's
 channel is cut while it runs, the page does not answer in time after the input was sent, the tab or
@@ -4427,13 +4442,17 @@ New events from the service (they join section 4.8 when built):
 
 | Event | Fields |
 |---|---|
-| `task_set` | `task`, `from` (`person`, `agent`), `sites` (each with `host`, `grade`), `ts` |
+| `task_set` | `task`, `from` (`person`, `agent`), `sites` (each with `host` and `grade`: `named`, `added_read`, `added_act`), `ts` |
+| `task_ended` | `ts`. The task line goes; the sites of a conversation stay known |
 | `sites_changed` | `sites` |
-| `check_decided` | `step`, `stage` (`rule`, `reviewer`, `person`, `limit`), `outcome` (`run`, `ask`, `refuse`), `findings`, `reason` (the engine's own sentence), `said` (the reviewer's sentence: to viewers only, never to a log), `refused_id` (when it can be allowed once) |
+| `check_decided` | `step`, `stage` (`rule`, `reviewer`, `person`, `limit`), `outcome` (`run`, `ask`, `refuse`), `findings`, `reason` (the engine's own sentence), `said` (the reviewer's sentence: to viewers only, never to a log), `refused_id` (when it can be allowed once), `ts` |
+| `refused_allowed` | `id`, `ts`. A person pressed "Allow once" for that refused step |
 | `page_flagged` | `tab`, `site`, `rule`, `count`, `ts` |
-| `auto_changed` | `state` (`on`, `paused`, `waiting_for_task`, `unavailable`), `why` |
-| `limit_reached` | `kind` (`calls`, `minutes`, `spend`), `limit`, `ts` |
-| `approval_requested` (extended) | `why` (the findings in words), `leaves` (`text`, `from_site`, `to_site`: the exception of 18.6), `amount` |
+| `auto_changed` | `mode` (`every_action`, `risky`, `auto`), `state` (`off`, `on`, `paused`, `waiting_for_task`, `unavailable`), `why`, `ts`. Sent when a session starts and whenever either changes |
+| `limit_reached` | `kind` (`calls`, `minutes`, `spend`), `limit`, `scope` (`task`, `session`), `more` (what "Allow more" adds: steps or minutes; absent for `spend`), `ts`. Sent once for a limit, not for every call it stops |
+| `limit_lifted` | `ts`. A person allowed more, or another task began |
+| `questions_unanswered` | `count`, `ts`. So many questions ran out in a row; further ones are refused until a person does something in the viewer |
+| `approval_requested` (extended) | `why` (each reason in words), `leaves` (`text`, `from_site`, `to_site`: the exception of 18.6), `amount`, `said` (the reviewer's sentence, in Auto Mode) |
 
 New commands from a viewer: `resume_auto`; `allow_refused` with `id`; `extend_limit`; `drop_site`
 with `host`; `end_task`. Like every command, each is taken only from a viewer that has given the

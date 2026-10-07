@@ -20,6 +20,7 @@ from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
 from bap_browser.policy.address import presentable_address
 from bap_browser.results import Picture, ToolResult
+from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
 from bap_browser.tools.browser_tools import RUN_A_SCRIPT, TOOLS, RunArgs
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
@@ -97,6 +98,18 @@ ANSWERS_A_DIALOG = "browser_handle_dialog"
 RUN_BESIDE_A_DIALOG = frozenset(
     {ANSWERS_A_DIALOG, "browser_tabs", "browser_console", "browser_network", "browser_downloads"}
 )
+# The tools that are no step on a page. They are not watched for going round in circles.
+NO_STEP_ON_A_PAGE = NEED_NO_SITE | {"browser_tabs", ANSWERS_A_DIALOG, RUN_A_SCRIPT}
+# What a hover brings up is often drawn by a style, which cannot be seen from here.
+CHANGES_UNSEEN = frozenset({"browser_hover"})
+# A script in the page is mostly a way to read it. Whether it repeats itself is told by what it gives.
+TOLD_BY_ITS_RESULT = READS | {"browser_evaluate"}
+# What an acting step is told when its answer was lost on the way (spec 18.8).
+OUTCOME_UNKNOWN = (
+    "The connection to the browser was lost while this step ran. Whether it was done is not known. "
+    "Read the page before anything else, and do not repeat a step that pays, sends or deletes "
+    "without looking."
+)
 NO_OTHER_WAY = " Do not try another way: ask the person, or choose a different approach."
 # What the agent is told when an action was not approved, and the same in a few words for the person.
 NOT_APPROVED = {
@@ -143,6 +156,11 @@ class Toolkit:
         self._turn = asyncio.Lock()
         self._log = EventLog(session.config.logging)
         self._steps = 0
+        self.limits = Limits(lambda: self._session.config.limits, session.spend)
+        # The limit the person watching has been told of, so that they are told once.
+        self._reached: Reached | None = None
+        # What the page said of itself after the last step (spec 18.8).
+        self._mark: str | None = None
         # The tools a person allowed on a site for the rest of the session: "Allow on this site".
         self._grants: set[tuple[str, str]] = set()
         # The action that a dialog interrupted. It goes on when the dialog has been answered.
@@ -188,8 +206,13 @@ class Toolkit:
             self._observer.step_started(step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None), None)
         started = time.perf_counter()
         checked = self._check(RUN_A_SCRIPT, arguments)
+        limited = (
+            None if isinstance(checked, CannotRun) else await self._within_limits(RUN_A_SCRIPT, arguments)
+        )
         if isinstance(checked, CannotRun):
             ran = Ran(checked.text, checked.reason)
+        elif limited is not None:
+            ran = Ran(limited.text, limited.failure)
         else:
             args = checked[1]
             assert isinstance(args, RunArgs)
@@ -234,11 +257,12 @@ class Toolkit:
             else:
                 outcome = (
                     self._blocked_by_a_dialog(name)
+                    or await self._within_limits(name, arguments)
                     or await self._site_permission(name, arguments, target)
                     or await self._permit(name, arguments, target)
                 )
                 if outcome is None:
-                    outcome = await self._run(name, *checked)
+                    outcome = await self._noted(name, arguments, await self._run(name, *checked))
                 if self._session.site_done is not None and name not in NEED_NO_SITE:
                     # What the person allowed once was for this call.
                     await self._session.site_done()
@@ -266,6 +290,77 @@ class Toolkit:
         except ValidationError as exc:
             problem = describe_problem(exc)
             return CannotRun(f"{name}: {problem}", problem)
+
+    async def _within_limits(self, name: str, arguments: Mapping[str, Any]) -> Outcome | None:
+        """The limits of a task, and a step that goes round in circles (spec 18.8). None when the
+        call may run. Each call that is let through is counted."""
+        admitted = await self.limits.admit()
+        if isinstance(admitted, Reached):
+            if admitted != self._reached and self._observer:
+                self._observer.limit_reached(admitted.kind, admitted.limit, self.limits.on_a_task)
+            self._reached = admitted
+            return Outcome(admitted.text, "a limit was reached")
+        self._reached = None
+        if admitted is not None:
+            return Outcome(admitted, "too many calls at once")
+        if name in TOLD_BY_ITS_RESULT or name in NO_STEP_ON_A_PAGE:
+            return None
+        again = self.limits.goes_in_circles(same_step(name, arguments))
+        if again is None:
+            if self._mark is None:
+                # What the page is like before the first step, so that it can be said to have changed.
+                await self._page_moved()
+            return None
+        if await self._page_moved():
+            # The page changed by itself meanwhile: the step may do something now.
+            self.limits.page_changed()
+            return None
+        return Outcome(again, "the same step again and again")
+
+    def allow_more(self) -> bool:
+        """A person allowed more steps and minutes. False when no limit had stopped anything."""
+        told, self._reached = self._reached, None
+        self.limits.extend()
+        return told is not None
+
+    def task_began(self) -> bool:
+        """A task begins: its steps are counted from here. True when a limit had stopped the one before."""
+        told, self._reached = self._reached, None
+        self.limits.begin_task()
+        return told is not None
+
+    def task_ended(self) -> bool:
+        told, self._reached = self._reached, None
+        self.limits.end_task()
+        return told is not None
+
+    async def _page_moved(self) -> bool:
+        """Whether the page has changed since this was last asked. True when it cannot be told."""
+        driver = self._session.started_driver
+        mark: str | None = None
+        # A page with a dialog open answers nothing.
+        if driver is not None and self._session.pending_dialog() is None:
+            try:
+                mark = await driver.change_mark()
+            except BapError:
+                mark = None
+        moved = mark is None or mark != self._mark
+        self._mark = mark
+        return moved
+
+    async def _noted(self, name: str, arguments: Mapping[str, Any], outcome: Outcome) -> Outcome:
+        """What a result gains when the step changed nothing, or is the same once more (spec 18.8)."""
+        if name in NO_STEP_ON_A_PAGE:
+            return outcome
+        step = same_step(name, arguments)
+        if name in TOLD_BY_ITS_RESULT:
+            note = self.limits.read(step, outcome.text)
+        else:
+            note = self.limits.acted(step, changed=await self._page_moved())
+            if outcome.failure is not None or name in CHANGES_UNSEEN:
+                # A step that failed has said so; and what a hover changes is not always seen.
+                note = note.removeprefix(NOTHING_CHANGED)
+        return replace(outcome, text=outcome.text + note) if note else outcome
 
     def _blocked_by_a_dialog(self, name: str) -> Outcome | None:
         """While a page has a dialog open, a tool that needs the page is refused (spec 5.7)."""
@@ -419,6 +514,9 @@ class Toolkit:
         except Exception as exc:
             # The last line of defence: an agent's call must never take the service down.
             logger.exception("%s failed unexpectedly", name)
+            if name not in READS and self._lost_on_the_way(exc):
+                # Reading again is safe. Acting again may do the thing twice.
+                return Outcome(OUTCOME_UNKNOWN, "it is not known whether it was done")
             return Outcome(
                 f"{name} failed unexpectedly ({type(exc).__name__}). Try again, or take a new snapshot.",
                 "something went wrong",
@@ -426,6 +524,15 @@ class Toolkit:
         if isinstance(returned, Shown):
             return Outcome(returned.text, None, returned.picture)
         return Outcome(returned)
+
+    def _lost_on_the_way(self, error: Exception) -> bool:
+        """Whether a failure means that the browser, the tab or the way to it went away under a step."""
+        driver = self._session.started_driver
+        return (
+            isinstance(error, ConnectionError | EOFError | OSError)
+            or type(error).__module__.startswith("playwright")
+            or (driver is not None and not driver.is_alive())
+        )
 
     async def _locate(self, name: str, arguments: Mapping[str, Any]) -> Located | None:
         """The element a call names, for the sentence and the outline a person sees."""

@@ -219,6 +219,12 @@ class Driver(Protocol):
 
     async def locate(self, ref: str) -> Located: ...
 
+    async def change_mark(self) -> str | None:
+        """A value that is the same as the last time only when the active tab shows the same
+        document and nothing in it has changed since: its structure, what is typed or chosen,
+        what is scrolled, where the keyboard put the focus (spec 18.8). None when it cannot be told."""
+        ...
+
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str: ...
 
     async def click(

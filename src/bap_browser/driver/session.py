@@ -14,6 +14,7 @@ from bap_browser.errors import BrowserError
 from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
+from bap_browser.safeguards.model import Spend
 
 SESSION_ENDED = "The session has ended."
 
@@ -51,6 +52,8 @@ class BrowserSession:
         self.ask_approval: AskApproval | None = None
         """Set by whoever can reach a person. None when there is nobody to ask."""
         self._closed = False
+        self.spend = Spend()
+        """What the engine's own model calls have cost in this session (spec 18.8)."""
         self.on_event: Callable[[Happened], None] | None = None
         """Set by whoever shows the session to a person. It is told at once what happens in the browser
         by itself: a tab that opens, a dialog, a file that was saved."""

@@ -90,6 +90,9 @@ class Timeouts(Section):
         5000, "Longest wait for the page to answer. A page too busy to answer fails the call"
     )
     popup_adopt_ms: int = setting(3000, "Longest wait for a new tab to load before it is reported")
+    change_wait_ms: int = setting(
+        300, "Longest wait for the page to say, after a step, whether anything in it changed"
+    )
     wait_max_s: int = setting(30, "Ceiling for `browser_wait`")
     idle_session_s: int = setting(900, "Close a session unused for this long; 0 means never")
 
@@ -494,21 +497,13 @@ class Actions(Section):
             "sent",
             "sending",
             "post",
-            "reply",
-            "share",
             "submit",
-            "forward",
-            "invite",
-            "comment",
             "publish",
             "tweet",
-            "apply",
             "भेजें",
             "पोस्ट करें",
             "जमा करें",
             "सबमिट",
-            "साझा करें",
-            "शेयर करें",
         ],
         "A control whose name holds one of these sends something to other people",
     )

@@ -93,7 +93,36 @@
     return !parent || getComputedStyle(parent).cursor !== 'pointer';
   }
 
+  // How often the document has changed since this script was put in it (spec 18.8): its
+  // structure, what was typed or chosen, what was scrolled, and where the keyboard put the focus.
+  // A focus that a press of the pointer brought is not counted: a dead button pressed twice
+  // changes nothing the second time.
+  let changes = 0;
+  let pointerIsDown = false;
+  const WATCHED = { subtree: true, childList: true, attributes: true, characterData: true };
+  const watcher = new MutationObserver(() => changes++);
+  const watchedRoots = new WeakSet();
+  // A shadow root is a tree of its own: the watcher of the document does not see into it.
+  function watch(root) {
+    if (watchedRoots.has(root)) return;
+    watchedRoots.add(root);
+    watcher.observe(root, WATCHED);
+  }
+  watch(document);
+  const seen = { capture: true, passive: true };
+  for (const type of ['input', 'change', 'scroll']) addEventListener(type, () => changes++, seen);
+  addEventListener('pointerdown', () => (pointerIsDown = true), seen);
+  for (const type of ['pointerup', 'pointercancel', 'keydown']) addEventListener(type, () => (pointerIsDown = false), seen);
+  addEventListener('focusin', () => pointerIsDown || changes++, seen);
+
+  function stamp() {
+    // What the watcher has seen and not yet told.
+    if (watcher.takeRecords().length) changes++;
+    return changes;
+  }
+
   function kids(el, a) {
+    if (el.shadowRoot) watch(el.shadowRoot);
     if (a.shadow && el.shadowRoot) return el.shadowRoot.childNodes;
     if (el.tagName === 'SLOT') {
       const assigned = el.assignedNodes({ flatten: true });
@@ -339,7 +368,7 @@
     return true;
   }
 
-  const operations = { snapshot, frames, turn };
+  const operations = { snapshot, frames, turn, stamp };
 
   globalThis.__bap = (operation, a) => {
     const run = operations[operation];

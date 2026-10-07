@@ -74,6 +74,8 @@ class ServiceSession:
         self._approval: str | None = None
         self._approval_outcome: ApprovalOutcome | None = None
         self._approvals = 0
+        # Questions that ran out unanswered in a row. Past a limit, further ones are not waited for.
+        self._unanswered = 0
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
         # The request for a person that is open now, and how it was answered.
         self._help: str | None = None
@@ -176,6 +178,8 @@ class ServiceSession:
     async def handle(self, command: Mapping[str, Any]) -> None:
         """Does what a person asked for in the viewer. A command that does not apply changes nothing."""
         kind = command.get("type") if isinstance(command, Mapping) else None
+        # A person is here: their questions are waited for again (spec 18.8).
+        self._unanswered = 0
         if kind == "pause":
             await self._take("paused", ("agent",))
         elif kind == "take_over":
@@ -197,8 +201,10 @@ class ServiceSession:
             await self._input(kind, command)
         elif kind == "task":
             self.give_task(command.get("text"))
-        elif kind == "stop_task":
+        elif kind in ("stop_task", "end_task"):
             await self._stop_task()
+        elif kind == "extend_limit" and self.toolkit.allow_more():
+            self._limit_lifted()
         elif kind == "new_session" and self.control == "ended" and self._on_restart is not None:
             self._on_restart()
         elif kind == "select_tab" and self.control == "person":
@@ -281,6 +287,9 @@ class ServiceSession:
         self._on_a_task = on_a_task
         self._task_stopped = False
         self.hub.publish({"type": "task_changed", "working": on_a_task, "ts": self._clock()})
+        # The steps of a task are counted from where it begins (spec 18.8).
+        if self.toolkit.task_began() if on_a_task else self.toolkit.task_ended():
+            self._limit_lifted()
 
     async def wait_until_ended(self) -> None:
         async with self._changed:
@@ -392,6 +401,23 @@ class ServiceSession:
                 "ts": self._clock(),
             }
         )
+
+    def limit_reached(self, kind: str, limit: float, on_a_task: bool) -> None:
+        limits = self.config.limits
+        event: dict[str, Any] = {
+            "type": "limit_reached",
+            "kind": kind,
+            "limit": limit,
+            "scope": "task" if on_a_task else "session",
+        }
+        # What "Allow more" adds. More steps do not buy more money.
+        more = {"calls": limits.extend_calls, "minutes": limits.extend_minutes}.get(kind)
+        if more:
+            event["more"] = more
+        self.hub.publish({**event, "ts": self._clock()})
+
+    def _limit_lifted(self) -> None:
+        self.hub.publish({"type": "limit_lifted", "ts": self._clock()})
 
     # Who is driving (spec 4.5).
 
@@ -534,6 +560,10 @@ class ServiceSession:
         if not watched and control.approval_without_viewer == "allow":
             self._approval = None
             return "allowed"
+        if watched and self._unanswered >= self.config.limits.unanswered_in_a_row:
+            # Nobody has answered for a while. The agent is not kept waiting for nobody again.
+            self._approval = None
+            return "expired"
         self.hub.publish(
             {
                 "type": "approval_requested",
@@ -562,6 +592,7 @@ class ServiceSession:
             outcome = self._approval_outcome or ("denied" if stopped else "expired")
             if every_time and outcome == "allowed_site":
                 outcome = "allowed"
+            self._count_unanswered(outcome == "expired")
         self.hub.publish({"type": "approval_closed", "id": self._approval, "outcome": outcome})
         self._approval = None
         if self.control == "ended":
@@ -569,6 +600,13 @@ class ServiceSession:
                 ENDED_BY_A_PERSON if self._ended_by == "person" else ENDED, reason="the session ended"
             )
         return outcome
+
+    def _count_unanswered(self, ran_out: bool) -> None:
+        """Keeps count of the questions nobody answered in a row, and says so when further ones
+        will not be waited for (spec 18.8)."""
+        self._unanswered = self._unanswered + 1 if ran_out else 0
+        if ran_out and self._unanswered == self.config.limits.unanswered_in_a_row:
+            self.hub.publish({"type": "questions_unanswered", "count": self._unanswered, "ts": self._clock()})
 
     async def _answer_help(self, outcome: HelpOutcome) -> None:
         if self._help_outcome is None:

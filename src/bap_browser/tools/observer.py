@@ -22,3 +22,7 @@ class StepObserver(Protocol):
     def navigation_blocked(self, url: str, reason: str) -> None:
         """The policy refused an address."""
         ...
+
+    def limit_reached(self, kind: str, limit: float, on_a_task: bool) -> None:
+        """A limit of the task, or of the session while it has no task, stopped a call (spec 18.8)."""
+        ...

@@ -4301,6 +4301,11 @@ a person's browser into the built-in browser, site by site, is a later item (sec
 <td>Longest wait for a new tab to load before it is reported</td>
 </tr>
 <tr>
+<td><code>change_wait_ms</code></td>
+<td>300</td>
+<td>Longest wait for the page to say, after a step, whether anything in it changed (section 18.8)</td>
+</tr>
+<tr>
 <td><code>wait_max_s</code></td>
 <td>30</td>
 <td>Ceiling for <code>browser_wait</code></td>
@@ -9959,7 +9964,7 @@ into.</p>
 </tr>
 <tr>
 <td><code>sends</code></td>
-<td>send, sent, sending, post, reply, share, submit, forward, invite, comment, publish, tweet, apply, भेजें, पोस्ट करें, जमा करें, सबमिट, साझा करें, शेयर करें</td>
+<td>send, sent, sending, post, submit, publish, tweet, भेजें, पोस्ट करें, जमा करें, सबमिट</td>
 <td>Enter or Ctrl+Enter pressed in a message box; a typing step with <code>submit: true</code> there; the submit button of a form that holds a message box</td>
 </tr>
 <tr>
@@ -9982,6 +9987,9 @@ into.</p>
 <ul>
 <li>A message box is a text area, an editable block, or a field whose name or label holds message, comment, reply, review, post, body, subject, to or recipient. A search box (a <code>search</code> field, or the one text field of its form) is not.</li>
 <li>A word in Latin letters is matched whole and without regard to case. A word in another script is looked for anywhere in the name.</li>
+<li>A phrase says more than a word: "Cancel order" deletes, though "order" alone pays. Between words of the same length the graver class wins, in the order of the table: "Confirm and pay" pays.</li>
+<li>A link goes somewhere. It is classed only when it pays, deletes or grants: links that send are rare, and a link named "Blog post" sends nothing.</li>
+<li>Reply, share, forward, invite, comment and apply are not in the list: such a control opens a form far more often than it sends one, and a person asked at every "Apply filters" stops reading the questions. What they lead to is caught where it is sent: by the form's own button, or by Enter in the message box.</li>
 <li>The words are settings, one list for each class (<code>safeguards.actions</code>). <code>permissions.consequential_words</code> stays, as the deployment's own extra words.</li>
 <li>A name in a language that is in none of the lists is not classified. That is a known limit, and one reason why the layers of 18.6 and 18.7 do not rest on a control's name.</li>
 </ul>
@@ -11089,10 +11097,23 @@ watching, the task stays stopped.</p>
 </tr>
 <tr>
 <td>Nothing changed</td>
-<td>After an acting step, when the tab did not move to another address and the page's change counter did not move, the result gains: "Nothing on the page changed."</td>
+<td>After an acting step, when the tab did not move to another document and the page's change counter did not move, the result gains: "Nothing on the page changed." Not after <code>browser_hover</code>: what a hover brings up is often drawn by a style, which the counter cannot see. A step that failed has said so, and is not told this as well; it still counts towards the repeats</td>
+</tr>
+<tr>
+<td>A script in the page</td>
+<td><code>browser_evaluate</code> is mostly a way to read. It is treated as a reading call here: told by its result, never refused</td>
 </tr>
 </tbody>
 </table></div>
+<p><strong>What counts as a change of the page.</strong> The page script keeps a counter for its document. It goes up
+when the structure of the document changes (in the page, in a frame that was read, in an open shadow
+tree that was read), when something is typed or chosen, when the page or a box in it is scrolled, and
+when the keyboard moves the focus. A focus that a press of the pointer brought is not counted: a dead
+button pressed twice changes nothing the second time. Another document in the tab is always a change.
+The page is asked after each acting step, for at most <code>browser.timeouts.change_wait_ms</code>; a page too
+busy to answer in that time is taken to have changed, so that no step is held back on a guess. What
+is drawn on a canvas and what is inside a closed shadow tree are not seen: there the notice can be
+wrong, and the refusal says how to go on (read the page, choose a different step).</p>
 <p><strong>4. A step whose outcome is not known.</strong> When the answer to an acting step is lost (the bridge's
 channel is cut while it runs, the page does not answer in time after the input was sent, the tab or
 the browser goes away under it), the result is neither success nor failure: "The connection to the
@@ -11300,7 +11321,11 @@ itself, and the task you gave is trusted. Stay near for anything that matters, a
 <tbody>
 <tr>
 <td><code>task_set</code></td>
-<td><code>task</code>, <code>from</code> (<code>person</code>, <code>agent</code>), <code>sites</code> (each with <code>host</code>, <code>grade</code>), <code>ts</code></td>
+<td><code>task</code>, <code>from</code> (<code>person</code>, <code>agent</code>), <code>sites</code> (each with <code>host</code> and <code>grade</code>: <code>named</code>, <code>added_read</code>, <code>added_act</code>), <code>ts</code></td>
+</tr>
+<tr>
+<td><code>task_ended</code></td>
+<td><code>ts</code>. The task line goes; the sites of a conversation stay known</td>
 </tr>
 <tr>
 <td><code>sites_changed</code></td>
@@ -11308,7 +11333,11 @@ itself, and the task you gave is trusted. Stay near for anything that matters, a
 </tr>
 <tr>
 <td><code>check_decided</code></td>
-<td><code>step</code>, <code>stage</code> (<code>rule</code>, <code>reviewer</code>, <code>person</code>, <code>limit</code>), <code>outcome</code> (<code>run</code>, <code>ask</code>, <code>refuse</code>), <code>findings</code>, <code>reason</code> (the engine's own sentence), <code>said</code> (the reviewer's sentence: to viewers only, never to a log), <code>refused_id</code> (when it can be allowed once)</td>
+<td><code>step</code>, <code>stage</code> (<code>rule</code>, <code>reviewer</code>, <code>person</code>, <code>limit</code>), <code>outcome</code> (<code>run</code>, <code>ask</code>, <code>refuse</code>), <code>findings</code>, <code>reason</code> (the engine's own sentence), <code>said</code> (the reviewer's sentence: to viewers only, never to a log), <code>refused_id</code> (when it can be allowed once), <code>ts</code></td>
+</tr>
+<tr>
+<td><code>refused_allowed</code></td>
+<td><code>id</code>, <code>ts</code>. A person pressed "Allow once" for that refused step</td>
 </tr>
 <tr>
 <td><code>page_flagged</code></td>
@@ -11316,15 +11345,23 @@ itself, and the task you gave is trusted. Stay near for anything that matters, a
 </tr>
 <tr>
 <td><code>auto_changed</code></td>
-<td><code>state</code> (<code>on</code>, <code>paused</code>, <code>waiting_for_task</code>, <code>unavailable</code>), <code>why</code></td>
+<td><code>mode</code> (<code>every_action</code>, <code>risky</code>, <code>auto</code>), <code>state</code> (<code>off</code>, <code>on</code>, <code>paused</code>, <code>waiting_for_task</code>, <code>unavailable</code>), <code>why</code>, <code>ts</code>. Sent when a session starts and whenever either changes</td>
 </tr>
 <tr>
 <td><code>limit_reached</code></td>
-<td><code>kind</code> (<code>calls</code>, <code>minutes</code>, <code>spend</code>), <code>limit</code>, <code>ts</code></td>
+<td><code>kind</code> (<code>calls</code>, <code>minutes</code>, <code>spend</code>), <code>limit</code>, <code>scope</code> (<code>task</code>, <code>session</code>), <code>more</code> (what "Allow more" adds: steps or minutes; absent for <code>spend</code>), <code>ts</code>. Sent once for a limit, not for every call it stops</td>
+</tr>
+<tr>
+<td><code>limit_lifted</code></td>
+<td><code>ts</code>. A person allowed more, or another task began</td>
+</tr>
+<tr>
+<td><code>questions_unanswered</code></td>
+<td><code>count</code>, <code>ts</code>. So many questions ran out in a row; further ones are refused until a person does something in the viewer</td>
 </tr>
 <tr>
 <td><code>approval_requested</code> (extended)</td>
-<td><code>why</code> (the findings in words), <code>leaves</code> (<code>text</code>, <code>from_site</code>, <code>to_site</code>: the exception of 18.6), <code>amount</code></td>
+<td><code>why</code> (each reason in words), <code>leaves</code> (<code>text</code>, <code>from_site</code>, <code>to_site</code>: the exception of 18.6), <code>amount</code>, <code>said</code> (the reviewer's sentence, in Auto Mode)</td>
 </tr>
 </tbody>
 </table></div>

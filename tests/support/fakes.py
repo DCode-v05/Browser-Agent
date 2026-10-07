@@ -65,6 +65,9 @@ class FakeDriver:
         self.saved: list[SavedFile] = []
         self.value: Any = None
         """What the next script gives."""
+        self.mark: str | None = None
+        """What the page says of itself after a step. The same twice means that nothing changed;
+        None means that it cannot be told."""
 
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         self.tell = on_event
@@ -189,6 +192,9 @@ class FakeDriver:
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
         self.calls.append(("wheel", (x, y, dx, dy)))
+
+    async def change_mark(self) -> str | None:
+        return self.mark
 
     async def locate(self, ref: str) -> Located:
         if ref == "e9":
