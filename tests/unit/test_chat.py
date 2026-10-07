@@ -8,8 +8,9 @@ from typing import Any
 from fakes import FakeDriver
 
 from bap_browser.agent.command import NOT_RUN, _do
-from bap_browser.agent.models import Message, ModelError, Reply, Said, ToolCall, ToolOutput
+from bap_browser.agent.models import Message, Reply, Said, ToolCall, ToolOutput
 from bap_browser.config import Config
+from bap_browser.errors import ModelError
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools import ToolDefinition
 

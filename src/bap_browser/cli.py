@@ -279,6 +279,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser.agent.command import Interrupted
     from bap_browser.agent.openai_model import OpenAIModel
     from bap_browser.agent.studio import run_studio
+    from bap_browser.safeguards.model import ModelClient
 
     extension = browser_extension.install(_extension_folder(config))
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
@@ -286,7 +287,9 @@ def _studio(args: argparse.Namespace) -> int:
         asyncio.run(
             run_studio(
                 config,
-                lambda service: OpenAIModel(config.agent, key),
+                lambda service: OpenAIModel(
+                    config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
+                ),
                 open_viewer=args.open,
                 extension=extension,
             )
@@ -320,7 +323,8 @@ def _agent(args: argparse.Namespace) -> int:
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
     from bap_browser.agent.loop import Unfinished
-    from bap_browser.agent.models import Model, ModelError
+    from bap_browser.agent.models import Model
+    from bap_browser.errors import ModelError
     from bap_browser.service.server import Service
 
     model_for: Callable[[Service], Model]
@@ -347,9 +351,12 @@ def _agent(args: argparse.Namespace) -> int:
                 "in the environment. To try without a model: bap-browser agent --demo"
             )
         from bap_browser.agent.openai_model import OpenAIModel
+        from bap_browser.safeguards.model import ModelClient
 
         task = args.task
-        model_for = lambda service: OpenAIModel(config.agent, key)  # noqa: E731
+        model_for = lambda service: OpenAIModel(  # noqa: E731
+            config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
+        )
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     try:

@@ -16,7 +16,7 @@ from model_stand_in import ModelStandIn, response, said
 
 from bap_browser.agent.models import Said, ToolCall, ToolOutput
 from bap_browser.agent.openai_model import OpenAIModel
-from bap_browser.config import Agent, Config
+from bap_browser.config import Agent, CheckModel, Config
 from bap_browser.driver import BrowserSession
 from bap_browser.driver.base import Happened, PageDialog, TabInfo
 from bap_browser.driver.screenshots import size_of
@@ -24,6 +24,7 @@ from bap_browser.errors import BadInput, BrowserError
 from bap_browser.mcp.server import build_server
 from bap_browser.policy.files import allowed_file
 from bap_browser.results import Picture
+from bap_browser.safeguards.model import ModelClient
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools import TOOLS, Toolkit
 
@@ -296,7 +297,8 @@ def provider() -> Iterator[Callable[..., ModelStandIn]]:
 
 async def test_the_model_is_sent_the_newest_picture_only(provider) -> None:
     stand_in = provider(response(said("I see it.")))
-    hosted = OpenAIModel(Agent(base_url=stand_in.base_url), "sk-test-not-a-real-key")
+    settings = Agent(base_url=stand_in.base_url)
+    hosted = OpenAIModel(settings, ModelClient(settings, CheckModel(), "sk-test-not-a-real-key", "loop"))
     first, second = ToolCall("a", "browser_screenshot", {}), ToolCall("b", "browser_screenshot", {})
     older, newer = Picture(b"older", "image/png"), Picture(b"newer", "image/jpeg")
     conversation = [

@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from bap_browser.agent.loop import Tools
-from bap_browser.agent.models import Message, Model, ModelError, Reply
+from bap_browser.agent.models import Message, Model, Reply
 from bap_browser.config import Agent, Evals
+from bap_browser.errors import ModelError
 from bap_browser.results import ToolResult
 from bap_browser.tools import ToolDefinition
 

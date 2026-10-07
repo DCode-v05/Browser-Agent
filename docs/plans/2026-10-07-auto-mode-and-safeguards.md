@@ -89,6 +89,25 @@ Attack pages of a slice are written with it, before its code.
 | 2026-10-07 | Plan written. Nothing built yet. Next: slice 0, the spec |
 | 2026-10-07 | Slice 0 done: section 18 of the spec says every resolution above. Next: slice 1, the model client |
 
+## Shapes fixed while building (the spec's 18.10 is to say these; the viewer is built against them)
+
+Events: `task_set {task, from, sites:[{host, grade: named|added_read|added_act}], ts}`, `task_ended {ts}`,
+`sites_changed {sites}`, `check_decided {step, stage: rule|reviewer|person|limit, outcome: run|ask|refuse,
+findings, reason, said?, refused_id?, ts}`, `refused_allowed {id, ts}`, `page_flagged {tab, site, rule, count, ts}`,
+`auto_changed {mode: every_action|risky|auto, state: off|on|paused|waiting_for_task|unavailable, why?, ts}`,
+`limit_reached {kind: calls|minutes|spend, limit, scope: task|session, more?, ts}`, `limit_lifted {ts}`,
+`questions_unanswered {count, ts}`. `approval_requested` gains `why?: string[]`, `leaves?: {text, from_site,
+to_site}`, `amount?`, `said?`. Commands: `resume_auto`, `allow_refused {id}`, `extend_limit`, `drop_site {host}`,
+`end_task`.
+
+Helpers at work (each owns only the files named; none commits): site identity and look-alikes
+(`policy/sites.py`, `safeguards/lookalikes.py`, the two data files, `scripts/refresh_data.py`); the viewer
+parts of 18.10 (everything under `viewer/`, no build).
+
+Module names as built: `safeguards/model.py` (`ModelClient`, `Spend`), `safeguards/limits.py` (`Limits`).
+`ModelError` is in `errors.py`. All settings of 18.11 are in `config.py` (`safeguards.*`, `limits.*`,
+`safety.auto_mode.*`, `agent.retries`, `logging.retention_days`).
+
 ## Where things are (found while reading; keep short)
 
 - The decision for a call is in `src/bap_browser/tools/toolkit.py`: `Toolkit.call` runs `_blocked_by_a_dialog`, `_site_permission` (the extension's question), `_permit` (tool policy, `ask_before`, consequential words, site grants), then `_run`.

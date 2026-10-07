@@ -7,32 +7,30 @@ included, as the provider's guide for stateless use asks.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
-import urllib.error
-import urllib.request
 from collections.abc import Sequence
 from typing import Any
 
-from bap_browser.agent.models import Message, ModelError, Reply, ToolCall, ToolOutput, Usage
+from bap_browser.agent.models import Message, Reply, ToolCall, ToolOutput, Usage
 from bap_browser.config import Agent
+from bap_browser.errors import ModelError
+from bap_browser.safeguards.model import LONGEST_REFUSAL, ModelClient, output_text, tokens_of
 from bap_browser.tools import ToolDefinition
-
-# The provider's own explanation of a refusal is passed on, but not at any length.
-LONGEST_REFUSAL = 300
 
 
 class OpenAIModel:
-    def __init__(self, settings: Agent, api_key: str) -> None:
+    def __init__(self, settings: Agent, client: ModelClient) -> None:
         self._settings = settings
-        self._key = api_key
+        self._client = client
+        """How a request reaches the provider: its time limit, its further tries, its breaker (spec 18.8)."""
         self._turns: list[list[dict[str, Any]]] = []
         """What the provider returned for each of the model's turns, in order."""
 
     def use(self, settings: Agent) -> None:
         """Takes the settings as they are now: a person may have chosen another model (spec 10.2)."""
         self._settings = settings
+        self._client.use(settings)
 
     async def complete(
         self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
@@ -57,18 +55,12 @@ class OpenAIModel:
             "store": False,
             "include": ["reasoning.encrypted_content"],
         }
-        answer = await asyncio.to_thread(self._post, body)
+        answer = await self._client.post(body)
         output = [item for item in answer.get("output") or [] if isinstance(item, dict)]
         if answer.get("status") == "failed":
             reason = (answer.get("error") or {}).get("message") or "no reason was given"
             raise ModelError(f"The model could not answer: {str(reason)[:LONGEST_REFUSAL]}")
-        text = "".join(
-            part.get("text", "")
-            for item in output
-            if item.get("type") == "message"
-            for part in item.get("content") or []
-            if isinstance(part, dict) and part.get("type") == "output_text"
-        )
+        text = output_text(answer)
         calls = tuple(
             ToolCall(str(item.get("call_id")), str(item.get("name")), _arguments(item.get("arguments")))
             for item in output
@@ -80,7 +72,8 @@ class OpenAIModel:
                 f"Raise agent.max_tokens ({settings.max_tokens}) in config.json."
             )
         self._turns.append(output)
-        return Reply(text, calls, _usage(answer.get("usage")))
+        tokens = tokens_of(answer)
+        return Reply(text, calls, None if tokens is None else Usage(*tokens))
 
     def _input(self, messages: Sequence[Message]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
@@ -109,53 +102,6 @@ class OpenAIModel:
                     items += _written_out(message.text, message.tool_calls)
                 turn += 1
         return items
-
-    def _post(self, body: dict[str, Any]) -> dict[str, Any]:
-        settings = self._settings
-        request = urllib.request.Request(
-            f"{settings.base_url.rstrip('/')}/responses",
-            data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=settings.request_timeout_s) as reply:
-                answer = json.loads(reply.read())
-        except urllib.error.HTTPError as refused:
-            # The refusal holds the connection it came on until it is closed.
-            with refused:
-                raise ModelError(self._refusal(refused)) from None
-        except (urllib.error.URLError, TimeoutError, OSError) as failed:
-            reason = getattr(failed, "reason", failed)
-            raise ModelError(f"The model provider could not be reached: {reason}") from None
-        except ValueError:
-            raise ModelError("The model provider's answer could not be read.") from None
-        if not isinstance(answer, dict):
-            raise ModelError("The model provider's answer could not be read.")
-        return answer
-
-    def _refusal(self, refused: urllib.error.HTTPError) -> str:
-        if refused.code == 401:
-            # The provider's own message repeats part of the key. It is not passed on.
-            return (
-                "The model provider did not accept the key (HTTP 401). "
-                f"Check {self._settings.api_key_env} in your .env file."
-            )
-        try:
-            said = json.loads(refused.read())["error"]["message"]
-        except (ValueError, KeyError, TypeError):
-            return f"The model provider answered HTTP {refused.code}."
-        return f"The model provider answered HTTP {refused.code}: {str(said)[:LONGEST_REFUSAL]}"
-
-
-def _usage(said: Any) -> Usage | None:
-    """The tokens of one reply, as the provider counted them. None when it did not say."""
-    if not isinstance(said, dict):
-        return None
-    sent, written = said.get("input_tokens"), said.get("output_tokens")
-    if not isinstance(sent, int) or not isinstance(written, int) or isinstance(sent, bool):
-        return None
-    return Usage(sent, written)
 
 
 def _arguments(text: Any) -> dict[str, Any]:

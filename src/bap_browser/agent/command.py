@@ -10,9 +10,10 @@ from pathlib import Path
 
 from bap_browser import browser_extension
 from bap_browser.agent.loop import Unfinished, run_agent
-from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
+from bap_browser.agent.models import Message, Model, Said, ToolOutput
 from bap_browser.config import Config
 from bap_browser.driver.playwright_driver import PlaywrightDriver
+from bap_browser.errors import ModelError
 from bap_browser.evals.record import Outcome, Recorder
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service

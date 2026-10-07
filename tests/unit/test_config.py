@@ -334,7 +334,10 @@ def test_sources_say_where_each_overridden_value_came_from(tmp_path: Path) -> No
 
 
 def test_the_configuration_holds_no_secret() -> None:
-    dumped = json.dumps(defaults().model_dump())
+    settings = defaults().model_dump()
+    # The words by which a password field is known are a setting (spec 18.6). They are no secret.
+    assert "password" in settings["safeguards"]["outgoing"].pop("sensitive_words")
+    dumped = json.dumps(settings)
     assert '"token"' not in dumped
     assert "password" not in dumped
 

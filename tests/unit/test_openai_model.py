@@ -9,10 +9,12 @@ from fakes import SNAPSHOT, FakeDriver
 from model_stand_in import ModelStandIn, called, response, said, thought
 
 from bap_browser.agent.loop import run_agent
-from bap_browser.agent.models import ModelError, Reply, Said, ToolCall, ToolOutput
+from bap_browser.agent.models import Reply, Said, ToolCall, ToolOutput
 from bap_browser.agent.openai_model import OpenAIModel
-from bap_browser.config import Agent, Config
+from bap_browser.config import Agent, CheckModel, Config
 from bap_browser.driver import BrowserSession
+from bap_browser.errors import ModelError
+from bap_browser.safeguards.model import ModelClient
 from bap_browser.tools import TOOLS, Toolkit
 
 KEY = "sk-test-not-a-real-key"
@@ -33,7 +35,11 @@ def provider() -> Iterator[Callable[..., ModelStandIn]]:
 
 
 def model(stand_in: ModelStandIn, **settings: object) -> OpenAIModel:
-    return OpenAIModel(Agent(base_url=stand_in.base_url, **settings), KEY)  # type: ignore[arg-type]
+    return hosted(Agent(base_url=stand_in.base_url, **settings))  # type: ignore[arg-type]
+
+
+def hosted(settings: Agent) -> OpenAIModel:
+    return OpenAIModel(settings, ModelClient(settings, CheckModel(), KEY, "loop"))
 
 
 async def test_the_request_is_what_the_provider_documents(provider) -> None:
@@ -81,10 +87,10 @@ async def test_text_and_tool_calls_are_read_from_the_reply(provider) -> None:
 async def test_the_next_request_carries_the_whole_turn_back_and_each_result(provider) -> None:
     first = [thought("rs_1"), called("call_a", "browser_snapshot", "{}")]
     stand_in = provider(response(*first), response(said("Done.")))
-    hosted = model(stand_in)
+    kept = model(stand_in)
     task = Said("user", "Read the page")
-    reply = await hosted.complete("", [task], TOOLS)
-    done = await hosted.complete(
+    reply = await kept.complete("", [task], TOOLS)
+    done = await kept.complete(
         "",
         [
             task,
@@ -149,14 +155,15 @@ async def test_another_refusal_passes_on_what_the_provider_said(provider) -> Non
         (404, {"error": {"message": "The model `gpt-9` does not exist.", "type": "invalid_request_error"}}),
         (500, {"unexpected": "shape"}),
     )
-    hosted = model(stand_in)
+    # Further tries are the client's affair (test_model_client.py). Here each refusal is the last word.
+    refused = model(stand_in, retries=0)
     for expected in (
         "The model provider answered HTTP 429: Rate limit reached for gpt-5.6-luna.",
         "The model provider answered HTTP 404: The model `gpt-9` does not exist.",
         "The model provider answered HTTP 500.",
     ):
         with pytest.raises(ModelError) as failed:
-            await hosted.complete("", [Said("user", "Hi")], TOOLS)
+            await refused.complete("", [Said("user", "Hi")], TOOLS)
         assert str(failed.value) == expected
 
 
@@ -164,9 +171,9 @@ async def test_a_provider_that_cannot_be_reached_is_said_so() -> None:
     with socket.socket() as unused:
         unused.bind(("127.0.0.1", 0))
         port = unused.getsockname()[1]
-    hosted = OpenAIModel(Agent(base_url=f"http://127.0.0.1:{port}/v1", request_timeout_s=5), KEY)
+    unreachable = hosted(Agent(base_url=f"http://127.0.0.1:{port}/v1", request_timeout_s=5, retries=0))
     with pytest.raises(ModelError, match=r"^The model provider could not be reached: "):
-        await hosted.complete("", [Said("user", "Hi")], TOOLS)
+        await unreachable.complete("", [Said("user", "Hi")], TOOLS)
 
 
 async def test_a_reply_that_failed_or_was_cut_off_before_it_said_anything_is_an_error(provider) -> None:
@@ -174,11 +181,11 @@ async def test_a_reply_that_failed_or_was_cut_off_before_it_said_anything_is_an_
         response(status="failed", error={"code": "server_error", "message": "The model had a problem."}),
         response(thought("rs_1"), status="incomplete", incomplete_details={"reason": "max_output_tokens"}),
     )
-    hosted = model(stand_in, max_tokens=64)
+    small = model(stand_in, max_tokens=64)
     with pytest.raises(ModelError, match=r"^The model could not answer: The model had a problem\.$"):
-        await hosted.complete("", [Said("user", "Hi")], TOOLS)
+        await small.complete("", [Said("user", "Hi")], TOOLS)
     with pytest.raises(ModelError, match=r"cut off before it said anything.*agent\.max_tokens \(64\)"):
-        await hosted.complete("", [Said("user", "Hi")], TOOLS)
+        await small.complete("", [Said("user", "Hi")], TOOLS)
 
 
 async def test_the_loop_runs_a_task_with_the_hosted_model(
