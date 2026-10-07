@@ -318,9 +318,33 @@ Not checked by me: the two pages on a phone-sized screen (the styles are the tok
 tests are at desktop size), and two people signed in as a user at the same time (they share one
 password, one set of settings and one preferred browser).
 
-What is not in it: an account for each person; a user's page that follows the admin's switches for
-"may change" and "may see" without a reload (the service refuses at once; the page reads them when
-it loads).
+What is not in it: an account for each person.
+
+### 1m. Finished on 2026-10-07: each thing in one place, every control working and saying what it does
+
+Asked for on 2026-10-07, after using the admin's page: working switches in the settings; no
+configuration, settings or evaluations shown twice; it made clear on the admin's side what is for
+users; every control saying what it does; a change by the admin showing on the user's page.
+
+| What was wrong | What it is now |
+|---|---|
+| The same card of a browser was under its tab and again on the Systems page, and a third time in a settings screen that opened over the page | One place for each thing. A browser's own Configuration and Evaluations are under its tab. The Systems page has only what is not one browser's: **Users** and **All systems**. The settings button on the chat goes to that browser's Configuration (a user's Settings) |
+| The settings screen vanished while it was being used: turning "Use this browser" off or on replaced the page behind it | There is no screen over the page in the window. "Use this browser" is one switch at the top of the Configuration, and the page stays where it is |
+| Choices and site lists were shown as words on the card, changed only in that screen | Every setting has its working control on the page: switch, choice, list of sites, button. A change is saved as it is made and the row says "Saved" |
+| A switch said only its name | Every setting has a line saying what it does (each under 110 characters, held by a test); every line of what users may change and see says what it lets a user do; the buttons and the lines of the evaluations say what they are |
+| Nothing said which settings reach users | On the admin's Configuration, a setting that is also on the user's page says so, and whether users may set their own or are held at the admin's value. Every page says whose it is and what it is for |
+| The colour mode held only on "Browser and chat": every other view fell back to the device's colours | The window keeps it: it holds on every page |
+| A user saw the admin's changes to "may change" and "may see" only after a reload | A user's window follows the admin within two seconds: browsers, views, and settings now held |
+| My Chrome's page showed "Protocol error (Target.setAutoAttach): No current window" | "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it." |
+| The window had two banners, no main part and, off the chat, no first heading (found by the accessibility scanner, which had never been run on these pages) | One of each. The scanner finds nothing on any page of the window, and the tests now run it on the admin's and the user's pages |
+
+Run in a real Chromium (`tests/viewer/test_studio.py`, `tests/viewer/test_roles.py`): every switch,
+choice and list of a browser's Configuration is changed and read back from the service; a browser is
+turned off and on from its Configuration with the page staying put; the Systems page is walked in
+both views; and a user's page is watched following the admin with no reload.
+
+Not checked by me: My Chrome's new sentence with a real Chrome that has no window (the wording is
+tested, the case was seen once in the log of the running service).
 
 ### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
 

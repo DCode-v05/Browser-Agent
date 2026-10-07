@@ -34,9 +34,11 @@ interface ButtonProps {
   label?: string;
   /** Pressed, and not taken hold yet. It keeps the focus, and takes no second press. */
   busy?: boolean;
+  /** What pressing it does, shown when the pointer rests on it. */
+  hint?: string;
 }
 
-export function Button({ kind = 'plain', icon, onClick, children, ref, disabled, label, busy }: ButtonProps) {
+export function Button({ kind = 'plain', icon, onClick, children, ref, disabled, label, busy, hint }: ButtonProps) {
   return (
     <button
       type="button"
@@ -46,6 +48,7 @@ export function Button({ kind = 'plain', icon, onClick, children, ref, disabled,
       ref={ref}
       disabled={disabled}
       aria-label={label}
+      title={hint}
       // Not `disabled`: a button that is disabled while it has the focus drops the focus.
       aria-busy={busy || undefined}
       aria-disabled={busy || undefined}

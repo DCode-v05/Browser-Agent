@@ -49,6 +49,17 @@ BUILT_IN_PROFILE = "built-in-browser"
 DESKTOP_STATE_FILE = "desktop-service.json"
 # What a person needs the agent's attention for.
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
+# What the page of the person's own Chrome says when that Chrome has no window to work in.
+NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
+
+
+def said_of(failed: BaseException) -> str:
+    """Why a browser could not be started, in words a person can act on."""
+    words = str(failed)
+    # Chrome says this when it runs with no window open. It is the person's to open one.
+    return NO_WINDOW if "No current window" in words else words
+
+
 # What a person may do with a browser of the window, besides setting it up.
 ACTIONS = ("start", "stop", "restart")
 # What the summary of an ended session says, in place of "You stopped it."
@@ -381,7 +392,7 @@ class Studio:
                 await session.start()
             except BapError as failed:
                 await session.close()
-                room.note = str(failed)
+                room.note = said_of(failed)
                 await asyncio.sleep(config.bridge.heartbeat_s)
                 continue
             room.note = ""

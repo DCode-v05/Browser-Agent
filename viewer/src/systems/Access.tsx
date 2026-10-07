@@ -1,5 +1,5 @@
-// What only the admin has (spec 4.11): the policy for users (what they may change and see), the
-// two passwords, and the evaluations of every system as one.
+// What only the admin has, and is not one browser's (spec 4.11): what users are allowed, the two
+// passwords, where each browser stands, and the evaluations of every system as one.
 
 import { useId, useState, type FormEvent } from 'react';
 
@@ -7,9 +7,9 @@ import type { PasswordSet, Role } from '../auth/api';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/StatusPanel';
 import { W } from '../wording';
-import type { Overall, Policy, PolicyChange, PolicyLine } from './api';
+import type { Overall, Policy, PolicyChange, PolicyLine, SystemInfo } from './api';
 import { count, dollars, percent, spanOf } from './format';
-import { Switch } from './parts';
+import { BACKEND_ICON, NOT_RUNNING, SwitchRow, TableScroll } from './parts';
 
 /** Sets a password: the admin's own, or the one users sign in with. */
 export interface Passwords {
@@ -18,37 +18,61 @@ export interface Passwords {
 
 interface AccessProps {
   policy: Policy;
+  systems: SystemInfo[];
   onPolicy(changes: PolicyChange): void;
   passwords?: Passwords;
+  /** Goes to a browser's own configuration, where users are let in to it or kept out. */
+  onOpen(system: string): void;
 }
 
-export function Access({ policy, onPolicy, passwords }: AccessProps) {
+export function Access({ policy, systems, onPolicy, passwords, onOpen }: AccessProps) {
   const A = W.systems.access;
   const lines = (part: 'may_change' | 'sees', list: PolicyLine[]) =>
     list.map((line) => (
-      <li key={line.id} className="system-row">
-        <span className="system-row-name">{line.title ?? line.id}</span>
-        <Switch label={`${A[part]}: ${line.title ?? line.id}`} on={line.allowed} onChange={(next) => onPolicy({ [part]: { [line.id]: next } })} />
+      <li key={line.id}>
+        <SwitchRow title={line.title ?? line.id} description={line.description ?? ''} label={`${A[part]}: ${line.title ?? line.id}`} on={line.allowed} onChange={(next) => onPolicy({ [part]: { [line.id]: next } })} />
       </li>
     ));
   return (
-    <article className="system-card" aria-label={A.title}>
+    <article className="system-card" aria-label={A.title} data-wide="true">
       <header className="system-head">
-        <Icon name="lock" size="large" />
+        <Icon name="person" size="large" />
         <h3 className="system-name">{A.title}</h3>
       </header>
-      <p className="system-note">{A.lead}</p>
+      <p className="system-hint">{A.lead}</p>
+
+      <h4 className="system-section">{A.browsers}</h4>
+      <p className="system-hint">{A.browsersLead}</p>
+      <ul className="system-list">
+        {systems.map((system) => {
+          const allowed = policy.systems.find((line) => line.id === system.id)?.allowed !== false;
+          const name = W.backend[system.backend];
+          return (
+            <li key={system.id} className="system-row">
+              <span className="system-row-name">
+                {name}
+                <span className="system-row-hint">{allowed ? A.allowed : A.kept}</span>
+              </span>
+              <Button icon="settings" label={`${A.open}: ${name}`} onClick={() => onOpen(system.id)}>
+                {A.open}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
 
       <h4 className="system-section">{A.may_change}</h4>
-      <p className="system-note">{A.mayChangeLead}</p>
+      <p className="system-hint">{A.mayChangeLead}</p>
       <ul className="system-list">{lines('may_change', policy.may_change)}</ul>
 
       <h4 className="system-section">{A.sees}</h4>
+      <p className="system-hint">{A.seesLead}</p>
       <ul className="system-list">{lines('sees', policy.sees)}</ul>
 
       {passwords && (
         <>
           <h4 className="system-section">{A.signIn}</h4>
+          <p className="system-hint">{A.signInLead}</p>
           <PasswordForm role="user" passwords={passwords} />
           <PasswordForm role="admin" passwords={passwords} />
         </>
@@ -94,6 +118,78 @@ function PasswordForm({ role, passwords }: { role: Role; passwords: Passwords })
   );
 }
 
+interface BrowsersProps {
+  systems: SystemInfo[];
+  /** What the admin lets users use. Null until the service has said. */
+  policy: Policy | null;
+  wordFor(system: SystemInfo): string;
+  onOpen(system: string, view: 'configuration' | 'evaluations'): void;
+}
+
+/** Where each browser stands, and the way to its own configuration and evaluations. Nothing is
+ *  changed here: each browser is set up in one place, under its own tab. */
+export function BrowsersCard({ systems, policy, wordFor, onOpen }: BrowsersProps) {
+  const V = W.systems.overview;
+  return (
+    <article className="system-card" aria-label={V.title} data-wide="true">
+      <header className="system-head">
+        <Icon name="monitor" size="large" />
+        <h3 className="system-name">{V.title}</h3>
+      </header>
+      <p className="system-hint">{V.lead}</p>
+      <TableScroll label={V.title}>
+      <table className="system-table">
+        <thead>
+          <tr>
+            <th scope="col">{V.system}</th>
+            <th scope="col">{V.state}</th>
+            <th scope="col">{V.inUse}</th>
+            <th scope="col">{V.forUsers}</th>
+            <th scope="col">{V.model}</th>
+            <th scope="col">{V.go}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {systems.map((system) => {
+            const name = W.backend[system.backend];
+            const users = policy?.systems.find((line) => line.id === system.id)?.allowed !== false;
+            return (
+              <tr key={system.id}>
+                <th scope="row">
+                  <span className="system-table-name">
+                    <Icon name={BACKEND_ICON[system.backend]} />
+                    {name}
+                  </span>
+                </th>
+                <td>
+                  <span className="system-state" data-on={system.enabled && !NOT_RUNNING.has(system.state)}>
+                    <span className="studio-tab-dot" aria-hidden="true" />
+                    {wordFor(system)}
+                  </span>
+                </td>
+                <td>{system.enabled ? V.on : V.off}</td>
+                <td>{users ? V.usersYes : V.usersNo}</td>
+                <td>{system.model}</td>
+                <td>
+                  <span className="system-actions">
+                    <Button label={V.configuration(name)} onClick={() => onOpen(system.id, 'configuration')}>
+                      {W.systems.configuration}
+                    </Button>
+                    <Button label={V.evaluations(name)} onClick={() => onOpen(system.id, 'evaluations')}>
+                      {W.systems.evaluations}
+                    </Button>
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      </TableScroll>
+    </article>
+  );
+}
+
 /** The tasks of every system as one, with a line for each system: the admin's view of the whole (spec 12.6). */
 export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall | null; nameOf(system: string): string; onRefresh(): void }) {
   const O = W.systems.overall;
@@ -104,8 +200,11 @@ export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall |
         <Icon name="globe" size="large" />
         <h3 className="system-name">{O.title}</h3>
       </header>
+      <p className="system-hint">{O.lead}</p>
       <div className="system-actions">
-        <Button onClick={onRefresh}>{W.systems.refresh}</Button>
+        <Button hint={W.systems.refreshHint} onClick={onRefresh}>
+          {W.systems.refresh}
+        </Button>
       </div>
       {overall === null ? (
         <p className="system-note" role="status">
@@ -146,6 +245,7 @@ export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall |
             </div>
           </dl>
           <h4 className="system-section">{O.bySystem}</h4>
+          <TableScroll label={O.bySystem}>
           <table className="system-table">
             <thead>
               <tr>
@@ -161,7 +261,9 @@ export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall |
             <tbody>
               {overall.systems.map((line) => (
                 <tr key={line.system}>
-                  <th scope="row">{nameOf(line.system)}</th>
+                  <th scope="row">
+                    <span className="system-table-name">{nameOf(line.system)}</span>
+                  </th>
                   <td>{line.tasks}</td>
                   <td>{percent(line.success_rate)}</td>
                   <td>{spanOf(line.task_p50_ms)}</td>
@@ -172,6 +274,7 @@ export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall |
               ))}
             </tbody>
           </table>
+          </TableScroll>
         </>
       )}
     </article>

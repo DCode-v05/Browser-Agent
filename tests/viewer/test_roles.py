@@ -22,6 +22,7 @@ from bap_browser.config import Config
 ADMINS = "the admin's own words"
 USERS = "what users sign in with"
 VISIT = "sessionStorage.getItem('bap-browser.visit')"
+IS_DARK = "document.documentElement.getAttribute('data-theme') === 'dark'"
 
 
 def answers() -> ScriptedModel:
@@ -148,19 +149,36 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await user.get_by_text("Your admin has not set a password for users yet.").wait_for()
             assert await user.get_by_label("Password").count() == 0
 
-            # Configuration is the admin's: the password users sign in with, and what users are allowed.
+            # The Systems page is the admin's, for what is not one browser's: the password users sign
+            # in with, and what users may change and see. Each line says what it is.
             await admin.get_by_role("button", name="Systems").click()
             systems = admin.get_by_role("region", name="Systems")
+            assert await tabs(admin, "What to show of the systems") == ["Users", "All systems"]
             users = systems.get_by_role("article", name="Users")
             await users.get_by_label("The password users sign in with").fill(USERS)
             await users.get_by_role("button", name="Set it").click()
             await users.get_by_text("Set. A user who was signed in signs in again with it.").wait_for()
-            cloud = systems.get_by_role("article", name="Cloud browser")
-            await turned(cloud.get_by_role("switch", name="Let users use this browser: Cloud browser"), False)
             await turned(users.get_by_role("switch", name="What users may see: What the tasks cost"), False)
             await turned(users.get_by_role("switch", name="What users may change: Picture quality"), False)
+            await users.get_by_text(
+                "The colours of this window: light, dark, or the same as your device."
+            ).wait_for()
             assert await admin.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert await admin_view.accessibility_violations() == []
             await admin.evaluate("document.querySelector('.systems').scrollTop = 0")
+            await admin_view.shot("admin-users")
+
+            # Whether users may use a browser is set on that browser's own configuration, one press away.
+            await users.get_by_role("button", name="Open its configuration: Cloud browser").click()
+            await admin.get_by_role("heading", name="Configuration of Cloud browser").wait_for()
+            cloud = admin.get_by_role("article", name="Cloud browser")
+            await turned(cloud.get_by_role("switch", name="Let users use this browser: Cloud browser"), False)
+            # A setting users are held to says so, where the admin sets it.
+            await cloud.get_by_text(
+                "Also on the user's page, held at your value: users cannot change it."
+            ).wait_for()
+            assert await admin.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert await admin_view.accessibility_violations() == []
             await admin_view.shot("admin-configuration")
 
             # A user signs in on their own page. A wrong password is said to be wrong, and opens nothing.
@@ -212,30 +230,45 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await task.press("Enter")
             await user.get_by_text("The page is the start page.").wait_for()
 
-            # What is theirs to change is a working control. What the admin holds is said in words.
-            await user.get_by_role("tab", name="Settings").click()
+            # What is theirs to change is a working control, with a line saying what it does. What
+            # the admin holds is said in words. The settings button on the chat goes there.
+            await user.get_by_role("button", name="Open settings").click()
+            await user.get_by_role("heading", name="Your settings for Built-in browser").wait_for()
+            assert await user.get_by_role("dialog").count() == 0
             card = user.get_by_role("article", name="Built-in browser")
             await card.get_by_text("This is the one your window opens on.").wait_for()
-            await turned(
-                card.get_by_role("switch", name="Show where the agent is acting: Built-in browser"), False
-            )
-            await card.get_by_role("combobox", name="Ask before").select_option("every_action")
+            await turned(card.get_by_role("switch", name="Show where the agent is acting"), False)
+            await card.get_by_role("radio", name="Every action").click()
             async with asyncio.timeout(10):
                 while await running.setting("builtin", "ask_before", users_visit) != "every_action":
                     await asyncio.sleep(0.05)
             # It is the user's own, and tighter: the admin's configuration stays as the admin has it.
             assert await running.setting("builtin", "ask_before", admins_visit) == "risky"
-            await card.get_by_text("Set by your admin").wait_for()
-            assert await card.get_by_role("combobox", name="Picture quality").count() == 0
-            assert await card.get_by_text("Picture quality").count() == 1
+            held = card.locator('.setting[data-locked="true"]').filter(has_text="Picture quality")
+            await held.get_by_text("Set by your admin").wait_for()
+            await held.get_by_text("Standard", exact=True).wait_for()
+            assert await held.get_by_role("radio").count() == 0
+            assert (
+                await card.locator(".setting").count() == await card.locator(".setting-description").count()
+            )
             # Managing the browser is the admin's.
             assert await card.get_by_role("button", name="Stop").count() == 0
             assert await card.get_by_role("switch", name="Let the agent download files").count() == 0
             assert await user.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert await user_view.accessibility_violations() == []
             await user_view.shot("user-settings")
+
+            # The colour mode is the user's own. It holds on every page of their window, and is not the admin's.
+            await card.get_by_role("radio", name="Dark").click()
+            await user.wait_for_function(IS_DARK)
+            await user.get_by_role("tab", name="Browser and chat").click()
+            await user.get_by_label("Your task").wait_for()
+            assert await user.evaluate(IS_DARK)
+            assert not await admin.evaluate(IS_DARK)
 
             # Evaluations, as the admin lets users see them: how the task went, and not what it cost.
             await user.get_by_role("tab", name="Evaluations").click()
+            assert await user.evaluate(IS_DARK)
             card = user.get_by_role("article", name="Built-in browser")
             await card.get_by_text("1 task, 1 step").wait_for()
             await card.get_by_text("Say which page this is").wait_for()
@@ -244,27 +277,27 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             assert await user.get_by_role("article").count() == 1, "their browser's card, and not the whole"
             await user_view.shot("user-evaluations")
 
-            # The admin sees all of it: every system as one, and what the tasks cost.
-            await systems.get_by_role("tab", name="Evaluations").click()
-            overall = systems.get_by_role("article", name="All systems")
+            # The admin sees all of it: every system as one, and under a browser's tab what its tasks cost.
+            await admin.get_by_role("button", name="Systems").click()
+            await systems.get_by_role("tab", name="All systems").click()
+            overall = systems.get_by_role("article", name="Evaluations of all systems")
             await overall.get_by_text("1 task, 1 step").wait_for()
             await overall.get_by_role("row", name="Built-in browser").wait_for()
-            await (
-                systems.get_by_role("article", name="Built-in browser")
-                .get_by_text("Cost", exact=True)
-                .wait_for()
-            )
+            browsers = systems.get_by_role("article", name="The browsers")
+            await browsers.get_by_role("row", name="Cloud browser").get_by_text("Kept from them").wait_for()
+            assert await admin_view.accessibility_violations() == []
+            await admin_view.shot("admin-all-systems")
+            await browsers.get_by_role("button", name="Evaluations of Built-in browser").click()
+            await admin.get_by_role("heading", name="Evaluations of Built-in browser").wait_for()
+            built_in = admin.get_by_role("article", name="Built-in browser")
+            await built_in.get_by_text("Cost", exact=True).wait_for()
             await admin.evaluate("document.querySelector('.systems').scrollTop = 0")
             await admin_view.shot("admin-evaluations")
 
             # The browser a user prefers is started for them when it has stopped.
             sessions = await running.navigations("builtin")
-            await systems.get_by_role("tab", name="Configuration").click()
-            await (
-                systems.get_by_role("article", name="Built-in browser")
-                .get_by_role("button", name="Stop")
-                .click()
-            )
+            await admin.get_by_role("tab", name="Configuration").click()
+            await built_in.get_by_role("button", name="Stop").click()
             async with asyncio.timeout(30):
                 while await running.navigations("builtin") == sessions:
                     await asyncio.sleep(0.1)
@@ -272,16 +305,27 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await user.get_by_role("tab", name="Browser and chat").click()
             await user.get_by_label("Your task").wait_for(timeout=20_000)
 
-            # The admin keeps the evaluations from users: the next time the page is loaded, they are not there.
-            await systems.get_by_role("tab", name="Configuration").click()
+            # The admin keeps the evaluations from users: they leave the user's page by themselves.
+            await admin.get_by_role("button", name="Systems").click()
             await turned(
                 users.get_by_role("switch", name="What users may see: Evaluations of the browsers they use"),
                 False,
             )
-            await user.reload()
-            await user.get_by_role("tablist", name="Where the agent works").wait_for()
+            await user.get_by_role("tab", name="Evaluations").wait_for(state="detached")
             assert await tabs(user, "What to show of Built-in browser") == ["Browser and chat", "Settings"]
             assert await running.status("GET", "/api/systems/builtin/evals", users_visit) == 403
+            # A setting the admin now holds is shown to the user as held, with no reload either.
+            await turned(users.get_by_role("switch", name="What users may change: Ask before"), False)
+            await user.get_by_role("tab", name="Settings").click()
+            held = user.locator('.setting[data-locked="true"]').filter(has_text="Ask before")
+            await held.get_by_text("Risky actions").wait_for()
+            assert await running.setting("builtin", "ask_before", users_visit) == "risky"
+            # And the cloud browser, given back to users, is on the user's page again.
+            await admin.get_by_role("tab", name="Cloud browser").click()
+            await admin.get_by_role("tab", name="Configuration").click()
+            await turned(cloud.get_by_role("switch", name="Let users use this browser: Cloud browser"), True)
+            await user.get_by_role("tab", name="Cloud browser").wait_for()
+            await admin.get_by_role("button", name="Systems").click()
 
             # The admin's page asks a user for the admin's password. Theirs does not open it.
             await user.goto(f"{running.service}/admin")

@@ -60,6 +60,23 @@ SEES: Mapping[str, tuple[str, bool]] = {
     "checklist": ("Run the checklist", True),
     "log": ("The log of the agent's steps", False),
 }
+# What each of them is, for the admin who decides it.
+SEEN: Mapping[str, str] = {
+    "evaluations": (
+        "On: a user has the Evaluations view under each browser they may use, with how its tasks went and "
+        "how long they took. Off: a user has no Evaluations view."
+    ),
+    "cost": "On: a user also sees the tokens the tasks used and what they cost. Off: no cost is shown to them.",
+    "traces": (
+        "On: a user sees the list of recent tasks, opens the trace of each, and says Good or Bad on an "
+        "answer. Off: they see only the totals."
+    ),
+    "checklist": (
+        "On: a user sees the checklist and may run it: a few real steps on the demo site, to check the "
+        "browser works. Off: they neither see nor run it."
+    ),
+    "log": "On: a user may read the newest lines of the log of the agent's steps. Off: the log is yours alone.",
+}
 
 Saved = dict[str, Value]
 
@@ -272,12 +289,18 @@ class SettingsStore:
                 for system in self.systems
             ],
             "may_change": [
-                {"id": entry.id, "title": entry.title, "allowed": self.user_may_change(entry.id)}
+                {
+                    "id": entry.id,
+                    "title": entry.title,
+                    # What the setting is, so that the admin knows what they are letting users change.
+                    "description": entry.description,
+                    "allowed": self.user_may_change(entry.id),
+                }
                 for entry in CATALOGUE
                 if entry.user
             ],
             "sees": [
-                {"id": what, "title": title, "allowed": self.user_sees(what)}
+                {"id": what, "title": title, "description": SEEN[what], "allowed": self.user_sees(what)}
                 for what, (title, _) in SEES.items()
             ],
         }

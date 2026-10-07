@@ -1,8 +1,9 @@
 // The small pieces the cards of the systems are made of (spec 9.17).
 
+import type { ReactNode } from 'react';
+
 import { Icon, type IconName } from '../components/Icon';
 import type { Backend } from '../protocol';
-import type { Setting } from '../settings/types';
 import { W } from '../wording';
 import type { LogAnswer, SystemInfo } from './api';
 import { clock, spanOf } from './format';
@@ -42,11 +43,27 @@ export function Switch({ label, on, locked, onChange }: { label: string; on: boo
   );
 }
 
-/** What a setting is set to, in the words its choices use. */
-export function chosen(setting: Setting): string {
-  if (typeof setting.value === 'boolean') return setting.value ? W.settings.on : W.settings.off;
-  if (Array.isArray(setting.value)) return W.systems.sites(setting.value.length + (setting.fixed?.length ?? 0));
-  return setting.choices?.find((choice) => choice.value === setting.value)?.label ?? String(setting.value ?? '');
+/** A table wider than its card is scrolled sideways, not squeezed until its words break. The
+ *  keyboard reaches it, to scroll it. */
+export function TableScroll({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="system-table-scroll" role="group" aria-label={label} tabIndex={0}>
+      {children}
+    </div>
+  );
+}
+
+/** A switch with its name and a line saying what it does. */
+export function SwitchRow({ title, description, label, on, onChange }: { title: string; description: string; label: string; on: boolean; onChange(next: boolean): void }) {
+  return (
+    <div className="system-row">
+      <span className="system-row-name">
+        {title}
+        <span className="system-row-hint">{description}</span>
+      </span>
+      <Switch label={label} on={on} onChange={onChange} />
+    </div>
+  );
 }
 
 export function LogLines({ log }: { log: LogAnswer }) {
