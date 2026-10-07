@@ -149,7 +149,8 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             # A user's page is the address itself. Until the admin sets a password, nobody signs in there.
             await user.goto(f"{running.service}/")
             await user.get_by_role("heading", name="Sign in").wait_for()
-            await user.get_by_text("Your admin has not set a password for users yet.").wait_for()
+            # It says where the admin sets it, as the pages are now.
+            await user.get_by_text("Ask them to set one: it is under Systems, Users.").wait_for()
             assert await user.get_by_label("Password").count() == 0
 
             # The Systems page is the admin's, for what is not one browser's: the password users sign

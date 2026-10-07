@@ -345,7 +345,16 @@ turned off and on from its Configuration with the page staying put; the Systems 
 both views; and a user's page is watched following the admin with no reload.
 
 Checked on the running service on 2026-10-07: My Chrome's page shows the new sentence with the
-person's real Chrome, which had no window open.
+person's real Chrome, which had no window open. The checklist passes on the running cloud and
+built-in browsers (10 of 11; the eleventh needs a person watching), and one task with the real model
+was answered in 5.3 s (4,738 tokens in, 54 out) and is on the record.
+
+Two faults found while checking that everything works, both seen as a test that failed now and then:
+
+| Fault | What it was | Now |
+|---|---|---|
+| A click could take a moving element for still | The click looks at the element twice, a frame apart. In a browser that had just started, the wait for the next frame could end inside the frame the first look was in: nothing had moved on, and "the same place twice" was read as holding still (about 1 time in 10 under load) | Two looks count only in different frames, told apart by the page's own clock. 36 of 36 under the same load; click by ref is as fast as before (67 ms) |
+| A test of a download that is too large failed now and then | Its helper counted the word "failed" in the whole result, which also holds the note of what just happened; the note can come a moment before the list says so | The helper reads the list itself |
 
 ### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
 

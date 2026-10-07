@@ -221,7 +221,7 @@ export const W = {
       },
     },
     noBrowser: 'No browser to use yet',
-    noBrowserLead: 'Your admin has not let users use any browser. Ask them to turn one on for users in Configuration.',
+    noBrowserLead: "Your admin has not let users use any browser. Ask them to turn one on for users: it is in that browser's Configuration.",
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
     desktop: {
@@ -259,7 +259,7 @@ export const W = {
     createButton: 'Create the password and sign in',
     notTheSame: 'The two are not the same. Type them again.',
     adminNotMade: 'The admin password has not been created yet. Open the link the service printed when it started: it creates the password.',
-    userNotSet: 'Your admin has not set a password for users yet. Ask them to set one in Configuration.',
+    userNotSet: 'Your admin has not set a password for users yet. Ask them to set one: it is under Systems, Users.',
     failed: {
       wrong: 'That is not the password.',
       not_set: 'There is no password to sign in with yet.',
