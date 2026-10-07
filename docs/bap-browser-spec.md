@@ -1725,8 +1725,11 @@ own settings for this browser, inside what your admin allows…", "Evaluations o
 **Every control says what it does.** A setting is drawn as its name, one line saying what it does
 (section 10.2), and its control: a switch, a choice with a hint under each option, a list of sites to
 type, a button. A change is saved as it is made, and the row says "Saving…", then "Saved", or why it was
-not taken. A button that manages something says what it does when the pointer rests on it, and the
-line under a group of buttons says it too. A setting that cannot be changed here is said in words, with
+not taken. Every button says what it does when the pointer rests on it: the browsers' tabs (what each
+browser is), the views, Systems, Open desktop app and Sign out in the bar; Pause, Take over, Hand back
+and Stop session; the task box and Send; a step of the activity; the answers to an approval. A button
+with an icon and no words says its name. The line under a group of buttons says it too. A test walks
+the admin's and the user's pages and fails on any control that says nothing. A setting that cannot be changed here is said in words, with
 its value and who holds it. It is never drawn as a control that does nothing.
 
 **The admin's Configuration of a browser.** One card, in this order.

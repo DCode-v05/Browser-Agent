@@ -210,7 +210,7 @@ export function SystemsPage({ api, pollMs, wordFor, passwords, onOpen }: PagePro
         </div>
         <div className="systems-views" role="tablist" aria-label={W.systems.views}>
           {(['users', 'overview'] as const).map((name) => (
-            <button key={name} type="button" role="tab" className="systems-view" aria-selected={view === name} onClick={() => setView(name)}>
+            <button key={name} type="button" role="tab" className="systems-view" aria-selected={view === name} title={W.systems.viewHint[name]} onClick={() => setView(name)}>
               {W.systems.view[name]}
             </button>
           ))}

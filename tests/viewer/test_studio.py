@@ -137,7 +137,7 @@ async def test_the_window_has_a_page_for_each_browser(
         # The cloud browser's page: its picture, and its own chat.
         await page.get_by_label("Your task").wait_for()
         await page.get_by_role("img", name="Live browser view: BAP Browser,").wait_for()
-        assert await page.get_by_title("Session").inner_text() == "Session\ncloud"
+        assert await page.get_by_title("Session", exact=True).inner_text() == "Session\ncloud"
 
         await opened.open("My Chrome")
         await page.get_by_role("heading", name="Connect your Chrome").wait_for()
@@ -147,7 +147,7 @@ async def test_the_window_has_a_page_for_each_browser(
         # The built-in browser is another browser with another session, and keeps its sign-ins.
         await opened.open("Built-in browser")
         await page.get_by_label("Your task").wait_for()
-        assert await page.get_by_title("Session").inner_text() == "Session\nbuiltin"
+        assert await page.get_by_title("Session", exact=True).inner_text() == "Session\nbuiltin"
         assert (tmp_path / "built-in-browser").is_dir(), "the built-in browser keeps a profile of its own"
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
 
@@ -556,7 +556,7 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await page.get_by_role("button", name="Turn it on").click()
         await opened.room("builtin", "agent")
         await page.get_by_label("Your task").wait_for(timeout=20_000)
-        assert await page.get_by_title("Session").inner_text() == "Session\nbuiltin"
+        assert await page.get_by_title("Session", exact=True).inner_text() == "Session\nbuiltin"
 
 
 async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of_it(

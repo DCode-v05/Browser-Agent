@@ -31,11 +31,15 @@ export function ApprovalCard({ approval, now, onAnswer, firstRef }: ApprovalProp
       <p className="card-summary">{approval.summary}</p>
       <p className="card-note">{W.approval.left(timeLeft(approval.expiresAt, now))}</p>
       <div className="card-actions">
-        <Button kind="primary" onClick={() => onAnswer('once')} ref={firstRef}>
+        <Button kind="primary" hint={W.buttons.hint.allowOnce} onClick={() => onAnswer('once')} ref={firstRef}>
           {W.buttons.allowOnce}
         </Button>
-        {!approval.everyTime && <Button onClick={() => onAnswer('site')}>{W.buttons.allowSite}</Button>}
-        <Button kind="danger" onClick={() => onAnswer('deny')}>
+        {!approval.everyTime && (
+          <Button hint={W.buttons.hint.allowSite} onClick={() => onAnswer('site')}>
+            {W.buttons.allowSite}
+          </Button>
+        )}
+        <Button kind="danger" hint={W.buttons.hint.deny} onClick={() => onAnswer('deny')}>
           {W.buttons.deny}
         </Button>
       </div>
@@ -90,7 +94,9 @@ export function UnwatchedNotice({ onDismiss }: { onDismiss(): void }) {
     <div className="card" data-tone="waiting" role="group" aria-label={W.approval.title}>
       <p className="card-summary">{W.approval.outcome.unwatched}</p>
       <div className="card-actions">
-        <Button onClick={onDismiss}>{W.buttons.dismiss}</Button>
+        <Button hint={W.buttons.hint.dismiss} onClick={onDismiss}>
+          {W.buttons.dismiss}
+        </Button>
       </div>
     </div>
   );
@@ -117,7 +123,7 @@ export function SummaryCard({ state, onNewSession }: { state: ViewerState; onNew
       </dl>
       {onNewSession && state.session.restartable && (
         <div className="card-actions">
-          <Button kind="primary" icon="play" onClick={onNewSession}>
+          <Button kind="primary" icon="play" hint={W.buttons.hint.newSession} onClick={onNewSession}>
             {W.buttons.newSession}
           </Button>
         </div>

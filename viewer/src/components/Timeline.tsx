@@ -52,6 +52,7 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
               type="button"
               className="row"
               data-status={row.status}
+              title={W.buttons.hint.step}
               aria-haspopup="dialog"
               aria-expanded={selected === row.step.n}
               // One stop in the tab order; the arrow keys move between rows.

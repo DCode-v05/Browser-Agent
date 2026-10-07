@@ -56,12 +56,18 @@ export function ApprovalPopup({ approval, now, onAnswer, onLater }: Props) {
         <p className="confirm-consequence">{approval.everyTime ? W.approval.popup.hintEveryTime : W.approval.popup.hint}</p>
         <p className="card-note">{W.approval.left(timeLeft(approval.expiresAt, now))}</p>
         <div className="confirm-actions">
-          <Button onClick={onLater}>{W.approval.popup.later}</Button>
-          <Button kind="danger" onClick={() => onAnswer('deny')}>
+          <Button hint={W.buttons.hint.lookFirst} onClick={onLater}>
+            {W.approval.popup.later}
+          </Button>
+          <Button kind="danger" hint={W.buttons.hint.deny} onClick={() => onAnswer('deny')}>
             {W.buttons.deny}
           </Button>
-          {!approval.everyTime && <Button onClick={() => onAnswer('site')}>{W.buttons.allowSite}</Button>}
-          <Button kind="primary" onClick={() => onAnswer('once')}>
+          {!approval.everyTime && (
+            <Button hint={W.buttons.hint.allowSite} onClick={() => onAnswer('site')}>
+              {W.buttons.allowSite}
+            </Button>
+          )}
+          <Button kind="primary" hint={W.buttons.hint.allowOnce} onClick={() => onAnswer('once')}>
             {W.buttons.allowOnce}
           </Button>
         </div>

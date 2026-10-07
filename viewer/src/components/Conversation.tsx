@@ -95,37 +95,37 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
     switch (name) {
       case 'pause':
         return (
-          <Button key={name} kind="quiet" icon="pause" onClick={() => onCommand({ type: 'pause' })}>
+          <Button key={name} kind="quiet" icon="pause" hint={W.buttons.hint.pause} onClick={() => onCommand({ type: 'pause' })}>
             {W.buttons.pause}
           </Button>
         );
       case 'resume':
         return (
-          <Button key={name} icon="play" onClick={() => onCommand({ type: 'resume' })}>
+          <Button key={name} icon="play" hint={W.buttons.hint.resume} onClick={() => onCommand({ type: 'resume' })}>
             {W.buttons.resume}
           </Button>
         );
       case 'take_over':
         return (
-          <Button key={name} kind="quiet" icon="hand" onClick={() => onCommand({ type: 'take_over' })}>
+          <Button key={name} kind="quiet" icon="hand" hint={W.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
             {W.buttons.takeOver}
           </Button>
         );
       case 'hand_back':
         return (
-          <Button key={name} kind="person" onClick={onHandBack}>
+          <Button key={name} kind="person" hint={W.buttons.hint.handBack} onClick={onHandBack}>
             {W.buttons.handBack}
           </Button>
         );
       case 'done':
         return (
-          <Button key={name} icon="check" kind="person" onClick={() => onCommand({ type: 'done' })}>
+          <Button key={name} icon="check" kind="person" hint={W.buttons.hint.done} onClick={() => onCommand({ type: 'done' })}>
             {W.buttons.done}
           </Button>
         );
       case 'could_not':
         return (
-          <Button key={name} onClick={() => onCommand({ type: 'could_not' })}>
+          <Button key={name} hint={W.buttons.hint.couldNot} onClick={() => onCommand({ type: 'could_not' })}>
             {W.buttons.couldNot}
           </Button>
         );
@@ -152,7 +152,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           {null}
         </Button>
         {view.controls.includes('stop') && (
-          <Button kind="quiet" icon="close" onClick={onStopSession} ref={stopRef} label={W.buttons.stop}>
+          <Button kind="quiet" icon="close" onClick={onStopSession} ref={stopRef} label={W.buttons.stop} hint={W.buttons.hint.stop}>
             {null}
           </Button>
         )}
@@ -219,6 +219,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           disabled={!open}
           placeholder={open ? (onATask ? W.chat.placeholderWorking : W.chat.placeholder) : W.chat.closed}
           aria-label={W.chat.inputLabel}
+          title={W.buttons.hint.task}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKey}
         />
@@ -226,11 +227,11 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           {view.controls.map(control)}
           <span className="top-bar-space" />
           {onATask && !task ? (
-            <Button icon="stop" onClick={() => onCommand({ type: 'stop_task' })} label={W.chat.stopTask}>
+            <Button icon="stop" onClick={() => onCommand({ type: 'stop_task' })} label={W.chat.stopTask} hint={W.buttons.hint.stopTask}>
               {null}
             </Button>
           ) : (
-            <Button kind="primary" icon="send" onClick={send} disabled={!canSend} label={W.chat.send}>
+            <Button kind="primary" icon="send" onClick={send} disabled={!canSend} label={W.chat.send} hint={W.buttons.hint.send}>
               {null}
             </Button>
           )}

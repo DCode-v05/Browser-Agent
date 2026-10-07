@@ -40,6 +40,7 @@ export function BrowserPane({ state, view, now, showPointer, options, onCommand,
               type="button"
               role="tab"
               className="tab"
+              title={W.buttons.hint.tab}
               aria-selected={tab.active}
               onClick={() => onCommand({ type: 'select_tab', id: tab.id })}
             >

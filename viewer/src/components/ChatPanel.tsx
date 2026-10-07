@@ -113,10 +113,11 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
           disabled={!open}
           placeholder={open ? (chat.working ? W.chat.placeholderWorking : W.chat.placeholder) : W.chat.closed}
           aria-label={W.chat.inputLabel}
+          title={W.buttons.hint.task}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKey}
         />
-        <Button kind="primary" icon="send" onClick={send} disabled={!canSend} label={W.chat.send}>
+        <Button kind="primary" icon="send" onClick={send} disabled={!canSend} label={W.chat.send} hint={W.buttons.hint.send}>
           {null}
         </Button>
       </form>

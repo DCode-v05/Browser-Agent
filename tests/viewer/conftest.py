@@ -19,6 +19,34 @@ SHOTS = ROOT / ".bap-browser" / "viewer-shots"
 
 SIZES = {"desktop": (1360, 850), "phone": (400, 820)}
 
+# The controls on a page that do not say what they do. A control says it with a line under its name,
+# a line for the group it is in, or a hint when the pointer rests on it.
+SILENT_CONTROLS = """
+() => {
+  const says = (e) => {
+    if (e.title) return true;
+    const described = e.getAttribute('aria-describedby');
+    if (described && document.getElementById(described)?.textContent.trim()) return true;
+    const row = e.closest('.setting, .system-row, .choice, .system-password, .sign-in-card');
+    if (row && row.querySelector('.setting-description, .system-row-hint, .choice-hint, .setting-hint, .sign-in-lead')) return true;
+    if (e.closest('.choice')) return true;
+    const group = e.closest('.system-actions, .system-password');
+    for (let near = group; near; near = near.previousElementSibling) {
+      if (near.matches('.system-hint')) return true;
+      if (near.matches('.system-section')) break;
+    }
+    if (group?.nextElementSibling?.matches('.system-hint')) return true;
+    return Boolean(e.closest('table') && e.closest('.system-card')?.querySelector('.system-hint'));
+  };
+  const silent = [];
+  for (const e of document.querySelectorAll('button, [role=switch], select, input, textarea, a[href]')) {
+    if (e.getClientRects().length === 0 || says(e)) continue;
+    silent.push((e.getAttribute('aria-label') || e.innerText || e.value || e.tagName).replace(/\\s+/g, ' ').trim().slice(0, 60));
+  }
+  return silent;
+}
+"""
+
 
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
@@ -93,6 +121,11 @@ class View:
             for violation in results["violations"]
             for node in violation["nodes"]
         ]
+
+    async def silent_controls(self) -> list[str]:
+        """The controls on the page that do not say what they do, by their names."""
+        await self.settled()
+        return await self.page.evaluate(SILENT_CONTROLS)
 
     async def shot(self, name: str) -> None:
         SHOTS.mkdir(parents=True, exist_ok=True)

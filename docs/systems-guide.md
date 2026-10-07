@@ -33,8 +33,9 @@ is recorded and shown for it alone.
 Every page begins with a heading and a line that say whose page it is and what it is for, such as
 "Configuration of Cloud browser. For the admin. How this one browser is set up…". Every setting has
 a line under its name saying what it does, and every control works: a change is saved as you make
-it, and the row says "Saved". The view you choose under a browser's tab stays as it is when you go
-to the next browser.
+it, and the row says "Saved". Every button says what it does when you rest the pointer on it: the
+browsers' tabs, the views, Systems, Sign out, Pause, Take over, Stop session. The view you choose
+under a browser's tab stays as it is when you go to the next browser.
 
 That is the window as **the admin** has it. A **user** signs in on a page of their own and has less:
 Part 0 says who has what.
