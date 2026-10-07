@@ -531,8 +531,8 @@ the page that asks for it does not keep it.
   `/admin#token=…` with its own token. That page makes the admin's password, typed twice and at least
   `auth.min_chars` characters long, and signs the admin in. Opened without that link, the admin's page
   says the password has not been made, and makes none.
-- **The users' password** is set by the admin, in Configuration. Until then a user's page says so and
-  asks for nothing.
+- **The users' password** is set by the admin, on the Systems page under Users. Until then a user's page
+  says so and asks for nothing.
 - A right password gives the page a token for the visit. The page keeps it for the life of the tab and
   sends it as the bearer token. A visit lasts `auth.session_hours`; "Sign out" ends it sooner.
 - After `auth.max_failures` wrong passwords in a row, signing in to that role waits `auth.lock_s`
@@ -546,8 +546,10 @@ the page that asks for it does not keep it.
   first password, and it is how an admin who lost theirs makes a new one: they start the service and
   open the link it prints.
 
-**What the admin allows: the policy.** Three lists, kept in `settings.file` under `"policy"` and changed
-in Configuration, each line with a switch.
+**What the admin allows: the policy.** Three lists, kept in `settings.file` under `"policy"`. Whether
+users may use a browser is set on that browser's Configuration; what users may change and see is set on
+the Systems page, under Users (section 9.17). Each line is a switch with a sentence saying what it lets a
+user do, and a change shows on a user's page within a few seconds, with no reload.
 
 | List | A line | Default |
 |---|---|---|
@@ -574,7 +576,7 @@ for what is the admin's, and 404 for a browser a user may not use, the same as f
 | `POST /api/auth/sign-out` | Ends the visit | Whoever signed in |
 | `GET /api/me` | `role`, the `systems` this person may use, the one they prefer (`preferred`), and what they see (`sees`) | Admin, user |
 | `PATCH /api/me` | `{"preferred": "{name}"}`. 409 for a browser the person may not use | Admin, user |
-| `GET`, `PATCH /api/admin/policy` | The policy: each line with its words and whether it is allowed. A change names its lines: `{"systems": {"cloud": false}}`, `{"may_change": {…}}`, `{"sees": {…}}` | Admin |
+| `GET`, `PATCH /api/admin/policy` | The policy: each line with its `title`, a `description` of what it lets a user do, and whether it is `allowed`. A change names its lines: `{"systems": {"cloud": false}}`, `{"may_change": {…}}`, `{"sees": {…}}` | Admin |
 
 `GET /api/sessions` says `role` where people sign in, and lists for a user only the browsers they may
 use. The viewer's WebSocket is closed with 4401 for a token that speaks for nobody and 4404 for a
@@ -1489,7 +1491,9 @@ Target: WCAG 2.2 level AA.
 
 ### 9.12 Settings screen
 
-Opened from the settings button in the top bar. It is a dialog over the viewer: groups on the left,
+Opened from the settings button in the top bar, where the viewer shows one session. (In the window of
+three browsers the same rows are on a page of their own, under each browser's tab, and the button goes
+there: section 9.17.) It is a dialog over the viewer: groups on the left,
 the chosen group's settings on the right. Below 700 px wide the groups become a list, and choosing one
 shows its settings on a screen of their own with a Back button.
 
@@ -1694,44 +1698,65 @@ they are changed on.
 Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
 beside "Sign out".
 
+**Each thing is in one place.** What is one browser's is under that browser's tab, and nowhere else.
+What is not one browser's is on the Systems page, which is the admin's. Nothing is set in two places,
+and no screen opens over a page to set it.
+
 | On a page of the window | For the admin | For a user |
 |---|---|---|
 | The tabs | The three browsers | The browsers the admin lets users use. With none, the page says "No browser to use yet" |
-| Under each browser's tab | **Browser and chat** (the browser itself and its chat), **Configuration** and **Evaluations**. The last two show that system's card by itself, the same card as on the Systems page | **Browser and chat**, **Settings** (their own settings of that browser) and **Evaluations**, which is there only where the admin lets users see evaluations |
-| The settings button | Opens the settings of that page's browser. Its first setting is "Use this browser" | Opens the settings that are theirs to change |
+| Under each browser's tab | **Browser and chat** (the browser itself and its chat), **Configuration** (how that browser is set up) and **Evaluations** (what its tasks took) | **Browser and chat**, **Settings** (their own settings for that browser) and **Evaluations**, which is there only where the admin lets users see evaluations |
+| The settings button on the chat | Goes to that browser's Configuration | Goes to their Settings for that browser |
 | A browser that is turned off | Its tab says "Turned off". Its page says so, and has "Turn it on" | Its page says so. Turning it on is the admin's |
 | "Systems" in the bar | The Systems page | Not there |
 
 The view stays as it is from one browser to the next, so the browsers are looked at one after the other.
 A user's window opens on the browser they prefer.
 
-**A user's Settings.** One card for the browser, every control on it a working one.
+**Every page says whose it is and what it is for,** in a heading and a line under it: "Configuration of
+Cloud browser. For the admin. How this one browser is set up…", "Your settings for Cloud browser. Your
+own settings for this browser, inside what your admin allows…", "Evaluations of Cloud browser".
 
-| On the card | What it is |
+**Every control says what it does.** A setting is drawn as its name, one line saying what it does
+(section 10.2), and its control: a switch, a choice with a hint under each option, a list of sites to
+type, a button. A change is saved as it is made, and the row says "Saving…", then "Saved", or why it was
+not taken. A button that manages something says what it does when the pointer rests on it, and the
+line under a group of buttons says it too. A setting that cannot be changed here is said in words, with
+its value and who holds it. It is never drawn as a control that does nothing.
+
+**The admin's Configuration of a browser.** One card, in this order.
+
+| Part of the card | What it is |
+|---|---|
+| This browser | **Use this browser** (on, off), once, here. **Restart** and **Stop** for one that runs, **Start** for one that does not; a person's own Chrome is not started from here, it connects by itself |
+| For users | **Let users use this browser**: off, it is not there for a user at all |
+| Every setting the browser has, by group | Browser, Agent, Approvals, Sites, Files, Privacy, Live view, Appearance, Advanced: each setting with its line and its working control. A setting that is also on the user's page says so, and says whether users may set their own or are held at the admin's value. A setting that is one for all three browsers says so. One that `config.json` locks is said in words, with "Locked in config.json" |
+| Log file, Records of its tasks | Where each is written. "Show the log" reads the newest lines |
+
+**A user's Settings for a browser.** One card.
+
+| Part of the card | What it is |
 |---|---|
 | Preferred browser | A choice among the browsers they may use. The one chosen opens at once, on its chat |
-| Yours to turn on and off | A switch for each setting that is theirs and is a switch |
-| Yours to choose | A choice for each setting that is theirs and has choices. One that would be looser than the admin has it is shown, and cannot be taken |
-| Sites | How many blocked and allowed sites they have. "Change these settings" opens the settings screen, where the lists are typed |
-| Set by your admin | The settings the admin holds, each with its value in words. They are not drawn as switches that do nothing |
+| The settings that are theirs, by group | Each with its line and its working control. A choice looser than the admin has it is shown, and cannot be taken |
+| What the admin holds | In the same place, in words: the value, and "Set by your admin" |
 | Log | The newest lines of the agent's steps, where the admin lets users see the log |
 
 A user's card has no Start, Stop or Restart, and nothing of what the agent may do: those are the admin's.
 
-**The Systems page** is the admin's. "Systems" in the bar opens a page in place of a browser's own, with
-the three systems side by side, each a card, and two views of them. Above the cards, Configuration has
-the card **Users** and Evaluations has the card **All systems** (section 12.6).
+**The Systems page** is the admin's, and has what is not one browser's alone. "Systems" in the bar opens
+it in place of a browser's page. It has two views, and repeats no browser's settings.
 
-| On the Users card | What it is |
+| View | What it shows |
 |---|---|
-| What users may change | A switch for each setting that can be a user's. Off holds every user at the admin's value |
-| What users may see | A switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist, and the log |
-| Sign-in passwords | The password users sign in with, and the admin's own |
+| **Users** | One card. *Browsers users may use*: each browser, whether users may use it, and a button to its Configuration, where that is set. *What users may change*: a switch for each setting that can be a user's, with what the setting is. *What users may see*: a switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist and the log, each with what it lets a user see. *Sign-in passwords*: the one users sign in with, and the admin's own |
+| **All systems** | *The browsers*: a row for each with where it stands, whether it is in use, whether users may use it, its model, and buttons to its Configuration and its Evaluations. Nothing is changed here. *Evaluations of all systems*: section 12.6 |
 
-| View | What a card shows |
-|---|---|
-| Configuration | Where the system stands. **Use this browser** (on, off). **Let users use this browser** (on, off: off, it is not there for a user at all). **Restart** and **Stop** for one that runs, **Start** for one that does not; a person's own Chrome is not started from here, it connects by itself. **What the agent may do here**: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". **How it is set up**: the model and every other setting of this system, in the words of its choices. **All settings** opens the settings screen of this system. **Log file**: where it is, and "Show the log" for its newest lines. **Records of its tasks**: the folder |
-| Evaluations | Section 12.6 |
+**What follows by itself.** The window asks the service where things stand every second or two, so a
+page follows what was changed elsewhere with no reload. A user's window follows the admin: a browser
+taken from users leaves it, a view the admin keeps back leaves it, and a setting the admin now holds is
+shown as held. The colour mode and "Show where the agent is acting" are the window's to keep: they hold
+on every page of it, not only on a browser's own.
 
 **Turning a system off** ends its session, with "This browser was turned off." as the reason, and takes
 it off its page: nobody is connected to it, and the agent cannot work in it. It stays off the next time
@@ -1739,10 +1764,16 @@ the service starts. Turning it on starts a new session. **Stop** ends the sessio
 on; **Start** and **Restart** give it a new browser and a new conversation. What cannot be done is
 answered with a sentence for the person: "This browser is turned off. Turn it on first."
 
+**One page, one frame.** The window has the page's one bar, its one heading and its one main part.
+The browser and chat drawn inside it have none of their own, so a screen reader finds one of each.
+
+**A person's Chrome with no window open** cannot be worked in: its page says "Your Chrome has no window
+open. Open a window in Chrome: the agent works in a tab of it.", and connects by itself once there is one.
+
 **A log of its own.** Each system writes its tool calls to `<logging.systems_dir>/<name>.jsonl`, in the
 form of section 5.9's event log, and nothing goes to the one log of a single session. Where a deployment
 keeps no log (`logging.event_log` is `null`) no system writes one, until a person turns the log on for a
-system. The Systems page reads the newest `logging.shown_lines` lines of the file.
+system. A browser's Configuration reads the newest `logging.shown_lines` lines of the file.
 
 **The API.** All behind the token. A system the service does not have answers 404, and so does one a
 user may not use; a service with one session has none of these routes. A user is told of a system
@@ -1814,13 +1845,13 @@ app adds what needs the local machine (`docs/research/settings.md`).
 | ID | Name in the screen | What it does | Choices (default first) | Web | Mobile | Desktop | Key | Phase |
 |---|---|---|---|---|---|---|---|---|
 | `preferred_browser` | Preferred browser | The browser a person's window opens on. It is kept with the person's settings and is not an entry of the settings screen: a user chooses it on their Settings card (sections 4.11 and 9.17) | The browsers of the window the person may use; the first of them until they choose | yes | no | yes | none; kept in `settings.file` | Built, in the window of three browsers |
-| `stay_signed_in` | Stay signed in to sites | Keeps the cloud browser's cookies and site data between sessions | Off, On | yes | yes | yes | `browser.user_data_dir` | M1 |
+| `stay_signed_in` | Stay signed in to sites | Keeps the cloud browser's cookies and site data from one session to the next, so sites stay signed in | Off, On | yes | yes | yes | `browser.user_data_dir` | M1 |
 | `clear_browsing_data` | Clear browsing data | A button. Deletes cookies and site data in the cloud browser; on desktop also offered for the built-in browser | none | yes | yes | yes | none; an action | M1 for the cloud browser; M3 for the built-in browser |
 | `my_chrome` | My Chrome | Whether the extension is connected; Connect and Disconnect | none | yes | no | yes | none; the bridge's state | M2 |
 | `show_builtin_browser` | Show the built-in browser | Whether the built-in browser is a visible pane or works out of sight | Shown, Hidden | no | no | yes | `browser.headless` | M3 |
 | `ask_before` | Ask before | When the agent must wait for the person's approval | Risky actions (uploads, page scripts and whatever the deployment lists), Every action | yes | yes | yes | `safety.ask_before` | M1 |
-| `approval_wait` | Wait for my answer | How long an approval waits before it is denied | 3 minutes, 1 minute, 5 minutes, 10 minutes | yes | yes | yes | `control.approval_timeout_s` | M1 |
-| `remember_site_approval` | Remember "Allow on this site" | How long that answer lasts | Until the session ends, Never | yes | yes | yes | `control.site_grant_lifetime` | M1 |
+| `approval_wait` | Wait for my answer | How long the agent waits for an answer to an approval. With no answer by then, the action is denied | 3 minutes, 1 minute, 5 minutes, 10 minutes | yes | yes | yes | `control.approval_timeout_s` | M1 |
+| `remember_site_approval` | Remember "Allow on this site" | After "Allow on this site", how long the agent may go on acting on that site without asking again | Until the session ends, Never | yes | yes | yes | `control.site_grant_lifetime` | M1 |
 | `my_chrome_mode` | In my Chrome | How freely the agent acts in the person's own browser | Act on sites I've allowed, Ask before acting | yes | no | yes | `permissions.mode` | M2 |
 | `blocked_sites` | Blocked sites | Sites the agent must never open. Added to the deployment's list | An empty list | yes | yes | yes | `safety.blocked_domains` | M1 |
 | `allowed_sites` | Only allow these sites | When the list has entries, the agent may open only these | An empty list, meaning any site that is not blocked | yes | yes | yes | `safety.allowed_domains` | M1 |
@@ -1830,7 +1861,7 @@ app adds what needs the local machine (`docs/research/settings.md`).
 | `download_folder` | Download folder | Where files the agent downloads are saved on this computer | The app's downloads folder | no | no | yes | `browser.downloads.dir` | M3 |
 | `upload_folders` | Folders the agent may upload from | The only folders an upload may come from | The app's uploads folder | no | no | yes | `browser.uploads.allowed_dirs` | M3 |
 | `activity_log` | Keep a log of the agent's steps | Turns the event log on or off | On, Off | yes | yes | yes | `logging.event_log` | M1 |
-| `picture_quality` | Picture quality | How much data the live picture uses | Standard, Data saver, High | yes | yes | yes | `viewer.quality` | M1 |
+| `picture_quality` | Picture quality | How sharp the live picture of the browser is. A sharper picture uses more data | Standard, Data saver, High | yes | yes | yes | `viewer.quality` | M1 |
 | `show_agent_pointer` | Show where the agent is acting | The target outline and the agent's pointer over the live picture | On, Off | yes | yes | yes | `viewer.show_agent_pointer` | M1 |
 | `colour_mode` | Colour mode | The viewer's theme | Match system, Light, Dark | yes | yes | yes | `viewer.theme` | M1 |
 | `notify_when_needed` | Notify me when the agent needs me | A notification, with an optional sound, when an approval or a help request is waiting | Off, On | yes | yes | yes | `viewer.notifications` | Next |
@@ -1871,15 +1902,20 @@ system by itself: `system_enabled` ("Use this browser", which is there only for 
 steps", `code.enabled`, tighten only). The saved file holds a system's own values under
 `"systems": {"cloud": {…}}`, beside the values for every browser.
 
+**What a setting says of itself.** Every entry has a `description`: one line, under 110 characters,
+saying what the setting does in words for a person who has never seen it ("The colours of this window:
+light, dark, or the same as your device."). It is drawn under the setting's name wherever the setting
+is, and a test holds every entry to it.
+
 **The settings API.** `GET /api/settings?surface=web` returns the groups and, for each setting, its
-name, kind of control, choices, current value, default, whether it is locked and why, and when a
-change applies. A build returns only the settings whose feature it contains. The answer is for whoever
+name, its description, kind of control, choices, current value, default, whether it is locked and why,
+and when a change applies. A build returns only the settings whose feature it contains. The answer is for whoever
 asks and says so in `role`: the admin gets the configuration, a user their own eight settings with their
 own values. A change is saved to the asker's own layer.
 
 ```json
 {"surface":"web","groups":[{"id":"approvals","title":"Approvals","settings":[
-  {"id":"ask_before","title":"Ask before","description":"When the agent must wait for your approval.",
+  {"id":"ask_before","title":"Ask before","description":"When the agent must stop and wait for a person's approval before it acts.",
    "control":"choice",
    "choices":[{"value":"risky","label":"Risky actions","hint":"Uploads and page scripts"},
               {"value":"every_action","label":"Every action","hint":"Each click, key press and page change"}],
@@ -2625,7 +2661,7 @@ The items below are milestone 1. Items added by later milestones follow at the e
 
 The bench of sections 12.1 to 12.4 times each tool on pages made for it. This section is about the
 systems as a person uses them: every task a system does is recorded, and what the records add up to is
-shown for each system on the Systems page (section 9.17), beside a checklist of real steps.
+shown for each system under its own tab (section 9.17), beside a checklist of real steps.
 
 **What is recorded.** One line for each task, in `<evals.dir>/<name>/tasks.jsonl`, for the person alone
 to read.
@@ -2674,8 +2710,12 @@ was. It runs only on a session the agent is driving and that is doing nothing; o
 | Writes its log | The system's log file grew during the run. Skipped where the log is off |
 | A person can be asked | Someone is watching the system's page. Skipped when no one is |
 
-**Every system as one** (`GET /api/evals`, the admin's alone) is the card "All systems", above the three
-on the Systems page: the tasks of all three added up, with the same lines for tasks, latency, time and
+**Where they are shown.** A browser's evaluations are under its own tab, in the view Evaluations, and
+nowhere else. Each line says what it is (what "Latency" measures, what the checklist does), and each
+button says what it does.
+
+**Every system as one** (`GET /api/evals`, the admin's alone) is the card "Evaluations of all systems",
+on the Systems page under All systems: the tasks of all three added up, with the same lines for tasks, latency, time and
 cost, and then a row for each system with its tasks, the share answered, a typical task, its tokens, its
 cost and how its checklist went. It is how the admin compares the browsers.
 

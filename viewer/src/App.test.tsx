@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { App, type AppProps } from './App';
 import type { Connection, ConnectionHandlers } from './connection/connection';
@@ -8,7 +8,7 @@ import { DemoConnection } from './connection/demo';
 import { createDemoSettings } from './demo/settings';
 import { STATES } from './demo/sessions';
 import { DEFAULT_OPTIONS } from './options';
-import type { ClientCommand } from './protocol';
+import type { ClientCommand, ServerEvent } from './protocol';
 
 function show(name: string, props: Partial<AppProps> = {}) {
   const sent: ClientCommand[] = [];
@@ -537,6 +537,36 @@ describe('settings', () => {
     expect(within(confirm).getByText("You'll be signed out of sites there, and open sessions will end.")).toBeInTheDocument();
     await user.click(within(confirm).getByRole('button', { name: 'Clear data' }));
     expect(await screen.findByText('Browsing data cleared.')).toBeInTheDocument();
+  });
+
+  it('reads what the person prefers again when the settings were changed somewhere else', async () => {
+    const settings = createDemoSettings();
+    let handlers: ConnectionHandlers | undefined;
+    const createConnection = () => {
+      const connection = new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 });
+      const start = connection.start.bind(connection);
+      connection.start = (given) => {
+        handlers = given;
+        start(given);
+      };
+      return connection;
+    };
+    render(<App createConnection={createConnection} settings={settings} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
+    expect(document.documentElement).not.toHaveAttribute('data-theme');
+    // Another page changes the colour mode, and the service says the settings changed.
+    await settings.change('web', { colour_mode: 'dark' });
+    act(() => handlers?.onEvent({ type: 'settings_changed', changes: { colour_mode: 'dark' }, ts: 1001 } as ServerEvent));
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+  });
+
+  it('leaves the settings and the colour mode to a page that has them, and sends its button there', async () => {
+    const onOpenSettings = vi.fn();
+    const { user } = show('agent', { onOpenSettings, preferences: { colourMode: 'dark', showAgentPointer: true } });
+    // The page around the app keeps the colour mode: the app sets none, and takes none away.
+    expect(document.documentElement).not.toHaveAttribute('data-theme');
+    await user.click(button('Open settings'));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument();
   });
 
   it('colour mode changes the theme at once', async () => {

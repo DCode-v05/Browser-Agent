@@ -497,7 +497,9 @@ async def test_a_policy_that_is_not_one_is_refused(window: Open) -> None:
     assert (await one.ask("PATCH", "/api/admin/policy", None, token=admin))[0] == 400
     told = (await one.ask("GET", "/api/admin/policy", token=admin))[1]
     assert [line["id"] for line in told["sees"]] == ["evaluations", "cost", "traces", "checklist", "log"]
-    assert told["sees"][1] == {"id": "cost", "title": "What the tasks cost", "allowed": True}
+    cost = told["sees"][1]
+    assert (cost["id"], cost["title"], cost["allowed"]) == ("cost", "What the tasks cost", True)
+    assert "what they cost" in cost["description"]
 
 
 async def test_a_service_nobody_signs_in_to_has_its_own_token_and_nothing_else(window: Open) -> None:

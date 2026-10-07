@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Browser, Page, async_playwright
+from playwright.async_api import Browser, Locator, Page, async_playwright
 
 from bap_browser import browser_extension
 from bap_browser.agent.models import Reply, ScriptedModel, ToolCall
@@ -408,7 +408,25 @@ async def test_a_systems_settings_reach_that_browser_alone(
 SHOTS = Path(__file__).parents[2] / ".bap-browser" / "viewer-shots"
 
 
-async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers(
+async def turned(switch: Locator, on: bool) -> None:
+    """Presses a switch, and waits until it shows what the service saved."""
+    await switch.click()
+    async with asyncio.timeout(10):
+        while await switch.get_attribute("aria-checked") != ("true" if on else "false"):
+            await asyncio.sleep(0.05)
+
+
+async def saved(opened: Window, system: str, setting: str, value: Any) -> None:
+    """Waits until the service has a setting of one browser at a value."""
+    async with asyncio.timeout(10):
+        while True:
+            groups = (await opened.ask("GET", f"/api/settings?system={system}"))[1]["groups"]
+            if next(s["value"] for g in groups for s in g["settings"] if s["id"] == setting) == value:
+                return
+            await asyncio.sleep(0.05)
+
+
+async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
     def answers() -> ScriptedModel:
@@ -424,29 +442,22 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         await task.press("Enter")
         await page.get_by_text("The page is the start page.").wait_for()
 
-        await page.get_by_role("button", name="Systems").click()
-        systems = page.get_by_role("region", name="Systems")
-        await systems.get_by_role("article").first.wait_for()
-        assert [
-            await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
-        ] == [
-            # What users are allowed comes first: it is the admin's alone (spec 4.11).
-            "Users",
-            "Cloud browser",
-            "My Chrome",
-            "Built-in browser",
-        ]
-        cloud = systems.get_by_role("article", name="Cloud browser")
-        built_in = systems.get_by_role("article", name="Built-in browser")
+        # The settings button on a browser's page goes to that browser's own configuration: a
+        # setting is in one place, and no second screen opens over the page.
+        await page.get_by_role("button", name="Open settings").click()
+        await page.get_by_role("heading", name="Configuration of Cloud browser").wait_for()
+        assert await page.get_by_role("dialog").count() == 0
+        assert await page.get_by_role("tab", name="Configuration").get_attribute("aria-selected") == "true"
+        cloud = page.get_by_role("article", name="Cloud browser")
+        assert await page.get_by_role("article").count() == 1, "that browser's card, and no other's"
 
-        # Configuration: what the agent may do in one browser is that browser's alone.
-        downloads = cloud.get_by_role("switch", name="Let the agent download files: Cloud browser")
+        # What the agent may do in one browser is that browser's alone, and says what it does.
+        downloads = cloud.get_by_role("switch", name="Let the agent download files")
         await downloads.wait_for()
         assert await downloads.get_attribute("aria-checked") == "true"
-        await downloads.click()
-        async with asyncio.timeout(10):
-            while await downloads.get_attribute("aria-checked") != "false":
-                await asyncio.sleep(0.1)
+        await cloud.get_by_text("On: the agent may download files, saved where you can find them").wait_for()
+        await turned(downloads, False)
+        await cloud.get_by_text("Saved", exact=True).wait_for()
         own = {
             s["id"]: s
             for g in (await opened.ask("GET", "/api/settings?system=cloud"))[1]["groups"]
@@ -458,15 +469,26 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
             for s in g["settings"]
         }
         assert own["allow_downloads"]["value"] is False and others["allow_downloads"]["value"] is True
+        # A choice, a list of sites: every kind of setting is changed on the page itself.
+        await cloud.get_by_role("radio", name="Every action").click()
+        await saved(opened, "cloud", "ask_before", "every_action")
+        await cloud.get_by_role("radio", name="Risky actions").click()
+        await saved(opened, "cloud", "ask_before", "risky")
+        blocked = cloud.get_by_role("textbox", name="Blocked sites")
+        await blocked.fill("ads.example")
+        await blocked.blur()
+        await saved(opened, "cloud", "blocked_sites", ["ads.example"])
         # What the deployment left off is the admin's to turn on: the switch is a working one.
-        scripts = cloud.get_by_role(
-            "switch", name="Let the agent run scripts of several steps: Cloud browser"
-        )
+        scripts = cloud.get_by_role("switch", name="Let the agent run scripts of several steps")
         assert await scripts.get_attribute("aria-checked") == "false"
         assert await scripts.is_enabled()
-        # And the admin says, on the same card, whether users may use this browser at all.
+        # Every row says what its control does.
+        assert await cloud.locator(".setting").count() == await cloud.locator(".setting-description").count()
+        assert await cloud.locator(".setting-description:empty").count() == 0
+        # And the admin says, on the same page, whether users may use this browser at all.
         for_users = cloud.get_by_role("switch", name="Let users use this browser: Cloud browser")
         assert await for_users.get_attribute("aria-checked") == "true"
+        await cloud.get_by_text("Also on the user's page. Users may set their own").first.wait_for()
 
         # Its log is a file of its own, and its newest lines are read from here.
         await cloud.get_by_text(str((tmp_path / "logs" / "cloud.jsonl").resolve())).wait_for()
@@ -476,22 +498,33 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         SHOTS.mkdir(parents=True, exist_ok=True)
         await page.evaluate("document.querySelector('.systems').scrollTop = 0")
-        await page.screenshot(path=str(SHOTS / "systems-configuration.png"))
+        await page.screenshot(path=str(SHOTS / "system-configuration-under-its-tab.png"))
 
-        # A browser is turned off from its card, and stopped and started.
-        await built_in.get_by_role("switch", name="Use this browser: Built-in browser", exact=True).click()
-        await opened.room("builtin", "off")
-        await built_in.get_by_text("Turned off").wait_for()
-        assert await built_in.get_by_role("button", name="Start").is_disabled()
+        # The browser is stopped and started from here.
         await cloud.get_by_role("button", name="Stop").click()
         await opened.room("cloud", "ended")
         await cloud.get_by_role("button", name="Start").click()
         await opened.room("cloud", "agent")
         await cloud.get_by_role("button", name="Restart").wait_for()
 
-        # Evaluations: what the task took, the checklist, and the trace.
-        await systems.get_by_role("tab", name="Evaluations").click()
-        cloud = systems.get_by_role("article", name="Cloud browser")
+        # The view stays from one browser to the next. The built-in browser is turned off from its
+        # own configuration, and the page stays where it is.
+        await opened.open("Built-in browser")
+        await page.get_by_role("heading", name="Configuration of Built-in browser").wait_for()
+        built_in = page.get_by_role("article", name="Built-in browser")
+        await built_in.get_by_text(str((tmp_path / "logs" / "builtin.jsonl").resolve())).wait_for()
+        use = built_in.get_by_role("switch", name="Use this browser: Built-in browser", exact=True)
+        await turned(use, False)
+        await opened.room("builtin", "off")
+        await built_in.get_by_text("Turned off").first.wait_for()
+        assert await built_in.get_by_role("button", name="Start").is_disabled()
+        assert await opened.tab("Built-in browser") == "Built-in browser Turned off"
+
+        # Evaluations of the cloud browser: what the task took, the checklist, and the trace.
+        await opened.open("Cloud browser")
+        await page.get_by_role("tab", name="Evaluations").click()
+        await page.get_by_role("heading", name="Evaluations of Cloud browser").wait_for()
+        cloud = page.get_by_role("article", name="Cloud browser")
         await cloud.get_by_text("1 task, 1 step").wait_for()
         await cloud.get_by_text("100% answered (1 of 1)").wait_for()
         await cloud.get_by_text("The model did not say how many tokens it used.").wait_for()
@@ -513,61 +546,101 @@ async def test_the_systems_page_sets_up_manages_and_evaluates_the_three_browsers
         await cloud.get_by_text("You rated 1 good and 0 bad").wait_for()
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         await page.evaluate("document.querySelector('.systems').scrollTop = 0")
-        await page.screenshot(path=str(SHOTS / "systems-evaluations.png"))
+        await page.screenshot(path=str(SHOTS / "system-evaluations-under-its-tab.png"))
+        assert await page.get_by_role("article").count() == 1
 
         # Back on a browser's own page: the one turned off says so, and is turned on from there.
         await opened.open("Built-in browser")
+        await page.get_by_role("tab", name="Browser and chat").click()
         await page.get_by_role("heading", name="This browser is turned off").wait_for()
         await page.get_by_role("button", name="Turn it on").click()
         await opened.room("builtin", "agent")
         await page.get_by_label("Your task").wait_for(timeout=20_000)
-        # Each page opens the settings of its own browser.
-        await page.get_by_role("button", name="Open settings").click()
-        dialog = page.get_by_role("dialog", name="Settings")
-        await dialog.get_by_role("switch", name="Use this browser").wait_for()
+        assert await page.get_by_title("Session").inner_text() == "Session\nbuiltin"
 
 
-async def test_each_system_shows_its_configuration_and_its_evaluations_under_its_own_tab(
+async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of_it(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
-    async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
-        page = opened.page
-        for name in ("Cloud browser", "Built-in browser"):
-            await opened.open(name)
-            views = page.get_by_role("tablist", name=f"What to show of {name}")
-            assert await views.get_by_role("tab").all_inner_texts() == [
-                "Browser and chat",
-                "Configuration",
-                "Evaluations",
-            ]
+    def answers() -> ScriptedModel:
+        go = ToolCall("a", "browser_snapshot", {})
+        return ScriptedModel(
+            [lambda page: Reply("", (go,)), lambda page: Reply("The page is the start page.")]
+        )
 
-        # Under the built-in browser's own tab: how it is set up, with what to enable and how to manage it.
-        await page.get_by_role("tab", name="Configuration").click()
-        card = page.get_by_role("article", name="Built-in browser")
-        await card.get_by_role("switch", name="Use this browser: Built-in browser", exact=True).wait_for()
-        await card.get_by_role("switch", name="Let users use this browser: Built-in browser").wait_for()
-        await card.get_by_role("switch", name="Let the agent download files: Built-in browser").wait_for()
-        await card.get_by_role("button", name="Restart").wait_for()
-        await card.get_by_text(str((tmp_path / "logs" / "builtin.jsonl").resolve())).wait_for()
-        assert await page.get_by_role("article").count() == 1, "that browser's card, and no other's"
+    async with window(make_config, tmp_path, browser, answers) as opened:
+        page = opened.page
+        task = page.get_by_label("Your task")
+        await task.fill("Say which page this is")
+        await task.press("Enter")
+        await page.get_by_text("The page is the start page.").wait_for()
+
+        await page.get_by_role("button", name="Systems").click()
+        systems = page.get_by_role("region", name="Systems")
+        await systems.get_by_role("article").first.wait_for()
+        views = systems.get_by_role("tablist", name="What to show of the systems")
+        assert await views.get_by_role("tab").all_inner_texts() == ["Users", "All systems"]
+
+        # Users: what a user is allowed. No browser's own settings are repeated here.
+        assert [
+            await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
+        ] == ["Users"]
+        users = systems.get_by_role("article", name="Users")
+        assert await systems.get_by_role("switch", name="Let the agent download files").count() == 0
+        assert await systems.get_by_role("switch", name="Use this browser").count() == 0
+        # Every switch says what it lets a user do, and works.
+        switches = await users.get_by_role("switch").all()
+        assert len(switches) == 13
+        assert await users.locator(".system-row-hint:empty").count() == 0
+        cost = users.get_by_role("switch", name="What users may see: What the tasks cost")
+        await turned(cost, False)
+        assert (await opened.ask("GET", "/api/admin/policy"))[1]["sees"][1]["allowed"] is False
+        await turned(cost, True)
+        colour = users.get_by_role("switch", name="What users may change: Colour mode")
+        await turned(colour, False)
+        policy = (await opened.ask("GET", "/api/admin/policy"))[1]
+        assert {"id": "colour_mode", "allowed": False}.items() <= policy["may_change"][-1].items()
+        await turned(colour, True)
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         SHOTS.mkdir(parents=True, exist_ok=True)
-        await page.screenshot(path=str(SHOTS / "system-configuration-under-its-tab.png"))
+        await page.evaluate("document.querySelector('.systems').scrollTop = 0")
+        await page.screenshot(path=str(SHOTS / "systems-users.png"))
 
-        # And what its tasks took, with its checklist.
-        await page.get_by_role("tab", name="Evaluations").click()
-        card = page.get_by_role("article", name="Built-in browser")
-        await card.get_by_text("No task has been done in this browser yet.").wait_for()
-        await card.get_by_role("button", name="Run the checklist").click()
-        await card.get_by_text("10 of 11 passed").wait_for(timeout=60_000)
-        await page.screenshot(path=str(SHOTS / "system-evaluations-under-its-tab.png"))
+        # All systems: where each browser stands, and the tasks of all three as one.
+        await views.get_by_role("tab", name="All systems").click()
+        browsers = systems.get_by_role("article", name="The browsers")
+        await browsers.wait_for()
+        assert [
+            await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
+        ] == ["The browsers", "Evaluations of all systems"]
+        rows = browsers.get_by_role("row")
+        model = (await opened.ask("GET", "/api/systems"))[1]["systems"][0]["model"]
+        assert [" ".join(text.split()) for text in await rows.all_inner_texts()][1:] == [
+            f"Cloud browser Ready On May use it {model} Configuration Evaluations",
+            f"My Chrome Not connected On May use it {model} Configuration Evaluations",
+            f"Built-in browser Ready On May use it {model} Configuration Evaluations",
+        ]
+        assert await browsers.get_by_role("switch").count() == 0, "nothing is changed here"
+        overall = systems.get_by_role("article", name="Evaluations of all systems")
+        await overall.get_by_text("1 task, 1 step").wait_for()
+        await overall.get_by_text("100% answered (1 of 1)").wait_for()
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        await page.screenshot(path=str(SHOTS / "systems-all.png"))
 
-        # The view stays from one browser to the next: the cloud browser's evaluations are one press away.
-        await opened.open("Cloud browser")
-        await page.get_by_role("article", name="Cloud browser").get_by_text("Not run yet.").wait_for()
-        assert await page.get_by_role("article").count() == 1
-
-        # Back to the browser itself and its chat.
-        await page.get_by_role("tab", name="Browser and chat").click()
-        await page.get_by_label("Your task").wait_for()
-        assert await page.get_by_title("Session").inner_text() == "Session\ncloud"
+        # From here to a browser's own evaluations, and to its configuration.
+        await browsers.get_by_role("button", name="Evaluations of Cloud browser").click()
+        await page.get_by_role("heading", name="Evaluations of Cloud browser").wait_for()
+        await page.get_by_role("article", name="Cloud browser").get_by_text("1 task, 1 step").wait_for()
+        assert (
+            await opened.page.get_by_role("tab", name="Cloud browser").get_attribute("aria-selected")
+            == "true"
+        )
+        await page.get_by_role("button", name="Systems").click()
+        await views.get_by_role("tab", name="All systems").click()
+        await browsers.get_by_role("button", name="Configuration of Built-in browser").click()
+        await page.get_by_role("heading", name="Configuration of Built-in browser").wait_for()
+        await (
+            page.get_by_role("article", name="Built-in browser")
+            .get_by_role("switch", name="Use this browser: Built-in browser", exact=True)
+            .wait_for()
+        )

@@ -296,6 +296,29 @@
   font-size: var(--text-secondary);
 }
 
+/* Who else a setting reaches: every browser, the users. */
+.setting-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.setting-note .icon {
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+/* What a setting is held at, where it is said in words and not drawn as a control. */
+.setting-value {
+  flex: none;
+  max-width: 50%;
+  font-weight: var(--weight-emphasis);
+  text-align: end;
+}
+
 .setting-locked {
   color: var(--text-muted);
 }

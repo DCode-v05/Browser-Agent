@@ -1,8 +1,9 @@
 # bap-browser: the Systems page
 
-Written on 2026-10-06 and brought up to date on 2026-10-07 for the admin and the user. It says what
-was added for the three browsers as **systems**: who signs in, their configuration (what to enable,
-how to manage each), a user's own settings, and their evaluations. The design is in
+Written on 2026-10-06 and brought up to date on 2026-10-07: for the admin and the user, and then so
+that each thing is in one place. It says what was added for the three browsers as **systems**: who
+signs in, their configuration (what to enable, how to manage each), a user's own settings, and their
+evaluations. The design is in
 `docs/bap-browser-spec.md`, sections 4.11, 9.17 and 12.6; what else is built is in `docs/demo-guide.md`.
 
 ## In one paragraph
@@ -12,12 +13,16 @@ The window has three browsers the agent can work in: **Cloud browser**, **My Chr
 and off and started and stopped by itself, it writes its own log file, and everything its tasks took
 is recorded and shown for it alone.
 
-It is shown in two places:
+**Each thing is in one place.** Nothing is set twice, and no screen opens over a page.
 
-| Where | What you see |
+| What you want | Where it is |
 |---|---|
-| Under each browser's own tab | Three views of that browser: **Browser and chat**, **Configuration** and **Evaluations** |
-| **Systems**, at the top right of the window | The three browsers side by side, to compare them |
+| To work with one browser | Its tab, view **Browser and chat** |
+| To set one browser up (admin) | Its tab, view **Configuration**. The settings button on the chat goes there too |
+| To see what one browser's tasks took | Its tab, view **Evaluations** |
+| To say what users may change and see, and the passwords (admin) | **Systems**, at the top right, view **Users** |
+| To compare the three browsers (admin) | **Systems**, view **All systems** |
+| Your own settings for one browser (user) | Its tab, view **Settings** |
 
 | System | Name in files and addresses | What it is |
 |---|---|---|
@@ -25,9 +30,11 @@ It is shown in two places:
 | My Chrome | `chrome` | A tab of your own Chrome, through the extension |
 | Built-in browser | `builtin` | The app's own browser, which keeps its sign-ins |
 
-The Systems page has the same two views, **Configuration** and **Evaluations**, with one card for
-each system. The card is the same in both places. The view you choose under a browser's tab stays
-as it is when you go to the next browser.
+Every page begins with a heading and a line that say whose page it is and what it is for, such as
+"Configuration of Cloud browser. For the admin. How this one browser is set up…". Every setting has
+a line under its name saying what it does, and every control works: a change is saved as you make
+it, and the row says "Saved". The view you choose under a browser's tab stays as it is when you go
+to the next browser.
 
 That is the window as **the admin** has it. A **user** signs in on a page of their own and has less:
 Part 0 says who has what.
@@ -55,8 +62,8 @@ sign-in page has a link to the other.
    with the link that creates the password.
 2. **Create the admin password**: type it twice (8 characters or more) and press "Create the password
    and sign in". From then on the admin signs in at `/admin` with it.
-3. Press **Systems**. On the card **Users**, under "Sign-in passwords", type the password users sign
-   in with and press **Set it**.
+3. Press **Systems**. In the view **Users**, under "Sign-in passwords", type the password users
+   sign in with and press **Set it**.
 4. A user opens `/` and signs in with that password.
 
 If the admin's password is lost: start the service again and open the link it prints
@@ -73,32 +80,42 @@ A new password signs out everyone who used the old one; their open page goes bac
 
 ### 0.3 What the admin allows users
 
-On the **Systems** page, in **Configuration**. Every line is a working switch.
+Every line is a working switch, with a sentence under it saying what it lets a user do. A change
+shows on the user's page within a few seconds, with no reload.
 
 | Where | Switch | Off means |
 |---|---|---|
-| Each browser's card | **Let users use this browser** | For a user that browser is not there at all: no tab, no address |
-| Users card, "What users may change" | One for each of: Ask before, Wait for my answer, Remember "Allow on this site", Blocked sites, Only allow these sites, Picture quality, Show where the agent is acting, Colour mode | Every user has your value for it, shown to them in words |
-| Users card, "What users may see" | Evaluations of the browsers they use | A user has no Evaluations view |
+| A browser's tab, **Configuration**, under "For users" | **Let users use this browser** | For a user that browser is not there at all: no tab, no address |
+| **Systems**, Users, "What users may change" | One for each of: Ask before, Wait for my answer, Remember "Allow on this site", Blocked sites, Only allow these sites, Picture quality, Show where the agent is acting, Colour mode | Every user has your value for it, shown to them in words |
+| **Systems**, Users, "What users may see" | Evaluations of the browsers they use | A user has no Evaluations view |
 | | What the tasks cost | A user sees no tokens-to-dollars and no cost of a task |
 | | The tasks and their traces | A user sees no list of tasks, no trace, and gives no Good or Bad |
 | | Run the checklist | A user sees no checklist and cannot run one |
 | | The log of the agent's steps (off as installed) | A user does not see the log |
 
-Everything else on a card (Use this browser, Start, Stop, Restart, the model, downloads, uploads, the
-log, scripts) is the admin's alone. A user never sees those controls.
+Everything else in a browser's Configuration (Use this browser, Start, Stop, Restart, the model,
+downloads, uploads, the log, scripts) is the admin's alone. A user never sees those controls.
+
+On a browser's Configuration, a setting that users also have says so under its description: "Also on
+the user's page. Users may set their own, never looser than yours.", or "…held at your value: users
+cannot change it." A setting with no such line is yours alone.
+
+The Users view also lists **Browsers users may use**, each with a button to that browser's
+Configuration, where it is set.
 
 ### 0.4 A user's Settings
 
-Under a browser's tab, **Settings** shows one card for that browser.
+Under a browser's tab, **Settings** shows one card for that browser. The settings button on the chat
+goes there too.
 
 | On the card | What it does |
 |---|---|
 | **Preferred browser** | The browser your window opens on. Choose one and it opens at once, ready for a task. If it has stopped, it is started for you |
-| **Yours to turn on and off** | A switch for each setting that is yours and is a switch |
-| **Yours to choose** | A choice for each setting that is yours and has choices: Ask before, Wait for my answer, Remember "Allow on this site", Colour mode, Picture quality |
-| **Sites** | How many sites you block and allow. **Change these settings** opens the settings screen, where the lists are typed |
-| **Set by your admin** | What the admin holds, with its value |
+| **Approvals**: Ask before, Wait for my answer, Remember "Allow on this site" | When the agent must wait for you, for how long, and how long "Allow on this site" lasts |
+| **Sites**: Blocked sites, Only allow these sites | Typed here, one site for each line |
+| **Live view**: Picture quality, Show where the agent is acting | How sharp the live picture is, and whether the agent's pointer is drawn over it |
+| **Appearance**: Colour mode | Light, dark, or the same as your device. It holds on every page of your window |
+| A setting your admin holds | Shown in the same place in words, with its value and "Set by your admin". It has no control |
 
 A user can make a setting stricter than the admin has it, never looser: where the admin asks before
 every action, a user cannot go back to "Risky actions". The looser choice is shown, and cannot be taken.
@@ -108,7 +125,7 @@ every action, a user cannot go back to "Risky actions". The looser choice is sho
 | | The admin | A user |
 |---|---|---|
 | Each system's evaluations | All three | Those of the browsers they may use, if the admin lets users see evaluations |
-| **All systems** (every system as one, with a row for each) | Yes, at the top of Systems, Evaluations | No |
+| **Evaluations of all systems** (every system as one, with a row for each) | Yes: Systems, All systems | No |
 | Cost, tasks and traces, the checklist | Yes | Each only where the admin's switch for it is on |
 
 What a user may not see is not sent to their page at all.
@@ -121,7 +138,7 @@ What a user may not see is not sent to their page at all.
 
 | Control | What it does |
 |---|---|
-| **Use this browser** (a switch, on each card) | On: the system runs and the agent can work in it. Off: its session ends, its tab says "Turned off", and nobody is connected to it. It stays off the next time the service starts |
+| **Use this browser** (a switch, at the top of a browser's Configuration) | On: the system runs and the agent can work in it. Off: its session ends, its tab says "Turned off", and nobody is connected to it. It stays off the next time the service starts |
 | **Turn it on** (on the page of a system that is off) | The same switch, from the system's own page |
 
 ### 1.2 Managing a system
@@ -131,7 +148,8 @@ What a user may not see is not sent to their page at all.
 | **Start** | The system has no session | Starts a new browser and a new conversation |
 | **Stop** | The system is running | Ends its session. The system stays turned on |
 | **Restart** | The system is running | Ends its session and starts a new one |
-| **All settings** | Always | Opens the whole settings screen of that system |
+
+The line under the buttons says what they do, and each says it when the pointer rests on it.
 
 My Chrome has no Start button while it is not connected: it connects by itself, a moment after its
 extension is loaded in Chrome. What cannot be done is answered with a sentence on the card, such as
@@ -139,61 +157,55 @@ extension is loaded in Chrome. What cannot be done is answered with a sentence o
 
 ### 1.3 What to enable in a system
 
-These are switches on each card, under **What the agent may do here**. Each is that system's alone:
-turning downloads off for the cloud browser leaves them on for the other two.
+These are switches in a browser's Configuration, under **Files**, **Privacy** and **Advanced**. Each
+is that system's alone: turning downloads off for the cloud browser leaves them on for the other two.
 
 | Switch | What it does | As installed |
 |---|---|---|
 | Let the agent download files | Offers the tool that lists saved files | On |
 | Let the agent upload files | Offers the upload tool. Each upload still asks you | On |
 | Keep a log of the agent's steps | Writes that system's log file (section 1.6) | On |
-| Let the agent run scripts in pages | Offers `browser_evaluate`. Each use still asks you | Off, and locked |
-| Let the agent run scripts of several steps | Offers `browser_run`, the code tool | Off, and locked |
+| Let the agent run scripts in pages | Offers `browser_evaluate`. Each use still asks you | Off |
+| Let the agent run scripts of several steps | Offers `browser_run`, the code tool | Off |
 
-**Locked** means the switch is shown, off, with "Set by your organisation", and cannot be turned on
-from the window. The rule is the same everywhere in the settings: in the window a person can make
-things stricter than `config.json` says, never looser. To be able to turn these two on, allow them
-in `config.json` first:
+All five are the admin's to turn on and off. To take one out of the admin's hands, lock it in
+`config.json`; it is then shown in words, with "Locked in config.json", and has no switch:
 
 ```json
-{
-  "browser": { "javascript": { "allow_evaluate": true } },
-  "code": { "enabled": true }
-}
+{ "settings": { "locked": ["page_scripts", "code_tool"] } }
 ```
-
-After that each system has the switch, and you turn it off for the systems that should not have it.
 
 ### 1.4 Every setting a system has of its own
 
-Shown on the card under **How it is set up**, and changed in **All settings** (or from the settings
-button on that browser's page).
+All of them are in the browser's Configuration, by group, each with its line and its control.
 
 | Setting | Choices (the first is as installed) | What it changes |
 |---|---|---|
 | Use this browser | On, Off | Section 1.1 |
 | Model | The model in `config.json`, and any in `agent.offered_models` | The model that plans the agent's steps. A change holds from the next task |
-| Ask before | Risky actions, Every action | When the agent must wait for your approval |
-| Wait for my answer | 3 minutes, 1, 5, 10 minutes | How long an approval waits before it is denied |
-| Remember "Allow on this site" | Until the session ends, Never | How long that answer lasts |
+| Ask before | Risky actions, Every action | When the agent must stop and wait for a person's approval before it acts |
+| Wait for my answer | 3 minutes, 1, 5, 10 minutes | How long the agent waits for an answer. With none by then, the action is denied |
+| Remember "Allow on this site" | Until the session ends, Never | After "Allow on this site", how long the agent may go on acting on that site without asking again |
 | Blocked sites | A list, one site for each line | Sites the agent must never open. Added to those of `config.json` |
 | Only allow these sites | A list | When it has entries, the agent may open only these |
 | Let the agent download files | On, Off | Section 1.3 |
 | Let the agent upload files | On, Off | Section 1.3 |
 | Keep a log of the agent's steps | On, Off | Section 1.6 |
-| Picture quality | Standard, Data saver, High | How much data the live picture uses |
+| Picture quality | Standard, Data saver, High | How sharp the live picture is. A sharper picture uses more data |
 | Let the agent run scripts in pages | Off, On | Section 1.3 |
 | Let the agent run scripts of several steps | Off, On | Section 1.3 |
 
 **Which value holds.** A system's own value, where it has one. Otherwise the value you set for
-every browser. Otherwise what `config.json` says.
+every browser. Otherwise what `config.json` says. A user's own value, where the admin lets users
+change the setting, is laid over that and may only be stricter.
 
 **When a change takes hold.** At the agent's next step: the site lists, the tools on offer,
 approvals, the log and the picture quality all follow at once. The model follows from the next task.
 
 **What is one for the whole window, not a system's.** Colour mode; Show where the agent is acting;
 Stay signed in to sites and Clear browsing data (both are about the cloud browser); About this
-deployment. Changed on any system's screen, these change everywhere.
+deployment. Changed in any browser's Configuration, these change everywhere, and each says "One
+value for all three browsers." The colour mode holds on every page of the window.
 
 ### 1.5 To choose the model for each system
 
@@ -229,7 +241,7 @@ One line for each step the agent took:
 | `chars` | How many characters went back to the agent |
 | `result` | The first line of the result: what was done |
 
-On the card, **Log file** shows where the file is, and **Show the log** shows its newest 20 lines,
+At the bottom of a browser's Configuration, **Log file** shows where the file is, and **Show the log** shows its newest 20 lines,
 newest first. Turning "Keep a log of the agent's steps" off for a system stops its file, and the
 card then says "The log is turned off for this browser."
 
@@ -423,31 +435,34 @@ A request that cannot be done answers 409 with `{"error": "…"}`, a sentence fo
 1. Start the window: `uv run bap-browser studio --open`. Sign in as the admin (the first time,
    create the password; section 0.2).
 2. On the Cloud browser's page, give the agent a task in the chat, and let it finish.
-3. Under the Cloud browser's tab, press **Configuration**, then **Evaluations**: that browser's own
-   set-up, and what the task took.
-4. Press **Systems** to see the three side by side. In **Configuration**, turn "Let the agent
-   download files" off for the Cloud browser: the other two cards keep it on.
-5. Press **Show the log** on the Cloud browser's card: the steps of the task are there.
-6. Turn **Use this browser** off for the Built-in browser: its tab says "Turned off". Turn it on again.
-7. Go to **Evaluations**. The Cloud browser's card shows the task: model, time, tokens.
-8. Press **Run the checklist** on a card, and watch the lines turn to Passed.
-9. Press **Show the trace** on the task, then **Good**.
-10. The admin and the user, side by side. On the **Users** card set the password users sign in with.
-    In another window open `http://127.0.0.1:8765/` and sign in as a user: Browser and chat,
+3. Under the Cloud browser's tab, press **Configuration**: the page says whose it is, and every
+   setting says what it does. Turn "Let the agent download files" off: the row says "Saved". Under
+   the Built-in browser's tab it is still on.
+4. Press **Show the log**, at the bottom: the steps of the task are there.
+5. Under the Built-in browser's tab, turn **Use this browser** off: its tab says "Turned off". Turn
+   it on again.
+6. Under the Cloud browser's tab, press **Evaluations**: the task, with its model, time and tokens.
+7. Press **Run the checklist**, and watch the lines turn to Passed.
+8. Press **Show the trace** on the task, then **Good**.
+9. Press **Systems**, then **All systems**: where each browser stands, and the tasks of all three as
+   one. A button on a row takes you to that browser's Configuration or Evaluations.
+10. The admin and the user, side by side. In **Systems**, **Users**, set the password users sign in
+    with. In another window open `http://127.0.0.1:8765/` and sign in as a user: Browser and chat,
     **Settings**, Evaluations, and no Systems button.
-11. As the admin, turn **Let users use this browser** off for the Cloud browser: within two seconds
-    its tab is gone from the user's window.
+11. As the admin, under the Cloud browser's tab, in Configuration, turn **Let users use this
+    browser** off: within two seconds its tab is gone from the user's window.
 12. As the user, under **Settings**, choose **Preferred browser**: Built-in browser. It opens at once.
     Give it a task.
-13. As the admin, turn off "What users may see: What the tasks cost". The user's Evaluations (after
-    a reload) show the task and its time, and no cost.
+13. As the admin, in **Systems**, **Users**, turn off "What users may change: Picture quality". On
+    the user's Settings, Picture quality turns into words, "Set by your admin", with no reload.
+14. As the admin, turn off "What users may see: What the tasks cost". The user's Evaluations show the
+    task and its time, and no cost.
 
 ## What it does not do
 
 | Not there | Note |
 |---|---|
 | An account for each person | There is one admin, and one password that every user signs in with. Users share their settings and their preferred browser |
-| A user's page that follows the admin's switches by itself | A browser taken from users leaves their window within two seconds. What users may see and change is read when their page loads: they see it after a reload. The service refuses at once either way |
 | A judgement of an answer by another model | Outcome quality is how tasks ended, and your own Good and Bad |
 | Cost without a price | Set the two prices in `config.json` (section 2.6) |
 | Systems outside the three-browser window | The Systems page belongs to `bap-browser studio`. The commands that run one session (`agent`, `mcp`) have one log, `.bap-browser/events.jsonl`, and no evaluations |

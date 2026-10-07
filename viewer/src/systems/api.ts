@@ -39,6 +39,8 @@ export interface Me {
 export interface PolicyLine {
   id: string;
   title?: string;
+  /** What the line lets a user do, for the admin who decides it. */
+  description?: string;
   allowed: boolean;
 }
 

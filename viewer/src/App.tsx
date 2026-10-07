@@ -52,6 +52,13 @@ export interface AppProps {
   embedded?: boolean;
   options?: ViewerOptions;
   preferences?: Preferences;
+  /** The page around the app has the settings of this browser on a page of its own (spec 9.17). The
+   *  settings button goes there; and that page keeps the colour mode and what the person prefers,
+   *  so that they hold on its other pages too. */
+  onOpenSettings?: () => void;
+  /** Drawn as one page of the window of several browsers (spec 9.16). That window has the page's
+   *  bar, its heading and its main part: the app is then none of them a second time. */
+  inWindow?: boolean;
 }
 
 interface Toast {
@@ -72,7 +79,11 @@ function toastFor(notice: Notice): Toast | null {
   }
 }
 
-export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES }: AppProps) {
+export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false }: AppProps) {
+  const hosted = onOpenSettings !== undefined;
+  // A page has one bar that is its banner and one main part. In the window, those are the window's.
+  const Bar = inWindow ? 'div' : 'header';
+  const Workspace = inWindow ? 'div' : 'main';
   const connection = useMemo(() => createConnection(), [createConnection]);
   const [state, dispatch] = useReducer(reduce, initialState);
   const [, setTick] = useState(0);
@@ -84,12 +95,15 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const [lookingFirst, setLookingFirst] = useState<string | null>(null);
   /** The approval the person chose to look at first, in the same way. */
   const [approvalLookedAt, setApprovalLookedAt] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState(given);
+  /** What the person prefers, as this page last read it. Until then, and in a page that keeps it, what was given. */
+  const [own, setOwn] = useState<Preferences | null>(null);
+  const preferences = hosted ? given : (own ?? given);
   const [ownToasts, setOwnToasts] = useState<Toast[]>([]);
   /** The control a person pressed, and the state the session was in when they did. */
   const [pressed, setPressed] = useState<{ name: ControlName; at: StateKey } | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
+  const openSettings = onOpenSettings ?? (() => setSettingsOpen(true));
   const settingsButton = useRef<HTMLButtonElement>(null);
   const stopButton = useRef<HTMLButtonElement>(null);
   const primaryButton = useRef<HTMLButtonElement>(null);
@@ -119,11 +133,26 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   }, [options.tickMs]);
 
   useEffect(() => {
+    if (hosted) return;
     const root = document.documentElement;
     if (preferences.colourMode === 'system') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', preferences.colourMode);
     return () => root.removeAttribute('data-theme');
-  }, [preferences.colourMode]);
+  }, [hosted, preferences.colourMode]);
+
+  // The settings were changed somewhere else: what the person prefers is read again.
+  const settingsVersion = state.settingsVersion;
+  useEffect(() => {
+    if (hosted || settingsVersion === 0) return;
+    let current = true;
+    settings.load(surface).then(
+      (answer) => current && setOwn(preferencesFrom(answer)),
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [hosted, settings, surface, settingsVersion]);
 
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
@@ -313,15 +342,15 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           onOpenStep={openStep}
           onHandBack={handBack}
           onStopSession={() => setConfirmingStop(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={openSettings}
           titleRef={statusTitle}
           settingsRef={settingsButton}
           stopRef={stopButton}
         />
       ) : (
         <>
-      <header className="top-bar">
-        {embedded ? (
+      <Bar className="top-bar">
+        {inWindow ? null : embedded ? (
           <h1 className="sr-only">{W.topBar.embeddedTitle}</h1>
         ) : (
           <h1 className="brand">
@@ -359,10 +388,10 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
             </Button>
           </span>
         )}
-        <Button kind="quiet" icon="settings" onClick={() => setSettingsOpen(true)} ref={settingsButton} label={W.buttons.openSettings}>
+        <Button kind="quiet" icon="settings" onClick={openSettings} ref={settingsButton} label={W.buttons.openSettings}>
           {null}
         </Button>
-      </header>
+      </Bar>
 
       {full && (
         <section className="control-bar" aria-label={W.topBar.controls}>
@@ -375,7 +404,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         </section>
       )}
 
-      <main className="workspace">
+      <Workspace className="workspace">
         {!beside && (
           <BrowserPane
             state={state}
@@ -405,7 +434,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
             {selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}
           </section>
         )}
-      </main>
+      </Workspace>
         </>
       )}
 
@@ -426,7 +455,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           surface={surface}
           version={state.settingsVersion}
           onClose={() => closeSettings('button')}
-          onChanged={(answer) => setPreferences(preferencesFrom(answer))}
+          onChanged={(answer) => setOwn(preferencesFrom(answer))}
           onToast={toast}
         />
       )}

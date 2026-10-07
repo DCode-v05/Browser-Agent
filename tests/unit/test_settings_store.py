@@ -44,7 +44,7 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
     assert settings["ask_before"] == {
         "id": "ask_before",
         "title": "Ask before",
-        "description": "When the agent must wait for your approval.",
+        "description": "When the agent must stop and wait for a person's approval before it acts.",
         "control": "choice",
         "choices": [
             {
@@ -624,7 +624,14 @@ def test_the_admin_says_which_settings_users_may_change(make_config: MakeConfig,
         "show_agent_pointer",
         "colour_mode",
     ]
-    assert told["may_change"][0] == {"id": "ask_before", "title": "Ask before", "allowed": True}
+    # Each line says what it is, so that the admin knows what they are deciding.
+    assert told["may_change"][0] == {
+        "id": "ask_before",
+        "title": "Ask before",
+        "description": "When the agent must stop and wait for a person's approval before it acts.",
+        "allowed": True,
+    }
+    assert all(line["description"] for part in ("may_change", "sees") for line in told[part])
     store.change("web", {"approval_wait": "60"}, role="user")
     assert store.apply_to(config).control.approval_timeout_s == 60
 

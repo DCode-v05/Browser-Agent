@@ -1586,6 +1586,10 @@
   min-height: 0;
 }
 
+.studio-panel {
+  height: 100%;
+}
+
 .studio-wait {
   display: flex;
   flex-direction: column;
@@ -1958,14 +1962,59 @@
 .system-row-name {
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
   min-width: 0;
+  font-weight: var(--weight-emphasis);
 }
 
 .system-locked,
+.system-row-hint,
 .system-check-detail {
   display: block;
   color: var(--text-muted);
   font-size: var(--text-secondary);
+  font-weight: var(--weight-regular);
+}
+
+/* A line saying what the controls beside it do, or who a part of the card is for. */
+.system-hint {
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+/* The settings of one group, on the card itself: the rows of the settings screen. */
+.system-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.system-group .setting:first-of-type {
+  border-top: 0;
+  padding-top: var(--space-3);
+}
+
+.system-group .setting:last-of-type {
+  padding-bottom: var(--space-2);
+}
+
+/* A browser's name in a table: in the words' own face, not the one for a tool's name. */
+.system-table-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-emphasis);
+}
+
+.system-table td .system-actions {
+  justify-content: flex-end;
+}
+
+/* One browser by itself: what the page is for stands over its card, as wide as the card. */
+.systems[data-single='true'] .systems-head {
+  align-self: center;
+  width: 100%;
+  max-width: var(--dialog-width);
 }
 
 .system-list,
@@ -2082,6 +2131,16 @@
   border-bottom: var(--border-width) solid var(--border);
   text-align: right;
   font-weight: var(--weight-regular);
+  white-space: nowrap;
+}
+
+/* A table wider than its card is scrolled sideways, not squeezed until its words break. */
+.system-table-scroll {
+  overflow-x: auto;
+}
+
+.system-table td .system-actions {
+  flex-wrap: nowrap;
 }
 
 .system-table th:first-child {

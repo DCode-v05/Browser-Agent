@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { Surface } from '../protocol';
 import type { ChangeResult, ConfigAnswer, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
+import { valueInWords } from '../settings/words';
 import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button, Confirm } from './StatusPanel';
@@ -20,7 +21,7 @@ interface Props {
   onToast(text: string): void;
 }
 
-type RowStatus = { id: string; tone: 'saving' | 'saved' | 'refused'; text: string };
+export type RowStatus = { id: string; tone: 'saving' | 'saved' | 'refused'; text: string };
 
 export function SettingsScreen({ source, surface, version, onClose, onChanged, onToast }: Props) {
   const [answer, setAnswer] = useState<SettingsAnswer | null>(null);
@@ -231,11 +232,22 @@ interface RowProps {
   onToast(text: string): void;
   /** Who holds a setting that cannot be changed here. */
   lockedWords: string;
+  /** A line under the description: who else the setting reaches. */
+  note?: string;
+  /** A setting that cannot be changed here is said in words, not drawn as a control that does nothing. */
+  lockedAsWords?: boolean;
 }
 
-function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWords }: RowProps) {
+/** One setting: its name, one line saying what it does, and its control. */
+export function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWords, note, lockedAsWords }: RowProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const noted = note && (
+    <p className="setting-note">
+      <Icon name="info" />
+      {note}
+    </p>
+  );
   const footer = (
     <>
       {setting.locked && (
@@ -253,11 +265,28 @@ function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWor
     </>
   );
 
+  if (setting.locked && lockedAsWords && setting.control !== 'about' && setting.control !== 'action') {
+    return (
+      <div className="setting" data-locked="true">
+        <div className="setting-line">
+          <div className="setting-words">
+            <p className="setting-title">{setting.title}</p>
+            <p className="setting-description">{setting.description}</p>
+            {noted}
+          </div>
+          <p className="setting-value">{valueInWords(setting)}</p>
+        </div>
+        {footer}
+      </div>
+    );
+  }
+
   if (setting.control === 'choice') {
     return (
       <fieldset className="setting" disabled={setting.locked}>
         <legend className="setting-title">{setting.title}</legend>
         <p className="setting-description">{setting.description}</p>
+        {noted}
         <div className="choices">
           {setting.choices?.map((choice) => (
             <label key={choice.value} className="choice" data-disabled={choice.disabled || setting.locked}>
@@ -296,6 +325,7 @@ function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWor
           <p className="setting-description" id={descriptionId}>
             {setting.description}
           </p>
+          {noted}
         </div>
         {setting.control === 'switch' && (
           <button

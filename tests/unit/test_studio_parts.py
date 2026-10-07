@@ -10,7 +10,8 @@ from fakes import FakeDriver
 
 from bap_browser import browser_extension
 from bap_browser.agent.command import _with_where_the_browser_is  # pyright: ignore[reportPrivateUsage]
-from bap_browser.agent.studio import Room
+from bap_browser.agent.studio import Room, said_of
+from bap_browser.errors import BrowserError
 from bap_browser.service.events import FellBehind
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools.human_checks import HUMAN_CHECK_NOTICE, SIGN_IN_NOTICE, notice_for
@@ -90,6 +91,19 @@ def test_what_the_window_is_told_about_a_page(tmp_path: Path) -> None:
     )
     assert failed.described(tmp_path)["note"].startswith("The browser could not be started")
     assert "extension" not in failed.described(tmp_path)
+
+
+def test_a_chrome_with_no_window_open_is_said_in_words_a_person_can_act_on() -> None:
+    raw = BrowserError(
+        "The browser could not be started: BrowserType.connect_over_cdp: "
+        "Protocol error (Target.setAutoAttach): No current window"
+    )
+    assert said_of(raw) == (
+        "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
+    )
+    # Any other reason is said as it was given.
+    other = BrowserError("The browser could not be started: no such file")
+    assert said_of(other) == "The browser could not be started: no such file"
 
 
 async def test_a_page_whose_agent_waits_for_the_person_says_so(make_config, tmp_path: Path) -> None:

@@ -1256,8 +1256,8 @@ the page that asks for it does not keep it.</p>
   <code>/admin#token=…</code> with its own token. That page makes the admin's password, typed twice and at least
   <code>auth.min_chars</code> characters long, and signs the admin in. Opened without that link, the admin's page
   says the password has not been made, and makes none.</li>
-<li><strong>The users' password</strong> is set by the admin, in Configuration. Until then a user's page says so and
-  asks for nothing.</li>
+<li><strong>The users' password</strong> is set by the admin, on the Systems page under Users. Until then a user's page
+  says so and asks for nothing.</li>
 <li>A right password gives the page a token for the visit. The page keeps it for the life of the tab and
   sends it as the bearer token. A visit lasts <code>auth.session_hours</code>; "Sign out" ends it sooner.</li>
 <li>After <code>auth.max_failures</code> wrong passwords in a row, signing in to that role waits <code>auth.lock_s</code>
@@ -1271,8 +1271,10 @@ the page that asks for it does not keep it.</p>
   first password, and it is how an admin who lost theirs makes a new one: they start the service and
   open the link it prints.</li>
 </ul>
-<p><strong>What the admin allows: the policy.</strong> Three lists, kept in <code>settings.file</code> under <code>"policy"</code> and changed
-in Configuration, each line with a switch.</p>
+<p><strong>What the admin allows: the policy.</strong> Three lists, kept in <code>settings.file</code> under <code>"policy"</code>. Whether
+users may use a browser is set on that browser's Configuration; what users may change and see is set on
+the Systems page, under Users (section 9.17). Each line is a switch with a sentence saying what it lets a
+user do, and a change shows on a user's page within a few seconds, with no reload.</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -1348,7 +1350,7 @@ for what is the admin's, and 404 for a browser a user may not use, the same as f
 </tr>
 <tr>
 <td><code>GET</code>, <code>PATCH /api/admin/policy</code></td>
-<td>The policy: each line with its words and whether it is allowed. A change names its lines: <code>{"systems": {"cloud": false}}</code>, <code>{"may_change": {…}}</code>, <code>{"sees": {…}}</code></td>
+<td>The policy: each line with its <code>title</code>, a <code>description</code> of what it lets a user do, and whether it is <code>allowed</code>. A change names its lines: <code>{"systems": {"cloud": false}}</code>, <code>{"may_change": {…}}</code>, <code>{"sees": {…}}</code></td>
 <td>Admin</td>
 </tr>
 </tbody>
@@ -3140,7 +3142,9 @@ duration and opens the step drawer.</p>
 <li><code>npm run build</code> writes the viewer into <code>src/bap_browser/viewer_dist/</code>, which the service serves.</li>
 </ul>
 <h3 id="912-settings-screen">9.12 Settings screen</h3>
-<p>Opened from the settings button in the top bar. It is a dialog over the viewer: groups on the left,
+<p>Opened from the settings button in the top bar, where the viewer shows one session. (In the window of
+three browsers the same rows are on a page of their own, under each browser's tab, and the button goes
+there: section 9.17.) It is a dialog over the viewer: groups on the left,
 the chosen group's settings on the right. Below 700 px wide the groups become a list, and choosing one
 shows its settings on a screen of their own with a Back button.</p>
 <pre><code>┌────────────────────────────────────────────────────────────────────────────────────┐
@@ -3468,6 +3472,9 @@ browser's (Colour mode, Show where the agent is acting) are one for the window, 
 they are changed on.</p>
 <p>Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
 beside "Sign out".</p>
+<p><strong>Each thing is in one place.</strong> What is one browser's is under that browser's tab, and nowhere else.
+What is not one browser's is on the Systems page, which is the admin's. Nothing is set in two places,
+and no screen opens over a page to set it.</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -3484,13 +3491,13 @@ beside "Sign out".</p>
 </tr>
 <tr>
 <td>Under each browser's tab</td>
-<td><strong>Browser and chat</strong> (the browser itself and its chat), <strong>Configuration</strong> and <strong>Evaluations</strong>. The last two show that system's card by itself, the same card as on the Systems page</td>
-<td><strong>Browser and chat</strong>, <strong>Settings</strong> (their own settings of that browser) and <strong>Evaluations</strong>, which is there only where the admin lets users see evaluations</td>
+<td><strong>Browser and chat</strong> (the browser itself and its chat), <strong>Configuration</strong> (how that browser is set up) and <strong>Evaluations</strong> (what its tasks took)</td>
+<td><strong>Browser and chat</strong>, <strong>Settings</strong> (their own settings for that browser) and <strong>Evaluations</strong>, which is there only where the admin lets users see evaluations</td>
 </tr>
 <tr>
-<td>The settings button</td>
-<td>Opens the settings of that page's browser. Its first setting is "Use this browser"</td>
-<td>Opens the settings that are theirs to change</td>
+<td>The settings button on the chat</td>
+<td>Goes to that browser's Configuration</td>
+<td>Goes to their Settings for that browser</td>
 </tr>
 <tr>
 <td>A browser that is turned off</td>
@@ -3506,11 +3513,47 @@ beside "Sign out".</p>
 </table></div>
 <p>The view stays as it is from one browser to the next, so the browsers are looked at one after the other.
 A user's window opens on the browser they prefer.</p>
-<p><strong>A user's Settings.</strong> One card for the browser, every control on it a working one.</p>
+<p><strong>Every page says whose it is and what it is for,</strong> in a heading and a line under it: "Configuration of
+Cloud browser. For the admin. How this one browser is set up…", "Your settings for Cloud browser. Your
+own settings for this browser, inside what your admin allows…", "Evaluations of Cloud browser".</p>
+<p><strong>Every control says what it does.</strong> A setting is drawn as its name, one line saying what it does
+(section 10.2), and its control: a switch, a choice with a hint under each option, a list of sites to
+type, a button. A change is saved as it is made, and the row says "Saving…", then "Saved", or why it was
+not taken. A button that manages something says what it does when the pointer rests on it, and the
+line under a group of buttons says it too. A setting that cannot be changed here is said in words, with
+its value and who holds it. It is never drawn as a control that does nothing.</p>
+<p><strong>The admin's Configuration of a browser.</strong> One card, in this order.</p>
 <div class="tw"><table>
 <thead>
 <tr>
-<th>On the card</th>
+<th>Part of the card</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>This browser</td>
+<td><strong>Use this browser</strong> (on, off), once, here. <strong>Restart</strong> and <strong>Stop</strong> for one that runs, <strong>Start</strong> for one that does not; a person's own Chrome is not started from here, it connects by itself</td>
+</tr>
+<tr>
+<td>For users</td>
+<td><strong>Let users use this browser</strong>: off, it is not there for a user at all</td>
+</tr>
+<tr>
+<td>Every setting the browser has, by group</td>
+<td>Browser, Agent, Approvals, Sites, Files, Privacy, Live view, Appearance, Advanced: each setting with its line and its working control. A setting that is also on the user's page says so, and says whether users may set their own or are held at the admin's value. A setting that is one for all three browsers says so. One that <code>config.json</code> locks is said in words, with "Locked in config.json"</td>
+</tr>
+<tr>
+<td>Log file, Records of its tasks</td>
+<td>Where each is written. "Show the log" reads the newest lines</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>A user's Settings for a browser.</strong> One card.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Part of the card</th>
 <th>What it is</th>
 </tr>
 </thead>
@@ -3520,20 +3563,12 @@ A user's window opens on the browser they prefer.</p>
 <td>A choice among the browsers they may use. The one chosen opens at once, on its chat</td>
 </tr>
 <tr>
-<td>Yours to turn on and off</td>
-<td>A switch for each setting that is theirs and is a switch</td>
+<td>The settings that are theirs, by group</td>
+<td>Each with its line and its working control. A choice looser than the admin has it is shown, and cannot be taken</td>
 </tr>
 <tr>
-<td>Yours to choose</td>
-<td>A choice for each setting that is theirs and has choices. One that would be looser than the admin has it is shown, and cannot be taken</td>
-</tr>
-<tr>
-<td>Sites</td>
-<td>How many blocked and allowed sites they have. "Change these settings" opens the settings screen, where the lists are typed</td>
-</tr>
-<tr>
-<td>Set by your admin</td>
-<td>The settings the admin holds, each with its value in words. They are not drawn as switches that do nothing</td>
+<td>What the admin holds</td>
+<td>In the same place, in words: the value, and "Set by your admin"</td>
 </tr>
 <tr>
 <td>Log</td>
@@ -3542,58 +3577,44 @@ A user's window opens on the browser they prefer.</p>
 </tbody>
 </table></div>
 <p>A user's card has no Start, Stop or Restart, and nothing of what the agent may do: those are the admin's.</p>
-<p><strong>The Systems page</strong> is the admin's. "Systems" in the bar opens a page in place of a browser's own, with
-the three systems side by side, each a card, and two views of them. Above the cards, Configuration has
-the card <strong>Users</strong> and Evaluations has the card <strong>All systems</strong> (section 12.6).</p>
-<div class="tw"><table>
-<thead>
-<tr>
-<th>On the Users card</th>
-<th>What it is</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>What users may change</td>
-<td>A switch for each setting that can be a user's. Off holds every user at the admin's value</td>
-</tr>
-<tr>
-<td>What users may see</td>
-<td>A switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist, and the log</td>
-</tr>
-<tr>
-<td>Sign-in passwords</td>
-<td>The password users sign in with, and the admin's own</td>
-</tr>
-</tbody>
-</table></div>
+<p><strong>The Systems page</strong> is the admin's, and has what is not one browser's alone. "Systems" in the bar opens
+it in place of a browser's page. It has two views, and repeats no browser's settings.</p>
 <div class="tw"><table>
 <thead>
 <tr>
 <th>View</th>
-<th>What a card shows</th>
+<th>What it shows</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Configuration</td>
-<td>Where the system stands. <strong>Use this browser</strong> (on, off). <strong>Let users use this browser</strong> (on, off: off, it is not there for a user at all). <strong>Restart</strong> and <strong>Stop</strong> for one that runs, <strong>Start</strong> for one that does not; a person's own Chrome is not started from here, it connects by itself. <strong>What the agent may do here</strong>: every setting of this system that is a switch (downloads, uploads, the log, scripts in pages, scripts of several steps), each to turn on or off for this system alone; one the deployment requires is shown, off, with "Set by your organisation". <strong>How it is set up</strong>: the model and every other setting of this system, in the words of its choices. <strong>All settings</strong> opens the settings screen of this system. <strong>Log file</strong>: where it is, and "Show the log" for its newest lines. <strong>Records of its tasks</strong>: the folder</td>
+<td><strong>Users</strong></td>
+<td>One card. <em>Browsers users may use</em>: each browser, whether users may use it, and a button to its Configuration, where that is set. <em>What users may change</em>: a switch for each setting that can be a user's, with what the setting is. <em>What users may see</em>: a switch each for the evaluations, what the tasks cost, the tasks and their traces, running the checklist and the log, each with what it lets a user see. <em>Sign-in passwords</em>: the one users sign in with, and the admin's own</td>
 </tr>
 <tr>
-<td>Evaluations</td>
-<td>Section 12.6</td>
+<td><strong>All systems</strong></td>
+<td><em>The browsers</em>: a row for each with where it stands, whether it is in use, whether users may use it, its model, and buttons to its Configuration and its Evaluations. Nothing is changed here. <em>Evaluations of all systems</em>: section 12.6</td>
 </tr>
 </tbody>
 </table></div>
+<p><strong>What follows by itself.</strong> The window asks the service where things stand every second or two, so a
+page follows what was changed elsewhere with no reload. A user's window follows the admin: a browser
+taken from users leaves it, a view the admin keeps back leaves it, and a setting the admin now holds is
+shown as held. The colour mode and "Show where the agent is acting" are the window's to keep: they hold
+on every page of it, not only on a browser's own.</p>
 <p><strong>Turning a system off</strong> ends its session, with "This browser was turned off." as the reason, and takes
 it off its page: nobody is connected to it, and the agent cannot work in it. It stays off the next time
 the service starts. Turning it on starts a new session. <strong>Stop</strong> ends the session and leaves the system
 on; <strong>Start</strong> and <strong>Restart</strong> give it a new browser and a new conversation. What cannot be done is
 answered with a sentence for the person: "This browser is turned off. Turn it on first."</p>
+<p><strong>One page, one frame.</strong> The window has the page's one bar, its one heading and its one main part.
+The browser and chat drawn inside it have none of their own, so a screen reader finds one of each.</p>
+<p><strong>A person's Chrome with no window open</strong> cannot be worked in: its page says "Your Chrome has no window
+open. Open a window in Chrome: the agent works in a tab of it.", and connects by itself once there is one.</p>
 <p><strong>A log of its own.</strong> Each system writes its tool calls to <code>&lt;logging.systems_dir&gt;/&lt;name&gt;.jsonl</code>, in the
 form of section 5.9's event log, and nothing goes to the one log of a single session. Where a deployment
 keeps no log (<code>logging.event_log</code> is <code>null</code>) no system writes one, until a person turns the log on for a
-system. The Systems page reads the newest <code>logging.shown_lines</code> lines of the file.</p>
+system. A browser's Configuration reads the newest <code>logging.shown_lines</code> lines of the file.</p>
 <p><strong>The API.</strong> All behind the token. A system the service does not have answers 404, and so does one a
 user may not use; a service with one session has none of these routes. A user is told of a system
 without where its files are, may start one and not stop or restart it (403), and reads its log only
@@ -3705,7 +3726,7 @@ app adds what needs the local machine (<code>docs/research/settings.md</code>).<
 <tr>
 <td><code>stay_signed_in</code></td>
 <td>Stay signed in to sites</td>
-<td>Keeps the cloud browser's cookies and site data between sessions</td>
+<td>Keeps the cloud browser's cookies and site data from one session to the next, so sites stay signed in</td>
 <td>Off, On</td>
 <td>yes</td>
 <td>yes</td>
@@ -3760,7 +3781,7 @@ app adds what needs the local machine (<code>docs/research/settings.md</code>).<
 <tr>
 <td><code>approval_wait</code></td>
 <td>Wait for my answer</td>
-<td>How long an approval waits before it is denied</td>
+<td>How long the agent waits for an answer to an approval. With no answer by then, the action is denied</td>
 <td>3 minutes, 1 minute, 5 minutes, 10 minutes</td>
 <td>yes</td>
 <td>yes</td>
@@ -3771,7 +3792,7 @@ app adds what needs the local machine (<code>docs/research/settings.md</code>).<
 <tr>
 <td><code>remember_site_approval</code></td>
 <td>Remember "Allow on this site"</td>
-<td>How long that answer lasts</td>
+<td>After "Allow on this site", how long the agent may go on acting on that site without asking again</td>
 <td>Until the session ends, Never</td>
 <td>yes</td>
 <td>yes</td>
@@ -3881,7 +3902,7 @@ app adds what needs the local machine (<code>docs/research/settings.md</code>).<
 <tr>
 <td><code>picture_quality</code></td>
 <td>Picture quality</td>
-<td>How much data the live picture uses</td>
+<td>How sharp the live picture of the browser is. A sharper picture uses more data</td>
 <td>Standard, Data saver, High</td>
 <td>yes</td>
 <td>yes</td>
@@ -3994,13 +4015,17 @@ system by itself: <code>system_enabled</code> ("Use this browser", which is ther
 <code>activity_log</code>, <code>picture_quality</code>, <code>page_scripts</code> and <code>code_tool</code> ("Let the agent run scripts of several
 steps", <code>code.enabled</code>, tighten only). The saved file holds a system's own values under
 <code>"systems": {"cloud": {…}}</code>, beside the values for every browser.</p>
+<p><strong>What a setting says of itself.</strong> Every entry has a <code>description</code>: one line, under 110 characters,
+saying what the setting does in words for a person who has never seen it ("The colours of this window:
+light, dark, or the same as your device."). It is drawn under the setting's name wherever the setting
+is, and a test holds every entry to it.</p>
 <p><strong>The settings API.</strong> <code>GET /api/settings?surface=web</code> returns the groups and, for each setting, its
-name, kind of control, choices, current value, default, whether it is locked and why, and when a
-change applies. A build returns only the settings whose feature it contains. The answer is for whoever
+name, its description, kind of control, choices, current value, default, whether it is locked and why,
+and when a change applies. A build returns only the settings whose feature it contains. The answer is for whoever
 asks and says so in <code>role</code>: the admin gets the configuration, a user their own eight settings with their
 own values. A change is saved to the asker's own layer.</p>
 <pre><code class="language-json">{&quot;surface&quot;:&quot;web&quot;,&quot;groups&quot;:[{&quot;id&quot;:&quot;approvals&quot;,&quot;title&quot;:&quot;Approvals&quot;,&quot;settings&quot;:[
-  {&quot;id&quot;:&quot;ask_before&quot;,&quot;title&quot;:&quot;Ask before&quot;,&quot;description&quot;:&quot;When the agent must wait for your approval.&quot;,
+  {&quot;id&quot;:&quot;ask_before&quot;,&quot;title&quot;:&quot;Ask before&quot;,&quot;description&quot;:&quot;When the agent must stop and wait for a person's approval before it acts.&quot;,
    &quot;control&quot;:&quot;choice&quot;,
    &quot;choices&quot;:[{&quot;value&quot;:&quot;risky&quot;,&quot;label&quot;:&quot;Risky actions&quot;,&quot;hint&quot;:&quot;Uploads and page scripts&quot;},
               {&quot;value&quot;:&quot;every_action&quot;,&quot;label&quot;:&quot;Every action&quot;,&quot;hint&quot;:&quot;Each click, key press and page change&quot;}],
@@ -6244,7 +6269,7 @@ the evidence before a change is called done.</p>
 <h3 id="126-evaluations-of-the-three-systems">12.6 Evaluations of the three systems</h3>
 <p>The bench of sections 12.1 to 12.4 times each tool on pages made for it. This section is about the
 systems as a person uses them: every task a system does is recorded, and what the records add up to is
-shown for each system on the Systems page (section 9.17), beside a checklist of real steps.</p>
+shown for each system under its own tab (section 9.17), beside a checklist of real steps.</p>
 <p><strong>What is recorded.</strong> One line for each task, in <code>&lt;evals.dir&gt;/&lt;name&gt;/tasks.jsonl</code>, for the person alone
 to read.</p>
 <div class="tw"><table>
@@ -6385,8 +6410,11 @@ was. It runs only on a session the agent is driving and that is doing nothing; o
 </tr>
 </tbody>
 </table></div>
-<p><strong>Every system as one</strong> (<code>GET /api/evals</code>, the admin's alone) is the card "All systems", above the three
-on the Systems page: the tasks of all three added up, with the same lines for tasks, latency, time and
+<p><strong>Where they are shown.</strong> A browser's evaluations are under its own tab, in the view Evaluations, and
+nowhere else. Each line says what it is (what "Latency" measures, what the checklist does), and each
+button says what it does.</p>
+<p><strong>Every system as one</strong> (<code>GET /api/evals</code>, the admin's alone) is the card "Evaluations of all systems",
+on the Systems page under All systems: the tasks of all three added up, with the same lines for tasks, latency, time and
 cost, and then a row for each system with its tasks, the share answered, a typical task, its tokens, its
 cost and how its checklist went. It is how the admin compares the browsers.</p>
 <p><strong>Who is shown what</strong> (section 4.11). The admin is shown everything. A user is shown the evaluations of

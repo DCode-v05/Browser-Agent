@@ -271,7 +271,7 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     expect(screen.getByRole('region', { name: W.systems.title })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
     // No browser's tab is the chosen one while the Systems page is shown.
-    expect(screen.getAllByRole('tab', { selected: true }).map((one) => one.textContent)).toEqual([W.systems.configuration]);
+    expect(screen.getAllByRole('tab', { selected: true }).map((one) => one.textContent)).toEqual([W.systems.view.users]);
     await user.click(tab(/Cloud browser/));
     expect(screen.queryByRole('region', { name: W.systems.title })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
@@ -291,12 +291,14 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
   });
 
-  it('opens, on a browser’s page, the settings of that browser', async () => {
+  it('goes, from the settings button on a browser’s page, to that browser’s own configuration', async () => {
     const { user, changed } = withSystems();
     await user.click(screen.getByRole('button', { name: W.buttons.openSettings }));
-    const dialog = await screen.findByRole('dialog', { name: W.settings.title });
-    await user.click(await within(dialog).findByRole('tab', { name: 'Live view' }));
-    await user.click(within(dialog).getByRole('switch', { name: 'Show where the agent is acting' }));
+    // A browser's settings are in one place: no second screen is opened over the page.
+    expect(await screen.findByRole('heading', { name: W.systems.panel.title.configuration('Cloud browser') })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: W.studio.view.configuration })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('switch', { name: 'Show where the agent is acting' }));
     await waitFor(() => expect(changed).toEqual([['cloud', { show_agent_pointer: false }]]));
   });
 });
@@ -306,7 +308,7 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
   /** The settings the service gives a user: those that can be a user's, and no others (spec 10.2). */
   const A_USERS = ['ask_before', 'approval_wait', 'remember_site_approval', 'blocked_sites', 'allowed_sites', 'picture_quality', 'show_agent_pointer', 'colour_mode'];
 
-  function signedIn(role: 'admin' | 'user', rooms: Room[], me: Me | null, over: Partial<SystemsApi> = {}) {
+  function signedIn(role: 'admin' | 'user', rooms: Room[], me: Me | null, over: Partial<SystemsApi> = {}, pollMs = 0, loadRooms: () => Promise<Room[] | null> = async () => rooms) {
     const manage = vi.fn(async () => ({ ok: true }) as const);
     const prefer = vi.fn(async (system: string) => (me ? { ...me, preferred: system } : null));
     const systems: SystemsApi = {
@@ -331,8 +333,8 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     render(
       <Studio
         rooms={rooms}
-        loadRooms={async () => rooms}
-        pollMs={0}
+        loadRooms={loadRooms}
+        pollMs={pollMs}
         systems={systems}
         role={role}
         me={me}
@@ -399,7 +401,7 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     const { user, prefer, pages } = signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
     await user.click(screen.getByRole('tab', { name: W.studio.view.settings }));
     // Their own settings are on the card by now, each a working control, beside the browser they prefer.
-    expect(await screen.findByRole('combobox', { name: 'Ask before' })).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: /Every action/ })).toBeInTheDocument();
     const preferred = screen.getByRole('combobox', { name: new RegExp(`^${W.systems.user.preferred}`) });
     await user.selectOptions(preferred, 'builtin');
     expect(prefer).toHaveBeenCalledWith('builtin');
@@ -407,6 +409,52 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     expect(pages).toEqual(['builtin']);
     expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: W.studio.view.agent })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('follows what the admin allows as it changes, with no reload', async () => {
+    const mine: Me = { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees };
+    let now = mine;
+    let rooms: Room[] = [cloud, builtIn];
+    signedIn('user', rooms, mine, { me: async () => now }, 20, async () => rooms);
+    expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings, W.studio.view.evaluations]);
+    // The admin keeps the evaluations from users, and then the built-in browser.
+    now = { ...mine, sees: { ...sees, evaluations: false } };
+    await waitFor(() => expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings]));
+    rooms = [cloud];
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /Built-in browser/ })).not.toBeInTheDocument());
+  });
+
+  it('keeps the colour mode a person chose on every page of the window', async () => {
+    const { user } = signedIn('admin', [cloud, builtIn], { role: 'admin', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
+    await user.click(screen.getByRole('tab', { name: W.studio.view.configuration }));
+    await user.click(await screen.findByRole('radio', { name: 'Dark' }));
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+    // On the browser's own page, on another browser's, and on the Systems page: it holds.
+    await user.click(screen.getByRole('tab', { name: W.studio.view.agent }));
+    expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    await user.click(tab(/Built-in browser/));
+    await user.click(screen.getByRole('tab', { name: W.studio.view.evaluations }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    await user.click(screen.getByRole('button', { name: W.studio.systems }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it('goes from the Systems page to a browser’s own configuration', async () => {
+    const policy = {
+      systems: [
+        { id: 'cloud', allowed: true },
+        { id: 'builtin', allowed: false },
+      ],
+      may_change: [],
+      sees: [],
+    };
+    const { user } = signedIn('admin', [cloud, builtIn], { role: 'admin', systems: ['cloud', 'builtin'], preferred: 'cloud', sees }, { policy: async () => policy });
+    await user.click(screen.getByRole('button', { name: W.studio.systems }));
+    await user.click(await screen.findByRole('button', { name: `${W.systems.access.open}: Built-in browser` }));
+    expect(await screen.findByRole('heading', { name: W.systems.panel.title.configuration('Built-in browser') })).toBeInTheDocument();
+    expect(tab(/Built-in browser/)).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('region', { name: W.systems.title })).not.toBeInTheDocument();
   });
 
   it('tells a user who may use no browser so, and still lets them sign out', async () => {

@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { App, type AppProps } from './App';
+import { App, DEFAULT_PREFERENCES, preferencesFrom, type AppProps, type Preferences } from './App';
 import type { Role } from './auth/api';
 import { Icon, type IconName } from './components/Icon';
 import { Button } from './components/StatusPanel';
@@ -65,7 +65,10 @@ function useStartsPreferred(systems: SystemsApi | undefined, room: string, state
   }, [systems, room, state]);
 }
 
-export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedded'> {
+/** What the person prefers is the same when nothing of it differs: the window is not drawn again for it. */
+const samePreferences = (one: Preferences, other: Preferences) => one.colourMode === other.colourMode && one.showAgentPointer === other.showAgentPointer;
+
+export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedded' | 'onOpenSettings'> {
   /** The pages as the service listed them when the window opened. */
   rooms: Room[];
   loadRooms: LoadRooms;
@@ -106,18 +109,36 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   const roomId = room?.id ?? '';
   useStartsPreferred(role === 'user' && roomId === me?.preferred ? systems : undefined, roomId, room?.state);
 
+  // What the person prefers is the window's to keep: the colour mode holds on every page of it, not
+  // only on a browser's own.
+  const [preferences, setPreferences] = useState(app.preferences ?? DEFAULT_PREFERENCES);
+  const prefers = useCallback((next: Preferences) => setPreferences((was) => (samePreferences(was, next) ? was : next)), []);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (preferences.colourMode === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', preferences.colourMode);
+    return () => root.removeAttribute('data-theme');
+  }, [preferences.colourMode]);
+
+  const { settings, surface = 'web' } = app;
+  // A user's window follows what the admin allows as it changes (spec 4.11): the browsers they may
+  // use, what they may see, and the settings held at the admin's value.
+  const follows = role === 'user' ? systems : undefined;
   useEffect(() => {
     if (!pollMs) return;
     let current = true;
     const timer = setInterval(async () => {
-      const now = await loadRooms();
-      if (current && now) setRooms(now);
+      const [now, mine, set] = await Promise.all([loadRooms(), follows ? follows.me() : null, systems ? settings.load(surface).catch(() => null) : null]);
+      if (!current) return;
+      if (now) setRooms(now);
+      if (mine) setMe(mine);
+      if (set) prefers(preferencesFrom(set));
     }, pollMs);
     return () => {
       current = false;
       clearInterval(timer);
     };
-  }, [loadRooms, pollMs]);
+  }, [loadRooms, pollMs, follows, systems, settings, surface, prefers]);
 
   const createConnection = useCallback(() => connectionFor(roomId), [connectionFor, roomId]);
   const open = (id: string) => {
@@ -174,19 +195,19 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     return (
       <div className="studio">
         <header className="studio-bar">
-          <span className="brand">
+          <h1 className="brand">
             <span className="brand-mark" aria-hidden="true" />
             <span className="brand-name">{W.product}</span>
-          </span>
+          </h1>
           {side}
         </header>
-        <div className="studio-page">
+        <main className="studio-page">
           <section className="studio-wait" aria-label={W.studio.noBrowser}>
             <Icon name="lock" size="large" />
             <h2 className="studio-wait-title">{W.studio.noBrowser}</h2>
             <p className="studio-wait-lead">{W.studio.noBrowserLead}</p>
           </section>
-        </div>
+        </main>
       </div>
     );
   }
@@ -194,10 +215,10 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   return (
     <div className="studio">
       <header className="studio-bar">
-        <span className="brand">
+        <h1 className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-name">{W.product}</span>
-        </span>
+        </h1>
         <div className="studio-tabs" role="tablist" aria-label={W.studio.pages}>
           {rooms.map((one) => (
             <button
@@ -245,9 +266,20 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           </div>
         </nav>
       )}
-      <div className="studio-page" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
+      {/* The window has the page's one bar, its heading and its main part: what is drawn in it has none of its own. */}
+      <main className="studio-page">
+       <div className="studio-panel" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
         {showingSystems ? (
-          <SystemsPage api={systems} surface={app.surface ?? 'web'} pollMs={pollMs} wordFor={wordFor} passwords={passwords} />
+          <SystemsPage
+            api={systems}
+            pollMs={pollMs}
+            wordFor={wordFor}
+            passwords={passwords}
+            onOpen={(id, next) => {
+              open(id);
+              setView(next);
+            }}
+          />
         ) : systems && view !== 'agent' ? (
           <SystemPanel
             key={room.id}
@@ -257,18 +289,30 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             role={role}
             me={me}
             onPrefer={(id) => void prefer(id)}
-            surface={app.surface ?? 'web'}
+            surface={surface}
             pollMs={pollMs}
             wordFor={wordFor}
             onChanged={() => void refresh()}
+            onSettings={(answer) => prefers(preferencesFrom(answer))}
           />
         ) : hasSession(room) ? (
           // A page keeps nothing of the page before it: each has its own session, and settings of its own.
-          <App key={room.id} {...app} settings={systems ? systems.settings(room.id) : app.settings} createConnection={createConnection} embedded />
+          <App
+            key={room.id}
+            {...app}
+            preferences={preferences}
+            settings={systems ? systems.settings(room.id) : settings}
+            createConnection={createConnection}
+            // A browser's settings are on a page of their own, under its tab: the button goes there.
+            onOpenSettings={systems ? () => setView(role === 'admin' ? 'configuration' : 'settings') : undefined}
+            embedded
+            inWindow
+          />
         ) : (
-          <NoSession room={room} onTurnOn={systems && role === 'admin' ? () => systems.settings(room.id).change(app.surface ?? 'web', { system_enabled: true }).then(refresh, refresh) : undefined} />
+          <NoSession room={room} onTurnOn={systems && role === 'admin' ? () => systems.settings(room.id).change(surface, { system_enabled: true }).then(refresh, refresh) : undefined} />
         )}
-      </div>
+       </div>
+      </main>
     </div>
   );
 }
