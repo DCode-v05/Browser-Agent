@@ -322,6 +322,34 @@ What is not in it: an account for each person; a user's page that follows the ad
 "may change" and "may see" without a reload (the service refuses at once; the page reads them when
 it loads).
 
+### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
+
+The spec has a new section 18, written to be built from. No code of it exists yet.
+
+| Part | What the spec says |
+|---|---|
+| Auto Mode (18.3, 18.4) | A third choice of "Ask before", for each of the three browsers, off by default. Fixed rules settle what they can; a model that never reads the page judges the rest against the task; a step that pays, sends, deletes or gives a password still goes to the person; a step with no part in the task is refused and the agent goes on. An outside agent states its task once with a new tool, `browser_begin_task` |
+| What comes in (18.5) | Text a person cannot see is left out; page text is marked; planted instructions are found by rules on this machine, checked by a model, and withheld |
+| What goes out (18.6) | Passwords, cards and codes; text copied from one site to another; files that can run programs; screens that grant access; the amount of a payment, and a cap |
+| Where the browser goes (18.7) | The task's sites; look-alike sites; sensitive sites; optional known-bad lists of abuse.ch |
+| When something fails (18.8) | The check fails closed; limits on steps, time and money; repeated calls; a step whose outcome is not known |
+| The record, what a person sees, settings, where the code goes (18.9 to 18.12) | All given with defaults and wording |
+| Tests and order (18.13 to 18.15) | An attack set of 25 pages with a fooled agent, nine slices to build in, and the list it is accepted by |
+
+Decided with you by dialog before it was written: a check decides, like Claude Code's auto mode;
+rules first, then a model; the model is OpenAI's with a setting of its own; an outside agent states
+its task at the start; Auto Mode is off until a person turns it on; known-bad lists are optional and
+local checks always on; only what local rules flag goes to a model.
+
+Not decided by you, and written as I judged best, to be changed if you see it otherwise: the limits'
+defaults (500 steps and 60 minutes a session), the pause after 3 refusals in a row or 20 in a session,
+that a paying, sending or deleting step is asked of you even when you asked for it, that a download on
+your own machine is checked before it is kept, and the lists of sensitive and protected sites.
+
+The research behind it, each claim with its source: `docs/research/auto-mode.md`,
+`prompt-injection.md`, `web-threats.md`, `fallbacks.md`, `safeguards-map.md`,
+`anthropic-safeguards.md`, `mcp-security.md`.
+
 ### 2. Not started
 
 | What | Note |
