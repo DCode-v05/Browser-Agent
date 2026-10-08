@@ -57,6 +57,44 @@ def names_only(arguments: Mapping[str, Any]) -> dict[str, str]:
     return {name: f"<{type(value).__name__}>" for name, value in arguments.items()}
 
 
+def forget_old_lines(file: Path, days: int, now: float) -> int:
+    """Removes the lines of a record that are older than so many days (spec 18.9). A line says when
+    it was written in `ts`, or in `started`. A line that says neither is kept. Returns how many went."""
+    if days <= 0 or not file.is_file():
+        return 0
+    oldest = now - days * 24 * 60 * 60
+    kept: list[str] = []
+    gone = 0
+    size = file.stat().st_size
+    for line in file.read_text(encoding="utf-8").splitlines():
+        try:
+            written = json.loads(line)
+            when = written.get("ts", written.get("started")) if isinstance(written, dict) else None
+        except ValueError:
+            when = None
+        if isinstance(when, int | float) and when < oldest:
+            gone += 1
+        else:
+            kept.append(line)
+    if not gone:
+        return 0
+    if file.stat().st_size != size:
+        # A line was written while this one was read. Nothing is removed now, so that it is not
+        # lost: the old lines go the next time.
+        return 0
+    file.write_text("".join(f"{line}\n" for line in kept), encoding="utf-8")
+    return gone
+
+
+def forget_old_records(logging: Logging, evals_dir: str, now: float) -> int:
+    """Removes what is older than `logging.retention_days` from the event log, the logs of the
+    browsers of a window, and the records of what their tasks took."""
+    files = [Path(logging.event_log)] if logging.event_log else []
+    files += sorted(Path(logging.systems_dir).glob("*.jsonl"))
+    files += sorted(Path(evals_dir).glob("*/tasks.jsonl"))
+    return sum(forget_old_lines(file, logging.retention_days, now) for file in files)
+
+
 class EventLog:
     def __init__(self, settings: Logging) -> None:
         self._settings = settings

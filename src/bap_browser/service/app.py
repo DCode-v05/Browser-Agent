@@ -39,6 +39,7 @@ from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
 from bap_browser.settings.store import SEES, Refused, SettingsStore, known_surface
+from bap_browser.tools.registry import tools_hash
 
 # The first byte of a binary message says what it carries.
 PICTURE = b"\x01"
@@ -138,6 +139,21 @@ def create_app(
     async def admin_page(request: Request) -> Response:
         """The admin's sign-in page. It is the viewer's own page: the page reads where it was opened."""
         return FileResponse(viewer / "index.html")
+
+    async def list_tools(request: Request) -> Response:
+        """The tools each session offers, and one value that changes when any of them does."""
+        role = allowed(request, "admin", "user")
+        if isinstance(role, Response):
+            return role
+        offered = {
+            name: {
+                "hash": tools_hash(session.toolkit.definitions()),
+                "tools": [tool.name for tool in session.toolkit.definitions()],
+            }
+            for name, session in sessions.items()
+            if may_use(role, name)
+        }
+        return JSONResponse({"sessions": offered})
 
     async def list_sessions(request: Request) -> Response:
         role = allowed(request, "admin", "user")
@@ -627,7 +643,12 @@ def create_app(
             Route("/api/systems/{system}/evals/{task}/rating", rate_task, methods=["POST"]),
             Route("/api/systems/{system}/checks", check_system, methods=["POST"]),
             Route("/api/systems/{system}/{action}", manage_system, methods=["POST"]),
-            *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
+            *(
+                [Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in, origins))]
+                if mcp is not None
+                else []
+            ),
+            Route("/api/tools", list_tools, methods=["GET"]),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,
             Mount("/demo-site", StaticFiles(directory=package / "demo_site", html=True)),
@@ -740,12 +761,21 @@ class _McpEndpoint:
     """The tools over MCP, for an agent in another process. It is let in by the service's token,
     sent as a bearer token, like the API."""
 
-    def __init__(self, handle: ASGIApp, signed_in: Callable[[Any], bool]) -> None:
+    def __init__(self, handle: ASGIApp, signed_in: Callable[[Any], bool], origins: set[str]) -> None:
         self._handle = handle
         self._signed_in = signed_in
+        self._origins = origins
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        scheme, _, given = Headers(scope=scope).get("authorization", "").partition(" ")
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+        # A browser says which page sends a request. A web page that is not the viewer's own has no
+        # business with the tools, whatever token it holds. An agent that is no browser says nothing.
+        own = {f"http://{headers.get('host', '')}", f"https://{headers.get('host', '')}"}
+        if origin is not None and origin not in own | self._origins:
+            await Response(status_code=403)(scope, receive, send)
+            return
+        scheme, _, given = headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not self._signed_in(given):
             # What was sent is read first. An answer that closes the connection over a request still
             # unread reaches the sender as a broken connection, not as a refusal.

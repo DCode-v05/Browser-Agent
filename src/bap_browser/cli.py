@@ -49,6 +49,9 @@ def _parser() -> argparse.ArgumentParser:
     show = config_commands.add_parser("show", help="print the effective configuration")
     show.add_argument("--config", help="path of config.json")
     show.add_argument("--sources", action="store_true", help="print where each overridden value came from")
+    show.add_argument(
+        "--tools", action="store_true", help="print the tools on offer and the one value that stands for them"
+    )
     show.set_defaults(run=_config_show)
 
     init = config_commands.add_parser("init", help="write a starter config.json")
@@ -164,6 +167,16 @@ def with_visible_browser(config: Config) -> Config:
 def _config_show(args: argparse.Namespace) -> int:
     config, sources = load_config_with_sources(args.config)
     data = config.model_dump()
+    if args.tools:
+        # Imported here so that the other config commands start without loading the tools.
+        from bap_browser.tools import tools_for
+        from bap_browser.tools.registry import tools_hash
+
+        offered = tools_for(config)
+        print(f"tools = {tools_hash(offered)}")
+        for tool in offered:
+            print(tool.name)
+        return 0
     if not args.sources:
         print(json.dumps(data, indent=2))
         return 0

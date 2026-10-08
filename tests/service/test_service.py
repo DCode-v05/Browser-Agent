@@ -19,6 +19,7 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 from bap_browser.config import Config
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.tools.registry import tools_hash
 
 TOKEN = "a-token-made-up-for-these-tests"
 Running = Callable[..., Awaitable[tuple[Service, ServiceSession, FakeDriver]]]
@@ -136,6 +137,21 @@ async def test_the_api_needs_the_token(running: Running) -> None:
     status, _, body = await get(sessions, Authorization=f"Bearer {TOKEN}")
     assert status == 200
     assert json.loads(body) == {"sessions": [{"id": "default", "state": "agent"}]}
+
+
+async def test_the_tools_on_offer_are_listed_with_one_value_that_stands_for_them(running: Running) -> None:
+    service, session, _ = await running()
+    tools = f"{service.address}/api/tools"
+    assert (await get(tools))[0] == 401
+    status, _, body = await get(tools, Authorization=f"Bearer {TOKEN}")
+    offered = json.loads(body)["sessions"]["default"]
+    assert status == 200
+    assert offered["tools"] == [tool.name for tool in session.toolkit.definitions()]
+    assert offered["hash"] == tools_hash(session.toolkit.definitions())
+    # The same tools give the same value again: a client that kept it sees nothing has changed.
+    assert (
+        json.loads((await get(tools, Authorization=f"Bearer {TOKEN}"))[2])["sessions"]["default"] == offered
+    )
 
 
 async def test_a_request_for_another_host_is_refused(running: Running) -> None:
