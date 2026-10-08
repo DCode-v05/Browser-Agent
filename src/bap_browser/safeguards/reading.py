@@ -171,7 +171,11 @@ class Reader:
     def own_words(self, words: str) -> str:
         """One of the engine's own lines that no read of a page went through: the news of what
         happened in the browser, and what is said of a dialog that blocks the page."""
-        return self._engines_own(words, self._session.config.safeguards.incoming.scan != "off")
+        incoming = self._session.config.safeguards.incoming
+        if incoming.strip_invisible:
+            # Before the rules read it: a character nobody can see would keep them from matching.
+            words, _ = without_invisible(words)
+        return self._engines_own(words, incoming.scan != "off")
 
     def _engines_own(self, words: str, scanning: bool) -> str:
         """The engine's own lines. A name a page wrote stands in them in double quotes: it is cut

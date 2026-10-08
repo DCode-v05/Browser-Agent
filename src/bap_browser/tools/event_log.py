@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging as stdlib_logging
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -12,6 +13,8 @@ from bap_browser import keys
 from bap_browser.config import Logging
 from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
+
+logger = stdlib_logging.getLogger(__name__)
 
 # What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.
 TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression", "task"})
@@ -66,7 +69,9 @@ def forget_old_lines(file: Path, days: int, now: float) -> int:
     kept: list[str] = []
     gone = 0
     size = file.stat().st_size
-    for line in file.read_text(encoding="utf-8").splitlines():
+    # A line ends at a line feed and nowhere else: text inside a line may hold other characters
+    # that `splitlines` would take for the end of one.
+    for line in file.read_text(encoding="utf-8").removesuffix("\n").split("\n"):
         try:
             written = json.loads(line)
             when = written.get("ts", written.get("started")) if isinstance(written, dict) else None
@@ -92,7 +97,15 @@ def forget_old_records(logging: Logging, evals_dir: str, now: float) -> int:
     files = [Path(logging.event_log)] if logging.event_log else []
     files += sorted(Path(logging.systems_dir).glob("*.jsonl"))
     files += sorted(Path(evals_dir).glob("*/tasks.jsonl"))
-    return sum(forget_old_lines(file, logging.retention_days, now) for file in files)
+    gone = 0
+    for file in files:
+        try:
+            gone += forget_old_lines(file, logging.retention_days, now)
+        except (OSError, UnicodeError) as failed:
+            # A file another program holds, or one that is not text. The others are still looked
+            # through, and this one again the next time.
+            logger.warning("Old lines of %s could not be removed: %s", file.name, failed)
+    return gone
 
 
 class EventLog:

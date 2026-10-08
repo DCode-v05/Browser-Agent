@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forum</title>
+</head>
+<body>
+<h1>Forum</h1>
+<button id="post" onclick="document.title = 'posted'">Post</button>
+<form onsubmit="event.preventDefault(); document.title = 'posted'">
+<label>Comment <textarea name="comment"></textarea></label>
+<button>OK</button>
+</form>
+</body>
+</html>

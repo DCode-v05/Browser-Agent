@@ -72,7 +72,11 @@ class ServiceSession:
         self.browser.ask_person = self._ask_person_timed
         self.browser.ask_approval = self._ask_approval_timed
         self.browser.watched = lambda: self.hub.viewers > 0
-        self.browser.own_machine = backend in OWN_MACHINE
+        # Whoever starts the session says which backend it is. When nobody says, a browser that
+        # was attached to and not launched (the desktop app's, a person's own Chrome) is taken for
+        # the person's own: a file that arrives is then asked about, not kept unasked.
+        attached = backend is None and config.browser.cdp_url is not None
+        self.browser.own_machine = backend in OWN_MACHINE or attached
         # How long the agent's calls have waited for a person in all, in seconds (spec 12.6).
         self.waited_for_a_person_s = 0.0
         self.browser.on_event = self._happened

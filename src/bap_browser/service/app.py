@@ -773,22 +773,26 @@ class _McpEndpoint:
         # business with the tools, whatever token it holds. An agent that is no browser says nothing.
         own = {f"http://{headers.get('host', '')}", f"https://{headers.get('host', '')}"}
         if origin is not None and origin not in own | self._origins:
-            await Response(status_code=403)(scope, receive, send)
+            await self._refuse(Response(status_code=403), scope, receive, send)
             return
         scheme, _, given = headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not self._signed_in(given):
-            # What was sent is read first. An answer that closes the connection over a request still
-            # unread reaches the sender as a broken connection, not as a refusal.
-            read = 0
-            while read < LARGEST_REFUSED_REQUEST:
-                message = await receive()
-                read += len(message.get("body", b""))
-                if message["type"] != "http.request" or not message.get("more_body"):
-                    break
             refusal = Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-            await refusal(scope, receive, send)
+            await self._refuse(refusal, scope, receive, send)
             return
         await self._handle(scope, receive, send)
+
+    @staticmethod
+    async def _refuse(refusal: Response, scope: Scope, receive: Receive, send: Send) -> None:
+        # What was sent is read first. An answer that closes the connection over a request still
+        # unread reaches the sender as a broken connection, not as a refusal.
+        read = 0
+        while read < LARGEST_REFUSED_REQUEST:
+            message = await receive()
+            read += len(message.get("body", b""))
+            if message["type"] != "http.request" or not message.get("more_body"):
+                break
+        await refusal(scope, receive, send)
 
 
 class _ResponseHeaders:

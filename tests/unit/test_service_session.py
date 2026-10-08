@@ -444,3 +444,24 @@ async def test_viewers_are_told_when_the_browser_is_a_window_on_the_persons_own_
         assert first.get("on_screen") is told
     finally:
         await session.close()
+
+
+@pytest.mark.parametrize(
+    ("backend", "attached", "own"),
+    [
+        ("remote_headless", False, False),
+        ("takeover_chrome", False, True),
+        ("bundled_chromium", False, True),
+        # Nobody said which backend it is: a browser that was attached to and not launched is the
+        # desktop app's or a person's own Chrome, so a file that arrives there is asked about.
+        (None, True, True),
+        (None, False, False),
+        ("remote_headless", True, False),
+    ],
+)
+def test_a_session_knows_when_its_browser_is_on_the_persons_own_machine(
+    make_config, tmp_path: Path, backend: str | None, attached: bool, own: bool
+) -> None:
+    browser = {"cdp_url": "http://127.0.0.1:9222"} if attached else {}
+    session = ServiceSession(make_config(tmp_path, browser=browser), FakeDriver(), backend=backend)
+    assert session.browser.own_machine is own

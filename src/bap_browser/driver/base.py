@@ -135,6 +135,10 @@ class Dragged:
     navigated_to: str | None = None
 
 
+# Where a file waits, inside the downloads folder, until a person has said that it may stay.
+HELD_FOLDER = "held"
+
+
 @dataclass(frozen=True)
 class PageDialog:
     """A dialog a page opened (alert, confirm, prompt, or "leave this page?") that waits for an answer."""
@@ -152,10 +156,16 @@ class PageDialog:
         return f"{'an' if self.kind == 'alert' else 'a'} {self.kind} dialog"
 
     @property
+    def said(self) -> str:
+        """What it says, on one line: each of the engine's own lines that holds it is one line, so
+        that what a page wrote cannot begin a line of its own in a result."""
+        return " ".join(self.text.split())
+
+    @property
     def quoted(self) -> str:
         """What it says, to follow what it is: ('Proceed?'). The dialog that asks whether to leave
         the page says nothing of its own."""
-        return "" if self.kind == "beforeunload" else f" ('{self.text}')"
+        return "" if self.kind == "beforeunload" else f" ('{self.said}')"
 
     @property
     def named(self) -> str:

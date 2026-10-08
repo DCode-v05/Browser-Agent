@@ -93,8 +93,8 @@ READS = frozenset(
     }
 )
 DECLARES_A_TASK = "browser_begin_task"
-# How much of a file's name a person is shown when they are asked about it.
-NAME_SHOWN = 80
+# The one use of the tabs tool that changes nothing: it tells which tabs are open.
+LISTS_THE_TABS = ("browser_tabs", "list")
 # The tools whose keys go to the element that has the focus when they name no element.
 GO_WHERE_THE_FOCUS_IS = frozenset({"browser_type", "browser_press_key"})
 # The tools that touch no site: asking a person, waiting, and the list of saved files.
@@ -384,6 +384,7 @@ class Toolkit:
         when nobody is watching."""
         driver = self._session.started_driver
         held = [file for file in driver.downloads() if file.state == "held"] if driver else []
+        shown = self._session.config.safeguards.incoming.name_chars
         for file in held:
             assert driver is not None
             ask = self._session.ask_approval
@@ -393,7 +394,7 @@ class Toolkit:
                     answer = await ask(
                         Question(
                             "browser_downloads",
-                            f"Keeping the downloaded file {quoted_name(file.name, NAME_SHOWN)}",
+                            f"Keeping the downloaded file {quoted_name(file.name, shown)}",
                             "",
                             every_time=True,
                             must_be_seen=True,
@@ -449,7 +450,7 @@ class Toolkit:
             number,
             name,
             arguments,
-            acts=name not in READS,
+            acts=name not in READS and (name, arguments.get("action")) != LISTS_THE_TABS,
             address="" if name in NEED_NO_SITE else without_credentials(address),
             opens=opens,
             tab=tab,

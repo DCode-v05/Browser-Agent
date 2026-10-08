@@ -77,7 +77,7 @@ only what local rules flag goes to a model.
 - [ ] **8. Sites** (built: everything on this machine. Not built: the optional lists, abuse.ch and RDAP) `safeguards/sites.py`: look-alikes, confusable letters, `data:` addresses, bare addresses, sensitive sites, the active tab judged at every call; then the optional lists (abuse.ch, RDAP).
 - [x] **9. The reviewer and Auto Mode** `safeguards/reviewer.py`: the value `auto` (offered: false), the input with marks, the table, the floor (H2), refuse / ask / run, "Allow once", the pause after refusals, sites added by the reviewer, frames outside the task. Viewer: the chip, the notice, marks on steps, the "Refused" list, the pause bar.
 - [x] **10. The record and the service**: retention, control characters, tool hints, the tool list's hash and `GET /api/tools`, `Origin` on `/mcp`.
-- [ ] **11. The attack set** (built: 17 attack pages and 4 harmless pages run in a real browser, `tests/e2e/test_attacks.py`. Not built: the fooled agent with its reached / tried / done report, the group in each browser's checklist, the Systems page numbers, the pages listed under "What is left" below) `tests/safety/` and `tests/site/attacks/`: the fooled agent, reached / tried / done, the report, the false-alarm pages; the group in each browser's checklist; the Systems page numbers.
+- [ ] **11. The attack set** (built: 26 attack pages and 4 harmless pages run in a real browser, `tests/e2e/test_attacks.py`. Not built: the fooled agent with its reached / tried / done report, the group in each browser's checklist, the Systems page numbers, the pages listed under "What is left" below) `tests/safety/` and `tests/site/attacks/`: the fooled agent, reached / tried / done, the report, the false-alarm pages; the group in each browser's checklist; the Systems page numbers.
 - [ ] **12. Finish** (done: the settings, the README with how an agent connects, the status page. Left: `/verify`, the pull request): settings in the catalogue and the settings screen; README, the connection guide, `docs/status.md`; `/verify`; a pull request.
 
 Attack pages of a slice are written with it, before its code.
@@ -114,10 +114,14 @@ What is left, in order:
 4. **The Systems page numbers**: checked, asked and refused steps for each browser.
 5. **The spending cap in the settings screen** (`safeguards.money.max_amount` is a setting of
    `config.json` only) and the "Known-bad site list" setting.
-6. **More of the attack set** (18.13): the fooled agent and its report; the pages `spanish`,
-   `picture`, `late`, `shared_host`, `open_tab`, `redirect`, `frame`, `blob_login`, `decoys`,
-   `leak_address`, `leak_typing`, `leak_short` as pages in a real browser (their rules have unit
-   tests).
+6. **More of the attack set** (18.13): the fooled agent and its report; the pages `shared_host`,
+   `open_tab`, `redirect`, `frame`, `decoys`, `fragment`, `leak_picture`, and the harmless pages
+   `address_form` and `forum_post`, as pages in a real browser (their rules have unit tests).
+   `open_tab`, `redirect` and `frame` need Auto Mode with a stand-in for the model, as the test
+   "a reviewer that was talked round" has.
+7. **Two downloads of one name that finish at the same moment** can be given the same place
+   (`free_path`, then `save_as`, in `PlaywrightDriver._save`). Seen by a review, not reproduced;
+   it was so before this work.
 
 Tests: `uv run pytest tests/unit tests/service -q`, then `tests/e2e`, then `tests/viewer` (build the
 viewer first). In the tests' own configuration the marks around page text are off

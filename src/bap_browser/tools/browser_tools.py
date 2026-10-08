@@ -5,12 +5,21 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from bap_browser import keys
-from bap_browser.driver.base import ActionOutcome, Driver, LoadState, LogLevel, Place, TabInfo
+from bap_browser.driver.base import (
+    HELD_FOLDER,
+    ActionOutcome,
+    Driver,
+    LoadState,
+    LogLevel,
+    Place,
+    TabInfo,
+)
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
 from bap_browser.policy.files import allowed_file
@@ -549,7 +558,7 @@ async def handle_dialog(session: BrowserSession, args: DialogArgs) -> str:
     done = "Accepted" if args.action == "accept" else "Dismissed"
     if dialog.kind == "beforeunload":
         return f"{done} the dialog that asked whether to leave the page."
-    return f"{done} the dialog '{dialog.text}'."
+    return f"{done} the dialog '{dialog.said}'."
 
 
 class TabsArgs(Args):
@@ -683,6 +692,13 @@ class UploadArgs(Args):
 async def upload_file(session: BrowserSession, args: UploadArgs) -> str:
     folders = session.config.browser.uploads.allowed_dirs
     files = [allowed_file(folders, path) for path in args.paths]
+    waiting = (Path(session.config.browser.downloads.dir) / HELD_FOLDER).resolve()
+    if any(file.is_relative_to(waiting) for file in files):
+        # Wherever uploads may come from: a file that arrived and waits for a yes is nobody's yet.
+        raise BadInput(
+            "That file was downloaded and waits for the person's yes. It cannot be uploaded before that.",
+            reason="the file waits for the person's yes",
+        )
     driver = await session.driver()
     outcome = await driver.upload(args.ref, [str(file) for file in files])
     names = ", ".join(file.name for file in files)

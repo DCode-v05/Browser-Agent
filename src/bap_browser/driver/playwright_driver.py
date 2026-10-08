@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import logging
 import os
 import re
 from collections import deque
@@ -32,6 +33,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from bap_browser.config import Config, QualityLevel
 from bap_browser.driver.base import (
+    HELD_FOLDER,
     ActionOutcome,
     Box,
     Checked,
@@ -63,6 +65,7 @@ from bap_browser.driver.snapshot import NOTICE, WHOLE_PAGE, matching_lines, snap
 from bap_browser.errors import BadInput, BrowserError, ConfigError, PolicyBlocked, StaleRef
 from bap_browser.policy.address import without_credentials
 from bap_browser.results import Picture
+from bap_browser.safeguards.outgoing import FIRST_BYTES
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
@@ -192,10 +195,7 @@ def free_path(folder: str, name: str) -> Path:
     return path
 
 
-# Where a file waits, inside the downloads folder, until a person has said that it may stay.
-HELD_FOLDER = "held"
-# How much of a file is read to tell a program from what its name says it is.
-FIRST_BYTES = 16
+logger = logging.getLogger(__name__)
 
 
 def _first_bytes(path: str | Path) -> bytes:
@@ -436,6 +436,14 @@ class PlaywrightDriver:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._stack.aclose()
+        # A file nobody said yes to does not outlive the session.
+        for place, file in enumerate(self._downloads):
+            if file.state == "held":
+                try:
+                    await asyncio.to_thread(Path(file.path).unlink, True)
+                except OSError:
+                    logger.warning("A downloaded file that was not kept could not be deleted.")
+                self._downloads[place] = SavedFile(file.name, "failed", reason="the session ended")
         self._browser = self._context = self._active = self._pictured = None
         self._tabs.clear()
         self._dialogs.clear()
@@ -1871,24 +1879,38 @@ class PlaywrightDriver:
         )
 
     async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
-        for place, file in enumerate(self._downloads):
-            if file.state != "held" or file.name != name:
-                continue
-            held = Path(file.path)
-            if not keep:
+        waiting = [
+            place for place, file in enumerate(self._downloads) if file.state == "held" and file.name == name
+        ]
+        if not waiting:
+            return
+        place = waiting[0]
+        file = self._downloads[place]
+        held = Path(file.path)
+
+        def not_kept(why: str) -> None:
+            self._downloads[place] = SavedFile(name, "failed", reason=why)
+            self._tell(Happened("download", f'the download of "{name}" was not kept: {why}'))
+
+        if not keep:
+            try:
                 await asyncio.to_thread(held.unlink, True)
-                self._downloads[place] = SavedFile(name, "failed", reason=reason)
-                self._tell(Happened("download", f'the download of "{name}" was not kept: {reason}'))
-                return
+            except OSError:
+                # Another program holds it. It stays where no tool reads, and is not kept.
+                logger.warning("A downloaded file that was not kept could not be deleted.")
+            not_kept(reason)
+            return
+        try:
             target = await asyncio.to_thread(free_path, self._config.browser.downloads.dir, name)
             await asyncio.to_thread(held.replace, target)
-            self._downloads[place] = SavedFile(target.name, "saved", str(target), file.size)
-            self._tell(
-                Happened(
-                    "download", f'download saved: "{target.name}"', {"name": target.name, "size": file.size}
-                )
-            )
+        except OSError:
+            # It was taken away, or another program holds it, while the person decided.
+            not_kept("it could not be saved in the downloads folder")
             return
+        self._downloads[place] = SavedFile(target.name, "saved", str(target), file.size)
+        self._tell(
+            Happened("download", f'download saved: "{target.name}"', {"name": target.name, "size": file.size})
+        )
 
     # The live picture.
 

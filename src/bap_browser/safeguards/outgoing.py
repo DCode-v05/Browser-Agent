@@ -32,6 +32,8 @@ PROGRAM_BEGINNINGS = (
     b"\xca\xfe\xba\xbe",
     b"#!",
 )
+# How much of a file is read to tell a program from what its name says it is.
+FIRST_BYTES = max(len(beginning) for beginning in PROGRAM_BEGINNINGS)
 SIGNS = {
     "$": "USD",
     "€": "EUR",

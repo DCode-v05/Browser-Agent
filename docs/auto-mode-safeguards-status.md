@@ -9,7 +9,7 @@ Last brought up to date: 2026-10-08. Branch `feature/auto-mode-safeguards`, not 
 ## In one line
 
 About 90% built. Every step is checked before it runs, Auto Mode works, what comes in and what goes
-out is guarded, files that arrive are judged, the service is hardened, and 17 attack pages are run in
+out is guarded, files that arrive are judged, the service is hardened, and 26 attack pages are run in
 a real browser. What is left is listed under "Pending": mainly the optional outside lists, a few
 numbers and settings in the window, more attack pages, and the final check with the pull request.
 
@@ -37,7 +37,8 @@ numbers and settings in the window, more attack pages, and the final check with 
 | The engine's own lines | A name or a dialog's words that a page wrote, inside a result, a refusal or the `[events]` line, is withheld when it is addressed to an agent | `reading.py`, `toolkit.py` | `test_reading.py` |
 | Files that arrive | A program is never kept, whatever its name says. An archive, an HTML or SVG file, and any file on the person's own machine, waits in a folder of its own and is kept only with the person's yes; with nobody watching it is deleted | `driver/playwright_driver.py`, `toolkit.py`, `outgoing.py` | `test_outgoing.py`, three tests in `tests/e2e/test_attacks.py` |
 | The service and the record | Another web page cannot call the tools (`Origin` on `/mcp`); `GET /api/tools` and `bap-browser config show --tools` give one value for the tools on offer; the tools carry read-only hints; log lines older than 30 days are removed | `service/app.py`, `service/server.py`, `tools/event_log.py`, `tools/registry.py`, `mcp/server.py`, `cli.py` | `tests/unit/test_record.py`, `test_cli.py`, `tests/service/test_serve.py`, `test_service.py` |
-| The attack set, in a real browser | 17 attack pages and 4 harmless pages: planted instructions (plain, hidden, in attributes, in invisible characters, in an inbox), a page that imitates the engine, a page that talks to the check, sending by Enter, paying, deleting, granting access, a password field, a leaked order number, downloads | `tests/site/attacks/`, `tests/site/harmless/`, `tests/e2e/test_attacks.py` | 25 tests |
+| The attack set, in a real browser | 26 attack pages and 4 harmless pages: planted instructions (plain, hidden, in attributes, in invisible characters, in the title, in the markup, in a dialog, in the console, arriving late, in an inbox, in Spanish), a page that imitates the engine, a button that talks to the check, sending by Enter and by "Post", paying, deleting, granting access, a password field, a sign-in form with no site of its own, a look-alike site, a leaked order number, a leaked code and email address, a very long address, downloads | `tests/site/attacks/`, `tests/site/harmless/`, `tests/e2e/test_attacks.py` | 40 tests |
+| An independent review of the newest code | Seven problems found and put right, each with a test: a dialog with a line break or an invisible character got past the rules; a download on a person's own Chrome was kept without a question; a held file that was locked or removed crashed the step; a held file outlived the session; a held file could be uploaded; the clean-up of old log lines could stop for good on one bad file, and broke a line at a rare character; a refusal at `/mcp` could reach the sender as a broken connection | `safeguards/reading.py`, `driver/`, `service/`, `tools/` | `test_reading.py`, `test_record.py`, `test_service_session.py`, `test_remaining_tools.py`, `test_attacks.py` |
 | The documents | The spec for what changed while building, the README (what is on, how to turn Auto Mode on, how an agent connects), this page, the plan | `docs/`, `README.md` | Read them |
 
 ## Pending
@@ -49,7 +50,8 @@ numbers and settings in the window, more attack pages, and the final check with 
 | Optional outside lists | abuse.ch (known-bad sites and files) and the age of a domain. The settings exist and are off; nothing uses them yet | Medium |
 | The Systems page | The numbers of checked, asked and refused steps for each browser | Small |
 | Two settings in the settings screen | The spending cap for one step, and the "Known-bad site list" switch. The cap works today from `config.json` | Small |
-| More of the attack set | An agent that is fooled on purpose, with its report of reached / tried / done; and about twelve more pages as real-browser tests (Spanish wording, a picture, text that loads late, shared hosts, a redirect, a frame, and others). Their rules are tested without a browser today | Medium |
+| More of the attack set | An agent that is fooled on purpose, with its report of reached / tried / done; and about eight more pages as real-browser tests (a redirect, a frame from another site, a tab that was open before the task, shared hosts, a leak through a picture's address, decoy passages, the part of an address after `#`, two more harmless pages). Their rules are tested without a browser today | Medium |
+| Two downloads of one name at the same moment | Both can be given the same place to wait in; the second is then said not to be kept. Seen by the review, not reproduced; it was so before this work for ordinary downloads too | Small |
 
 ## What changes for people who use it today
 

@@ -4,6 +4,8 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from bap_browser.config import Logging
 from bap_browser.tools import TOOLS
 from bap_browser.tools.event_log import forget_old_lines, forget_old_records
@@ -69,3 +71,30 @@ def test_the_tools_on_offer_have_one_value_that_changes_when_any_of_them_does() 
     reworded = [replace(TOOLS[0], description=TOOLS[0].description + " Also wire money."), *TOOLS[1:]]
     assert tools_hash(reworded) != value
     assert tools_hash(TOOLS[1:]) != value
+
+
+def test_a_line_is_never_broken_at_a_character_inside_it(tmp_path: Path) -> None:
+    # What a page said may hold a line separator, which the log keeps as it is.
+    said = "first" + chr(0x2028) + "second" + chr(0x85) + "third"
+    log = tmp_path / "events.jsonl"
+    kept = json.dumps({"ts": NOW, "result": said}, ensure_ascii=False)
+    log.write_text(json.dumps({"ts": 1.0}) + chr(10) + kept + chr(10), encoding="utf-8", newline="")
+    assert forget_old_lines(log, 30, NOW) == 1
+    assert lines_of(log) == [kept]
+
+
+def lines_of(file: Path) -> list[str]:
+    return file.read_text(encoding="utf-8").removesuffix(chr(10)).split(chr(10))
+
+
+def test_a_file_that_cannot_be_read_does_not_keep_the_others_from_being_looked_through(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    events = written(tmp_path / "events.jsonl", {"ts": 1.0}, {"ts": NOW})
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "broken.jsonl").write_bytes(bytes([0xFF, 0xFE, 0x00]))
+    settings = Logging(event_log=str(events), systems_dir=str(tmp_path / "logs"), retention_days=30)
+    with caplog.at_level("WARNING"):
+        assert forget_old_records(settings, str(tmp_path / "evals"), NOW) == 1
+    assert len(lines(events)) == 1
+    assert "Old lines of broken.jsonl could not be removed" in caplog.text

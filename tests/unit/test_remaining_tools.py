@@ -470,3 +470,25 @@ def test_a_link_that_leads_out_of_the_folder_is_refused(tmp_path: Path) -> None:
         pytest.skip("links cannot be made here")
     with pytest.raises(BadInput, match="is not in a folder uploads may come from"):
         allowed_file([str(allowed)], "innocent.txt")
+
+
+async def test_a_file_that_waits_for_a_yes_cannot_be_uploaded_wherever_uploads_may_come_from(
+    make_config, tmp_path: Path
+) -> None:
+    downloads = tmp_path / "downloads"
+    (downloads / "held").mkdir(parents=True)
+    (downloads / "held" / "photos.zip").write_text("an archive", encoding="utf-8")
+    (downloads / "notes.txt").write_text("a file that was kept", encoding="utf-8")
+    tools, driver, _ = kit(
+        make_config,
+        tmp_path,
+        # A deployment that lets the agent upload what it downloaded.
+        browser={"downloads": {"dir": str(downloads)}, "uploads": {"allowed_dirs": [str(downloads)]}},
+        safety={"action_policies": {"browser_upload_file": "allow"}},
+    )
+    await tools.call("browser_snapshot")
+    refused = await said_by(tools, "browser_upload_file", {"ref": "e1", "paths": ["held/photos.zip"]})
+    assert refused.startswith("ERROR: That file was downloaded and waits for the person's yes.")
+    assert "upload" not in [call[0] for call in driver.calls]
+    kept = await said_by(tools, "browser_upload_file", {"ref": "e1", "paths": ["notes.txt"]})
+    assert kept.startswith("Uploaded notes.txt")

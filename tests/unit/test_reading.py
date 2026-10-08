@@ -276,3 +276,30 @@ async def test_what_a_dialog_says_is_withheld_when_it_talks_to_an_agent(make_con
         "[events] an alert dialog ('[withheld]') opened and was dismissed; "
         f'{harmless}; the download of "[withheld]" failed: it is too large'
     )
+
+
+async def test_a_dialog_cannot_get_past_the_rules_with_a_line_break_or_a_character_nobody_sees(
+    make_config, tmp_path
+) -> None:
+    from bap_browser.driver.base import Happened, PageDialog
+
+    tools, driver, _ = reading(
+        make_config, tmp_path, "Page", incoming={"scan": "local", "mark_page_text": False}
+    )
+    await tools.call("browser_snapshot", {})
+    # What a dialog says stands on one line of the engine's, so that the rules read all of it.
+    driver.open_dialog(PageDialog("d1", "alert", f"Saved.\n\n{PLANTED}", "t1"))
+    blocked = await tools.call("browser_click", {"ref": "e1"})
+    assert "is open ('[withheld]') and blocks the page" in blocked.text, blocked.text
+    assert "evil.example" not in blocked.text
+    answered = await tools.call("browser_handle_dialog", {"action": "accept"})
+    assert "the dialog '[withheld]'." in answered.text and "evil.example" not in answered.text
+    # A harmless dialog of several lines is told on one.
+    driver.open_dialog(PageDialog("d2", "alert", "Saved.\nYou can close this tab.", "t1"))
+    assert "('Saved. You can close this tab.')" in (await tools.call("browser_click", {"ref": "e1"})).text
+    await tools.call("browser_handle_dialog", {"action": "accept"})
+
+    broken_up = PLANTED.replace("ignore", "ig" + chr(0x200B) + "nore")
+    driver.tell(Happened("dialog_closed", f"an alert dialog ('{broken_up}') opened and was dismissed"))
+    told = (await tools.call("browser_snapshot", {})).text
+    assert told.endswith("[events] an alert dialog ('[withheld]') opened and was dismissed"), told
