@@ -532,33 +532,62 @@ async def test_a_program_is_never_kept_whatever_its_name_says(attacked: Start, t
     assert 'the download of "setup.exe" was refused: this kind of file can run programs' in told
 
 
+async def asked_about_a_file(on: Attacked, link: str, how: str, *, meanwhile: Any = None) -> dict[str, Any]:
+    """Downloads a file that needs a yes, and answers the one question about keeping it. A file
+    arrives when the browser has finished it: while the step that brought it still runs, or after
+    it. So the question comes with that step or with the next one, and both are right."""
+    before = len(on.told("approval_requested"))
+    driver = on.session.browser.started_driver
+    assert driver is not None
+    count = len(driver.downloads()) + 1
+
+    async def steps() -> None:
+        await on.tools.call("browser_click", {"ref": link})
+        await arrived(on, count)
+        await on.tools.call("browser_downloads", {})
+
+    work = asyncio.create_task(steps())
+    async with asyncio.timeout(20):
+        while len(on.told("approval_requested")) == before:
+            assert not work.done(), "nobody was asked about the file"
+            await asyncio.sleep(0.02)
+    request = on.told("approval_requested")[-1]
+    if meanwhile is not None:
+        meanwhile()
+    await on.session.handle({"type": how, "id": request["id"], "scope": "once"})
+    await asyncio.wait_for(work, 20)
+    return request
+
+
+def waiting(on: Attacked) -> Any:
+    """The file that waits for a person's yes."""
+    driver = on.session.browser.started_driver
+    assert driver is not None
+    (held,) = [file for file in driver.downloads() if file.state == "held"]
+    return held
+
+
 async def test_an_archive_is_kept_only_with_a_persons_yes(attacked: Start, tmp_path: Path) -> None:
     on = await attacked()
     opened = await on.open("shop.test", "attacks/download.html")
     archive = on.ref(opened.text, 'link "All photos"')
-    await on.tools.call("browser_click", {"ref": archive})
-    assert (await arrived(on, 1))[0].state == "held"
-    assert not (tmp_path / "downloads" / "photos.zip").exists(), "it waits apart from the files that are kept"
+    kept = tmp_path / "downloads" / "photos.zip"
 
-    # It is settled with the agent's next step: the person is asked, and says no.
-    request, _ = await on.refused("browser_downloads", {})
+    def apart() -> None:
+        # While the person decides, it waits apart from the files that are kept.
+        assert Path(waiting(on).path).parent.name == "held" and not kept.exists()
+
+    # The person is asked, and says no.
+    request = await asked_about_a_file(on, archive, "deny", meanwhile=apart)
     assert request["summary"] == 'Keeping the downloaded file "photos.zip"'
     assert (await arrived(on, 1))[0].state == "failed"
     assert list((tmp_path / "downloads").rglob("photos*")) == []
 
     # Once more, and this time they say yes.
-    await on.tools.call("browser_click", {"ref": archive})
-    assert (await arrived(on, 2))[1].state == "held"
-    call = asyncio.create_task(on.tools.call("browser_downloads", {}))
-    async with asyncio.timeout(10):
-        while len(on.told("approval_requested")) < 2:
-            await asyncio.sleep(0.02)
-    await on.session.handle(
-        {"type": "approve", "id": on.told("approval_requested")[-1]["id"], "scope": "once"}
-    )
-    listed = await asyncio.wait_for(call, 10)
-    assert (tmp_path / "downloads" / "photos.zip").is_file()
-    assert "photos.zip" in listed.text
+    await asked_about_a_file(on, archive, "approve", meanwhile=apart)
+    assert kept.is_file() and (await arrived(on, 2))[1].state == "saved"
+    assert "photos.zip" in (await on.tools.call("browser_downloads", {})).text
+    assert len(on.told("approval_requested")) == 2, "a file that is settled is not asked about again"
 
 
 async def test_with_nobody_watching_a_file_that_needs_a_yes_is_deleted(
@@ -579,23 +608,17 @@ async def test_a_file_that_was_taken_away_while_the_person_decided_is_said_not_t
 ) -> None:
     on = await attacked()
     opened = await on.open("shop.test", "attacks/download.html")
-    await on.tools.call("browser_click", {"ref": on.ref(opened.text, 'link "All photos"')})
-    (waiting,) = await arrived(on, 1)
-    call = asyncio.create_task(on.tools.call("browser_downloads", {}))
-    async with asyncio.timeout(10):
-        while not on.told("approval_requested"):
-            await asyncio.sleep(0.02)
     # A virus scanner, or the person, removes it before the answer.
-    Path(waiting.path).unlink()
-    await on.session.handle(
-        {"type": "approve", "id": on.told("approval_requested")[-1]["id"], "scope": "once"}
+    await asked_about_a_file(
+        on,
+        on.ref(opened.text, 'link "All photos"'),
+        "approve",
+        meanwhile=lambda: Path(waiting(on).path).unlink(),
     )
-    listed = await asyncio.wait_for(call, 10)
-    assert not listed.is_error, "the step itself ran"
     (file,) = await arrived(on, 1)
     assert (file.state, file.reason) == ("failed", "it could not be saved in the downloads folder")
-    # It is settled: the next step asks nothing more about it.
-    await asyncio.wait_for(on.tools.call("browser_snapshot", {}), 10)
+    # The step went on, and the file is settled: the next step asks nothing more about it.
+    assert not (await asyncio.wait_for(on.tools.call("browser_snapshot", {}), 10)).is_error
     assert len(on.told("approval_requested")) == 1
 
 
@@ -604,9 +627,15 @@ async def test_a_file_nobody_said_yes_to_does_not_outlive_the_session(
 ) -> None:
     on = await attacked()
     opened = await on.open("shop.test", "attacks/download.html")
-    # The agent's last step brings the file, and nothing is called after it.
-    await on.tools.call("browser_click", {"ref": on.ref(opened.text, 'link "All photos"')})
-    (waiting,) = await arrived(on, 1)
-    assert Path(waiting.path).is_file()
+    driver = on.session.browser.started_driver
+    assert driver is not None
+    # The agent's last step brings the file, and the session ends before anyone has said yes.
+    last = asyncio.create_task(
+        on.tools.call("browser_click", {"ref": on.ref(opened.text, 'link "All photos"')})
+    )
+    async with asyncio.timeout(20):
+        while not any(file.state == "held" for file in driver.downloads()):
+            await asyncio.sleep(0.02)
     await on.session.close()
+    await asyncio.wait_for(last, 20)
     assert [path for path in (tmp_path / "downloads").rglob("*") if path.is_file()] == []
