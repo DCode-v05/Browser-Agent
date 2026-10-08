@@ -230,8 +230,8 @@ class Check:
         self.memory = CopyMemory(lambda: self._session.config.safeguards.outgoing)
         # The tools a person allowed on a site for the rest of the session: "Allow on this site".
         self._grants: set[tuple[str, str]] = set()
-        # The tabs whose page holds a planted instruction, and the rule that found it.
-        self.flagged: dict[str, str] = {}
+        # The tabs whose page holds a planted instruction: the rule that found it, and the page.
+        self.flagged: dict[str, tuple[str, str]] = {}
         # The sites a page of which was opened in this session.
         self._visited: set[str] = set()
         # What was settled about a site, for the task: the finding, the site, and the answer.
@@ -293,6 +293,19 @@ class Check:
             f"the person allowed a step that was refused: {label}. Do it again if it is still needed"
         )
         return label
+
+    def flag(self, tab: str, address: str, rule: str) -> None:
+        """A page holds text that tries to give an agent instructions (spec 18.5)."""
+        self.flagged[tab] = (rule, address.partition("#")[0])
+
+    def unflag(self, tab: str) -> None:
+        self.flagged.pop(tab, None)
+
+    def now_at(self, tab: str, address: str) -> None:
+        """Where a tab is now. A flag was for the page that held the text, not for the tab."""
+        held = self.flagged.get(tab)
+        if held is not None and held[1] != address.partition("#")[0]:
+            self.unflag(tab)
 
     def task_began(self) -> None:
         """Another task: what was settled for the last one is asked again."""

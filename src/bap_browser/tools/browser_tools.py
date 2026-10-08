@@ -14,6 +14,7 @@ from bap_browser.driver.base import ActionOutcome, Driver, LoadState, LogLevel, 
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
 from bap_browser.policy.files import allowed_file
+from bap_browser.safeguards.reading import from_page
 from bap_browser.tools.human_checks import notice_for
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition
 
@@ -166,7 +167,7 @@ async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | No
     )
     # A page that needs a person says so in the result that shows it (spec 8.4).
     notice = notice_for(page)
-    return f"{page}\n{notice}" if notice else page
+    return f"{from_page(page)}\n{notice}" if notice else from_page(page)
 
 
 async def _allowed(session: BrowserSession, given: str) -> str:
@@ -246,6 +247,7 @@ async def get_text(session: BrowserSession, args: TextArgs) -> str:
     text, more = await driver.text(args.ref, min(args.max_chars or cap, cap))
     if not text:
         return f"{args.ref or 'The page'} has no visible text."
+    text = from_page(text)
     if more:
         text += f"\n\u2026 {more} more characters not shown. Give a ref to read one part of the page."
     return text
@@ -263,7 +265,7 @@ async def find(session: BrowserSession, args: FindArgs) -> str:
         if found.total > shown
         else f"{shown} match{'' if shown == 1 else 'es'}"
     )
-    return f"{count}, best first:\n" + "\n".join(found.lines)
+    return f"{count}, best first:\n" + from_page("\n".join(found.lines))
 
 
 async def click(session: BrowserSession, args: ClickArgs) -> str:
@@ -566,7 +568,7 @@ def _tab_list(session: BrowserSession, tabs: Sequence[TabInfo]) -> str:
         for tab in tabs
     ]
     count = f"{len(tabs)} tab{'' if len(tabs) == 1 else 's'}"
-    return f"{count}, the active one marked *:\n" + "\n".join(lines)
+    return f"{count}, the active one marked *:\n" + from_page("\n".join(lines))
 
 
 async def _the_page_now(session: BrowserSession, driver: Driver) -> str:
@@ -614,7 +616,7 @@ def _newest(session: BrowserSession, lines: Sequence[str], limit: int | None, wh
     count = f"{len(shown)} {what}{'' if len(shown) == 1 else 's'}"
     if len(lines) > len(shown):
         count += f", the newest of {len(lines)}"
-    return f"{count}, oldest first:\n" + "\n".join(shown)
+    return f"{count}, oldest first:\n" + from_page("\n".join(shown))
 
 
 async def console(session: BrowserSession, args: ConsoleArgs) -> str:
@@ -669,8 +671,8 @@ async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
     # The first line says what was done. The value is what the page holds, and follows it.
     head = f"The script's value, as JSON ({len(text)} characters):"
     if len(text) > cap:
-        return f"{head}\n{text[:cap]}\n\u2026 {len(text) - cap} more characters not shown."
-    return f"{head}\n{text}"
+        return f"{head}\n{from_page(text[:cap])}\n\u2026 {len(text) - cap} more characters not shown."
+    return f"{head}\n{from_page(text)}"
 
 
 class UploadArgs(Args):
@@ -710,7 +712,7 @@ async def downloads(session: BrowserSession, args: NoArgs) -> str:
             lines.append(f"{file.name} is still downloading")
         else:
             lines.append(f"{file.name} failed: {file.reason}")
-    return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + "\n".join(lines)
+    return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + from_page("\n".join(lines))
 
 
 class RunArgs(Args):

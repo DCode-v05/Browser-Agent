@@ -8,9 +8,10 @@ Last brought up to date: 2026-10-08. Branch `feature/auto-mode-safeguards`, not 
 
 ## In one line
 
-About 70% built. The check on every step, Auto Mode and the guards on what goes out are committed and
-pushed. What is left: connecting the guard on what comes in, text a person cannot see, files that
-arrive, hardening the service, the attack pages, and the documents.
+About 75% built. Work was stopped on 2026-10-08 at the user's word, with everything that is finished
+committed and pushed. The check on every step, Auto Mode, the guards on what goes out and the guard
+on what comes in (marks, the scan, flagged pages) are in. What is left: text a person cannot see,
+files that arrive, hardening the service, the attack pages run in a real browser, and the documents.
 
 ## Completed (committed and pushed)
 
@@ -33,17 +34,14 @@ arrive, hardening the service, the attack pages, and the documents.
 | The viewer | The mode chip, the first-time notice, the task line and its sites, marks on steps, the extended question, the "Refused" list, the flagged-page notice, the pause bar, the limit bar | `viewer/src` | The viewer's own tests |
 | The rules for what comes in | Characters nobody can see, addresses as shown, marks, the fixed rules of the scan, the model's second opinion | `safeguards/incoming.py`, `scan.py` | `test_incoming.py`, `test_scan.py` |
 
-## Being finished now (written, tests passing, not committed)
-
-| Part | What it does | Where |
-|---|---|---|
-| What comes in, connected | Every result puts what the page wrote between marks, withholds text addressed to an agent, flags the page, and remembers what was read so that copying to another site is noticed | `safeguards/reading.py`, `tools/browser_tools.py`, `tools/toolkit.py`, `tests/unit/test_reading.py` |
+| What comes in, connected | Every result puts what the page wrote between marks, withholds text addressed to an agent (fixed rules, then a model's second opinion), flags the page, tells the person, and remembers what was read so that copying to another site is noticed. A picture's result says whose words are in it | `safeguards/reading.py`, `tools/browser_tools.py`, `tools/toolkit.py` | `tests/unit/test_reading.py` |
 
 ## Pending
 
 | Part | What is left |
 |---|---|
-| Text a person cannot see | The tests for opacity, size, place, clipping and colour in the page script |
+| Text a person cannot see | The tests for opacity, size, place, clipping and colour in the page script. Until then, text hidden by a style still reaches the scan as ordinary text: it is scanned, but it is not left out for being unseen |
+| The words of events | What happens in the browser by itself (`[events]`) is not yet passed by the fixed rules |
 | Files that arrive | A program is never kept; an archive, or a file on the person's own machine, is asked about |
 | The service and the record | How long logs are kept; tool hints; the tool list's hash; the `Origin` rule on `/mcp` |
 | Optional lists | abuse.ch and the age of a domain. Not started |

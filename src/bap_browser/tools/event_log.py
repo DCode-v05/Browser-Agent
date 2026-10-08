@@ -69,10 +69,12 @@ class EventLog:
         result: ToolResult,
         ms: float,
         check: Mapping[str, Any] | None = None,
+        scan: Mapping[str, Any] | None = None,
     ) -> None:
         """`arguments` are written as given: the caller has already taken out what must not be kept.
         `check` is what the check decided about the call (spec 18.9): never page text, typed text
-        or a model's own sentence."""
+        or a model's own sentence. `scan` says that text was withheld from the result: the rule and
+        how much, never the text."""
         if self._path is None:
             return
         line: dict[str, Any] = {"ts": round(time.time(), 3), "tool": tool}
@@ -83,6 +85,7 @@ class EventLog:
             "ms": round(ms, 1),
             "chars": len(result.text),
             **({"check": dict(check)} if check is not None else {}),
+            **({"scan": dict(scan)} if scan is not None else {}),
             # The first line says what was done. What follows is the page, which can hold anything.
             "result": result.text.split("\n", 1)[0][: self._settings.max_result_chars],
         }

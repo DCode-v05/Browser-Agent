@@ -7,9 +7,10 @@ from typing import Protocol
 
 from bap_browser.driver.base import Box, TabInfo
 from bap_browser.safeguards.check import CheckObserver
+from bap_browser.safeguards.reading import ReadingObserver
 
 
-class StepObserver(CheckObserver, Protocol):
+class StepObserver(CheckObserver, ReadingObserver, Protocol):
     def step_started(self, step: int, tool: str, label: str, target: Box | None) -> None:
         """A call is about to run. `label` says what the agent is doing; `target` is where on the page."""
         ...

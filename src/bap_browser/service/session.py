@@ -457,6 +457,18 @@ class ServiceSession:
             event["refused_id"] = refused_id
         self.hub.publish({**event, "ts": self._clock()})
 
+    def page_flagged(self, tab: str, site: str, rule: str, count: int) -> None:
+        self.hub.publish(
+            {
+                "type": "page_flagged",
+                "tab": tab,
+                "site": site,
+                "rule": rule,
+                "count": count,
+                "ts": self._clock(),
+            }
+        )
+
     def sites_changed(self, sites: Sequence[TaskSite]) -> None:
         self.hub.publish({"type": "sites_changed", "sites": _shown(sites)})
 
@@ -756,8 +768,8 @@ class ServiceSession:
         redact = self.browser.redact
         shown = [
             {"id": tab.id, "title": redact(tab.title), "url": redact(tab.url), "active": tab.active}
-            # A tab with a dialog open wants a person's eye.
-            | ({"attention": True} if tab.attention else {})
+            # A tab with a dialog open wants a person's eye, and so does one whose page was flagged.
+            | ({"attention": True} if tab.attention or tab.id in self.toolkit.check.flagged else {})
             for tab in tabs
         ]
         if shown != self._tabs:

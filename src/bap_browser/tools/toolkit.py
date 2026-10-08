@@ -23,6 +23,7 @@ from bap_browser.policy.address import presentable_address, without_credentials
 from bap_browser.results import Picture, ToolResult
 from bap_browser.safeguards.check import NOT_APPROVED, OPENS_AN_ADDRESS, PRESS, Check, Step
 from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
+from bap_browser.safeguards.reading import Reader, as_written, from_page
 from bap_browser.tools.browser_tools import RUN_A_SCRIPT, TOOLS, RunArgs
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
@@ -181,6 +182,7 @@ class Toolkit:
         session.begin_task = self._begin_task
         self._task_declared = False
         self.check = Check(session, observer)
+        self.reader = Reader(session, self.check, observer)
         self.limits = Limits(lambda: self._session.config.limits, session.spend)
         # The limit the person watching has been told of, so that they are told once.
         self._reached: Reached | None = None
@@ -300,10 +302,12 @@ class Toolkit:
             assert isinstance(args, RunArgs)
             ran = await self._scripts.run(args.code, args.timeout_s)
         tabs = await self.tabs()
-        text = note + ran.text + self._state_block(tabs, self._session.take_news())
+        # What a script printed may be what a page wrote: all of it is read as such.
+        printed, withheld = await self._read(RUN_A_SCRIPT, arguments, from_page(ran.text))
+        text = note + printed + self._state_block(tabs, self._session.take_news())
         result = ToolResult(redact(text), ran.failure is not None)
         ms = (time.perf_counter() - started) * 1000
-        self._log.write(RUN_A_SCRIPT, logged, result, ms)
+        self._log.write(RUN_A_SCRIPT, logged, result, ms, scan=withheld)
         if self._observer:
             summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure)
             if ran.failure is None:
@@ -335,6 +339,7 @@ class Toolkit:
             started = time.perf_counter()
             checked = self._validated(name, arguments)
             decided: Mapping[str, Any] | None = None
+            withheld: Mapping[str, Any] | None = None
             done: Step | None = None
             if isinstance(checked, CannotRun):
                 outcome, logged = Outcome(checked.text, checked.reason), names_only(arguments)
@@ -346,6 +351,8 @@ class Toolkit:
                     decided = decision.record
                     if decision.run:
                         outcome = await self._noted(name, arguments, await self._run(name, *checked))
+                        read, withheld = await self._read(name, arguments, outcome.text)
+                        outcome = replace(outcome, text=read)
                         done = made
                     else:
                         outcome = Outcome(decision.text, decision.reason)
@@ -355,9 +362,9 @@ class Toolkit:
                 logged = masked(arguments, redact)
             tabs = await self.tabs()
             text = admission.note + outcome.text + self._state_block(tabs, self._session.take_news())
-            result = ToolResult(redact(text), outcome.failure is not None, outcome.picture)
+            result = ToolResult(redact(as_written(text)), outcome.failure is not None, outcome.picture)
             ms = (time.perf_counter() - started) * 1000
-            self._log.write(name, logged, result, ms, decided)
+            self._log.write(name, logged, result, ms, decided, withheld)
             summary = redact(summary_for(name, arguments, target, outcome.failure))
             if done is not None and outcome.failure is None:
                 self.check.ran(done, summary)
@@ -367,6 +374,15 @@ class Toolkit:
                 )
         return result
 
+    async def _read(
+        self, name: str, arguments: Mapping[str, Any], text: str
+    ) -> tuple[str, Mapping[str, Any] | None]:
+        """A result as the agent is given it (spec 18.5): what the page wrote between marks, with
+        what was addressed to an agent withheld. The page is the one the browser shows now."""
+        driver = self._session.started_driver
+        tab, here = driver.where() if driver is not None else ("", "")
+        return await self.reader.given(name, arguments, text, tab=tab, address=without_credentials(here))
+
     async def _step(
         self, number: int, name: str, arguments: Mapping[str, Any], target: Located | None
     ) -> Step:
@@ -375,6 +391,7 @@ class Toolkit:
         name no element into the element that has the focus."""
         driver = self._session.started_driver
         tab, here = driver.where() if driver is not None else ("", "")
+        self.check.now_at(tab, without_credentials(here))
         opens: str | None = None
         if name in OPENS_AN_ADDRESS and isinstance(arguments.get("url"), str):
             opens = presentable_address(arguments["url"])
