@@ -56,6 +56,11 @@ def write_config(folder: Path, **sections: Any) -> Path:
     # And who may sign in: a test never reads or changes the developer's own passwords.
     data["auth"] = {"file": str(folder / "accounts.json"), **data.get("auth", {})}
     data["logging"] = {"systems_dir": str(folder / "logs"), **data.get("logging", {})}
+    # Most tests say exactly what a result holds. The marks around what a page wrote (spec 18.5) are
+    # left out of those, and tested where they are what the test is about.
+    guards = dict(data.get("safeguards", {}))
+    guards["incoming"] = {"mark_page_text": False, **guards.get("incoming", {})}
+    data["safeguards"] = guards
     path = folder / "config.json"
     path.write_text(json.dumps(data), encoding="utf-8")
     return path

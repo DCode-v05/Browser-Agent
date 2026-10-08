@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A page that keeps an agent busy</title>
+<style>
+  #tall { height: 3000px; }
+  #box { height: 60px; overflow: auto; }
+  #box div { height: 400px; }
+</style>
+</head>
+<body>
+<h1>Controls that do, and controls that do nothing</h1>
+<button id="dead">Load more</button>
+<button id="live">Add a line</button>
+<button id="late">Add a line later</button>
+<label>Name <input id="name"></label>
+<label>Colour <select id="colour"><option>Red</option><option>Green</option></select></label>
+<a href="#top" id="first">First</a> <a href="#top" id="second">Second</a>
+<div id="box" tabindex="0" aria-label="A box that scrolls"><div>Inside the box</div></div>
+<shadow-host id="host"></shadow-host>
+<iframe id="inner" title="Inner" srcdoc="<button id='b' onclick=&quot;document.body.append('pressed ')&quot;>Inside the frame</button>"></iframe>
+<ul id="lines"></ul>
+<div id="tall"></div>
+<script>
+  const line = (text) => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    document.getElementById('lines').append(item);
+  };
+  document.getElementById('live').addEventListener('click', () => line('added'));
+  document.getElementById('late').addEventListener('click', () => setTimeout(() => line('added later'), 300));
+  const root = document.getElementById('host').attachShadow({ mode: 'open' });
+  root.innerHTML = '<button id="within">Count in the shadow</button><span id="count">0</span>';
+  root.getElementById('within').addEventListener('click', () => {
+    const count = root.getElementById('count');
+    count.textContent = String(Number(count.textContent) + 1);
+  });
+</script>
+</body>
+</html>

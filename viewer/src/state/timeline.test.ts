@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Step } from './reducer';
-import { buildRows, formatCount, formatDuration, formatElapsed, formatSize } from './timeline';
+import { buildRows, formatCount, formatDuration, formatElapsed, formatSize, markText } from './timeline';
 
 function step(n: number, tool: string, summary: string, startedAt: number, extra: Partial<Step> = {}): Step {
   return { n, tool, label: `${summary}…`, startedAt, status: 'ok', ms: 50, chars: 100, summary, ...extra };
@@ -64,6 +64,29 @@ describe('rows', () => {
     const second = buildRows([step(1, 'browser_click', 'Clicked "A"', 0), step(2, 'browser_click', 'Clicked "B"', 30)], 10);
     expect(second[0].key).toBe(first[0].key);
     expect(new Set(second.map((row) => row.key)).size).toBe(second.length);
+  });
+
+  it('a "nobody is answering" marker is placed among the steps by when it happened', () => {
+    const rows = buildRows(
+      [step(1, 'browser_click', 'Clicked "A"', 0), step(2, 'browser_click', 'Clicked "B"', 10)],
+      10,
+      [{ key: 'unanswered-1', count: 3, at: 5 }],
+    );
+    expect(rows.map((row) => row.kind)).toEqual(['step', 'unanswered', 'step']);
+    expect(rows[1]).toMatchObject({ kind: 'unanswered', count: 3 });
+  });
+
+  it('a marker before any step comes first, and does not begin the idle count', () => {
+    const rows = buildRows([step(1, 'browser_click', 'Clicked "A"', 20)], 10, [{ key: 'unanswered-1', count: 1, at: 0 }]);
+    expect(rows.map((row) => row.kind)).toEqual(['unanswered', 'step']);
+  });
+});
+
+describe('a step\'s mark (spec 18.10)', () => {
+  it('is worded for checked, allowed and refused', () => {
+    expect(markText({ kind: 'checked' })).toBe('checked');
+    expect(markText({ kind: 'allowed' })).toBe('you allowed');
+    expect(markText({ kind: 'refused', reason: 'the task did not ask for it' })).toBe('Refused: the task did not ask for it');
   });
 });
 

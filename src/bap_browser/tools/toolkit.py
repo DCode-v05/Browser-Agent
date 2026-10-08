@@ -3,23 +3,29 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
-from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
-from bap_browser.address import presentable_address
+from bap_browser import keys
+from bap_browser.address import presentable_address, without_credentials
 from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
-from bap_browser.driver.session import BrowserSession
-from bap_browser.errors import BapError, PolicyBlocked
+from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
+from bap_browser.errors import BadInput, BapError, PolicyBlocked
 from bap_browser.results import Picture, ToolResult
+from bap_browser.safeguards.check import NOT_APPROVED, Check
+from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, Step
+from bap_browser.safeguards.incoming import quoted_name
+from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
+from bap_browser.safeguards.reading import Reader, as_written, from_page
 from bap_browser.tools.arguments import RunArgs
 from bap_browser.tools.browser_tools import RUN_A_SCRIPT
 from bap_browser.tools.event_log import EventLog, masked, names_only
@@ -86,32 +92,63 @@ READS = frozenset(
         "browser_downloads",
         "browser_wait",
         "browser_request_human",
+        "browser_begin_task",
     }
 )
-# The tools that act on one control, whose name can show that the action pays, sends or deletes.
-ACTS_ON_A_CONTROL = frozenset(
-    {"browser_click", "browser_press_key", "browser_set_checked", "browser_select_option"}
-)
+DECLARES_A_TASK = "browser_begin_task"
+# The one use of the tabs tool that changes nothing: it tells which tabs are open.
+LISTS_THE_TABS = ("browser_tabs", "list")
+# The tools whose keys go to the element that has the focus when they name no element.
+GO_WHERE_THE_FOCUS_IS = frozenset({"browser_type", "browser_press_key"})
 # The tools that touch no site: asking a person, waiting, and the list of saved files.
-NEED_NO_SITE = frozenset({"browser_request_human", "browser_wait", "browser_downloads"})
+NEED_NO_SITE = frozenset({"browser_request_human", "browser_wait", "browser_downloads", DECLARES_A_TASK})
 ANSWERS_A_DIALOG = "browser_handle_dialog"
 # While a page has a dialog open it answers nothing. Only these tools need nothing from it (spec 5.7).
 RUN_BESIDE_A_DIALOG = frozenset(
-    {ANSWERS_A_DIALOG, "browser_tabs", "browser_console", "browser_network", "browser_downloads"}
+    {
+        ANSWERS_A_DIALOG,
+        "browser_tabs",
+        "browser_console",
+        "browser_network",
+        "browser_downloads",
+        DECLARES_A_TASK,
+    }
 )
-NO_OTHER_WAY = " Do not try another way: ask the person, or choose a different approach."
-# What the agent is told when an action was not approved, and the same in a few words for the person.
-NOT_APPROVED = {
-    "denied": ("The person did not allow this action." + NO_OTHER_WAY, "the person did not allow it"),
-    "expired": (
-        "The person did not answer in time, so this action was not done." + NO_OTHER_WAY,
-        "the person did not answer",
-    ),
-    "unwatched": (
-        "This action needs a person's approval and no one is watching, so it was not done." + NO_OTHER_WAY,
-        "no one was watching",
-    ),
-}
+# The tools that are no step on a page. They are not watched for going round in circles.
+NO_STEP_ON_A_PAGE = NEED_NO_SITE | {"browser_tabs", ANSWERS_A_DIALOG, RUN_A_SCRIPT}
+# What a hover brings up is often drawn by a style, which cannot be seen from here.
+CHANGES_UNSEEN = frozenset({"browser_hover"})
+# A script in the page is mostly a way to read it. Whether it repeats itself is told by what it gives.
+TOLD_BY_ITS_RESULT = READS | {"browser_evaluate"}
+# What an acting step is told when its answer was lost on the way (spec 18.8).
+OUTCOME_UNKNOWN = (
+    "The connection to the browser was lost while this step ran. Whether it was done is not known. "
+    "Read the page before anything else, and do not repeat a step that pays, sends or deletes "
+    "without looking."
+)
+
+
+def _typed(name: str, arguments: Mapping[str, Any]) -> str | None:
+    """What a call puts into a page: the text it types, the answer to a prompt, a script."""
+    if name == "browser_fill_form":
+        fields = arguments.get("fields")
+        values = [
+            field["value"]
+            for field in (fields if isinstance(fields, list) else [])
+            if isinstance(field, Mapping) and isinstance(field.get("value"), str)
+        ]
+        return "\n".join(values) or None
+    put = arguments.get(
+        {
+            "browser_type": "text",
+            "browser_press_key": "keys",
+            ANSWERS_A_DIALOG: "prompt_text",
+            "browser_evaluate": "expression",
+        }.get(name, "")
+    )
+    if not isinstance(put, str) or (name == "browser_press_key" and not keys.is_typed_text(put)):
+        return None
+    return put
 
 
 def tools_for(config: Config) -> tuple[ToolDefinition, ...]:
@@ -145,8 +182,19 @@ class Toolkit:
         self._turn = asyncio.Lock()
         self._log = EventLog(session.config.logging)
         self._steps = 0
-        # The tools a person allowed on a site for the rest of the session: "Allow on this site".
-        self._grants: set[tuple[str, str]] = set()
+        # The tools that are not on offer in this session, whatever the configuration offers.
+        self._left_out: set[str] = set()
+        session.tool_names = tuple(self._tools)
+        session.begin_task = self._begin_task
+        self._task_declared = False
+        self.check = Check(session, observer)
+        self.reader = Reader(session, self.check, observer)
+        self.limits = Limits(lambda: self._session.config.limits, self.check.spend)
+        session.guard_files(self.check.judge_file)
+        # The limit the person watching has been told of, so that they are told once.
+        self._reached: Reached | None = None
+        # What the page said of itself after the last step (spec 18.8).
+        self._mark: str | None = None
         # The action that a dialog interrupted. It goes on when the dialog has been answered.
         self._held: asyncio.Future[Outcome] | None = None
         # The code tool's worker (spec 7). It starts with the first script, and ends with the session.
@@ -156,11 +204,70 @@ class Toolkit:
     def reconfigure(self) -> None:
         """Takes up a change in the session's configuration: the tools on offer, and the log."""
         if self._chosen is None:
-            self._tools = {tool.name: tool for tool in tools_for(self._session.config)}
+            offered = tools_for(self._session.config)
+            self._tools = {tool.name: tool for tool in offered if tool.name not in self._left_out}
+            self._session.tool_names = tuple(self._tools)
         self._log = EventLog(self._session.config.logging)
 
     def definitions(self) -> list[ToolDefinition]:
         return list(self._tools.values())
+
+    def leave_out(self, name: str) -> None:
+        """Takes a tool off offer for this session."""
+        self._left_out.add(name)
+        self._tools.pop(name, None)
+        self._session.tool_names = tuple(self._tools)
+
+    async def _begin_task(self, task: str, sites: Sequence[str]) -> str:
+        """`browser_begin_task` (spec 18.3). The first task of a session is taken as it is, and so
+        is one stated before the agent was given the text of any page. After that a change of task
+        needs a person's yes: an agent that a page talked round cannot rewrite its own task."""
+        config = self._session.config
+        most = config.safeguards.task
+        if len(task) > most.max_chars:
+            raise BadInput(
+                f"The task is longer than {most.max_chars} characters. Say it in fewer words.",
+                reason="the task is too long",
+            )
+        if len(sites) > most.max_sites:
+            raise BadInput(
+                f"A task takes at most {most.max_sites} sites. Name the ones it needs.",
+                reason="too many sites",
+            )
+        book = self.check.task
+        if self._task_declared and book.read_a_page:
+            ask = self._session.ask_approval
+            answer: ApprovalOutcome = "unwatched"
+            if ask is not None:
+                answer = await ask(
+                    Question(
+                        DECLARES_A_TASK,
+                        f"The agent wants to change its task to: {self._session.redact(task)}",
+                        "",
+                        every_time=True,
+                        must_be_seen=True,
+                        why=("an agent may not change its own task without you",),
+                    )
+                )
+            if answer not in ("allowed", "allowed_site"):
+                text, reason = NOT_APPROVED[answer]
+                raise BapError(text, reason=reason)
+        taken: list[str] = []
+        refused: list[str] = []
+        for site in sites:
+            judged = await self._session.policy.check(site if "://" in site else f"https://{site}")
+            (taken if judged.allowed else refused).append(site)
+        book.declared(task, taken)
+        self._task_declared = True
+        lifted = self.task_began()
+        self.check.task_began()
+        if self._observer:
+            self._observer.task_declared(lifted)
+        names = ", ".join(site.host for site in book.sites())
+        said = f"Task set. Its sites: {names}." if names else "Task set. It names no site."
+        if refused:
+            said += f" Left out, because this deployment does not allow them: {', '.join(refused)}."
+        return said
 
     def _in_a_script(self) -> dict[str, list[str]]:
         """The tools a script has as methods of `browser`, each with the names of its arguments in order."""
@@ -191,18 +298,25 @@ class Toolkit:
                 step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None, self._room()), None
             )
         started = time.perf_counter()
-        checked = self._check(RUN_A_SCRIPT, arguments)
+        checked = self._validated(RUN_A_SCRIPT, arguments)
+        limited = (
+            None if isinstance(checked, CannotRun) else await self._within_limits(RUN_A_SCRIPT, arguments)
+        )
         if isinstance(checked, CannotRun):
             ran = Ran(checked.text, checked.reason)
+        elif limited is not None:
+            ran = Ran(limited.text, limited.failure)
         else:
             args = checked[1]
             assert isinstance(args, RunArgs)
             ran = await self._scripts.run(args.code, args.timeout_s)
         tabs = await self.tabs()
-        text = note + ran.text + self._state_block(tabs, self._session.take_news())
+        # What a script printed may be what a page wrote: all of it is read as such.
+        printed, withheld = await self._read(RUN_A_SCRIPT, arguments, from_page(ran.text))
+        text = note + printed + self._state_block(tabs, self._news())
         result = ToolResult(redact(text), ran.failure is not None)
         ms = (time.perf_counter() - started) * 1000
-        self._log.write(RUN_A_SCRIPT, logged, result, ms)
+        self._log.write(RUN_A_SCRIPT, logged, result, ms, scan=withheld)
         if self._observer:
             summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure, self._room())
             if ran.failure is None:
@@ -232,34 +346,128 @@ class Toolkit:
                 label = redact(label_for(name, arguments, target, self._room()))
                 self._observer.step_started(step, name, label, target.box if target else None)
             started = time.perf_counter()
-            checked = self._check(name, arguments)
+            checked = self._validated(name, arguments)
+            decided: Mapping[str, Any] | None = None
+            withheld: Mapping[str, Any] | None = None
+            done: Step | None = None
             if isinstance(checked, CannotRun):
                 outcome, logged = Outcome(checked.text, checked.reason), names_only(arguments)
             else:
-                outcome = (
-                    self._blocked_by_a_dialog(name)
-                    or await self._site_permission(name, arguments, target)
-                    or await self._permit(name, arguments, target)
-                )
+                outcome = self._blocked_by_a_dialog(name) or await self._within_limits(name, arguments)
                 if outcome is None:
-                    outcome = await self._run(name, *checked)
+                    made = await self._step(step, name, arguments, target)
+                    decision = await self.check.before(made)
+                    decided = decision.record
+                    if decision.run:
+                        outcome = await self._noted(name, arguments, await self._run(name, *checked))
+                        await self._settle_files()
+                        read, withheld = await self._read(name, arguments, outcome.text)
+                        outcome = replace(outcome, text=read)
+                        done = made
+                    else:
+                        outcome = Outcome(decision.text, decision.reason)
                 if self._session.site_done is not None and name not in NEED_NO_SITE:
                     # What the person allowed once was for this call.
                     await self._session.site_done()
                 logged = masked(arguments, redact)
             tabs = await self.tabs()
-            text = admission.note + outcome.text + self._state_block(tabs, self._session.take_news())
-            result = ToolResult(redact(text), outcome.failure is not None, outcome.picture)
+            text = admission.note + outcome.text + self._state_block(tabs, self._news())
+            result = ToolResult(redact(as_written(text)), outcome.failure is not None, outcome.picture)
             ms = (time.perf_counter() - started) * 1000
-            self._log.write(name, logged, result, ms)
+            self._log.write(name, logged, result, ms, decided, withheld)
+            summary = redact(summary_for(name, arguments, target, outcome.failure, self._room()))
+            if done is not None and outcome.failure is None:
+                self.check.ran(done, summary)
             if self._observer:
-                summary = redact(summary_for(name, arguments, target, outcome.failure, self._room()))
                 self._observer.step_finished(
                     step, outcome.failure is None, ms, len(result.text), summary, tabs
                 )
         return result
 
-    def _check(self, name: str, arguments: dict[str, Any]) -> tuple[ToolDefinition, Args] | CannotRun:
+    async def _settle_files(self) -> None:
+        """A file that arrived and waits for a person's yes is settled after the step that brought
+        it (spec 18.4, stage 8): kept when they say yes, deleted otherwise, and always deleted
+        when nobody is watching."""
+        driver = self._session.started_driver
+        held = [file for file in driver.downloads() if file.state == "held"] if driver else []
+        shown = self._session.config.safeguards.incoming.name_chars
+        for file in held:
+            assert driver is not None
+            ask = self._session.ask_approval
+            answer: ApprovalOutcome = "unwatched"
+            if ask is not None:
+                try:
+                    answer = await ask(
+                        Question(
+                            "browser_downloads",
+                            f"Keeping the downloaded file {quoted_name(file.name, shown)}",
+                            "",
+                            every_time=True,
+                            must_be_seen=True,
+                            why=("a file like this is kept only with your yes",),
+                        )
+                    )
+                except BapError:
+                    answer = "denied"
+            kept = answer in ("allowed", "allowed_site")
+            await driver.settle_download(file.name, kept, "" if kept else NOT_APPROVED[answer][1])
+
+    async def _read(
+        self, name: str, arguments: Mapping[str, Any], text: str
+    ) -> tuple[str, Mapping[str, Any] | None]:
+        """A result as the agent is given it (spec 18.5): what the page wrote between marks, with
+        what was addressed to an agent withheld. The page is the one the browser shows now."""
+        driver = self._session.started_driver
+        tab, here = driver.where() if driver is not None else ("", "")
+        return await self.reader.given(name, arguments, text, tab=tab, address=without_credentials(here))
+
+    async def _step(
+        self, number: int, name: str, arguments: Mapping[str, Any], target: Located | None
+    ) -> Step:
+        """The call as the check sees it (spec 18.4): where it acts, the control it lands on and
+        what it types. A press by its place is turned into the element at that place, and keys that
+        name no element into the element that has the focus."""
+        driver = self._session.started_driver
+        tab, here = driver.where() if driver is not None else ("", "")
+        self.check.now_at(tab, without_credentials(here))
+        opens: str | None = None
+        if name in OPENS_AN_ADDRESS and isinstance(arguments.get("url"), str):
+            opens = presentable_address(arguments["url"])
+        control = target
+        fields: list[Located] = []
+        # A page with a dialog open answers nothing, so it is not asked.
+        if driver is not None and self._session.pending_dialog() is None:
+            with contextlib.suppress(BapError):
+                if target is not None and target.role == POINT and target.box is not None:
+                    control = await driver.locate_point(target.box.x, target.box.y)
+                elif target is None and name in GO_WHERE_THE_FOCUS_IS and arguments.get("ref") is None:
+                    control = await driver.locate_focus()
+                asked = arguments.get("fields") if name == "browser_fill_form" else None
+                for entry in asked if isinstance(asked, list) else []:
+                    ref = entry.get("ref") if isinstance(entry, Mapping) else None
+                    if isinstance(ref, str) and re.fullmatch(REF_PATTERN, ref):
+                        fields.append(await driver.locate(ref))
+        if name in GO_WHERE_THE_FOCUS_IS and control is not None:
+            fields = [control]
+        # An element in a frame is on the frame's own site, which may not be the page's.
+        in_a_frame = control is not None and control.document.startswith(("http://", "https://"))
+        address = (control.document if control and in_a_frame else here) if opens is None else opens
+        return Step(
+            number,
+            name,
+            arguments,
+            acts=name not in READS and (name, arguments.get("action")) != LISTS_THE_TABS,
+            address="" if name in NEED_NO_SITE else without_credentials(address),
+            opens=opens,
+            tab=tab,
+            control=control,
+            fields=tuple(fields),
+            typed=_typed(name, arguments),
+            label=self._session.redact(label_for(name, arguments, target, self._room())),
+            on_a_site=name not in NEED_NO_SITE,
+        )
+
+    def _validated(self, name: str, arguments: dict[str, Any]) -> tuple[ToolDefinition, Args] | CannotRun:
         """The tool and its checked arguments, or what is wrong with the call."""
         tool = self._tools.get(name)
         if tool is None:
@@ -271,94 +479,92 @@ class Toolkit:
             problem = describe_problem(exc)
             return CannotRun(f"{name}: {problem}", problem)
 
+    async def _within_limits(self, name: str, arguments: Mapping[str, Any]) -> Outcome | None:
+        """The limits of a task, and a step that goes round in circles (spec 18.8). None when the
+        call may run. Each call that is let through is counted."""
+        admitted = await self.limits.admit()
+        if isinstance(admitted, Reached):
+            if admitted != self._reached and self._observer:
+                self._observer.limit_reached(admitted.kind, admitted.limit, self.limits.on_a_task)
+            self._reached = admitted
+            return Outcome(admitted.text, "a limit was reached")
+        self._reached = None
+        if admitted is not None:
+            return Outcome(admitted, "too many calls at once")
+        if name in TOLD_BY_ITS_RESULT or name in NO_STEP_ON_A_PAGE:
+            return None
+        again = self.limits.goes_in_circles(same_step(name, arguments))
+        if again is None:
+            if self._mark is None:
+                # What the page is like before the first step, so that it can be said to have changed.
+                await self._page_moved()
+            return None
+        if await self._page_moved():
+            # The page changed by itself meanwhile: the step may do something now.
+            self.limits.page_changed()
+            return None
+        return Outcome(again, "the same step again and again")
+
+    def allow_more(self) -> bool:
+        """A person allowed more steps and minutes. False when no limit had stopped anything."""
+        told, self._reached = self._reached, None
+        self.limits.extend()
+        return told is not None
+
+    def task_began(self) -> bool:
+        """A task begins: its steps are counted from here. True when a limit had stopped the one before."""
+        told, self._reached = self._reached, None
+        self.limits.begin_task()
+        return told is not None
+
+    def task_ended(self) -> bool:
+        told, self._reached = self._reached, None
+        self.limits.end_task()
+        return told is not None
+
+    async def _page_moved(self) -> bool:
+        """Whether the page has changed since this was last asked. True when it cannot be told."""
+        driver = self._session.started_driver
+        mark: str | None = None
+        # A page with a dialog open answers nothing.
+        if driver is not None and self._session.pending_dialog() is None:
+            try:
+                mark = await driver.change_mark()
+            except BapError:
+                mark = None
+        moved = mark is None or mark != self._mark
+        self._mark = mark
+        return moved
+
+    async def _noted(self, name: str, arguments: Mapping[str, Any], outcome: Outcome) -> Outcome:
+        """What a result gains when the step changed nothing, or is the same once more (spec 18.8)."""
+        if name in NO_STEP_ON_A_PAGE:
+            return outcome
+        step = same_step(name, arguments)
+        if name in TOLD_BY_ITS_RESULT:
+            note = self.limits.read(step, outcome.text)
+        else:
+            note = self.limits.acted(step, changed=await self._page_moved())
+            if outcome.failure is not None or name in CHANGES_UNSEEN:
+                # A step that failed has said so; and what a hover changes is not always seen.
+                note = note.removeprefix(NOTHING_CHANGED)
+        return replace(outcome, text=outcome.text + note) if note else outcome
+
     def _blocked_by_a_dialog(self, name: str) -> Outcome | None:
         """While a page has a dialog open, a tool that needs the page is refused (spec 5.7)."""
         dialog = self._session.pending_dialog()
         if dialog is None or name in RUN_BESIDE_A_DIALOG:
             return None
         return Outcome(
-            f"{_sentence(dialog.a_kind)} is open{dialog.quoted} and blocks the page. "
-            f"Answer it first with {ANSWERS_A_DIALOG}.",
+            self.reader.own_words(f"{_sentence(dialog.a_kind)} is open{dialog.quoted} and blocks the page. ")
+            + f"Answer it first with {ANSWERS_A_DIALOG}.",
             "a dialog is open",
         )
 
-    async def _site_permission(
-        self, name: str, arguments: Mapping[str, Any], target: Located | None
-    ) -> Outcome | None:
-        """On a person's own browser, whether they let the agent read or act on this site (spec
-        8.8). The bridge on their machine decides, and asks them when they have not chosen yet."""
-        ask = self._session.ask_site
-        if ask is None or name not in self._tools or name in NEED_NO_SITE:
-            return None
-        address: str | None = None
-        if name == "browser_navigate" and isinstance(arguments.get("url"), str):
-            judged = await self._session.policy.check(arguments["url"])
-            if not judged.allowed:
-                # The core's own policy refuses it: the person is not asked about what cannot be done.
-                return None
-            address = judged.url
-        if address is None:
-            address = next((tab.url for tab in await self.tabs() if tab.active), "")
-        summary = self._session.redact(label_for(name, arguments, target, self._room()))
-        refused = await ask("read" if name in READS else "act", address, summary)
-        if refused is None:
-            return None
-        return Outcome(refused + NO_OTHER_WAY, "the person has not allowed it")
-
-    async def _permit(
-        self, name: str, arguments: Mapping[str, Any], target: Located | None
-    ) -> Outcome | None:
-        """Whether a call may run now (spec 8.2). None when it may. Otherwise what the agent is told,
-        and why in a few words for the person watching."""
-        config = self._session.config
-        policy = config.safety.action_policies.get(name, config.safety.default_action_policy)
-        if policy == "deny":
-            return Outcome(
-                f"{name} is not allowed on this deployment.{NO_OTHER_WAY}", "it is not allowed here"
-            )
-        if config.safety.ask_before == "every_action" and name not in READS:
-            policy = "confirm"
-        consequential = self._consequential(name, target)
-        if policy != "confirm" and not consequential:
-            return None
-        site = await self._site(name, arguments)
-        # An action that pays, sends or deletes is asked about every time, whatever was allowed before.
-        if not consequential and (name, site) in self._grants:
-            return None
-        ask = self._session.ask_approval
-        if ask is None:
-            outcome = "allowed" if config.control.approval_without_viewer == "allow" else "unwatched"
-        else:
-            doing = label_for(name, arguments, target, self._room())
-            try:
-                summary = self._session.redact(f"{doing} on {site}" if site else doing)
-                outcome = await ask(name, summary, site, consequential)
-            except BapError as exc:
-                return Outcome(str(exc), exc.reason or "the session ended")
-        if (
-            outcome == "allowed_site"
-            and not consequential
-            and config.control.site_grant_lifetime == "session"
-        ):
-            self._grants.add((name, site))
-        return None if outcome in ("allowed", "allowed_site") else Outcome(*NOT_APPROVED[outcome])
-
-    def _consequential(self, name: str, target: Located | None) -> bool:
-        """Whether the call does something a person must agree to each time (spec 8.6): it acts on
-        a control whose name says that it pays, sends or deletes."""
-        if target is None or name not in ACTS_ON_A_CONTROL:
-            return False
-        words = self._session.config.permissions.consequential_words
-        return any(re.search(rf"\b{re.escape(word)}\b", target.name, re.IGNORECASE) for word in words)
-
-    async def _site(self, name: str, arguments: Mapping[str, Any]) -> str:
-        """The site a call acts on: where it goes, for a navigation; otherwise where the browser is."""
-        address: str | None = None
-        if name == "browser_navigate" and isinstance(arguments.get("url"), str):
-            address = presentable_address(arguments["url"])
-        if address is None:
-            address = next((tab.url for tab in await self.tabs() if tab.active), "")
-        return urlsplit(address).hostname or ""
+    def _news(self) -> list[str]:
+        """What happened in the browser by itself since the last call. A name in it, and what a
+        dialog said, were written by a page: they are withheld when they are addressed to an agent."""
+        return [self.reader.own_words(item) for item in self._session.take_news()]
 
     async def _run(self, name: str, tool: ToolDefinition, args: Args) -> Outcome:
         """Runs a tool to its result. A dialog that opens meanwhile interrupts it: the call returns
@@ -427,6 +633,9 @@ class Toolkit:
         except Exception as exc:
             # The last line of defence: an agent's call must never take the service down.
             logger.exception("%s failed unexpectedly", name)
+            if name not in READS and self._lost_on_the_way(exc):
+                # Reading again is safe. Acting again may do the thing twice.
+                return Outcome(OUTCOME_UNKNOWN, "it is not known whether it was done")
             return Outcome(
                 f"{name} failed unexpectedly ({type(exc).__name__}). Try again, or take a new snapshot.",
                 "something went wrong",
@@ -434,6 +643,15 @@ class Toolkit:
         if isinstance(returned, Shown):
             return Outcome(returned.text, None, returned.picture)
         return Outcome(returned)
+
+    def _lost_on_the_way(self, error: Exception) -> bool:
+        """Whether a failure means that the browser, the tab or the way to it went away under a step."""
+        driver = self._session.started_driver
+        return (
+            isinstance(error, ConnectionError | EOFError | OSError)
+            or type(error).__module__.startswith("playwright")
+            or (driver is not None and not driver.is_alive())
+        )
 
     async def _locate(self, name: str, arguments: Mapping[str, Any]) -> Located | None:
         """The element a call names, for the sentence and the outline a person sees."""
@@ -447,7 +665,7 @@ class Toolkit:
         if not isinstance(ref, str) or not re.fullmatch(REF_PATTERN, ref):
             return _point(arguments, driver) if ref is None and name in POINTED else None
         try:
-            return await driver.locate(ref)
+            return await driver.locate(ref, press=name in PRESS or name == "browser_press_key")
         except BapError:
             return None
 

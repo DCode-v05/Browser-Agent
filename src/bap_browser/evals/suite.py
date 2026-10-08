@@ -33,6 +33,7 @@ from bap_browser.config import Evals
 from bap_browser.driver.session import ApprovalOutcome
 from bap_browser.evals.record import Recorder
 from bap_browser.private_file import add_line
+from bap_browser.results import ToolResult
 from bap_browser.service.session import ServiceSession
 
 Mode = Literal["agent", "reference"]
@@ -190,8 +191,15 @@ class _Lost(Exception):
     """A step of a reference solution could not be done."""
 
 
+async def _own(session: ServiceSession, name: str, arguments: Mapping[str, Any]) -> ToolResult:
+    """One call of the runner's own: making the site ready, a step of a reference solution, the
+    reading of what was done. It is no step of an agent's, so the limits of a task do not count it."""
+    with session.toolkit.limits.own_work():
+        return await session.toolkit.call(name, arguments)
+
+
 async def _ref(session: ServiceSession, role: str, name: str) -> str:
-    page = await session.toolkit.call("browser_snapshot", {})
+    page = await _own(session, "browser_snapshot", {})
     found = re.search(A_LINE.format(role=re.escape(role), name=re.escape(name)), page.text, re.MULTILINE)
     if found is None:
         raise _Lost(f'there is no {role} "{name}" on the page')
@@ -221,7 +229,7 @@ async def solve(session: ServiceSession, site: str, steps: Sequence[Sequence[Any
             call = ("browser_set_checked", {"ref": ref, "checked": bool(rest[1])})
         else:
             raise _Lost(f"a reference solution has no step named {kind}")
-        result = await session.toolkit.call(*call)
+        result = await _own(session, *call)
         if result.is_error:
             raise _Lost(result.text.split("\n", 1)[0][:160])
     return answer, done
@@ -264,8 +272,8 @@ Doing = Callable[[str], Any]
 
 async def _state_of(session: ServiceSession, site: str) -> Any:
     """What was done on the practice site, read from its own page with the agent's own tools."""
-    await session.toolkit.call("browser_navigate", {"url": f"{site}/{LAB}/state.html"})
-    page = await session.toolkit.call("browser_get_text", {})
+    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/state.html"})
+    page = await _own(session, "browser_get_text", {})
     found = STATE.search(page.text)
     if found is None:
         return None
@@ -293,8 +301,8 @@ async def run_trial(
         return task.answer
 
     seed = quote(json.dumps(task.seed, separators=(",", ":")))
-    await session.toolkit.call("browser_navigate", {"url": f"{site}/{LAB}/reset.html?seed={seed}"})
-    await session.toolkit.call("browser_navigate", {"url": f"{site}/{LAB}/{task.start}"})
+    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/reset.html?seed={seed}"})
+    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/{task.start}"})
     told: dict[str, Any] = {"outcome": "answered", "steps": 0, "input_tokens": 0, "output_tokens": 0}
     answer, lost = "", ""
     session.stand_in = stand_in
@@ -377,7 +385,7 @@ async def run_set(
             break
     if before and session.control != "ended":
         # The browser goes back to where it was, for whatever the agent does next.
-        await session.toolkit.call("browser_navigate", {"url": before})
+        await _own(session, "browser_navigate", {"url": before})
     return {
         "id": secrets.token_hex(5),
         "set": name,

@@ -5,7 +5,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 
 import type { ViewerOptions } from '../options';
 import type { Step, ViewerState } from '../state/reducer';
-import { buildRows, formatCount, formatDuration, formatElapsed, type Row } from '../state/timeline';
+import { buildRows, formatCount, formatDuration, formatElapsed, markText, type Row } from '../state/timeline';
 import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function Timeline({ state, now, options, selected, onOpen }: Props) {
-  const rows = buildRows(state.steps, options.idleDividerS);
+  const rows = buildRows(state.steps, options.idleDividerS, state.unanswered);
   const stepRows = rows.filter((row): row is Extract<Row, { kind: 'step' }> => row.kind === 'step');
   const newest = stepRows.at(-1)?.step.n;
   const started = state.session?.startedAt ?? now;
@@ -46,6 +46,10 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
             <div key={row.key} className="idle" role="separator">
               {W.timeline.idle(row.seconds)}
             </div>
+          ) : row.kind === 'unanswered' ? (
+            <div key={row.key} className="idle">
+              {W.autoMode.unanswered(row.count)}
+            </div>
           ) : (
             <button
               key={row.key}
@@ -63,6 +67,11 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
               <span className="row-body">
                 <span className="row-text">{row.text}</span>
                 {row.count > 1 && <span className="row-count">{W.timeline.times(row.count)}</span>}
+                {row.step.mark && (
+                  <span className="row-mark" data-kind={row.step.mark.kind}>
+                    {markText(row.step.mark)}
+                  </span>
+                )}
               </span>
               {row.status === 'failed' && (
                 <span className="row-flag" data-kind="failed">

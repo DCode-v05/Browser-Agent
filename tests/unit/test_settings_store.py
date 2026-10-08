@@ -11,7 +11,8 @@ import pytest
 from bap_browser.config import Config
 from bap_browser.errors import ConfigError
 from bap_browser.settings import Refused, SettingsStore
-from bap_browser.settings.catalogue import CATALOGUE, SURFACES
+from bap_browser.settings.catalogue import CATALOGUE
+from bap_browser.settings.kinds import SURFACES
 
 MakeConfig = Callable[..., Config]
 
@@ -33,8 +34,10 @@ def test_the_screen_is_told_the_groups_and_their_settings(make_config: MakeConfi
         ("browser", "Browser"),
         ("agent", "Agent"),
         ("approvals", "Approvals"),
+        ("safety", "Safety"),
         ("sites", "Sites"),
         ("files", "Files"),
+        ("limits", "Limits"),
         ("privacy", "Privacy"),
         ("live_view", "Live view"),
         ("appearance", "Appearance"),
@@ -579,13 +582,24 @@ def test_a_user_is_shown_only_the_settings_that_are_a_users(make_config: MakeCon
         "ask_before",
         "approval_wait",
         "remember_site_approval",
+        "scan_pages",
+        "cross_site_text",
+        "sensitive_sites",
         "blocked_sites",
         "allowed_sites",
+        "task_limit",
         "picture_quality",
         "show_agent_pointer",
         "colour_mode",
     ]
-    assert [group["id"] for group in answer["groups"]] == ["approvals", "sites", "live_view", "appearance"]
+    assert [group["id"] for group in answer["groups"]] == [
+        "approvals",
+        "safety",
+        "sites",
+        "limits",
+        "live_view",
+        "appearance",
+    ]
 
 
 def test_the_two_layers_are_kept_apart_in_the_file(make_config: MakeConfig, tmp_path: Path) -> None:
@@ -618,6 +632,10 @@ def test_the_admin_says_which_settings_users_may_change(make_config: MakeConfig,
         "ask_before",
         "approval_wait",
         "remember_site_approval",
+        "scan_pages",
+        "cross_site_text",
+        "sensitive_sites",
+        "task_limit",
         "blocked_sites",
         "allowed_sites",
         "picture_quality",

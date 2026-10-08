@@ -7,8 +7,10 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import logging
 import os
 from collections.abc import Callable, Coroutine
+from pathlib import Path
 from typing import Any
 
 from playwright.async_api import (
@@ -24,6 +26,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from bap_browser.config import QualityLevel
 from bap_browser.driver.base import (
+    HELD_FOLDER,
     ConsoleLine,
     DialogKind,
     Happened,
@@ -43,6 +46,7 @@ from bap_browser.driver.browser_parts import (
     Taken,
     capped,
     file_name,
+    first_bytes,
     first_line,
     free_path,
 )
@@ -50,6 +54,8 @@ from bap_browser.driver.core import DriverCore
 from bap_browser.driver.screenshots import size_of
 from bap_browser.errors import BadInput, BrowserError
 from bap_browser.results import Picture
+
+logger = logging.getLogger(__name__)
 
 
 class Watching(DriverCore):
@@ -294,7 +300,7 @@ class Watching(DriverCore):
 
         def failed(reason: str) -> None:
             self._downloads[place] = SavedFile(name, "failed", reason=reason)
-            self._tell(Happened("download", f"the download of {name} failed: {reason}"))
+            self._tell(Happened("download", f'the download of "{name}" failed: {reason}'))
 
         if not settings.enabled:
             with contextlib.suppress(PlaywrightError):
@@ -312,15 +318,65 @@ class Watching(DriverCore):
                 await download.delete()
             failed(f"it is larger than {settings.max_size_mb} MB, the most allowed")
             return
+        verdict, why = "keep", ""
+        if self._judge_file is not None:
+            read = self._config.safeguards.downloads.first_bytes
+            verdict, why = self._judge_file(name, await asyncio.to_thread(first_bytes, arrived, read))
+        if verdict == "delete":
+            with contextlib.suppress(PlaywrightError):
+                await download.delete()
+            self._downloads[place] = SavedFile(name, "failed", reason=why)
+            self._tell(Happened("download", f'the download of "{name}" was refused: {why}'))
+            return
+        # A file that waits for a person's yes is kept apart from the ones the agent may use.
+        folder = settings.dir if verdict == "keep" else str(Path(settings.dir) / HELD_FOLDER)
         try:
-            target = await asyncio.to_thread(free_path, settings.dir, name)
+            target = await asyncio.to_thread(free_path, folder, name)
             await download.save_as(target)
         except (PlaywrightError, OSError):
             failed("it could not be saved in the downloads folder")
             return
+        if verdict == "ask":
+            self._downloads[place] = SavedFile(target.name, "held", str(target), size)
+            self._tell(Happened("download", f'the download of "{target.name}" waits for the person\'s yes'))
+            return
         self._downloads[place] = SavedFile(target.name, "saved", str(target), size)
         self._tell(
-            Happened("download", f"download saved: {target.name}", {"name": target.name, "size": size})
+            Happened("download", f'download saved: "{target.name}"', {"name": target.name, "size": size})
+        )
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        waiting = [
+            place for place, file in enumerate(self._downloads) if file.state == "held" and file.name == name
+        ]
+        if not waiting:
+            return
+        place = waiting[0]
+        file = self._downloads[place]
+        held = Path(file.path)
+
+        def not_kept(why: str) -> None:
+            self._downloads[place] = SavedFile(name, "failed", reason=why)
+            self._tell(Happened("download", f'the download of "{name}" was not kept: {why}'))
+
+        if not keep:
+            try:
+                await asyncio.to_thread(held.unlink, True)
+            except OSError:
+                # Another program holds it. It stays where no tool reads, and is not kept.
+                logger.warning("A downloaded file that was not kept could not be deleted.")
+            not_kept(reason)
+            return
+        try:
+            target = await asyncio.to_thread(free_path, self._config.browser.downloads.dir, name)
+            await asyncio.to_thread(held.replace, target)
+        except OSError:
+            # It was taken away, or another program holds it, while the person decided.
+            not_kept("it could not be saved in the downloads folder")
+            return
+        self._downloads[place] = SavedFile(target.name, "saved", str(target), file.size)
+        self._tell(
+            Happened("download", f'download saved: "{target.name}"', {"name": target.name, "size": file.size})
         )
 
     async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:

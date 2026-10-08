@@ -5,6 +5,7 @@ is given, and what does it. A tool that is not in this list does not exist for a
 from __future__ import annotations
 
 from bap_browser.tools.arguments import (
+    BeginTaskArgs,
     CheckArgs,
     ClickArgs,
     ConsoleArgs,
@@ -34,6 +35,7 @@ from bap_browser.tools.arguments import (
 )
 from bap_browser.tools.browser_tools import (
     RUN_A_SCRIPT,
+    begin_task,
     click,
     console,
     downloads,
@@ -216,6 +218,14 @@ TOOLS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         "browser_downloads", "The files downloaded in this session, with size and path.", NoArgs, downloads
+    ),
+    ToolDefinition(
+        "browser_begin_task",
+        "Say what the person asked you to do, once, before you read any page: `task` in their own "
+        "words, and `sites`, the web sites it needs. The person is shown it, and your steps are "
+        "judged against it. Changing it later needs the person's yes.",
+        BeginTaskArgs,
+        begin_task,
     ),
     ToolDefinition(
         "browser_request_human",

@@ -7,6 +7,7 @@ import { BrowserPane } from './components/BrowserPane';
 import { Conversation } from './components/Conversation';
 import { agentStatus, ChatPanel } from './components/ChatPanel';
 import { ApprovalCard, BlockedNotice, DialogCard, HelpCard, SummaryCard, UnwatchedNotice } from './components/Cards';
+import { CheckBars, FlaggedNotice, ModeChip, TaskLine } from './components/AutoMode';
 import { ApprovalPopup } from './components/ApprovalPopup';
 import { HelpPopup } from './components/HelpPopup';
 import { Icon } from './components/Icon';
@@ -297,7 +298,11 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     />
   );
   const blocked = view.key === 'blocked' ? state.blocked : null;
-  const needsAttention = Boolean(state.approval || state.help || state.dialog || blocked || unwatched || state.ended);
+  const flaggedVisible = state.flagged.filter((item) => !dismissed.has(`flagged-${item.id}`));
+  const autoPaused = state.auto?.state === 'paused';
+  const needsAttention = Boolean(
+    state.approval || state.help || state.dialog || blocked || unwatched || state.ended || flaggedVisible.length > 0 || autoPaused || state.limit || state.refused.length > 0,
+  );
   // What needs a person's answer or attention. It is on screen in both views.
   const cards = (
     <>
@@ -306,6 +311,10 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       {state.help && <HelpCard help={state.help} now={now} cardRef={helpCard} />}
       {state.dialog && <DialogCard dialog={state.dialog} />}
       {blocked && <BlockedNotice url={blocked.url} reason={blocked.reason} />}
+      {flaggedVisible.map((item) => (
+        <FlaggedNotice key={item.id} site={item.site} onClose={() => dismiss(`flagged-${item.id}`)} />
+      ))}
+      <CheckBars auto={state.auto} limit={state.limit} refused={state.refused} send={send} />
       {unwatched && <UnwatchedNotice onDismiss={() => dismiss(`notice-${unwatched.id}`)} />}
       <SummaryCard state={state} onNewSession={() => send({ type: 'new_session' })} />
     </>
@@ -358,6 +367,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
               <span className="chip-name sr-only">{W.topBar.browser}</span>
               {W.backend[state.session.backend]}
             </span>
+            <ModeChip auto={state.auto} onClick={openSettings} />
           </>
         )}
         <span className="top-bar-space" />
@@ -376,6 +386,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           {null}
         </Button>
       </Bar>
+      <TaskLine task={state.task} onDrop={(host) => send({ type: 'drop_site', host })} />
 
       {full && (
         <section className="control-bar" aria-label={W.topBar.controls}>

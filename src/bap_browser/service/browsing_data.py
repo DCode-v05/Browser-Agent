@@ -15,7 +15,7 @@ from typing import Any
 
 from bap_browser.config import Config
 from bap_browser.service.session import ServiceSession
-from bap_browser.settings.catalogue import CLOUD
+from bap_browser.settings.kinds import CLOUD
 from bap_browser.settings.store import SettingsStore
 
 CLEAR = "clear_browsing_data"

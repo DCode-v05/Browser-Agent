@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import hashlib
+import json
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,6 +41,13 @@ class ToolDefinition:
     @property
     def input_schema(self) -> dict[str, Any]:
         return _tidy(self.args.model_json_schema())
+
+
+def tools_hash(tools: Sequence[ToolDefinition]) -> str:
+    """One value for the tools on offer: their names, their descriptions and their arguments. A
+    client that keeps it can tell when any of them has changed (spec 18.9)."""
+    listed = [[tool.name, tool.description, tool.input_schema] for tool in tools]
+    return hashlib.sha256(json.dumps(listed, sort_keys=True).encode()).hexdigest()
 
 
 def _tidy(node: Any) -> Any:

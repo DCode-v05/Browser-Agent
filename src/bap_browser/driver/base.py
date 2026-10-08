@@ -58,6 +58,23 @@ class Located:
     """A password field. Nothing about what it holds, not even its length, is told to anyone."""
     kind: FieldKind = "other"
     """How it is filled in a form: by typing, by ticking, or by choosing an option."""
+    # What the check needs to know of it besides its name (spec 18.4, 18.6).
+    document: str = ""
+    """The address of the document it is in: the page's, or a frame's own."""
+    input_type: str = ""
+    autocomplete: str = ""
+    attributes: tuple[str, ...] = ()
+    """Its `name` and `id` attributes, where it has them."""
+    dots: bool = False
+    """What is typed into it is drawn as dots, as in a password field, whatever its type."""
+    multiline: bool = False
+    """A text area or an editable block."""
+    search: bool = False
+    sends_form: tuple[tuple[str, str, bool, bool], ...] = ()
+    """When pressing it sends a form: that form's text fields, each as its role, its name, whether
+    it takes several lines and whether it is a search box."""
+    around: tuple[str, ...] = ()
+    """The text near a control that is pressed: of its form, then of the block around it."""
 
 
 @dataclass(frozen=True)
@@ -118,6 +135,10 @@ class Dragged:
     navigated_to: str | None = None
 
 
+# Where a file waits, inside the downloads folder, until a person has said that it may stay.
+HELD_FOLDER = "held"
+
+
 @dataclass(frozen=True)
 class PageDialog:
     """A dialog a page opened (alert, confirm, prompt, or "leave this page?") that waits for an answer."""
@@ -135,10 +156,16 @@ class PageDialog:
         return f"{'an' if self.kind == 'alert' else 'a'} {self.kind} dialog"
 
     @property
+    def said(self) -> str:
+        """What it says, on one line: each of the engine's own lines that holds it is one line, so
+        that what a page wrote cannot begin a line of its own in a result."""
+        return " ".join(self.text.split())
+
+    @property
     def quoted(self) -> str:
         """What it says, to follow what it is: ('Proceed?'). The dialog that asks whether to leave
         the page says nothing of its own."""
-        return "" if self.kind == "beforeunload" else f" ('{self.text}')"
+        return "" if self.kind == "beforeunload" else f" ('{self.said}')"
 
     @property
     def named(self) -> str:
@@ -168,7 +195,8 @@ class SavedFile:
     """A file the browser downloaded, or is downloading."""
 
     name: str
-    state: Literal["saved", "downloading", "failed"]
+    state: Literal["saved", "downloading", "failed", "held"]
+    """`held`: it has arrived and is kept aside until a person says whether it may stay (spec 18.6)."""
     path: str = ""
     size: int = 0
     reason: str = ""
@@ -189,6 +217,7 @@ class Happened:
         "download",
         "blocked",
         "file_chooser",
+        "notice",
     ]
     text: str
     """As the agent is told, in the state block of its next result."""
@@ -198,6 +227,10 @@ class Happened:
 
 Guard = Callable[[str], Awaitable[tuple[bool, str]]]
 """Judges an address: whether it may be loaded, and when not, why in a few words."""
+
+FileGuard = Callable[[str, bytes], tuple[Literal["keep", "ask", "delete"], str]]
+"""Judges a file that arrived, by its name and its first bytes: kept, kept aside until a person
+has said yes, or deleted, and then why in a few words."""
 
 
 class Driver(Protocol):
@@ -217,7 +250,36 @@ class Driver(Protocol):
 
     async def navigate(self, url: str) -> str: ...
 
-    async def locate(self, ref: str) -> Located: ...
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        """What an element is. With `press`, also what pressing it would send and what stands near it."""
+        ...
+
+    async def locate_point(self, x: float, y: float) -> Located | None:
+        """The control that a press at a point of the page lands on. None when nothing is there."""
+        ...
+
+    async def locate_focus(self) -> Located | None:
+        """The element that has the focus, where typed keys go. None when nothing has it."""
+        ...
+
+    async def gist(self) -> list[str]:
+        """What the page says it is about, in a few words: its headings and its buttons."""
+        ...
+
+    def unseen(self) -> list[str]:
+        """The text the last read of the active tab left out because no person can see it (spec
+        18.5). It is not given to the agent; the rules that look for planted text read it."""
+        ...
+
+    def where(self) -> tuple[str, str]:
+        """The active tab and the address it shows, as known without asking the page. Empty when no tab is open."""
+        ...
+
+    async def change_mark(self) -> str | None:
+        """A value that is the same as the last time only when the active tab shows the same
+        document and nothing in it has changed since: its structure, what is typed or chosen,
+        what is scrolled, where the keyboard put the focus (spec 18.8). None when it cannot be told."""
+        ...
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str: ...
 
@@ -353,3 +415,11 @@ class Driver(Protocol):
         ...
 
     def downloads(self) -> list[SavedFile]: ...
+
+    def guard_files(self, judge: FileGuard) -> None:
+        """Names who decides what is done with a file that arrives (spec 18.6)."""
+        ...
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        """Keeps a file that was held, or deletes it and says why."""
+        ...

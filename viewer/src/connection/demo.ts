@@ -1,7 +1,7 @@
 // Plays a recorded session with no service (spec 9.11), and answers the viewer's commands the way
 // the service will: it waits at an approval, hands control over, pauses, stops.
 
-import type { ClientCommand, ControlState, ServerEvent } from '../protocol';
+import type { ClientCommand, ControlState, ServerEvent, TaskSite } from '../protocol';
 import type { Connection, ConnectionHandlers } from './connection';
 
 /** An event as it is recorded: its time is filled in when it is played. */
@@ -55,6 +55,15 @@ const TIMED = new Set<ServerEvent['type']>([
   'navigation_blocked',
   'session_ended',
   'picture_current',
+  'task_set',
+  'task_ended',
+  'check_decided',
+  'refused_allowed',
+  'page_flagged',
+  'auto_changed',
+  'limit_reached',
+  'limit_lifted',
+  'questions_unanswered',
 ]);
 
 type Waiting = { kind: 'approval'; id: string; beat: Beat } | { kind: 'help'; id: string; beat: Beat; personFrameShown: boolean };
@@ -70,6 +79,8 @@ export class DemoConnection implements Connection {
   private readonly heartbeatMs: number;
   private waiting: Waiting | null = null;
   private held: 'paused' | 'person' | null = null;
+  /** The task's sites, kept so `drop_site` can answer with the rest of them. */
+  private sites: TaskSite[] = [];
   /** The picture on screen, which a step that finishes now keeps. */
   private shown: string | undefined;
   private over = false;
@@ -94,6 +105,7 @@ export class DemoConnection implements Connection {
     this.queue = [...this.session.beats];
     this.waiting = null;
     this.held = null;
+    this.sites = [];
     this.shown = undefined;
     this.over = false;
     this.base = this.startAt ?? this.realNow() / 1000;
@@ -162,6 +174,23 @@ export class DemoConnection implements Connection {
       case 'stop':
         this.emit({ type: 'session_ended', reason: 'person' });
         break;
+      case 'resume_auto':
+        this.emit({ type: 'auto_changed', mode: 'auto', state: 'on' });
+        break;
+      case 'allow_refused':
+        this.emit({ type: 'refused_allowed', id: command.id });
+        break;
+      case 'extend_limit':
+        this.emit({ type: 'limit_lifted' });
+        break;
+      case 'drop_site':
+        this.sites = this.sites.filter((site) => site.host !== command.host);
+        this.emit({ type: 'sites_changed', sites: this.sites });
+        break;
+      case 'end_task':
+        this.emit({ type: 'task_ended' });
+        this.emit({ type: 'limit_lifted' });
+        break;
       case 'key':
       case 'pointer':
         this.showPersonFrame();
@@ -212,6 +241,7 @@ export class DemoConnection implements Connection {
 
   private emit(draft: EventDraft): void {
     const event = (TIMED.has(draft.type) ? { ...draft, ts: this.now() } : draft) as ServerEvent;
+    if (event.type === 'task_set' || event.type === 'sites_changed') this.sites = event.sites;
     this.handlers?.onEvent(event, event.type === 'step_finished' ? this.shown : undefined);
     if (event.type === 'session_ended') this.close();
   }

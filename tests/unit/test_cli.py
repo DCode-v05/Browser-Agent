@@ -34,6 +34,22 @@ def test_show_sources_lists_only_what_was_overridden(
     assert capsys.readouterr().out.strip() == "browser.headless = false  (config.json)"
 
 
+def test_show_tools_gives_the_tools_on_offer_and_the_one_value_that_stands_for_them(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from bap_browser.config import Config
+    from bap_browser.tools import tools_for
+    from bap_browser.tools.registry import tools_hash
+
+    file = write(tmp_path / "config.json", {})
+    assert main(["config", "show", "--config", str(file), "--tools"]) == 0
+    first, *names = capsys.readouterr().out.splitlines()
+    offered = tools_for(Config())
+    # The same value the service gives at /api/tools: a client can keep it and notice a change.
+    assert first == f"tools = {tools_hash(offered)}"
+    assert names == [tool.name for tool in offered]
+
+
 def test_show_sources_with_nothing_overridden(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     file = write(tmp_path / "config.json", {})
     assert main(["config", "show", "--config", str(file), "--sources"]) == 0

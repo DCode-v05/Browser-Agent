@@ -141,6 +141,11 @@ class TypeArgs(Args):
     slowly: bool = False
 
 
+class BeginTaskArgs(Args):
+    task: str = Field(min_length=1)
+    sites: list[str] = Field(default=[])
+
+
 class RequestHumanArgs(Args):
     reason: str = Field(min_length=1, max_length=300)
     kind: Literal["login", "verification", "payment", "other"] = "other"

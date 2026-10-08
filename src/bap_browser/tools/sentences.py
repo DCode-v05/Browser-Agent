@@ -59,6 +59,8 @@ def label_for(
             return _row(room, "Looking for ", _query(arguments), "")
         case "browser_run":
             return "Running a script"
+        case "browser_begin_task":
+            return "Stating its task"
         case "browser_click":
             return _row(room, "Clicking ", _element(arguments, target), "")
         case "browser_hover":
@@ -132,6 +134,8 @@ def summary_for(
             return _row(room, "Looked for ", _query(arguments), "")
         case "browser_run":
             return "Ran a script"
+        case "browser_begin_task":
+            return "Stated its task"
         case "browser_click":
             kind = f" ({target.role})" if target is not None and target.name else ""
             return _row(room, "Clicked ", _element(arguments, target), kind)
@@ -194,6 +198,8 @@ def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) ->
             return "read the page"
         case "browser_run":
             return "run the script"
+        case "browser_begin_task":
+            return "set the task"
         case "browser_find":
             return "search the page"
         case "browser_click":

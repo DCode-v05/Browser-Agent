@@ -42,6 +42,37 @@ A real task needs a model key. Copy `.env.example` to `.env` and put your key on
 `OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
 `agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
+## Safeguards and Auto Mode
+
+Every step an agent asks for is checked before it runs (spec section 18). The checks are always on:
+
+- A step that pays, sends, deletes or gives an app access, and typing a password, a card number or a
+  one-time code, asks the person first.
+- What a page wrote reaches the agent between `<<page …>>` marks. Text addressed to an AI agent is
+  withheld, text no person can see is left out, and the person is told about the page.
+- Text read on one site is not typed or sent to another without a yes. A look-alike of a known site
+  asks first.
+- A program that arrives as a download is never kept. An archive is kept only with a yes.
+- A task stops at 500 steps or 60 minutes (`limits`), and a step repeated on a page that does not
+  change is not run a sixth time.
+
+**Auto Mode** lets a model decide the steps the rules are unsure of, so the person is asked less. It
+is off until a deployment turns it on:
+
+```json
+{ "safety": { "auto_mode": { "offered": true }, "ask_before": "auto" } }
+```
+
+With `offered` alone, a person chooses "Auto" in the settings screen. Paying, sending, deleting and
+giving access never run on a model's word. It uses the model key of `.env`.
+
+**An agent that connects over MCP** states its task first, once: `browser_begin_task` with the task
+in the person's words and the sites it needs. Auto Mode judges each step against that task; without
+one, a step it is unsure of asks the person. A client can pin the tools it was offered:
+`GET /api/tools` on the service, or `uv run bap-browser config show --tools`, give one value that
+changes when any tool's name, description or arguments change.
+
+What is built and what is not: `docs/auto-mode-safeguards-status.md`.
 ## Working on it
 
 There is one way to make a change here, for a person and for an agent: `docs/agent-pathway.md`.

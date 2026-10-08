@@ -142,6 +142,12 @@ def file_name(suggested: str) -> str:
     return name or NAMELESS_DOWNLOAD
 
 
+def first_bytes(path: str | Path, count: int) -> bytes:
+    """How a file begins: enough to tell a program from what its name says it is."""
+    with open(path, "rb") as file:
+        return file.read(count)
+
+
 def free_path(folder: str, name: str) -> Path:
     """Where a file of that name goes in the folder, which is made if it is not there. A name
     already taken is numbered: report (1).pdf."""
@@ -214,6 +220,8 @@ class OpenTab:
     opening: list[tuple[str, str]] | None = None
     """While the agent's own navigation is under way: the addresses the policy refused on its way."""
     main_frame_id: str = ""
+    unseen: list[str] = field(default_factory=list[str])
+    """The text the last read left out because no person can see it."""
     frames: dict[str, InnerFrame] = field(default_factory=dict[str, "InnerFrame"])
     """The frames read so far, by name."""
     frame_names: dict[str, str] = field(default_factory=dict[str, str])

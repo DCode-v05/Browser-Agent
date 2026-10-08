@@ -12,9 +12,15 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator
+from pydantic import PrivateAttr, ValidationError, field_validator
 
 from bap_browser.address import site_pattern
+from bap_browser.config_base import Section, setting
+from bap_browser.config_safeguards import (
+    AutoMode,
+    Limits,
+    Safeguards,
+)
 from bap_browser.errors import ConfigError
 
 ENV_PREFIX = "BAP_BROWSER__"
@@ -44,15 +50,6 @@ Channel = Literal[
     "custom",
 ]
 ActionPolicy = Literal["allow", "confirm", "deny"]
-
-
-class Section(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-def setting(default: Any, meaning: str) -> Any:
-    """A setting with its default and the sentence the generated reference shows for it."""
-    return Field(default=default, description=meaning)
 
 
 class Backend(Section):
@@ -90,6 +87,9 @@ class Timeouts(Section):
         5000, "Longest wait for the page to answer. A page too busy to answer fails the call"
     )
     popup_adopt_ms: int = setting(3000, "Longest wait for a new tab to load before it is reported")
+    change_wait_ms: int = setting(
+        300, "Longest wait for the page to say, after a step, whether anything in it changed"
+    )
     settle_frames: int = setting(
         2, "Animation frames waited after an action, for a navigation it started to show itself"
     )
@@ -244,9 +244,12 @@ class Safety(Section):
     action_policies: dict[str, ActionPolicy] = setting(
         {"browser_evaluate": "confirm", "browser_upload_file": "confirm"}, "Per tool"
     )
-    ask_before: Literal["risky", "every_action"] = setting(
-        "risky", "`every_action` also makes every tool that acts on a page `confirm`"
+    ask_before: Literal["risky", "every_action", "auto"] = setting(
+        "risky",
+        "`every_action` also makes every tool that acts on a page `confirm`. With `auto` a check "
+        "decides each step, and a person is asked only about the risky ones (section 18.4)",
     )
+    auto_mode: AutoMode = AutoMode()
     redact_patterns: list[str] = setting([], "Regular expressions scrubbed from every result")
 
     @field_validator("allowed_domains", "blocked_domains", mode="after")
@@ -422,6 +425,7 @@ class Agent(Section):
         "Where the provider's API is. Change it for a proxy or a compatible service",
     )
     request_timeout_s: int = setting(120, "Longest wait for one reply from the model")
+    retries: int = setting(2, "Further tries of a call to the model that failed")
     max_steps: int = setting(40, "Tool calls after which the loop stops")
     max_tokens: int = setting(4096, "The most a single reply may be")
     max_task_chars: int = setting(4000, "Longest task a person may send from the viewer's chat")
@@ -451,6 +455,9 @@ class Logging(Section):
         ".bap-browser/logs", "Where each browser of the three-browser window writes a log of its own"
     )
     shown_lines: int = setting(200, "The most lines of a log the window shows at once")
+    retention_days: int = setting(
+        30, "Lines of the logs and records older than this are removed. 0 keeps everything"
+    )
 
 
 class Code(Section):
@@ -527,6 +534,8 @@ class Config(Section):
     mcp: Mcp = Mcp()
     viewer: Viewer = Viewer()
     agent: Agent = Agent()
+    safeguards: Safeguards = Safeguards()
+    limits: Limits = Limits()
     settings: Settings = Settings()
     logging: Logging = Logging()
     code: Code = Code()

@@ -37,7 +37,7 @@ from bap_browser.service.browsing_data import CLEAR, clear_browsing_data
 from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
 from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE, Close, command_of, send, serve_viewer
-from bap_browser.service.wrapping import McpEndpoint, ResponseHeaders
+from bap_browser.service.wrapping import McpEndpoint, ResponseHeaders, tools_on_offer
 from bap_browser.settings.store import SEES, Refused, SettingsStore, known_surface
 
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
@@ -672,7 +672,8 @@ def create_app(
             Route("/api/systems/{system}/suite", run_suite, methods=["POST"]),
             Route("/api/systems/{system}/suite/stop", stop_suite, methods=["POST"]),
             Route("/api/systems/{system}/{action}", manage_system, methods=["POST"]),
-            *([Route(config.mcp.http_path, McpEndpoint(mcp, signed_in))] if mcp is not None else []),
+            *([Route(config.mcp.http_path, McpEndpoint(mcp, signed_in, origins))] if mcp is not None else []),
+            Route("/api/tools", tools_on_offer(sessions, allowed, may_use), methods=["GET"]),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,
             Mount("/demo-site", StaticFiles(directory=package / "demo_site", html=True)),

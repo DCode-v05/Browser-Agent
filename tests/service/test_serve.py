@@ -85,6 +85,13 @@ async def test_nothing_is_offered_without_the_token(
         assert await asyncio.to_thread(post, service.mcp_address, Authorization="Bearer not-the-token") == 401
         assert await asyncio.to_thread(post, service.mcp_address, Authorization=f"Basic {TOKEN}") == 401
         assert await asyncio.to_thread(post, service.mcp_address, Authorization=f"Bearer {TOKEN}") == 200
+        # A web page that is not the viewer's own has no business with the tools, whatever token it
+        # holds (spec 18.9). A browser says which page sends a request; an agent says nothing.
+        held = {"Authorization": f"Bearer {TOKEN}"}
+        assert (
+            await asyncio.to_thread(post, service.mcp_address, Origin="https://evil.example", **held) == 403
+        )
+        assert await asyncio.to_thread(post, service.mcp_address, Origin=service.address, **held) == 200
 
 
 async def test_a_service_that_was_not_asked_to_has_no_mcp_endpoint(

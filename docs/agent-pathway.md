@@ -32,7 +32,7 @@ Where a thing goes. If you are about to put it somewhere else, stop.
 
 | The thing | Its one place |
 |---|---|
-| A tunable value | `src/bap_browser/config.py`; for the viewer, `viewer/src/options.ts` |
+| A tunable value | `src/bap_browser/config.py`; a setting of Auto Mode or the safeguards, in its section in `src/bap_browser/config_safeguards.py`; for the viewer, `viewer/src/options.ts` |
 | A file for the person alone to read | Written with `src/bap_browser/private_file.py` |
 | A string a person reads | `viewer/src/wording.ts` |
 | A colour, a size, a duration, a font | `viewer/src/tokens.css` |

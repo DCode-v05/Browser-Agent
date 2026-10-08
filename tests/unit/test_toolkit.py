@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-from fakes import SNAPSHOT, FakeDriver
+from fakes import SNAPSHOT, FakeDriver, QuietObserver
 
 from bap_browser.config import Config
 from bap_browser.driver import BrowserSession
@@ -94,7 +94,7 @@ async def test_type_reports_a_count_and_never_the_text(make_config, tmp_path: Pa
 async def test_bad_calls_are_results_not_crashes(make_config, tmp_path: Path) -> None:
     tools, driver = kit(make_config, tmp_path)
     cases = {
-        ("browser_fly", ()): "Unknown tool 'browser_fly'. Available: browser_click, browser_console, ",
+        ("browser_fly", ()): "Unknown tool 'browser_fly'. Available: browser_begin_task, browser_click, ",
         ("browser_click", (("reff", "e1"),)): "browser_click: unknown argument 'reff'",
         ("browser_click", ()): "browser_click: give ref, or both x and y",
         ("browser_click", (("x", 5),)): "browser_click: give either ref, or both x and y",
@@ -167,7 +167,7 @@ async def test_every_call_is_logged_with_typed_text_replaced_by_its_length(
     assert lines[0]["args"] == {"ref": "e3", "text": f"<{len(secret)} characters>"}
     assert lines[0]["ok"] is True and lines[2]["ok"] is False
     assert lines[1]["args"] == {"url": "https://93.184.216.34/?key=[REDACTED]"}
-    assert set(lines[0]) == {"ts", "tool", "args", "ok", "ms", "chars", "result"}
+    assert set(lines[0]) == {"ts", "tool", "args", "ok", "ms", "chars", "check", "result"}
 
 
 async def test_the_log_can_be_turned_off_and_arguments_left_out(make_config, tmp_path: Path) -> None:
@@ -186,7 +186,7 @@ async def test_the_log_can_be_turned_off_and_arguments_left_out(make_config, tmp
     assert "args" not in line
 
 
-class Seen:
+class Seen(QuietObserver):
     """Records what the toolkit reports, the way the session service will receive it."""
 
     def __init__(self) -> None:

@@ -8,7 +8,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from bap_browser.agent.loop import Tools
-from bap_browser.agent.models import Message, Model, ModelError, Reply
+from bap_browser.agent.models import Message, Model, Reply
+from bap_browser.errors import ModelError
 from bap_browser.evals.record import Trace
 from bap_browser.results import ToolResult
 from bap_browser.tools import ToolDefinition

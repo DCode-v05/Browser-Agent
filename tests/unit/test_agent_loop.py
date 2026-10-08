@@ -75,7 +75,7 @@ async def test_the_model_is_shown_the_task_the_tools_and_every_result(make_confi
     assert "untrusted" in system and "browser_snapshot" in system
     assert opening == [Said("user", "What is on the page?")]
     assert offered == [tool.name for tool in tools_for(Config())]
-    assert "browser_evaluate" not in offered and len(offered) == 27
+    assert "browser_evaluate" not in offered and len(offered) == 28
     _, later, _ = model.seen[1]
     assert later == [
         Said("user", "What is on the page?"),

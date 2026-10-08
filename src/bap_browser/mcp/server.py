@@ -17,6 +17,7 @@ from mcp.types import (
     PaginatedRequestParams,
     TextContent,
     Tool,
+    ToolAnnotations,
 )
 
 from bap_browser import __version__
@@ -26,6 +27,7 @@ from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools import Toolkit
+from bap_browser.tools.toolkit import READS
 
 INSTRUCTIONS = (
     "Browser tools. Read a page with browser_snapshot: an accessibility tree in which every element "
@@ -39,7 +41,14 @@ def build_server(toolkit: Toolkit, name: str) -> Server:
     async def list_tools(ctx: ServerRequestContext, params: PaginatedRequestParams | None) -> ListToolsResult:
         return ListToolsResult(
             tools=[
-                Tool(name=tool.name, description=tool.description, input_schema=tool.input_schema)
+                Tool(
+                    name=tool.name,
+                    description=tool.description,
+                    input_schema=tool.input_schema,
+                    # Hints for the client, and no more: nothing here relies on them. Every tool
+                    # reaches the open web, where anyone may have written what comes back.
+                    annotations=ToolAnnotations(read_only_hint=tool.name in READS, open_world_hint=True),
+                )
                 for tool in toolkit.definitions()
             ]
         )

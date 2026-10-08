@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import secrets
 import socket
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,10 @@ from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
 from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE
 from bap_browser.settings.store import SettingsStore
+from bap_browser.tools.event_log import forget_old_records
+
+# How often the records are looked through for what is too old to keep.
+A_DAY_S = 24 * 60 * 60
 
 
 class Service:
@@ -50,6 +56,7 @@ class Service:
         whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
         may sign in as the admin or as a user (spec 4.11)."""
         self._config = config
+        self._sessions = sessions
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
         self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
@@ -73,6 +80,7 @@ class Service:
         self.port = 0
         self._server: uvicorn.Server | None = None
         self._serving: asyncio.Task[None] | None = None
+        self._forgetting: asyncio.Task[None] | None = None
 
     @property
     def address(self) -> str:
@@ -131,6 +139,9 @@ class Service:
         self.port = listener.getsockname()[1]
         if self.bridge is not None:
             self.bridge.own_address = self.address
+        for session in self._sessions.values():
+            # The start page and the demo site are served from here: they are no stranger's pages.
+            session.served_at(self.address)
         self._server = uvicorn.Server(
             uvicorn.Config(
                 self._app,
@@ -157,6 +168,14 @@ class Service:
             await asyncio.sleep(0)
         # Files are written off the event loop, which is busy with sessions.
         await asyncio.to_thread(self._write_state)
+        self._forgetting = asyncio.create_task(self._forget_what_is_old())
+
+    async def _forget_what_is_old(self) -> None:
+        """Removes old lines of the records when the service starts, and once a day after (spec 18.9)."""
+        while True:
+            config = self._config
+            await asyncio.to_thread(forget_old_records, config.logging, config.evals.dir, time.time())
+            await asyncio.sleep(A_DAY_S)
 
     async def wait(self) -> None:
         """Returns when the service has stopped: it was told to, or the process was interrupted."""
@@ -168,6 +187,11 @@ class Service:
             return
         if self.bridge is not None:
             await self.bridge.close()
+        if self._forgetting is not None:
+            self._forgetting.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._forgetting
+            self._forgetting = None
         self._server.should_exit = True
         await self._serving
         self._server = self._serving = None

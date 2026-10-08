@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Session ended</title>
+</head>
+<body>
+<h1>Your session has ended</h1>
+<button onclick="again()">Sign in again</button>
+<script>
+// The sign-in form is a page made up in the browser: it has no site of its own, so nothing that
+// goes by the name of a site can tell whose it is.
+function again() {
+  var form = '<!doctype html><title>Sign in</title><h1>Sign in</h1>' +
+    '<label>Email <input name="email"></label>' +
+    '<label>Password <input type="password" name="password"></label><button>Continue</button>';
+  location.href = URL.createObjectURL(new Blob([form], {type: 'text/html'}));
+}
+</script>
+</body>
+</html>

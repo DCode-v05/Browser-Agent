@@ -49,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     show = config_commands.add_parser("show", help="print the effective configuration")
     show.add_argument("--config", help="path of config.json")
     show.add_argument("--sources", action="store_true", help="print where each overridden value came from")
+    show.add_argument(
+        "--tools", action="store_true", help="print the tools on offer and the one value that stands for them"
+    )
     show.set_defaults(run=_config_show)
 
     init = config_commands.add_parser("init", help="write a starter config.json")
@@ -164,6 +167,16 @@ def with_visible_browser(config: Config) -> Config:
 def _config_show(args: argparse.Namespace) -> int:
     config, sources = load_config_with_sources(args.config)
     data = config.model_dump()
+    if args.tools:
+        # Imported here so that the other config commands start without loading the tools.
+        from bap_browser.tools import tools_for
+        from bap_browser.tools.registry import tools_hash
+
+        offered = tools_for(config)
+        print(f"tools = {tools_hash(offered)}")
+        for tool in offered:
+            print(tool.name)
+        return 0
     if not args.sources:
         print(json.dumps(data, indent=2))
         return 0
@@ -279,6 +292,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser.agent.command import Interrupted
     from bap_browser.agent.openai_model import OpenAIModel
     from bap_browser.agent.studio import run_studio
+    from bap_browser.safeguards.model import ModelClient
 
     extension = browser_extension.install(extension_folder(config))
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
@@ -286,7 +300,9 @@ def _studio(args: argparse.Namespace) -> int:
         asyncio.run(
             run_studio(
                 config,
-                lambda service: OpenAIModel(config.agent, key),
+                lambda service: OpenAIModel(
+                    config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
+                ),
                 open_viewer=args.open,
                 extension=extension,
             )
@@ -320,7 +336,8 @@ def _agent(args: argparse.Namespace) -> int:
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
     from bap_browser.agent.loop import Unfinished
-    from bap_browser.agent.models import Model, ModelError
+    from bap_browser.agent.models import Model
+    from bap_browser.errors import ModelError
     from bap_browser.service.server import Service
 
     model_for: Callable[[Service], Model]
@@ -351,11 +368,12 @@ def _agent(args: argparse.Namespace) -> int:
                 "in the environment. To try without a model: bap-browser agent --demo"
             )
         from bap_browser.agent.openai_model import OpenAIModel
+        from bap_browser.safeguards.model import ModelClient
 
         task = args.task
 
         def hosted(service: Service) -> Model:
-            return OpenAIModel(config.agent, key)
+            return OpenAIModel(config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop"))
 
         model_for = hosted
 

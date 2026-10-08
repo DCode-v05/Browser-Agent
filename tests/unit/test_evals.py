@@ -10,9 +10,10 @@ from typing import Any
 
 import pytest
 
-from bap_browser.agent.models import Message, ModelError, Reply, ToolCall, Usage
+from bap_browser.agent.models import Message, Reply, ToolCall, Usage
 from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
+from bap_browser.errors import ModelError
 from bap_browser.evals import Recorder, summarise, trace_of
 from bap_browser.evals.record import cost_of
 from bap_browser.evals.summary import percentile

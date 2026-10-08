@@ -19,6 +19,7 @@ from websockets.exceptions import ConnectionClosed, InvalidStatus
 from bap_browser.config import Config
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.tools.registry import tools_hash
 
 TOKEN = "a-token-made-up-for-these-tests"
 Running = Callable[..., Awaitable[tuple[Service, ServiceSession, FakeDriver]]]
@@ -138,6 +139,21 @@ async def test_the_api_needs_the_token(running: Running) -> None:
     assert json.loads(body) == {"sessions": [{"id": "default", "state": "agent"}]}
 
 
+async def test_the_tools_on_offer_are_listed_with_one_value_that_stands_for_them(running: Running) -> None:
+    service, session, _ = await running()
+    tools = f"{service.address}/api/tools"
+    assert (await get(tools))[0] == 401
+    status, _, body = await get(tools, Authorization=f"Bearer {TOKEN}")
+    offered = json.loads(body)["sessions"]["default"]
+    assert status == 200
+    assert offered["tools"] == [tool.name for tool in session.toolkit.definitions()]
+    assert offered["hash"] == tools_hash(session.toolkit.definitions())
+    # The same tools give the same value again: a client that kept it sees nothing has changed.
+    assert (
+        json.loads((await get(tools, Authorization=f"Bearer {TOKEN}"))[2])["sessions"]["default"] == offered
+    )
+
+
 async def test_a_request_for_another_host_is_refused(running: Running) -> None:
     service, _, _ = await running()
     assert (await get(f"{service.address}/healthz", Host="evil.example"))[0] == 400
@@ -162,6 +178,7 @@ async def test_a_viewer_that_signs_in_is_sent_what_happened_then_the_picture_the
     kinds = [item["type"] if isinstance(item, dict) else "picture" for item in items]
     assert kinds == [
         "session_started",
+        "auto_changed",
         "tab_changed",
         "step_started",
         "step_finished",
@@ -169,8 +186,8 @@ async def test_a_viewer_that_signs_in_is_sent_what_happened_then_the_picture_the
         "caught_up",
     ]
     # A picture is one type byte and then the JPEG.
-    assert items[4] == b"\x01\xff\xd8 a picture"
-    assert before <= items[5]["ts"] <= time.time()
+    assert items[5] == b"\x01\xff\xd8 a picture"
+    assert before <= items[6]["ts"] <= time.time()
 
 
 async def test_what_happens_next_reaches_every_viewer(running: Running) -> None:

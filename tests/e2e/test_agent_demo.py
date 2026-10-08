@@ -42,6 +42,8 @@ async def test_the_scripted_agent_signs_up_and_a_viewer_is_told_every_step(
 ) -> None:
     config = make_config(tmp_path, agent={"provider": "scripted"})
     session = ServiceSession(config, agent="Reference agent")
+    # The service serves the demo site itself. Here a server of the test's own stands in for it.
+    session.served_at(demo_site)
     await session.start()
     try:
         answer = await run_agent(

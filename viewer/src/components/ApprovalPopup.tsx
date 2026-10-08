@@ -53,6 +53,14 @@ export function ApprovalPopup({ approval, now, onAnswer, onLater }: Props) {
         <p id="approval-popup-summary" className="popup-reason">
           {approval.summary}
         </p>
+        {approval.why?.map((reason) => (
+          <p key={reason} className="card-note">
+            {W.approval.why(reason)}
+          </p>
+        ))}
+        {approval.leaves && <p className="card-note">{W.approval.leaves(approval.leaves.text, approval.leaves.fromSite, approval.leaves.toSite)}</p>}
+        {approval.amount && <p className="card-note">{W.approval.amount(approval.amount)}</p>}
+        {approval.said && <p className="card-note">{approval.said}</p>}
         <p className="confirm-consequence">{approval.everyTime ? W.approval.popup.hintEveryTime : W.approval.popup.hint}</p>
         <p className="card-note">{W.approval.left(timeLeft(approval.expiresAt, now))}</p>
         <div className="confirm-actions">

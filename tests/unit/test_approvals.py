@@ -189,9 +189,9 @@ async def test_an_action_on_a_control_that_pays_sends_or_deletes_always_asks(wat
 
 async def test_typing_is_not_asked_about_by_itself(watched: Watched) -> None:
     session, _ = await watched()
-    for ref in ("e3", "e8"):
-        typed = await asyncio.wait_for(session.toolkit.call("browser_type", {"ref": ref, "text": "abc"}), 2)
-        assert not typed.is_error
+    # An ordinary field. A password field is a person's to allow (spec 18.6, test_check.py).
+    typed = await asyncio.wait_for(session.toolkit.call("browser_type", {"ref": "e3", "text": "abc"}), 2)
+    assert not typed.is_error
     assert told(session, "approval_requested") == []
 
 

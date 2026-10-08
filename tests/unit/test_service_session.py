@@ -13,6 +13,8 @@ from bap_browser.service.session import ServiceSession
 
 NOW = 1_759_480_000.0
 PUBLIC = "https://93.184.216.34"
+# What a session says of itself when it starts: what it is, how it asks, and its tabs.
+STARTED = 3
 
 
 Started = Callable[..., Awaitable[tuple[ServiceSession, FakeDriver]]]
@@ -72,6 +74,8 @@ async def test_a_session_starts_its_browser_and_says_what_it_is(
             "viewport": {"width": 1280, "height": 800},
             "ts": NOW,
         },
+        # How the session asks before it acts (spec 18.10).
+        {"type": "auto_changed", "mode": "risky", "state": "off", "ts": NOW},
         {
             "type": "tab_changed",
             "tabs": [{"id": "t1", "title": "Fake", "url": "about:blank", "active": True}],
@@ -86,7 +90,7 @@ async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(
     session, _ = await started(make_config, tmp_path)
     opened = await session.toolkit.call("browser_navigate", {"url": f"{PUBLIC}/"})
     await session.toolkit.call("browser_click", {"ref": "e1"})
-    events = sent(session)[2:]
+    events = sent(session)[STARTED:]
     assert events[0] == {
         "type": "step_started",
         "step": 1,
@@ -124,13 +128,13 @@ async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(
 async def test_a_blocked_address_is_shown_as_blocked(make_config, tmp_path: Path, started: Started) -> None:
     session, _ = await started(make_config, tmp_path, safety={"block_private_networks": True})
     await session.toolkit.call("browser_navigate", {"url": "http://10.0.0.5/admin"})
-    assert sent(session)[3] == {
+    assert sent(session)[STARTED + 1] == {
         "type": "navigation_blocked",
         "url": "http://10.0.0.5/admin",
         "reason": "private address",
         "ts": NOW,
     }
-    assert kinds(session)[2:] == ["step_started", "navigation_blocked", "step_finished"]
+    assert kinds(session)[STARTED:] == ["step_started", "navigation_blocked", "step_finished"]
 
 
 async def test_what_viewers_are_told_is_redacted(make_config, tmp_path: Path, started: Started) -> None:
@@ -159,8 +163,8 @@ async def test_a_paused_session_holds_the_agents_call_until_it_is_resumed(
     await session.handle({"type": "resume"})
     result = await asyncio.wait_for(call, 1)
     assert not result.is_error and result.text.startswith("Page: Fake")
-    assert kinds(session)[2:] == ["control:paused", "control:agent", "step_started", "step_finished"]
-    assert sent(session)[2] == {"type": "control_changed", "state": "paused", "since": NOW}
+    assert kinds(session)[STARTED:] == ["control:paused", "control:agent", "step_started", "step_finished"]
+    assert sent(session)[STARTED] == {"type": "control_changed", "state": "paused", "since": NOW}
 
 
 async def test_a_held_call_gives_up_politely_and_nothing_was_done(
@@ -194,7 +198,7 @@ async def test_taking_over_waits_for_the_action_in_progress(
     driver.hold.set()
     await asyncio.wait_for(asyncio.gather(click, take_over), 1)
     assert session.control == "person"
-    assert kinds(session)[2:] == ["step_started", "step_finished", "control:person"]
+    assert kinds(session)[STARTED:] == ["step_started", "step_finished", "control:person"]
 
 
 async def test_after_a_hand_back_the_next_result_says_what_changed_once(
@@ -302,7 +306,7 @@ async def test_commands_that_do_not_apply_or_make_no_sense_change_nothing(
     assert sent(session) == before
     await session.handle({"type": "pause"})
     await session.handle({"type": "pause"})
-    assert kinds(session)[2:] == ["control:paused"]
+    assert kinds(session)[STARTED:] == ["control:paused"]
 
 
 async def test_a_person_can_take_over_from_a_pause_and_pause_is_not_a_way_out_of_it(
@@ -440,3 +444,24 @@ async def test_viewers_are_told_when_the_browser_is_a_window_on_the_persons_own_
         assert first.get("on_screen") is told
     finally:
         await session.close()
+
+
+@pytest.mark.parametrize(
+    ("backend", "attached", "own"),
+    [
+        ("remote_headless", False, False),
+        ("takeover_chrome", False, True),
+        ("bundled_chromium", False, True),
+        # Nobody said which backend it is: a browser that was attached to and not launched is the
+        # desktop app's or a person's own Chrome, so a file that arrives there is asked about.
+        (None, True, True),
+        (None, False, False),
+        ("remote_headless", True, False),
+    ],
+)
+def test_a_session_knows_when_its_browser_is_on_the_persons_own_machine(
+    make_config, tmp_path: Path, backend: str | None, attached: bool, own: bool
+) -> None:
+    browser = {"cdp_url": "http://127.0.0.1:9222"} if attached else {}
+    session = ServiceSession(make_config(tmp_path, browser=browser), FakeDriver(), backend=backend)
+    assert session.browser.own_machine is own

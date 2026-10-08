@@ -28,6 +28,19 @@ export type DialogKind = 'alert' | 'confirm' | 'prompt' | 'beforeunload';
 export type DialogOutcome = 'accepted' | 'dismissed' | 'timed_out';
 export type EndReason = 'person' | 'agent' | 'timeout' | 'failed';
 
+// Auto Mode and safeguards (spec 18).
+export type SiteGrade = 'named' | 'added_read' | 'added_act';
+export interface TaskSite {
+  host: string;
+  grade: SiteGrade;
+}
+export type Mode = 'every_action' | 'risky' | 'auto';
+export type AutoState = 'off' | 'on' | 'paused' | 'waiting_for_task' | 'unavailable';
+export type CheckStage = 'rule' | 'reviewer' | 'person' | 'limit';
+export type CheckOutcome = 'run' | 'ask' | 'refuse';
+export type LimitKind = 'calls' | 'minutes' | 'spend';
+export type LimitScope = 'task' | 'session';
+
 export type ServerEvent =
   | {
       type: 'session_started';
@@ -49,7 +62,24 @@ export type ServerEvent =
   | { type: 'step_finished'; step: number; ok: boolean; ms: number; chars: number; summary: string; url: string }
   | { type: 'tab_changed'; tabs: TabInfo[] }
   /** `every_time`: the action pays, sends or deletes, so it cannot be allowed for the whole site. */
-  | { type: 'approval_requested'; id: string; tool: string; summary: string; site: string; expires_in_s: number; every_time?: boolean; ts: number }
+  | {
+      type: 'approval_requested';
+      id: string;
+      tool: string;
+      summary: string;
+      site: string;
+      expires_in_s: number;
+      every_time?: boolean;
+      /** Each reason in words, already written by the engine. */
+      why?: string[];
+      /** The exception of 18.6: text that was read on one site and is about to leave to another. */
+      leaves?: { text: string; from_site: string; to_site: string };
+      /** As the page shows it, e.g. "$84.00". */
+      amount?: string;
+      /** The check model's own sentence, for the person only. */
+      said?: string;
+      ts: number;
+    }
   | { type: 'approval_closed'; id: string; outcome: ApprovalOutcome }
   | { type: 'help_requested'; id: string; reason: string; kind: HelpKind; expires_in_s: number; ts: number }
   | { type: 'help_closed'; id: string; outcome: HelpOutcome }
@@ -64,7 +94,42 @@ export type ServerEvent =
   | { type: 'task_changed'; working: boolean; ts: number }
   /** The page has not changed, so the last picture is still what the browser shows. */
   | { type: 'picture_current'; ts: number }
-  | { type: 'session_ended'; reason: EndReason; detail?: string; ts: number };
+  | { type: 'session_ended'; reason: EndReason; detail?: string; ts: number }
+  // Auto Mode and safeguards (spec 18.10).
+  | { type: 'task_set'; task: string; from: 'person' | 'agent'; sites: TaskSite[]; ts: number }
+  /** The task line goes away; the sites stay known. */
+  | { type: 'task_ended'; ts: number }
+  | { type: 'sites_changed'; sites: TaskSite[] }
+  | {
+      type: 'check_decided';
+      step: number;
+      stage: CheckStage;
+      outcome: CheckOutcome;
+      findings: string[];
+      /** The engine's own sentence. */
+      reason: string;
+      /** The check model's own sentence, for the person only. */
+      said?: string;
+      /** Present when the refused step can be allowed once. */
+      refused_id?: string;
+      ts: number;
+    }
+  /** A person pressed "Allow once" (from any viewer). */
+  | { type: 'refused_allowed'; id: string; ts: number }
+  | { type: 'page_flagged'; tab: string; site: string; rule: string; count: number; ts: number }
+  | { type: 'auto_changed'; mode: Mode; state: AutoState; why?: string; ts: number }
+  | {
+      type: 'limit_reached';
+      kind: LimitKind;
+      limit: number;
+      scope: LimitScope;
+      /** What "Allow more" adds: steps for `calls`, minutes for `minutes`. Absent for `spend`. */
+      more?: number;
+      ts: number;
+    }
+  /** A person allowed more, or the task ended. */
+  | { type: 'limit_lifted'; ts: number }
+  | { type: 'questions_unanswered'; count: number; ts: number };
 
 export type ClientCommand =
   | { type: 'auth'; token: string }
@@ -84,6 +149,12 @@ export type ClientCommand =
   | { type: 'task'; text: string }
   /** Ends the task the agent is on. The session goes on. */
   | { type: 'stop_task' }
-  | { type: 'new_session' };
+  | { type: 'new_session' }
+  // Auto Mode and safeguards (spec 18.10).
+  | { type: 'resume_auto' }
+  | { type: 'allow_refused'; id: string }
+  | { type: 'extend_limit' }
+  | { type: 'drop_site'; host: string }
+  | { type: 'end_task' };
 
 export type CommandType = ClientCommand['type'];

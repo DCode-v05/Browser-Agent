@@ -14,7 +14,6 @@ from playwright.async_api import (
 from playwright.async_api import Error as PlaywrightError
 
 from bap_browser.address import without_credentials
-from bap_browser.driver.acting import Acting
 from bap_browser.driver.base import (
     Happened,
 )
@@ -27,11 +26,12 @@ from bap_browser.driver.browser_parts import (
     launch_options,
     load_failure,
 )
+from bap_browser.driver.for_the_check import ForTheCheck
 from bap_browser.driver.page_script import PageScript
 from bap_browser.errors import BadInput, BrowserError, PolicyBlocked
 
 
-class PlaywrightDriver(Acting):
+class PlaywrightDriver(ForTheCheck):
     async def start(self) -> None:
         timeouts = self._config.browser.timeouts
         try:
@@ -101,6 +101,7 @@ class PlaywrightDriver(Acting):
         page.on("request", lambda request: self._on_request(tab, request))
         page.on("framenavigated", lambda frame: self._on_frame_navigated(tab, frame))
         page.on("close", lambda _: self._forget(tab))
+        page.on("crash", lambda _: self._crashed(tab))
         page.on("download", lambda download: self._spawn(self._save(download)))
         # Listened for from the start, so that the browser hands every file chooser to this driver.
         # One that is asked for only at the moment of an upload can open before the browser has
@@ -182,7 +183,20 @@ class PlaywrightDriver(Acting):
         with contextlib.suppress(BrowserError):
             await self._begin_pictures(self._frames[1])
 
-    def _forget(self, tab: OpenTab) -> None:
+    def _crashed(self, tab: OpenTab) -> None:
+        """A tab's page has crashed. Nothing more can be done in it, so it is told and closed like
+        any tab that goes away (spec 18.8)."""
+        if tab.id not in self._tabs:
+            return
+        self._forget(tab, "crashed")
+        self._spawn(self._close_quietly(tab.page))
+
+    @staticmethod
+    async def _close_quietly(page: Page) -> None:
+        with contextlib.suppress(PlaywrightError):
+            await page.close()
+
+    def _forget(self, tab: OpenTab, how: str = "closed") -> None:
         """A tab has closed. The one opened last becomes the active one."""
         if self._tabs.pop(tab.id, None) is None:
             return
@@ -194,7 +208,7 @@ class PlaywrightDriver(Acting):
         if tab.id in self._closing:
             return
         now = f"; {self._active.id} is now the active tab" if was_active and self._active else ""
-        self._tell(Happened("tab_closed", f"tab {tab.id} closed{now}"))
+        self._tell(Happened("tab_closed", f"tab {tab.id} {how}{now}"))
         if was_active and self._active is not None:
             self._spawn(self._show(self._active))
 

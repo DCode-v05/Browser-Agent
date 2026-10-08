@@ -19,7 +19,7 @@ LINE = Line("snapshot.small", "browser_snapshot", "Small form", target_ms=5, fai
 def test_the_budget_file_holds_the_lines_of_the_spec() -> None:
     lines = runner.load_budget(BUDGET)
     ids = [line.id for line in lines]
-    assert len(ids) == len(set(ids)) == 40
+    assert len(ids) == len(set(ids)) == 41
     # The code tool is of milestone 4. Its lines are with those of the next steps (spec 11.4).
     known = {tool.name for tool in TOOLS} - {"browser_run"}
     assert {line.tool for line in lines} <= known

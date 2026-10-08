@@ -8,7 +8,8 @@ from typing import Any
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from bap_browser.config import Config, Section
+from bap_browser.config import Config
+from bap_browser.config_base import Section
 
 
 def reference_markdown() -> str:

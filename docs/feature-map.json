@@ -129,6 +129,72 @@
       ]
     },
     {
+      "id": "safeguards",
+      "title": "The check on every step, and the safeguards",
+      "spec": "18",
+      "source": [
+        "src/bap_browser/safeguards/check.py",
+        "src/bap_browser/safeguards/findings.py",
+        "src/bap_browser/safeguards/actions.py",
+        "src/bap_browser/safeguards/task.py",
+        "src/bap_browser/safeguards/incoming.py",
+        "src/bap_browser/safeguards/scan.py",
+        "src/bap_browser/safeguards/reading.py",
+        "src/bap_browser/safeguards/outgoing.py",
+        "src/bap_browser/safeguards/lookalikes.py",
+        "src/bap_browser/safeguards/limits.py",
+        "src/bap_browser/policy/sites.py",
+        "src/bap_browser/config_safeguards.py",
+        "src/bap_browser/driver/for_the_check.py",
+        "src/bap_browser/driver/snapshot_page.js",
+        "src/bap_browser/service/check_news.py",
+        "src/bap_browser/service/wrapping.py"
+      ],
+      "tests": [
+        "tests/unit/test_check.py",
+        "tests/unit/test_actions.py",
+        "tests/unit/test_task.py",
+        "tests/unit/test_begin_task.py",
+        "tests/unit/test_incoming.py",
+        "tests/unit/test_scan.py",
+        "tests/unit/test_reading.py",
+        "tests/unit/test_outgoing.py",
+        "tests/unit/test_lookalikes.py",
+        "tests/unit/test_sites.py",
+        "tests/unit/test_limits.py",
+        "tests/unit/test_toolkit_limits.py",
+        "tests/unit/test_record.py",
+        "tests/e2e/test_attacks.py",
+        "tests/e2e/test_loops.py"
+      ],
+      "reach": "Always on, in every session: `uv run bap-browser serve`, then any tool call. The pages that attack an agent are in `tests/site/attacks/`; `docs/auto-mode-safeguards-status.md` says what is built and what was seen when it was run.",
+      "addresses": [
+        "/api/tools"
+      ],
+      "tools": [
+        "browser_begin_task"
+      ]
+    },
+    {
+      "id": "auto-mode",
+      "title": "Auto Mode: a model decides the steps the rules are unsure of",
+      "spec": "18.4",
+      "source": [
+        "src/bap_browser/safeguards/reviewer.py",
+        "src/bap_browser/safeguards/model.py",
+        "src/bap_browser/safeguards/check.py",
+        "viewer/src/components/AutoMode.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_auto_mode.py",
+        "tests/unit/test_reviewer.py",
+        "tests/unit/test_model_client.py"
+      ],
+      "reach": "In `config.json`: `{\"safety\": {\"auto_mode\": {\"offered\": true}, \"ask_before\": \"auto\"}}`, or \"Auto\" in the settings screen where a deployment offers it. The chip in the viewer's header says how it stands. It needs the model's key.",
+      "addresses": [],
+      "tools": []
+    },
+    {
       "id": "viewer",
       "title": "The viewer: who is driving, what is happening, and the controls",
       "spec": "9",

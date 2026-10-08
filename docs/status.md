@@ -356,33 +356,27 @@ Two faults found while checking that everything works, both seen as a test that 
 | A click could take a moving element for still | The click looks at the element twice, a frame apart. In a browser that had just started, the wait for the next frame could end inside the frame the first look was in: nothing had moved on, and "the same place twice" was read as holding still (about 1 time in 10 under load) | Two looks count only in different frames, told apart by the page's own clock. 36 of 36 under the same load; click by ref is as fast as before (67 ms) |
 | A test of a download that is too large failed now and then | Its helper counted the word "failed" in the whole result, which also holds the note of what just happened; the note can come a moment before the list says so | The helper reads the list itself |
 
-### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
+### 1n. Being built since 2026-10-07: Auto Mode and safeguards (spec section 18)
 
-The spec has a new section 18, written to be built from. No code of it exists yet.
+Its status has a page of its own, kept up to date as parts land:
+**`docs/auto-mode-safeguards-status.md`** (what is completed, what is being finished, what is pending,
+and what changes for people who use the browser today). The hand-over for whoever goes on is
+`docs/plans/2026-10-07-auto-mode-and-safeguards.md`.
 
-| Part | What the spec says |
+On 2026-10-08 `main` was brought into its branch (15 changes of `main`, conflicts in 13 files), and
+the work was made to pass the gate of section 1p:
+
+| What the gate asked | What was done |
 |---|---|
-| Auto Mode (18.3, 18.4) | A third choice of "Ask before", for each of the three browsers, off by default. Fixed rules settle what they can; a model that never reads the page judges the rest against the task; a step that pays, sends, deletes or gives a password still goes to the person; a step with no part in the task is refused and the agent goes on. An outside agent states its task once with a new tool, `browser_begin_task` |
-| What comes in (18.5) | Text a person cannot see is left out; page text is marked; planted instructions are found by rules on this machine, checked by a model, and withheld |
-| What goes out (18.6) | Passwords, cards and codes; text copied from one site to another; files that can run programs; screens that grant access; the amount of a payment, and a cap |
-| Where the browser goes (18.7) | The task's sites; look-alike sites; sensitive sites; optional known-bad lists of abuse.ch |
-| When something fails (18.8) | The check fails closed; limits on steps, time and money; repeated calls; a step whose outcome is not known |
-| The record, what a person sees, settings, where the code goes (18.9 to 18.12) | All given with defaults and wording |
-| Tests and order (18.13 to 18.15) | An attack set of 25 pages with a fooled agent, nine slices to build in, and the list it is accepted by |
+| No file of the engine over 700 lines | `config.py` gave its sections of Auto Mode and the safeguards to `config_safeguards.py`, and what a section is to `config_base.py`. `safeguards/check.py` gave what the rules notice to `safeguards/findings.py`. `service/session.py` gave what the check reports to viewers to `service/check_news.py`. `settings/catalogue.py` gave the kinds of setting to `settings/kinds.py`. The answer of `/api/tools` is in `service/wrapping.py`. In the viewer, three bars became one component |
+| Imports go one way | `safeguards` has a line of its own in `LAYERS`, between the driver and the tools. The driver imported it in three places; it no longer does: the check hands the session the judge of a file, and keeps the count of what its model calls cost |
+| No tunable number outside the configuration | Nine numbers: six became settings (`safeguards.sites.lookalike_min_chars`, `one_edit_max_chars`, `lure_min_chars`, `measured_hosts`, `safeguards.outgoing.grouped_number_digits`, `safeguards.reviewer.reason_chars`), two code points are named characters, and a minute is said as a minute. A tenth, how much of a file's beginning is read, is `safeguards.downloads.first_bytes` |
+| One helper for one job | The reading of an IP address was written twice; `policy/sites.py` has it once |
+| Every tool and address in the feature map | Two features: `safeguards` and `auto-mode` |
+| The task sets of section 1o, by their reference solutions | They do more than 120 tool calls a minute, and the limit of 18.8 refused 22 of them. A run of a task set is the engine's own work on a session, and is now not counted (`Limits.own_work`); an agent that is being evaluated is still held to the limits |
 
-Decided with you by dialog before it was written: a check decides, like Claude Code's auto mode;
-rules first, then a model; the model is OpenAI's with a setting of its own; an outside agent states
-its task at the start; Auto Mode is off until a person turns it on; known-bad lists are optional and
-local checks always on; only what local rules flag goes to a model.
-
-Not decided by you, and written as I judged best, to be changed if you see it otherwise: the limits'
-defaults (500 steps and 60 minutes a session), the pause after 3 refusals in a row or 20 in a session,
-that a paying, sending or deleting step is asked of you even when you asked for it, that a download on
-your own machine is checked before it is kept, and the lists of sensitive and protected sites.
-
-The research behind it, each claim with its source: `docs/research/auto-mode.md`,
-`prompt-injection.md`, `web-threats.md`, `fallbacks.md`, `safeguards-map.md`,
-`anthropic-safeguards.md`, `mcp-security.md`.
+The driver's changes of this work are in the files `main` divided the driver into: `core.py`,
+`watching.py`, `acting.py`, and a new `for_the_check.py`.
 
 ### 1o. Finished on 2026-10-08: task sets, the evaluations of what the agent does
 

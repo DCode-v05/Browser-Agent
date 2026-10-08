@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import FakeDriver
+from fakes import FakeDriver, QuietObserver
 
 from bap_browser.address import presentable_address
 from bap_browser.config import Config
@@ -17,7 +17,7 @@ from bap_browser.tools import Toolkit
 from bap_browser.tools.sentences import label_for, summary_for
 
 
-class Seen:
+class Seen(QuietObserver):
     def __init__(self) -> None:
         self.told: list[Any] = []
 
@@ -114,9 +114,9 @@ async def test_a_ref_that_is_not_a_ref_is_never_sent_to_the_page(make_config, tm
     located: list[str] = []
     original = driver.locate
 
-    async def locate(ref: str) -> Any:
+    async def locate(ref: str, *, press: bool = False) -> Any:
         located.append(ref)
-        return await original(ref)
+        return await original(ref, press=press)
 
     driver.locate = locate  # type: ignore[method-assign]
     tools = Toolkit(BrowserSession(make_config(tmp_path), driver), observer=Seen())

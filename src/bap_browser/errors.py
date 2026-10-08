@@ -38,5 +38,9 @@ class BrowserError(BapError):
     """The browser could not do what was asked."""
 
 
+class ModelError(Exception):
+    """The model could not answer. The message is written for the person who ran the command."""
+
+
 class ConfigError(Exception):
     """The configuration is wrong. Start-up stops with this message."""

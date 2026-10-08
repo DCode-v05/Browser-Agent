@@ -35,6 +35,40 @@ SNAPSHOT = (
 )
 
 
+class QuietObserver:
+    """Takes every notice of the tool layer and does nothing with it. A test's own observer
+    inherits from it, and listens to what the test is about."""
+
+    def step_started(self, step: int, tool: str, label: str, target: Box | None) -> None: ...
+
+    def step_finished(
+        self, step: int, ok: bool, ms: float, chars: int, summary: str, tabs: Sequence[TabInfo]
+    ) -> None: ...
+
+    def navigation_blocked(self, url: str, reason: str) -> None: ...
+
+    def limit_reached(self, kind: str, limit: float, on_a_task: bool) -> None: ...
+
+    def task_declared(self, limit_lifted: bool) -> None: ...
+
+    def check_decided(
+        self,
+        step: int,
+        stage: str,
+        outcome: str,
+        findings: Sequence[str],
+        reason: str,
+        said: str = "",
+        refused_id: str | None = None,
+    ) -> None: ...
+
+    def sites_changed(self, sites: Sequence[Any]) -> None: ...
+
+    def page_flagged(self, tab: str, site: str, rule: str, count: int) -> None: ...
+
+    def auto_changed(self) -> None: ...
+
+
 class FakeDriver:
     def __init__(self) -> None:
         self.started = 0
@@ -65,6 +99,19 @@ class FakeDriver:
         self.saved: list[SavedFile] = []
         self.value: Any = None
         """What the next script gives."""
+        self.elements: dict[str, Located] = {}
+        """What a test puts on the page, by ref, besides the elements every fake page has."""
+        self.at_point: Located | None = None
+        """The control a press by its place lands on."""
+        self.focused: Located | None = None
+        """The element that has the focus."""
+        self.said: list[str] = []
+        self.hidden: list[str] = []
+        """The text the last read left out because no person can see it."""
+        """The page's headings and buttons."""
+        self.mark: str | None = None
+        """What the page says of itself after a step. The same twice means that nothing changed;
+        None means that it cannot be told."""
 
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         self.tell = on_event
@@ -149,6 +196,18 @@ class FakeDriver:
         self.calls.append(("upload", {"ref": ref, "paths": list(paths)}))
         return ActionOutcome('button "Attach files"')
 
+    def guard_files(self, judge: Any) -> None:
+        self.judge_file = judge
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        self.calls.append(("settle_download", (name, keep, reason)))
+        self.saved = [
+            SavedFile(file.name, "saved" if keep else "failed", file.path, file.size, "" if keep else reason)
+            if file.name == name and file.state == "held"
+            else file
+            for file in self.saved
+        ]
+
     def downloads(self) -> list[SavedFile]:
         return list(self.saved)
 
@@ -190,7 +249,27 @@ class FakeDriver:
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
         self.calls.append(("wheel", (x, y, dx, dy)))
 
-    async def locate(self, ref: str) -> Located:
+    async def change_mark(self) -> str | None:
+        return self.mark
+
+    async def locate_point(self, x: float, y: float) -> Located | None:
+        return self.at_point
+
+    async def locate_focus(self) -> Located | None:
+        return self.focused
+
+    async def gist(self) -> list[str]:
+        return self.said
+
+    def where(self) -> tuple[str, str]:
+        return self.active_tab, self.url
+
+    def unseen(self) -> list[str]:
+        return self.hidden
+
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        if ref in self.elements:
+            return self.elements[ref]
         if ref == "e9":
             raise StaleRef(ref)
         if ref == "e3":

@@ -30,17 +30,8 @@ from bap_browser import __version__
 from bap_browser.config import Config, deep_merge, defaults
 from bap_browser.errors import ConfigError
 from bap_browser.private_file import write_json
-from bap_browser.settings.catalogue import (
-    BY_ID,
-    CATALOGUE,
-    ENABLED,
-    FREE,
-    GROUPS,
-    SURFACES,
-    Entry,
-    Reason,
-    Value,
-)
+from bap_browser.settings.catalogue import BY_ID, CATALOGUE, ENABLED, FREE
+from bap_browser.settings.kinds import GROUPS, SURFACES, Entry, Reason, Value
 
 Role = Literal["admin", "user"]
 # Where a value comes from when nobody said: the configuration file or the environment.

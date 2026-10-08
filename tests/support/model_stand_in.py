@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import threading
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -47,13 +48,31 @@ def response(*output: dict[str, Any], status: str = "completed", **extra: Any) -
     } | extra
 
 
-class ModelStandIn:
-    """Answers each request with the next reply. A reply is a response body, or (status, body) for a refusal."""
+def spent(sent: int, written: int) -> dict[str, Any]:
+    """The `usage` of a response: the tokens the provider counted."""
+    return {"input_tokens": sent, "output_tokens": written, "total_tokens": sent + written}
 
-    def __init__(self, *replies: dict[str, Any] | tuple[int, dict[str, Any]]) -> None:
+
+@dataclass(frozen=True)
+class Slow:
+    """A reply that is held back for so many seconds, as a provider under load does."""
+
+    seconds: float
+    reply: Any
+
+
+class ModelStandIn:
+    """Answers each request with the next reply.
+
+    A reply is a response body; or (status, body) for a refusal; or (status, body, headers); or any
+    of these inside `Slow`.
+    """
+
+    def __init__(self, *replies: Any) -> None:
         self.replies = list(replies)
         self.requests: list[dict[str, Any]] = []
         """Each request as it arrived: `path`, `authorization`, and `body`."""
+        self._closing = threading.Event()
         stand_in = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -67,13 +86,22 @@ class ModelStandIn:
                     }
                 )
                 reply = stand_in.replies.pop(0)
-                status, body = reply if isinstance(reply, tuple) else (200, reply)
+                if isinstance(reply, Slow):
+                    stand_in._closing.wait(reply.seconds)
+                    reply = reply.reply
+                status, body, *more = reply if isinstance(reply, tuple) else (200, reply)
                 data = json.dumps(body).encode()
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
+                try:
+                    self.send_response(status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(data)))
+                    for name, value in (more[0] if more else {}).items():
+                        self.send_header(name, value)
+                    self.end_headers()
+                    self.wfile.write(data)
+                except OSError:
+                    # The caller stopped waiting for a slow reply and hung up.
+                    self.close_connection = True
 
             def log_message(self, format: str, *args: Any) -> None:
                 """The stand-in writes nothing to the test output."""
@@ -84,6 +112,7 @@ class ModelStandIn:
         self.base_url = f"http://127.0.0.1:{self._server.server_port}/v1"
 
     def close(self) -> None:
+        self._closing.set()
         self._server.shutdown()
         self._server.server_close()
         self._thread.join()

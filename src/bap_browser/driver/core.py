@@ -7,7 +7,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import logging
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from pathlib import Path
 from typing import Any
 
 from playwright.async_api import (
@@ -24,8 +26,11 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from bap_browser.address import without_credentials
 from bap_browser.config import Config, QualityLevel
 from bap_browser.driver.base import (
+    Box,
+    FileGuard,
     Guard,
     Happened,
+    Located,
     SavedFile,
     TabInfo,
 )
@@ -48,6 +53,8 @@ from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.screenshots import size_of
 from bap_browser.errors import BadInput, BrowserError, StaleRef
 from bap_browser.results import Picture
+
+logger = logging.getLogger(__name__)
 
 
 class DriverCore:
@@ -73,6 +80,7 @@ class DriverCore:
         self._tasks: set[asyncio.Task[Any]] = set()
         self._on_event: Callable[[Happened], None] | None = None
         self._guard: Guard | None = None
+        self._judge_file: FileGuard | None = None
         # The dialogs that wait for an answer, oldest first.
         self._dialogs: list[OpenDialog] = []
         self._dialog_count = 0
@@ -94,6 +102,52 @@ class DriverCore:
 
     def guard(self, judge: Guard) -> None:
         self._guard = judge
+
+    def guard_files(self, judge: FileGuard) -> None:
+        self._judge_file = judge
+
+    def _what_to_locate(self, *, press: bool) -> dict[str, Any]:
+        return {
+            "press": press,
+            "maxName": self._config.browser.snapshot.max_name_chars,
+            "maxAround": self._config.safeguards.money.around_chars,
+        }
+
+    @staticmethod
+    def _located(found: dict[str, Any]) -> Located:
+        box = Box(*found["box"]) if found["box"] else None
+        return Located(
+            found["role"],
+            found["name"],
+            box,
+            found["secret"],
+            found["kind"],
+            document=found.get("document", ""),
+            input_type=found.get("inputType", ""),
+            autocomplete=found.get("autocomplete", ""),
+            attributes=tuple(found.get("attributes", ())),
+            dots=bool(found.get("dots", False)),
+            multiline=bool(found.get("multiline", False)),
+            search=bool(found.get("search", False)),
+            sends_form=tuple(
+                (str(role), str(name), bool(multiline), bool(search))
+                for role, name, multiline, search in found.get("sendsForm", ())
+            ),
+            around=tuple(found.get("around", ())),
+        )
+
+    def _unseen_limits(self) -> dict[str, Any] | None:
+        """What the page script is told about text nobody can see, or None when it is not looked for."""
+        incoming = self._config.safeguards.incoming
+        if not incoming.unseen_text:
+            return None
+        return {
+            "minOpacity": incoming.min_opacity,
+            "minFontPx": incoming.min_font_px,
+            "minContrast": incoming.min_contrast,
+            "contrast": incoming.contrast,
+            "screenReaderChars": incoming.screen_reader_max_chars,
+        }
 
     def listen(self, on_event: Callable[[Happened], None]) -> None:
         self._on_event = on_event
@@ -139,6 +193,14 @@ class DriverCore:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._stack.aclose()
+        # A file nobody said yes to does not outlive the session.
+        for place, file in enumerate(self._downloads):
+            if file.state == "held":
+                try:
+                    await asyncio.to_thread(Path(file.path).unlink, True)
+                except OSError:
+                    logger.warning("A downloaded file that was not kept could not be deleted.")
+                self._downloads[place] = SavedFile(file.name, "failed", reason="the session ended")
         self._browser = self._context = self._active = self._pictured = None
         self._tabs.clear()
         self._dialogs.clear()

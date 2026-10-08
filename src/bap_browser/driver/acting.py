@@ -17,7 +17,6 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from bap_browser.driver.base import (
     ActionOutcome,
-    Box,
     Checked,
     Dragged,
     Found,
@@ -42,17 +41,14 @@ from bap_browser.errors import BadInput, BrowserError, StaleRef
 class Acting(Watching):
     """The actions of the tools (spec 5), each on the tab that is active."""
 
-    async def locate(self, ref: str) -> Located:
-        return await self._locate(self._current(), ref)
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        return await self._locate(self._current(), ref, press=press)
 
-    async def _locate(self, tab: OpenTab, ref: str) -> Located:
-        found = await self._ask(
-            tab, "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
-        )
-        if found.get("error") == "stale":
+    async def _locate(self, tab: OpenTab, ref: str, *, press: bool = False) -> Located:
+        found = await self._ask(tab, "locate", {"ref": ref, **self._what_to_locate(press=press)})
+        if found.get("error"):
             raise StaleRef(ref)
-        box = Box(*found["box"]) if found["box"] else None
-        return Located(found["role"], found["name"], box, found["secret"], found["kind"])
+        return self._located(found)
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         tab = self._current()
@@ -81,11 +77,15 @@ class Acting(Watching):
             max_chars=max_chars,
             include_bboxes=include_bboxes,
             next_ref=self._next_ref,
+            unseen=self._unseen_limits(),
         )
         arguments |= {"prefix": frame.name if frame else "", "embedded": embedded, "indent": indent}
         data = await (frame.script if frame else tab.script).call("snapshot", arguments)
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
+        if not embedded:
+            tab.unseen = []
+        tab.unseen += [str(text) for text in data.get("unseen", ())]
         # Numbering continues across navigations, tabs and frames, so an old ref can never point at a
         # new element.
         self._next_ref = data["next"]
@@ -295,9 +295,13 @@ class Acting(Watching):
         return tab.page.url
 
     async def text(self, ref: str | None, max_chars: int) -> tuple[str, int]:
-        data = await self._ask(self._current(), "text", {"ref": ref, "maxChars": max_chars})
+        tab = self._current()
+        data = await self._ask(
+            tab, "text", {"ref": ref, "maxChars": max_chars, "unseen": self._unseen_limits()}
+        )
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
+        tab.unseen = [str(text) for text in data.get("unseen", ())]
         return data["text"], data["more"]
 
     async def find(self, query: str, limit: int) -> Found:

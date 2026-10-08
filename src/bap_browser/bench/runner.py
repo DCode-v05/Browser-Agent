@@ -140,7 +140,10 @@ def _unmeasured(line: Line, browser: str, state: State, note: str) -> Measured:
 async def _time(config: Config, site: str, scenario: Scenario, warmup: int, runs: int) -> list[float]:
     """One browser for the line, so that no line is slowed or sped up by the one before it."""
     samples: list[float] = []
-    async with open_session(config) as session:
+    # A line is measured by calling one tool far more often than any agent does: the limits of a
+    # task are not what is being measured (spec 18.8).
+    unhurried = config.limits.model_copy(update={"max_calls": 0, "max_calls_per_minute": 0})
+    async with open_session(config.model_copy(update={"limits": unhurried})) as session:
         stage = Stage(Toolkit(session), site, {})
         await scenario.once(stage)
         for index in range(warmup + runs):

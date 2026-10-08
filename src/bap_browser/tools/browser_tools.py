@@ -5,13 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 from bap_browser import keys
-from bap_browser.driver.base import ActionOutcome, Driver, LogLevel, Place, TabInfo
+from bap_browser.driver.base import HELD_FOLDER, ActionOutcome, Driver, LogLevel, Place, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
 from bap_browser.policy.files import allowed_file
+from bap_browser.safeguards.reading import from_page
 from bap_browser.tools.arguments import (
+    BeginTaskArgs,
     CheckArgs,
     ClickArgs,
     ConsoleArgs,
@@ -64,7 +67,7 @@ async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | No
     )
     # A page that needs a person says so in the result that shows it (spec 8.4).
     notice = notice_for(page)
-    return f"{page}\n{notice}" if notice else page
+    return f"{from_page(page)}\n{notice}" if notice else from_page(page)
 
 
 async def _allowed(session: BrowserSession, given: str) -> str:
@@ -144,6 +147,7 @@ async def get_text(session: BrowserSession, args: TextArgs) -> str:
     text, more = await driver.text(args.ref, min(args.max_chars or cap, cap))
     if not text:
         return f"{args.ref or 'The page'} has no visible text."
+    text = from_page(text)
     if more:
         text += f"\n\u2026 {more} more characters not shown. Give a ref to read one part of the page."
     return text
@@ -161,7 +165,7 @@ async def find(session: BrowserSession, args: FindArgs) -> str:
         if found.total > shown
         else f"{shown} match{'' if shown == 1 else 'es'}"
     )
-    return f"{count}, best first:\n" + "\n".join(found.lines)
+    return f"{count}, best first:\n" + from_page("\n".join(found.lines))
 
 
 async def click(session: BrowserSession, args: ClickArgs) -> str:
@@ -325,6 +329,12 @@ async def wait(session: BrowserSession, args: WaitArgs) -> str:
     )
 
 
+async def begin_task(session: BrowserSession, args: BeginTaskArgs) -> str:
+    if session.begin_task is None:
+        raise BrowserError("This session takes no task.", reason="it takes no task")
+    return await session.begin_task(args.task, args.sites)
+
+
 async def request_human(session: BrowserSession, args: RequestHumanArgs) -> str:
     if session.ask_person is None:
         raise BrowserError(
@@ -399,7 +409,7 @@ async def handle_dialog(session: BrowserSession, args: DialogArgs) -> str:
     done = "Accepted" if args.action == "accept" else "Dismissed"
     if dialog.kind == "beforeunload":
         return f"{done} the dialog that asked whether to leave the page."
-    return f"{done} the dialog '{dialog.text}'."
+    return f"{done} the dialog '{dialog.said}'."
 
 
 def _tab_list(session: BrowserSession, tabs: Sequence[TabInfo]) -> str:
@@ -412,7 +422,7 @@ def _tab_list(session: BrowserSession, tabs: Sequence[TabInfo]) -> str:
         for tab in tabs
     ]
     count = f"{len(tabs)} tab{'' if len(tabs) == 1 else 's'}"
-    return f"{count}, the active one marked *:\n" + "\n".join(lines)
+    return f"{count}, the active one marked *:\n" + from_page("\n".join(lines))
 
 
 async def _the_page_now(session: BrowserSession, driver: Driver) -> str:
@@ -454,7 +464,7 @@ def _newest(session: BrowserSession, lines: Sequence[str], limit: int | None, wh
     count = f"{len(shown)} {what}{'' if len(shown) == 1 else 's'}"
     if len(lines) > len(shown):
         count += f", the newest of {len(lines)}"
-    return f"{count}, oldest first:\n" + "\n".join(shown)
+    return f"{count}, oldest first:\n" + from_page("\n".join(shown))
 
 
 async def console(session: BrowserSession, args: ConsoleArgs) -> str:
@@ -498,13 +508,20 @@ async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
     # The first line says what was done. The value is what the page holds, and follows it.
     head = f"The script's value, as JSON ({len(text)} characters):"
     if len(text) > cap:
-        return f"{head}\n{text[:cap]}\n\u2026 {len(text) - cap} more characters not shown."
-    return f"{head}\n{text}"
+        return f"{head}\n{from_page(text[:cap])}\n\u2026 {len(text) - cap} more characters not shown."
+    return f"{head}\n{from_page(text)}"
 
 
 async def upload_file(session: BrowserSession, args: UploadArgs) -> str:
     folders = session.config.browser.uploads.allowed_dirs
     files = [allowed_file(folders, path) for path in args.paths]
+    waiting = (Path(session.config.browser.downloads.dir) / HELD_FOLDER).resolve()
+    if any(file.is_relative_to(waiting) for file in files):
+        # Wherever uploads may come from: a file that arrived and waits for a yes is nobody's yet.
+        raise BadInput(
+            "That file was downloaded and waits for the person's yes. It cannot be uploaded before that.",
+            reason="the file waits for the person's yes",
+        )
     driver = await session.driver()
     outcome = await driver.upload(args.ref, [str(file) for file in files])
     names = ", ".join(file.name for file in files)
@@ -532,9 +549,11 @@ async def downloads(session: BrowserSession, args: NoArgs) -> str:
             lines.append(f"{file.name} ({_size(file.size)}) saved at {file.path}")
         elif file.state == "downloading":
             lines.append(f"{file.name} is still downloading")
+        elif file.state == "held":
+            lines.append(f"{file.name} waits for the person's yes before it is kept")
         else:
             lines.append(f"{file.name} failed: {file.reason}")
-    return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + "\n".join(lines)
+    return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + from_page("\n".join(lines))
 
 
 async def run(session: BrowserSession, args: RunArgs) -> str:
