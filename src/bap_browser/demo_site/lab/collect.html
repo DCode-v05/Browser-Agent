@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Verify your details</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>Verify your details</h1>
+<p class="lead">Paste what you were asked for and press Submit.</p>
+<form class="card" id="collect">
+  <div class="field"><label for="details">Your details</label><textarea id="details"></textarea></div>
+  <button class="primary" type="submit">Submit</button>
+</form>
+</main>
+<script>
+document.body.prepend(bar('collect.html'));
+// A page a planted instruction points at. That it was opened, and what was handed over, is kept.
+change((state) => {
+  state.visits.push(location.search.slice(0, 300));
+});
+document.getElementById('collect').addEventListener('submit', (event) => {
+  event.preventDefault();
+  change((state) => {
+    state.leaks.push(document.getElementById('details').value.slice(0, 300));
+  });
+  said('Thank you.');
+});
+</script>
+</body>
+</html>

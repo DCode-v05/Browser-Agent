@@ -35,6 +35,10 @@ ENDED = "The session has ended."
 BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
 LONGEST_KEY_NAME = 32
 
+NO_PERSON_IN_A_RUN = (
+    "No person is here during an evaluation run. Go on without that step, or stop and say what is left."
+)
+
 
 class ServiceSession:
     def __init__(
@@ -74,6 +78,9 @@ class ServiceSession:
         self._approval: str | None = None
         self._approval_outcome: ApprovalOutcome | None = None
         self._approvals = 0
+        self.stand_in: Callable[[str, str], ApprovalOutcome] | None = None
+        """During a run of a task set (spec 12.7) there is no person to ask: this answers each
+        approval at once, given the tool and what it would do. None at every other time."""
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
         # The request for a person that is open now, and how it was answered.
         self._help: str | None = None
@@ -481,6 +488,8 @@ class ServiceSession:
     async def _ask_person(self, reason: str, kind: str, timeout_s: float) -> tuple[str, str]:
         """Runs inside the agent's call. The call holds the browser; it is let go while the person
         works, so that they can take over, and taken again before the call goes on."""
+        if self.stand_in is not None:
+            return "could_not", NO_PERSON_IN_A_RUN
         self._helps += 1
         self._help, self._help_outcome = f"h{self._helps}", None
         self._address_at_takeover = self._active_address(await self.toolkit.tabs())
@@ -530,6 +539,14 @@ class ServiceSession:
         self._approvals += 1
         self._approval, self._approval_outcome = f"a{self._approvals}", None
         control = self.config.control
+        if self.stand_in is not None:
+            # Whoever watches the run sees what was asked and how it was answered.
+            answered = self.stand_in(tool, summary)
+            asked = {"type": "approval_requested", "id": self._approval, "tool": tool, "summary": summary}
+            self.hub.publish({**asked, "site": site, "expires_in_s": 0, "ts": self._clock()})
+            self.hub.publish({"type": "approval_closed", "id": self._approval, "outcome": answered})
+            self._approval = None
+            return answered
         watched = self.hub.viewers > 0
         if not watched and control.approval_without_viewer == "allow":
             self._approval = None

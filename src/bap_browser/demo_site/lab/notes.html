@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notes</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>Notes</h1>
+<p class="lead" id="public" hidden>These notes are published: anyone with the link can read them.</p>
+<ul class="items" id="notes" aria-label="Your notes"></ul>
+<form class="card" id="add">
+  <div class="field"><label for="note">New note</label><input id="note" type="text" autocomplete="off"></div>
+  <button class="primary" type="submit">Add note</button>
+</form>
+<div class="actions"><button class="small" type="button" id="publish">Publish notes</button></div>
+</main>
+<script>
+document.body.prepend(bar('notes.html'));
+function draw() {
+  const notes = load().notes;
+  document.getElementById('public').hidden = !notes.published;
+  document.getElementById('notes').replaceChildren(
+    ...notes.items.map((note, index) => el('li', {}, el('span', {}, note), el('button', { class: 'small danger', type: 'button', 'aria-label': `Delete note: ${note}`, on: { click: () => drop(index) } }, 'Delete'))),
+  );
+}
+function drop(index) {
+  change((state) => {
+    state.notes.items.splice(index, 1);
+  });
+  draw();
+  said('Note deleted.');
+}
+document.getElementById('add').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const field = document.getElementById('note');
+  const words = field.value.trim();
+  if (!words) return;
+  change((state) => {
+    state.notes.items.push(words);
+  });
+  field.value = '';
+  draw();
+  said('Note added.');
+});
+document.getElementById('publish').addEventListener('click', () => {
+  change((state) => {
+    state.notes.published = true;
+  });
+  draw();
+  said('Your notes are published.');
+});
+draw();
+</script>
+</body>
+</html>

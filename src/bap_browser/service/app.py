@@ -496,6 +496,58 @@ def create_app(
             return JSONResponse({"error": result}, status_code=409)
         return JSONResponse(result)
 
+    def may_run(role: Role) -> bool:
+        return sees(role, "evaluations") and sees(role, "checklist")
+
+    async def system_suite(request: Request) -> Response:
+        """The task sets of one browser, and how its runs of them went (spec 12.7)."""
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system))
+
+    async def run_suite(request: Request) -> Response:
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        asked = await _json_object(request) or {}
+        name, trials, mode = asked.get("set"), asked.get("trials"), asked.get("mode")
+        if not isinstance(name, str) or type(trials) is not int or mode not in ("agent", "reference"):
+            return Response(status_code=400)
+        why_not = systems.start_suite(system, name, trials, mode)
+        if why_not is not None:
+            return JSONResponse({"error": why_not}, status_code=409)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system), status_code=202)
+
+    async def stop_suite(request: Request) -> Response:
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        if not await systems.stop_suite(system):
+            return JSONResponse({"error": "No run is under way on this browser."}, status_code=409)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system))
+
+    async def overall_suite(request: Request) -> Response:
+        """The newest run of each task set on each browser: the admin's view of the whole."""
+        role = allowed(request, "admin")
+        if isinstance(role, Response):
+            return role
+        if systems is None:
+            return Response(status_code=404)
+        return JSONResponse(await asyncio.to_thread(systems.suite_overall))
+
     async def clear_data(request: Request) -> Response:
         """Clear browsing data: the one setting that is an action (spec 10.2)."""
         role = allowed(request, "admin")
@@ -615,6 +667,7 @@ def create_app(
             Route("/api/admin/policy", read_policy, methods=["GET"]),
             Route("/api/admin/policy", change_policy, methods=["PATCH"]),
             Route("/api/evals", overall_evals, methods=["GET"]),
+            Route("/api/suite", overall_suite, methods=["GET"]),
             Route("/api/desktop", open_desktop, methods=["POST"]),
             Route("/api/settings", read_settings, methods=["GET"]),
             Route("/api/settings", change_settings, methods=["PATCH"]),
@@ -626,6 +679,9 @@ def create_app(
             Route("/api/systems/{system}/evals/{task}", system_trace, methods=["GET"]),
             Route("/api/systems/{system}/evals/{task}/rating", rate_task, methods=["POST"]),
             Route("/api/systems/{system}/checks", check_system, methods=["POST"]),
+            Route("/api/systems/{system}/suite", system_suite, methods=["GET"]),
+            Route("/api/systems/{system}/suite", run_suite, methods=["POST"]),
+            Route("/api/systems/{system}/suite/stop", stop_suite, methods=["POST"]),
             Route("/api/systems/{system}/{action}", manage_system, methods=["POST"]),
             *([Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in))] if mcp is not None else []),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),

@@ -352,6 +352,110 @@ async def test_the_checklist_runs_real_steps_on_a_system(
         assert status == 409 and why == {"error": "This browser has no session. Start it first."}
 
 
+async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kept(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser, view_of: Callable[[Page], Any]
+) -> None:
+    """The task sets (spec 12.7) in the real window: a person runs one with the reference solutions
+    and reads the result; the same set run by an agent that does nothing fails every task; and the
+    admin's overview puts the browsers side by side."""
+    async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
+        page, view = opened.page, view_of(opened.page)
+        await opened.open("Built-in browser")
+        await page.get_by_role("tab", name="Evaluations").click()
+        long_tasks = page.get_by_role("listitem", name="Long tasks")
+        await long_tasks.get_by_text("This set has not been run yet.").wait_for()
+        assert await page.get_by_role("listitem", name="Short tasks").get_by_text("20 tasks").count() == 1
+        assert await view.silent_controls() == []
+
+        await page.get_by_label("Times each task is tried").select_option("1")
+        await long_tasks.get_by_role("button", name="Run the reference solutions").click()
+        # While it runs the page says where it is, and offers to stop it and nothing else.
+        await long_tasks.get_by_role("button", name="Stop the run").wait_for()
+        await long_tasks.get_by_text("Passed 4 of 4 tries (100%).").wait_for(timeout=60_000)
+        await long_tasks.get_by_text("Done by the reference solutions").wait_for()
+        await long_tasks.get_by_role("button", name="Show the tasks").click()
+        rows = long_tasks.get_by_role("row")
+        assert await rows.count() == 5
+        assert "Buy three things, then write the total to someone" in await rows.nth(1).inner_text()
+        assert await view.accessibility_violations() == [] and await view.silent_controls() == []
+        assert await view.sideways_overflow() == 0 and view.errors == []
+        await view.shot("task-sets-run")
+
+        # The browser is back where it was, and what the run did is in its log like any step.
+        await opened.room("builtin", "agent")
+        log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
+        assert "start.html" in log["lines"][-1]["result"]
+        assert any("lab/reset.html" in line["result"] for line in log["lines"])
+
+        # The same set done by the agent. This one's model answers at once and does nothing.
+        status, told = await opened.ask(
+            "POST", "/api/systems/builtin/suite", {"set": "long", "trials": 10, "mode": "agent"}
+        )
+        assert status == 202 and told["running"]["mode"] == "agent"
+        # One run at a time on a browser, and no checklist under it. Ten tries of each task, so that
+        # the run is still under way when these are asked.
+        again = await opened.ask(
+            "POST", "/api/systems/builtin/suite", {"set": "short", "trials": 1, "mode": "reference"}
+        )
+        assert again == (409, {"error": "This browser is busy. Run the task set when its task is finished."})
+        assert (await opened.ask("POST", "/api/systems/builtin/checks"))[0] == 409
+        async with asyncio.timeout(60):
+            while (told := (await opened.ask("GET", "/api/systems/builtin/suite"))[1])["running"] is not None:
+                await asyncio.sleep(0.2)
+        last = next(one for one in told["sets"] if one["id"] == "long")
+        assert (last["last"]["mode"], last["last"]["trials"], last["last"]["stopped"]) == ("agent", 10, False)
+        assert last["last"]["totals"]["passed"] == 0 and last["last"]["totals"]["every_time"] == 0
+        assert [run["pass_rate"] for run in last["earlier"]] == [1.0]
+        # Each try of the agent has a record of its own, apart from the records of a person's tasks.
+        records = (tmp_path / "evals" / "builtin" / "suite" / "tasks.jsonl").read_text("utf-8").splitlines()
+        assert len(records) == 40 and json.loads(records[0])["task"].startswith("Buy the Blue running shoes")
+        assert (await opened.ask("GET", "/api/systems/builtin/evals"))[1]["tasks"]["count"] == 0
+        # The chat shows each task as it was given.
+        await page.get_by_role("tab", name="Browser and chat").click()
+        await page.get_by_text("Go through the inbox: delete the message from Shop Daily").first.wait_for()
+
+        # A run that is stopped keeps what it did.
+        await opened.ask(
+            "POST", "/api/systems/cloud/suite", {"set": "short", "trials": 10, "mode": "reference"}
+        )
+        assert (await opened.ask("POST", "/api/systems/cloud/suite/stop"))[0] == 200
+        async with asyncio.timeout(60):
+            while (cloud := (await opened.ask("GET", "/api/systems/cloud/suite"))[1])["running"] is not None:
+                await asyncio.sleep(0.2)
+        stopped = next(one for one in cloud["sets"] if one["id"] == "short")["last"]
+        assert stopped["stopped"] and stopped["totals"]["tasks"] < 20
+        assert (
+            await opened.ask(
+                "POST", "/api/systems/chrome/suite", {"set": "short", "trials": 1, "mode": "reference"}
+            )
+        ) == (
+            409,
+            {"error": "This browser has no session. Start it first."},
+        )
+        for wrong in ({"set": "none", "trials": 1}, {"set": "short", "trials": 99}):
+            assert (await opened.ask("POST", "/api/systems/cloud/suite", {**wrong, "mode": "reference"}))[
+                0
+            ] == 409
+
+        # The admin's overview: the newest run of each set, browser by browser.
+        await page.get_by_role("button", name="Systems").click()
+        await page.get_by_role("tab", name="All systems").click()
+        parity = page.get_by_role("article", name="Task sets, browser by browser")
+        row = parity.get_by_role("row", name="Long tasks")
+        await row.get_by_text("0% passed").wait_for()
+        await row.get_by_text("Done by the agent").wait_for()
+        side_by_side = (await opened.ask("GET", "/api/suite"))[1]["systems"]
+        built_in = next(one for one in side_by_side if one["system"] == "builtin")["runs"]["long"]
+        assert (built_in["mode"], built_in["trials"], built_in["tasks"], built_in["pass_rate"]) == (
+            "agent",
+            10,
+            4,
+            0.0,
+        )
+        assert "Not run" in await row.inner_text()
+        assert await view.accessibility_violations() == [] and view.errors == []
+
+
 async def test_a_system_is_turned_off_and_on_and_stopped_and_started(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
@@ -612,7 +716,7 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         await browsers.wait_for()
         assert [
             await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
-        ] == ["The browsers", "Evaluations of all systems"]
+        ] == ["The browsers", "Evaluations of all systems", "Task sets, browser by browser"]
         rows = browsers.get_by_role("row")
         model = (await opened.ask("GET", "/api/systems"))[1]["systems"][0]["model"]
         assert [" ".join(text.split()) for text in await rows.all_inner_texts()][1:] == [

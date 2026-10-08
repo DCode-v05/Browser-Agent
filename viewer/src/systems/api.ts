@@ -180,6 +180,92 @@ export interface Overall {
   systems: OverallLine[];
 }
 
+/** The task sets of a system (spec 12.7). */
+export type SetName = 'short' | 'confirm' | 'attack' | 'long';
+/** Who does the tasks: the agent with its model, or the reference solutions, which need no model. */
+export type SuiteMode = 'agent' | 'reference';
+
+export interface SuiteTrial {
+  passed: boolean;
+  /** Why it did not pass, in a few words. */
+  why: string;
+  /** How many times a person would have been asked. */
+  asked: number;
+  /** For a planted instruction: whether it was followed. Null for a task that plants none. */
+  attacked: boolean | null;
+  outcome: string;
+  steps: number;
+  ms: number;
+}
+
+export interface SuiteTask {
+  id: string;
+  title: string;
+  risky: boolean | null;
+  passed: number;
+  trials: SuiteTrial[];
+}
+
+export interface SuiteTotals {
+  tasks: number;
+  trials: number;
+  passed: number;
+  pass_rate: number | null;
+  /** The tasks that passed every time they were tried. */
+  every_time: number;
+  every_time_rate: number | null;
+  ask_recall: number | null;
+  needless_asks: number | null;
+  attacks: number;
+  attacks_followed: number;
+  attack_rate: number | null;
+  attacks_asked: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number | null;
+}
+
+export interface SuiteRun {
+  id: string;
+  set: SetName;
+  mode: SuiteMode;
+  model: string;
+  started: number;
+  duration_ms: number;
+  trials: number;
+  /** It was ended before every task was done. */
+  stopped: boolean;
+  /** How many tasks the set has. */
+  of: number;
+  tasks: SuiteTask[];
+  totals: SuiteTotals;
+}
+
+export interface SuiteSet {
+  id: SetName;
+  title: string;
+  lead: string;
+  tasks: number;
+  last: SuiteRun | null;
+  earlier: { started: number; mode: SuiteMode; pass_rate: number | null; attack_rate: number | null }[];
+}
+
+export interface SuiteAnswer {
+  system: string;
+  model: string;
+  sets: SuiteSet[];
+  /** The run that is under way, and where it is. */
+  running: { set: SetName; mode: SuiteMode; trials: number; tasks: number; task: number; trial: number; title: string; started: number; stopping: boolean } | null;
+  trials: number;
+  max_trials: number;
+}
+
+/** The newest run of each set on each system, side by side. */
+export interface SuiteOverall {
+  sets: { id: SetName; title: string; lead: string; tasks: number }[];
+  systems: { system: string; runs: Partial<Record<SetName, SuiteTotals & { mode: SuiteMode; started: number; trials: number; stopped: boolean }>> }[];
+}
+
 export interface LogLine {
   ts: number;
   tool: string;
@@ -208,6 +294,12 @@ export interface SystemsApi {
   trace(system: string, task: string): Promise<TaskTrace | null>;
   rate(system: string, task: string, rating: Rating | null): Promise<boolean>;
   check(system: string): Promise<Done<Checklist>>;
+  /** The task sets of a system, how its newest runs went, and the run under way. */
+  suite(system: string): Promise<SuiteAnswer | null>;
+  runSuite(system: string, set: SetName, trials: number, mode: SuiteMode): Promise<Done<SuiteAnswer>>;
+  stopSuite(system: string): Promise<Done<SuiteAnswer>>;
+  /** For the admin: the newest run of each set on each system. */
+  suiteOverall(): Promise<SuiteOverall | null>;
   /** The settings of one system: its own values, and its own on and off. */
   settings(system: string): SettingsSource;
   /** Who is signed in, and what they may use and see. */
@@ -280,6 +372,16 @@ export function systemsFrom(pageAddress: string, token: string, unreachable: str
       const done = await post(`/${system}/checks`);
       return done.ok ? { ok: true, result: done.said as Checklist } : done;
     },
+    suite: (system) => read<SuiteAnswer>(`/${system}/suite`),
+    async runSuite(system, set, trials, mode) {
+      const done = await post(`/${system}/suite`, { set, trials, mode });
+      return done.ok ? { ok: true, result: done.said as SuiteAnswer } : done;
+    },
+    async stopSuite(system) {
+      const done = await post(`/${system}/suite/stop`);
+      return done.ok ? { ok: true, result: done.said as SuiteAnswer } : done;
+    },
+    suiteOverall: () => ask<SuiteOverall>('suite'),
     settings(system) {
       // One source for each system, kept: the settings screen reads again when it is handed another.
       let source = sources.get(system);

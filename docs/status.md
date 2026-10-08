@@ -384,6 +384,45 @@ The research behind it, each claim with its source: `docs/research/auto-mode.md`
 `prompt-injection.md`, `web-threats.md`, `fallbacks.md`, `safeguards-map.md`,
 `anthropic-safeguards.md`, `mcp-security.md`.
 
+### 1o. Finished on 2026-10-08: task sets, the evaluations of what the agent does
+
+The plan was "Evaluations for bap-browser: what we have, what to add, what others use", agreed on
+2026-10-08. Spec section 12.7 says what was built.
+
+| Step of the plan | State | What there is |
+|---|---|---|
+| 1. Task files, a runner and end-state graders, on our own test sites | Built | A practice site that is put back before each task (`demo_site/lab/`); 50 tasks in four files (`evals/sets/`), each with its checks and a reference solution; the runner and the graders (`evals/suite.py`) |
+| 2. Repeated trials | Built | Each task is tried 1 to 10 times; a run says how many tasks passed every time |
+| 3. The confirmation set | Built, smaller than planned | 16 labelled steps, not 100: 8 risky, 8 harmless |
+| 4. The safeguards, then the adversarial set | The set is built; the safeguards are not | 10 planted instructions, not 25. The safeguards were reverted on 2026-10-07 at your word, so the set measures the agent as it is |
+| 5. Results in the Evaluations view; a small set in CI, large sets nightly | Built but for the nightly run | The view has "Task sets" with run, stop, progress and each task's result. CI runs the reference solutions of all 50 tasks. A nightly run with the model needs your key as a secret of the repository: not set up |
+| 6. Parity across the three browsers | Built | "Task sets, browser by browser" on the Systems page. My Chrome was not connected when this was written, so it was not run there |
+| 7. A slice of a public benchmark; long-running tasks | Long tasks built; the benchmark is not | 4 long tasks. No public benchmark |
+
+Proof: 37 new unit tests of the grading, 11 tests that run the sets in a real browser, one of the
+service's addresses with two of its role tests extended, 12 of the viewer, and one that presses the
+buttons in the real window and reads the result. Run by hand against the real model (gpt-5.6-luna) on the Cloud browser:
+
+| Set | Result | Took |
+|---|---|---|
+| Short tasks, once | 20 of 20 passed | 3 min 36 s, 276,711 tokens in |
+| Planted instructions, once | 0 of 10 followed, and all 10 of the user's own tasks done | 3 min 1 s, 195,771 tokens in |
+| Asking before risky steps, by the reference solutions | Asked before 8 of 8 risky steps; asked without need before 2 of 8 harmless ones | 3 s |
+
+What it found:
+
+- The rules that decide when a person is asked go by the words in a control's name. They ask before
+  ticking "Send me the newsletter" and before "Remove Wool socks", which are harmless: the words
+  "send" and "remove" are in the names.
+- Reusing one model client for tasks that each start fresh sent the provider the turns of the task
+  before, and every task after the first failed. Each task of a run now has a client of its own.
+- 20 of 20 and 0 of 10 mean the sets are easy for this model. They hold a result steady; they do not
+  yet show where it breaks. Harder tasks are the next thing to add.
+
+Not built: a command that runs a set without the window; a run on a schedule; a judgement by another
+model; a public benchmark. The agent's runs of the confirmation set and the long tasks were not made,
+to spare tokens: press their buttons to make them.
+
 ### 2. Not started
 
 | What | Note |

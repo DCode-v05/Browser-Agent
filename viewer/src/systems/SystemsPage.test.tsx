@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ChangeResult, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
 import { W } from '../wording';
-import type { Checklist, Cost, Evals, LogAnswer, Me, Overall, Policy, PolicyChange, SystemInfo, SystemsApi, TaskTrace } from './api';
+import type { Checklist, Cost, Evals, LogAnswer, Me, Overall, Policy, PolicyChange, SuiteAnswer, SystemInfo, SystemsApi, TaskTrace } from './api';
 import { clock, dollars, percent, spanOf } from './format';
 import { SettingsList } from './SettingsList';
 import { SystemPanel, SystemsPage } from './SystemsPage';
@@ -146,6 +146,16 @@ const LOG: LogAnswer = {
   ],
 };
 
+/** The task sets of a browser on which none has been run. */
+const suite: SuiteAnswer = {
+  system: 'cloud',
+  model: 'gpt-test',
+  sets: [{ id: 'short', title: 'Short tasks', lead: 'Whether the agent finishes a small task.', tasks: 20, last: null, earlier: [] }],
+  running: null,
+  trials: 3,
+  max_trials: 10,
+};
+
 /** A stand-in for the service: it answers as the service would, and remembers what it was asked to change. */
 function standIn(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = [cloud, chrome, builtIn]) {
   const sources = new Map<string, ReturnType<typeof settingsOf>>();
@@ -163,6 +173,10 @@ function standIn(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = 
       evals.tasks = { ...evals.tasks, rated_good: rating === 'good' ? 1 : 0 };
       return true;
     }),
+    suite: vi.fn(async () => suite),
+    runSuite: vi.fn(async () => ({ ok: true, result: suite }) as const),
+    stopSuite: vi.fn(async () => ({ ok: true, result: suite }) as const),
+    suiteOverall: vi.fn(async () => null),
     check: vi.fn(async () => {
       evals.checklist = CHECKLIST;
       return { ok: true, result: CHECKLIST } as const;
@@ -506,7 +520,7 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
     const { user, onOpen } = open();
     await user.click(await screen.findByRole('tab', { name: W.systems.view.overview }));
     const browsers = await card(V.title);
-    expect(screen.getAllByRole('article').map((one) => one.getAttribute('aria-label'))).toEqual([V.title, W.systems.overall.title]);
+    expect(screen.getAllByRole('article').map((one) => one.getAttribute('aria-label'))).toEqual([V.title, W.systems.overall.title, W.systems.suite.parity.title]);
     const rows = within(within(browsers).getByRole('table')).getAllByRole('row').slice(1);
     expect(rows.map((row) => [within(row).getByRole('rowheader').textContent, ...within(row).getAllByRole('cell').slice(0, 4).map((cell) => cell.textContent)])).toEqual([
       ['Cloud browser', 'agent', V.on, V.usersYes, 'model-a'],

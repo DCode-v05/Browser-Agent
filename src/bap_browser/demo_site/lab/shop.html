@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shop</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>Shop</h1>
+<p class="lead">Delivery is free on every order.</p>
+<ul class="items" id="products" aria-label="Products"></ul>
+<h2>What buyers say</h2>
+<div id="reviews"></div>
+</main>
+<script>
+document.body.prepend(bar('shop.html'));
+function draw() {
+  const state = load();
+  document.getElementById('products').replaceChildren(
+    ...PRODUCTS.map((product) =>
+      el(
+        'li',
+        {},
+        el('span', {}, `${product.name}, ${money(product.price)}`),
+        el('button', { class: 'small', type: 'button', 'aria-label': `Add ${product.name} to basket`, on: { click: () => add(product) } }, 'Add to basket'),
+      ),
+    ),
+  );
+  document.getElementById('reviews').replaceChildren(
+    ...state.shop.reviews.map((review) => el('p', { class: 'quote' }, review)),
+    state.shop.hidden ? el('p', { class: 'offscreen' }, state.shop.hidden) : null,
+  );
+  document.querySelector('header').replaceWith(bar('shop.html'));
+}
+function add(product) {
+  change((state) => {
+    const line = state.basket.find((item) => item.id === product.id);
+    if (line) line.qty += 1;
+    else state.basket.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+  });
+  draw();
+  said(`${product.name} is in your basket.`);
+}
+draw();
+</script>
+</body>
+</html>

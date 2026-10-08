@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mail</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<div id="view"></div>
+</main>
+<script>
+document.body.prepend(bar('mail.html'));
+const asked = new URLSearchParams(location.search);
+const view = document.getElementById('view');
+
+function inbox() {
+  const state = load();
+  view.replaceChildren(
+    el('h1', {}, 'Inbox'),
+    el('div', { class: 'actions' }, el('a', { class: 'small', href: 'mail.html?compose=1' }, 'Write a message')),
+    el(
+      'ul',
+      { class: 'items', 'aria-label': 'Messages' },
+      state.mail.inbox.map((message) =>
+        el('li', { class: message.read ? '' : 'unread' }, el('a', { href: `mail.html?id=${message.id}` }, message.subject), el('span', { class: 'muted' }, `from ${message.from}${message.read ? '' : ', unread'}`)),
+      ),
+    ),
+    el('p', { class: 'muted' }, `${state.mail.sent.length} sent, ${state.mail.deleted.length} deleted`),
+  );
+  if (asked.get('said')) said(asked.get('said'));
+}
+
+function message(id) {
+  const state = change((now) => {
+    const found = now.mail.inbox.find((one) => one.id === id);
+    if (found) found.read = true;
+  });
+  const found = state.mail.inbox.find((one) => one.id === id);
+  if (!found) {
+    location.replace('mail.html');
+    return;
+  }
+  const reply = `mail.html?compose=1&to=${encodeURIComponent(found.address)}&subject=${encodeURIComponent('Re: ' + found.subject)}`;
+  view.replaceChildren(
+    el('h1', {}, found.subject),
+    el('p', { class: 'muted' }, `From ${found.from} <${found.address}>`),
+    el('div', { class: 'card' }, found.body.split('\n').map((line) => el('p', {}, line))),
+    el(
+      'div',
+      { class: 'actions' },
+      el('a', { class: 'small', href: reply }, 'Reply'),
+      el('button', { class: 'small danger', type: 'button', on: { click: () => remove(id) } }, 'Delete message'),
+      el('button', { class: 'small', type: 'button', on: { click: () => unread(id) } }, 'Mark as unread'),
+      el('a', { class: 'small', href: 'mail.html' }, 'Back to the inbox'),
+    ),
+  );
+}
+
+function remove(id) {
+  change((now) => {
+    now.mail.deleted.push(id);
+    now.mail.inbox = now.mail.inbox.filter((one) => one.id !== id);
+  });
+  location.replace('mail.html?said=' + encodeURIComponent('Message deleted.'));
+}
+
+function unread(id) {
+  change((now) => {
+    now.mail.inbox.find((one) => one.id === id).read = false;
+  });
+  location.replace('mail.html?said=' + encodeURIComponent('Marked as unread.'));
+}
+
+function compose() {
+  const form = el(
+    'form',
+    { class: 'card' },
+    el('div', { class: 'field' }, el('label', { for: 'to' }, 'To'), el('input', { id: 'to', type: 'text', autocomplete: 'off', value: asked.get('to') || '' })),
+    el('div', { class: 'field' }, el('label', { for: 'subject' }, 'Subject'), el('input', { id: 'subject', type: 'text', autocomplete: 'off', value: asked.get('subject') || '' })),
+    el('div', { class: 'field' }, el('label', { for: 'body' }, 'Message'), el('textarea', { id: 'body' })),
+    el('p', { class: 'error', id: 'problem', role: 'alert', hidden: true }),
+    el('button', { class: 'primary', type: 'submit' }, 'Send'),
+  );
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const to = document.getElementById('to').value.trim();
+    const problem = document.getElementById('problem');
+    problem.textContent = to ? '' : 'Say who the message is to.';
+    problem.hidden = Boolean(to);
+    if (!to) return;
+    change((now) => {
+      now.mail.sent.push({ to, subject: document.getElementById('subject').value.trim(), body: document.getElementById('body').value.trim() });
+    });
+    location.replace('mail.html?said=' + encodeURIComponent('Message sent.'));
+  });
+  view.replaceChildren(el('h1', {}, 'Write a message'), form, el('div', { class: 'actions' }, el('a', { class: 'small', href: 'mail.html' }, 'Back to the inbox')));
+}
+
+if (asked.get('compose')) compose();
+else if (asked.get('id')) message(asked.get('id'));
+else inbox();
+</script>
+</body>
+</html>

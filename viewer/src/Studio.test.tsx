@@ -203,6 +203,10 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
       trace: async () => null,
       rate: async () => false,
       check: async () => ({ ok: false, why: 'not now' }),
+      suite: async () => null,
+      runSuite: async () => ({ ok: false, why: 'not now' }),
+      stopSuite: async () => ({ ok: false, why: 'not now' }),
+      suiteOverall: async () => null,
       settings: (system) => {
         if (!sources.has(system)) {
           const real = createDemoSettings();
@@ -319,6 +323,10 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
       trace: async () => null,
       rate: async () => false,
       check: async () => ({ ok: false, why: 'not now' }),
+      suite: async () => null,
+      runSuite: async () => ({ ok: false, why: 'not now' }),
+      stopSuite: async () => ({ ok: false, why: 'not now' }),
+      suiteOverall: async () => null,
       settings: () => createDemoSettings(role === 'user' ? A_USERS : undefined),
       me: async () => me,
       prefer,

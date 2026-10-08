@@ -45,3 +45,19 @@ class Systems(Protocol):
     async def check(self, system: str) -> dict[str, Any] | str:
         """Runs the checklist. The result; or, as a sentence, why it could not run now."""
         ...
+
+    def suite(self, system: str) -> dict[str, Any]:
+        """The task sets of a system: what each is, how its newest run went, and the run under way."""
+        ...
+
+    def suite_overall(self) -> dict[str, Any]:
+        """The newest run of each task set on each system, side by side."""
+        ...
+
+    def start_suite(self, system: str, name: str, trials: int, mode: Any) -> str | None:
+        """Begins a run of a task set. None when it began; otherwise why not, as a sentence."""
+        ...
+
+    async def stop_suite(self, system: str) -> bool:
+        """Ends the run under way after the task it is on. False when there is none."""
+        ...

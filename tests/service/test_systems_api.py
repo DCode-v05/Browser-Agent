@@ -28,6 +28,7 @@ class Asked:
 
     asked: list[tuple[Any, ...]] = field(default_factory=list[tuple[Any, ...]])
     why_not: str | None = None
+    running: dict[str, Any] | None = None
 
     def described(self) -> list[dict[str, Any]]:
         return [
@@ -64,6 +65,23 @@ class Asked:
     async def check(self, system: str) -> dict[str, Any] | str:
         self.asked.append(("check", system))
         return self.why_not or {"passed": 9, "failed": 0, "checks": []}
+
+    def suite(self, system: str) -> dict[str, Any]:
+        return {"system": system, "sets": [], "running": self.running}
+
+    def suite_overall(self) -> dict[str, Any]:
+        return {"sets": [], "systems": [{"system": name, "runs": {}} for name in NAMES]}
+
+    def start_suite(self, system: str, name: str, trials: int, mode: Any) -> str | None:
+        self.asked.append(("start_suite", system, name, trials, mode))
+        if self.why_not is None:
+            self.running = {"set": name, "mode": mode, "trials": trials}
+        return self.why_not
+
+    async def stop_suite(self, system: str) -> bool:
+        self.asked.append(("stop_suite", system))
+        stopped, self.running = self.running is not None, None
+        return stopped
 
 
 @dataclass
@@ -215,6 +233,39 @@ async def test_the_checklist_is_run_or_says_why_not(window: Open) -> None:
     )
     one.systems.why_not = "This browser is busy. Run the checklist when its task is finished."
     assert await one.ask("POST", "/api/systems/cloud/checks") == (409, {"error": one.systems.why_not})
+
+
+async def test_a_task_set_is_run_stopped_and_asked_about(window: Open) -> None:
+    one = await window()
+    assert await one.ask("GET", "/api/systems/cloud/suite") == (
+        200,
+        {"system": "cloud", "sets": [], "running": None},
+    )
+    asked = {"set": "short", "trials": 3, "mode": "reference"}
+    status, told = await one.ask("POST", "/api/systems/cloud/suite", asked)
+    assert status == 202 and told["running"] == asked
+    assert one.systems.asked[-1] == ("start_suite", "cloud", "short", 3, "reference")
+    # What is not a run is refused before anything is asked of the browser.
+    for wrong in (
+        {},
+        {**asked, "trials": "3"},
+        {**asked, "trials": True},
+        {**asked, "mode": "fast"},
+        {**asked, "set": 4},
+    ):
+        assert (await one.ask("POST", "/api/systems/cloud/suite", wrong))[0] == 400, wrong
+    assert len([call for call in one.systems.asked if call[0] == "start_suite"]) == 1
+    assert (await one.ask("POST", "/api/systems/cloud/suite/stop"))[0] == 200
+    assert await one.ask("POST", "/api/systems/cloud/suite/stop") == (
+        409,
+        {"error": "No run is under way on this browser."},
+    )
+    one.systems.why_not = "This browser is busy. Run the task set when its task is finished."
+    assert await one.ask("POST", "/api/systems/cloud/suite", asked) == (409, {"error": one.systems.why_not})
+    # A browser that is not there has no task sets; and nothing is told without the token.
+    assert (await one.ask("GET", "/api/systems/nowhere/suite"))[0] == 404
+    assert (await one.ask("GET", "/api/systems/cloud/suite", token=None))[0] == 401
+    assert (await one.ask("GET", "/api/suite"))[1]["systems"][0] == {"system": "cloud", "runs": {}}
 
 
 async def test_a_systems_settings_are_its_own_and_reach_only_its_session(window: Open) -> None:

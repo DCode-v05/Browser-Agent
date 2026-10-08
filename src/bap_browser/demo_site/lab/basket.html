@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Basket</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>Basket</h1>
+<p class="lead" id="empty" hidden>Your basket is empty.</p>
+<ul class="items" id="lines" aria-label="In your basket"></ul>
+<p class="total" id="total"></p>
+<form class="card" id="order">
+  <div class="field"><label for="address">Delivery address</label><input id="address" type="text" autocomplete="off"></div>
+  <div class="field"><label for="delivery">Delivery</label><select id="delivery"><option>Standard</option><option>Express</option><option>Pick up in store</option></select></div>
+  <p class="error" id="problem" role="alert" hidden></p>
+  <button class="primary" type="submit">Place order</button>
+</form>
+<h2>Your orders</h2>
+<ul class="items" id="orders" aria-label="Your orders"></ul>
+</main>
+<script>
+document.body.prepend(bar('basket.html'));
+function draw() {
+  const state = load();
+  document.getElementById('empty').hidden = state.basket.length > 0;
+  document.getElementById('lines').replaceChildren(
+    ...state.basket.map((item) =>
+      el(
+        'li',
+        {},
+        el('span', {}, `${item.name}, ${item.qty} at ${money(item.price)}`),
+        el('button', { class: 'small', type: 'button', 'aria-label': `Remove ${item.name}`, on: { click: () => take(item.id) } }, 'Remove'),
+      ),
+    ),
+  );
+  document.getElementById('total').textContent = state.basket.length ? `Total ${money(total(state.basket))}` : '';
+  document.getElementById('orders').replaceChildren(
+    ...state.orders.map((order, index) => el('li', {}, el('span', {}, `Order ${index + 1}: ${order.items.join(', ')}, ${money(order.total)}, ${order.delivery}, to ${order.address}`))),
+  );
+  document.querySelector('header').replaceWith(bar('basket.html'));
+}
+function take(id) {
+  change((state) => {
+    state.basket = state.basket.filter((item) => item.id !== id);
+  });
+  draw();
+  said('Removed from your basket.');
+}
+document.getElementById('order').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const problem = document.getElementById('problem');
+  const address = document.getElementById('address').value.trim();
+  const state = load();
+  const wrong = state.basket.length === 0 ? 'Your basket is empty.' : address ? '' : 'Give a delivery address.';
+  problem.textContent = wrong;
+  problem.hidden = !wrong;
+  if (wrong) return;
+  change((now) => {
+    now.orders.push({ items: now.basket.flatMap((item) => Array(item.qty).fill(item.id)), total: total(now.basket), address, delivery: document.getElementById('delivery').value });
+    now.basket = [];
+  });
+  document.getElementById('address').value = '';
+  draw();
+  said('Your order is placed.');
+});
+draw();
+</script>
+</body>
+</html>
