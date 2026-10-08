@@ -356,33 +356,59 @@ Two faults found while checking that everything works, both seen as a test that 
 | A click could take a moving element for still | The click looks at the element twice, a frame apart. In a browser that had just started, the wait for the next frame could end inside the frame the first look was in: nothing had moved on, and "the same place twice" was read as holding still (about 1 time in 10 under load) | Two looks count only in different frames, told apart by the page's own clock. 36 of 36 under the same load; click by ref is as fast as before (67 ms) |
 | A test of a download that is too large failed now and then | Its helper counted the word "failed" in the whole result, which also holds the note of what just happened; the note can come a moment before the list says so | The helper reads the list itself |
 
-### 1m. Specified on 2026-10-07, not built: Auto Mode and safeguards
+### 1n. Being built since 2026-10-07: Auto Mode and safeguards (spec section 18)
 
-The spec has a new section 18, written to be built from. No code of it exists yet.
+Branch `feature/auto-mode-safeguards`. Not merged. The spec's section 18 was changed first for the
+38 points of its review (`docs/index.html`). The hand-over, with every decision and the next step, is
+`docs/plans/2026-10-07-auto-mode-and-safeguards.md`. This table was last brought up to date on
+2026-10-08.
 
-| Part | What the spec says |
+**Completed**
+
+| Part | What it does | Where | Proof |
+|---|---|---|---|
+| The spec after its review | Section 18 says what was decided for each of the 10 high, 18 medium and 10 low points | `docs/bap-browser-spec.md` | Committed |
+| The model client | One call to the provider with a time limit, further tries with a growing uneven wait, a breaker for each use, the cost counted | `safeguards/model.py` | `tests/unit/test_model_client.py`. Committed |
+| Limits and loops | A task stops at its steps, its minutes, the calls in a minute and the cost of model calls; "Allow more"; a step repeated on a page that does not change is told at the 3rd time and not run at the 6th; a step whose answer was lost says so; questions nobody answers stop being waited for | `safeguards/limits.py`, the page script's change counter | `test_limits.py`, `test_toolkit_limits.py`, `tests/e2e/test_loops.py`. Committed |
+| What a site is | The Public Suffix List and Unicode's look-alike letters, shipped as data | `policy/sites.py`, two data files, `scripts/refresh_data.py` | `test_sites.py`. Committed |
+| Look-alike sites | A name one letter from a protected one; a protected name beside a lure word; mixed writing systems | `safeguards/lookalikes.py` | `test_lookalikes.py`. Committed |
+| The task and its sites | The person's message, or what an outside agent declares; the grades named, added for reading, added for acting | `safeguards/task.py` | `test_task.py`. Committed |
+| What a step does | Pays, sends, deletes, grants or confirms, by word stems, phrases and Hindi words | `safeguards/actions.py` | `test_actions.py`. Committed |
+| The reviewer's table and floor | A model's rating becomes run, ask or refuse in code; a paying, sending or deleting step never runs on a model's word | `safeguards/reviewer.py` | `test_reviewer.py`. Committed |
+
+**Built and passing its tests, not committed yet**
+
+| Part | What it does | Where | Proof |
+|---|---|---|---|
+| The check on every call | The stages in order: hard stops, the person's own browser, what is always a person's, every action, what the rules are unsure of. One line of the log for each decision | `safeguards/check.py`, `tools/toolkit.py` | `test_check.py` |
+| Auto Mode | The reviewer rates what the rules are unsure of; refusals with "Allow once"; a pause after refusals in a row; sites outside the task; not offered until a deployment turns it on | `check.py`, `service/session.py` | `test_auto_mode.py`, with a stand-in for the model |
+| What goes out | Typing a password, a card or a code is asked of a person; text read on one site and sent to another; short secrets however they are packed; long addresses; screens that give an app access; the amount of a payment, and caps | `safeguards/outgoing.py`, `check.py` | `test_outgoing.py`, `test_check.py` |
+| Bad and sensitive sites | Look-alikes, pages with no site of their own, sensitive sites, judged at every call of the agent | `check.py` | `test_check.py` |
+| `browser_begin_task` | An outside agent states its task once; a change needs the person's yes; not offered in a chat | `tools/browser_tools.py`, `toolkit.py` | `test_begin_task.py` |
+| Settings | Auto, "Offer Auto", the page scan, copying between sites, sensitive sites, steps in one task; the groups "Safety" and "Limits" | `settings/catalogue.py` | `test_settings_store.py` |
+| The viewer | The mode chip, the first-time notice, the task line and its sites, marks on steps, the extended question, the "Refused" list, the flagged-page notice, the pause bar, the limit bar | `viewer/src` | 599 viewer tests |
+| The rules for what comes in | Characters nobody can see, addresses as shown, marks, the fixed rules of the scan, the model's second opinion | `safeguards/incoming.py`, `scan.py` | `test_incoming.py`, `test_scan.py` |
+
+**Pending**
+
+| Part | What is left |
 |---|---|
-| Auto Mode (18.3, 18.4) | A third choice of "Ask before", for each of the three browsers, off by default. Fixed rules settle what they can; a model that never reads the page judges the rest against the task; a step that pays, sends, deletes or gives a password still goes to the person; a step with no part in the task is refused and the agent goes on. An outside agent states its task once with a new tool, `browser_begin_task` |
-| What comes in (18.5) | Text a person cannot see is left out; page text is marked; planted instructions are found by rules on this machine, checked by a model, and withheld |
-| What goes out (18.6) | Passwords, cards and codes; text copied from one site to another; files that can run programs; screens that grant access; the amount of a payment, and a cap |
-| Where the browser goes (18.7) | The task's sites; look-alike sites; sensitive sites; optional known-bad lists of abuse.ch |
-| When something fails (18.8) | The check fails closed; limits on steps, time and money; repeated calls; a step whose outcome is not known |
-| The record, what a person sees, settings, where the code goes (18.9 to 18.12) | All given with defaults and wording |
-| Tests and order (18.13 to 18.15) | An attack set of 25 pages with a fooled agent, nine slices to build in, and the list it is accepted by |
+| What comes in, connected | `safeguards/reading.py` is written. It is not yet called: page text is not yet marked, scanned or remembered in a real session, so the guard on copying between sites has nothing to compare with outside its tests |
+| Text a person cannot see | The tests for opacity, size, place, clipping and colour in the page script |
+| Files that arrive | A program is never kept; an archive or a file on the person's own machine is asked about |
+| The service and the record | How long logs are kept; tool hints; the tool list's hash; the `Origin` rule on `/mcp` |
+| Optional lists | abuse.ch and the age of a domain. Not started |
+| The attack set | The attack pages, the fooled agent, the report, the false-alarm pages |
+| The end | The spec for what changed while building, the README, the connection guide, `/verify`, the pull request |
 
-Decided with you by dialog before it was written: a check decides, like Claude Code's auto mode;
-rules first, then a model; the model is OpenAI's with a setting of its own; an outside agent states
-its task at the start; Auto Mode is off until a person turns it on; known-bad lists are optional and
-local checks always on; only what local rules flag goes to a model.
+**Changed for people who use it today**
 
-Not decided by you, and written as I judged best, to be changed if you see it otherwise: the limits'
-defaults (500 steps and 60 minutes a session), the pause after 3 refusals in a row or 20 in a session,
-that a paying, sending or deleting step is asked of you even when you asked for it, that a download on
-your own machine is checked before it is kept, and the lists of sensitive and protected sites.
-
-The research behind it, each claim with its source: `docs/research/auto-mode.md`,
-`prompt-injection.md`, `web-threats.md`, `fallbacks.md`, `safeguards-map.md`,
-`anthropic-safeguards.md`, `mcp-security.md`.
+| Change | Why |
+|---|---|
+| Typing a password, a card number or a one-time code asks the person every time, in every mode. Not on the demo pages | Spec 18.6 |
+| With nobody watching, a question that a rule raised is refused, whatever `control.approval_without_viewer` says. A tool the deployment set to `confirm` still follows that setting | The review's point H8 |
+| Results say "Nothing on the page changed." after a step that changed nothing | Spec 18.8 |
+| A new tool, `browser_begin_task`; a new event at the start of a session, `auto_changed` | Spec 18.3, 18.10 |
 
 ### 2. Not started
 
