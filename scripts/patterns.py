@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -51,8 +52,11 @@ RULES = {
     "literal-in-viewer": "A string a person reads is written into a component. It belongs in viewer/src/wording.ts.",
     "large-file": "The file is over the size a reader can hold. Split it before adding to it.",
     "tracked-link": "A symbolic link is in the repository. It points at one machine's folders.",
+    "invisible-character": "A character nobody can see is written into the source as itself. Write it by its name or its number.",
 }
 
+# The kinds of character nobody can see: format characters, controls, line and paragraph separators.
+UNSEEN_KINDS = frozenset({"Cf", "Cc", "Zl", "Zp"})
 SUPPRESSIONS = re.compile(
     r"#\s*(pyright:\s*ignore|type:\s*ignore|noqa\b|ruff:\s*noqa)|eslint-disable|@ts-ignore|@ts-expect-error"
 )
@@ -122,6 +126,18 @@ def _files(root: Path, folder: str, *endings: str) -> Iterator[Path]:
             yield path
 
 
+def _unseen_in(line: str) -> str | None:
+    """The name of the first character of a line that nobody can see: a joiner, a mark of
+    direction, a space that is not the space, a control. A tab is seen by what it does."""
+    if line.isascii() and line.isprintable():
+        return None
+    for char in line:
+        kind = unicodedata.category(char)
+        if char != "\t" and (kind in UNSEEN_KINDS or (kind == "Zs" and char != " ")):
+            return unicodedata.name(char, f"U+{ord(char):04X}")
+    return None
+
+
 def _is_test(path: Path) -> bool:
     return ".test." in path.name or path.name == "test-setup.ts" or path.name.startswith("test_")
 
@@ -135,6 +151,9 @@ def _python(root: Path, path: Path, product: bool) -> Iterator[Found]:
     relative, text = path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")
     lines = text.splitlines()
     for number, line in enumerate(lines, 1):
+        unseen = _unseen_in(line)
+        if unseen:
+            yield Found("invisible-character", relative, number, unseen)
         if product and SUPPRESSIONS.search(line):
             yield Found("suppression", relative, number, line.strip())
         comment = A_COMMENT[".py"].search(line)
@@ -227,6 +246,9 @@ def _viewer(root: Path, path: Path) -> Iterator[Found]:
     relative, lines = path.relative_to(root).as_posix(), path.read_text(encoding="utf-8").splitlines()
     test = _is_test(path)
     for number, line in enumerate(lines, 1):
+        unseen = _unseen_in(line)
+        if unseen:
+            yield Found("invisible-character", relative, number, unseen)
         if not test and SUPPRESSIONS.search(line):
             yield Found("suppression", relative, number, line.strip())
         comment = A_COMMENT[path.suffix].search(line)

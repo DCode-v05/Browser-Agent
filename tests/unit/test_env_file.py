@@ -48,7 +48,7 @@ def test_no_file_means_the_environment_as_it_is(tmp_path: Path) -> None:
 
 def test_lines_that_are_not_settings_are_passed_over(tmp_path: Path) -> None:
     file = tmp_path / ".env"
-    file.write_text("just words\n=no name\n1BAD=x\nGOOD=1\n﻿BOM=2\n", encoding="utf-8")
+    file.write_text("just words\n=no name\n1BAD=x\nGOOD=1\n\ufeffBOM=2\n", encoding="utf-8")
     assert environment(file, {}) == {"GOOD": "1"}
 
 

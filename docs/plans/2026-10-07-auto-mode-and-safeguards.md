@@ -104,7 +104,8 @@ through the fixed rules (`Reader.own_words`), and slice 10 (`Origin` on `/mcp`, 
 
 What is left, in order:
 
-1. Done on 2026-10-08: `main` is merged in, the two failures of the run are put right, and the
+1. Done on 2026-10-08: the work is in `main` (pull request #33), its branch deleted. Before that
+   `main` was merged in, the two failures of the run were put right, and the
    work passes the rules of `docs/bad-patterns.md`. A change from here on follows
    `docs/agent-pathway.md` (the skill `develop`): the gate, a pull request, CI. On Windows the gate
    stops at "types" for two Unix-only lines of `code/worker.py`, as it does on `main`: run its

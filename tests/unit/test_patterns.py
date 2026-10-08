@@ -125,6 +125,9 @@ def test_code_that_follows_the_rules_is_found_clean(tmp_path: Path) -> None:
             "async def test_a(page):\n    await page.wait_for_timeout(500)\n",
         ),
         ("large-file", "src/bap_browser/driver/a.py", "x = None\n" * 701),
+        ("invisible-character", "src/bap_browser/driver/a.py", f'JOINER = "{chr(0x200D)}"\n'),
+        ("invisible-character", "tests/unit/test_a.py", f'x = "a{chr(0xA0)}b"\n'),
+        ("invisible-character", "viewer/src/a.ts", f"export const a = '{chr(0xFEFF)}';\n"),
         ("large-file", "viewer/src/A.tsx", "export const a = null;\n" * 501),
     ],
 )
@@ -169,6 +172,10 @@ def test_a_rule_finds_what_it_is_for(tmp_path: Path, rule: str, path: str, text:
             "viewer/src/A.tsx",
             'export const a = <div aria-label={W.parts.steps} className="rows" role="log" />;\n',
         ),
+        # A character nobody can see, written by its name or its number; and letters of other
+        # alphabets and signs, which are seen.
+        ("src/bap_browser/driver/a.py", 'JOINER = "\\N{ZERO WIDTH JOINER}"\nMARK = "\\u200e"\n'),
+        ("src/bap_browser/driver/a.py", 'WORDS = "अभी खरीदें: ß … €"\n'),
         # The list of every string a person reads is long by its nature.
         ("viewer/src/wording.ts", "export const a = null;\n" * 501),
     ],

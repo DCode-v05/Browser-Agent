@@ -356,7 +356,7 @@ Two faults found while checking that everything works, both seen as a test that 
 | A click could take a moving element for still | The click looks at the element twice, a frame apart. In a browser that had just started, the wait for the next frame could end inside the frame the first look was in: nothing had moved on, and "the same place twice" was read as holding still (about 1 time in 10 under load) | Two looks count only in different frames, told apart by the page's own clock. 36 of 36 under the same load; click by ref is as fast as before (67 ms) |
 | A test of a download that is too large failed now and then | Its helper counted the word "failed" in the whole result, which also holds the note of what just happened; the note can come a moment before the list says so | The helper reads the list itself |
 
-### 1n. Being built since 2026-10-07: Auto Mode and safeguards (spec section 18)
+### 1n. In `main` since 2026-10-08: Auto Mode and safeguards (spec section 18)
 
 Its status has a page of its own, kept up to date as parts land:
 **`docs/auto-mode-safeguards-status.md`** (what is completed, what is being finished, what is pending,
