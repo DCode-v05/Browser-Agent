@@ -104,7 +104,21 @@ through the fixed rules (`Reader.own_words`), and slice 10 (`Origin` on `/mcp`, 
 
 What is left, in order:
 
-1. `/verify` over the whole build, then the pull request.
+1. **Merge `main`** (`git fetch origin main`, then `git merge origin/main`): it gained 15 changes
+   while this was built. 13 files conflict, in 23 places. The driver is now `driver/core.py`,
+   `watching.py`, `acting.py` and a short `playwright_driver.py`: this branch's driver changes
+   (saved as patches is not enough: read `git diff 904d643 HEAD -- src/bap_browser/driver/`) go
+   into those, the new ones (`locate_point`, `locate_focus`, `gist`, `where`, `unseen`,
+   `change_mark`) best into a file of their own. Tools: arguments are in `tools/arguments.py`,
+   the list in `tools/offered.py`. The tools' endpoint is `service/wrapping.py`. `ModelError`
+   stays in `errors.py`. `policy/address.py` is now `address.py`. Then the gate
+   (`uv run python scripts/gate.py`, rules in `docs/bad-patterns.md`): no file of the engine over
+   700 lines (`config.py`, `safeguards/check.py`, `service/session.py` are), `safeguards` needs a
+   line in `LAYERS` of `scripts/patterns.py` between `driver` and `tools`, so the driver may not
+   import it (`driver/session.py` does: `judged_file`, `without_invisible`, `Spend`), and the
+   team's task sets (`evals/sets/`) must still pass with the safeguards on. Follow
+   `docs/agent-pathway.md`; add the feature to `docs/feature-map.json`.
+   Then `/verify` (only the user can start it), then the pull request.
 2. **Telling a connected MCP client that the tools changed** (18.9). The tools over HTTP are served
    one request at a time with no connection kept, so there is nobody to tell. Either the endpoint
    keeps sessions, or the spec's line is changed to "a client compares the value of `/api/tools`".

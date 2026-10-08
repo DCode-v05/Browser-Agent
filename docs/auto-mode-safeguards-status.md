@@ -12,6 +12,8 @@ About 90% built. Every step is checked before it runs, Auto Mode works, what com
 out is guarded, files that arrive are judged, the service is hardened, and 26 attack pages are run in
 a real browser. What is left is listed under "Pending": mainly the optional outside lists, a few
 numbers and settings in the window, more attack pages, and the final check with the pull request.
+**The largest thing left is not in this branch: `main` has moved, and has to be merged in before a
+pull request can be merged (first row of "Pending").**
 
 ## Completed (built, tested, committed and pushed)
 
@@ -45,7 +47,8 @@ numbers and settings in the window, more attack pages, and the final check with 
 
 | Part | What is left | Size |
 |---|---|---|
-| The end | `/verify` over the whole build, then the pull request | Small |
+| **Bringing in `main`** | While this was built, `main` gained 15 changes: the driver was divided into four files, the tools and the service were moved into more files, task sets for evaluation were added, and every change must now pass a gate (`scripts/gate.py`: no file of the engine over 700 lines, imports one way between the parts, no tunable number outside `config.py`, and more). This branch conflicts with `main` in 13 files (23 places). To do: merge `main`, move the driver, tool and service changes into the new files, divide the files that are now too long (`config.py`, `safeguards/check.py`, `service/session.py`), give `safeguards` its place among the layers, see that the team's task sets still pass with the safeguards on, add the feature to `docs/feature-map.json` | **Large: 5 to 9 hours** |
+| The end | `/verify` (only a person can start it), then the pull request | Small |
 | Telling a connected agent that the tools changed | The spec asks for it (18.9). The tools over HTTP keep no connection, so there is nobody to tell. Either the endpoint is changed to keep one, or the spec says "a client compares the value of `/api/tools`". **Your decision** | Small or medium |
 | Optional outside lists | abuse.ch (known-bad sites and files) and the age of a domain. The settings exist and are off; nothing uses them yet | Medium |
 | The Systems page | The numbers of checked, asked and refused steps for each browser | Small |
