@@ -4,7 +4,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { App, DEFAULT_PREFERENCES, preferencesFrom, type AppProps, type Preferences } from './App';
+import { App, type AppProps } from './App';
+import { DEFAULT_PREFERENCES, preferencesFrom, type Preferences } from './preferences';
 import type { Role } from './auth/api';
 import { Icon, type IconName } from './components/Icon';
 import { Button } from './components/StatusPanel';

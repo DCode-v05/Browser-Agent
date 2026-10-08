@@ -44,9 +44,11 @@ RULES = {
     "private-import": "A name that begins with _ is imported from another module. Make it public there, or do not use it.",
     "layer": "A lower layer imports a higher one. See LAYERS in scripts/patterns.py.",
     "tunable-outside-config": "A tunable number outside config.py (Python) or options.ts (viewer).",
-    "broad-except": "`except Exception` catches what was never thought of. Catch the errors that are expected.",
-    "skipped-test": "A test is skipped. A test that does not run proves nothing.",
-    "fixed-wait-in-test": "A test waits a fixed time. Wait for the thing itself.",
+    "broad-except": "`except Exception` catches what was never thought of. Catch the errors that are expected. It is right only at a boundary named in BOUNDARIES.",
+    "skipped-test": "A test is skipped. A test that does not run proves nothing. One that cannot run somewhere says where, with `skipif`.",
+    "fixed-wait-in-test": "A test waits a fixed time of a second or more. Wait for the thing itself.",
+    "duplicate-code": "The same function is written in two files. Keep one, and use it from both.",
+    "literal-in-viewer": "A string a person reads is written into a component. It belongs in viewer/src/wording.ts.",
     "large-file": "The file is over the size a reader can hold. Split it before adding to it.",
     "tracked-link": "A symbolic link is in the repository. It points at one machine's folders.",
 }
@@ -63,14 +65,32 @@ A_COMMENT = {
     ".ts": re.compile(r"//(.*)$|/\*(.*)"),
     ".tsx": re.compile(r"//(.*)$|/\*(.*)"),
 }
-SKIPS = re.compile(r"pytest\.skip\(|mark\.skip|mark\.xfail|\b(it|test|describe)\.(skip|only|todo)\(")
-FIXED_WAITS = re.compile(r"wait_for_timeout\(|\btime\.sleep\(")
+SKIPS = re.compile(r"pytest\.skip\(|mark\.skip\b(?!if)|mark\.xfail|\b(it|test|describe)\.(skip|only|todo)\(")
+# A second or more, written as a number. A short sleep in a loop that looks again is not a fixed wait.
+FIXED_WAITS = re.compile(r"wait_for_timeout\(|\b(time|asyncio)\.sleep\(\s*[1-9][0-9]*(\.[0-9]+)?\s*\)")
+# What a person reads or hears of an element, written as text and not taken from the list of strings.
+A_READ_ATTRIBUTE = re.compile(r'\b(aria-label|title|alt|placeholder)="[^"{}]*[A-Za-z]{2}[^"]*"')
+TEXT_IN_A_TAG = re.compile(r">\s*[A-Z][A-Za-z]+(?: [A-Za-z']+)*[.:…]?\s*<")
+# A function shorter than this is too small to call a copy.
+SHORTEST_COPY = 3
+
+# Where anything at all may go wrong and must not go further: `except Exception` is right here, and
+# nowhere else. Each is one function, with the reason it is a boundary.
+BOUNDARIES = {
+    ("src/bap_browser/tools/toolkit.py", "_outcome"): "an agent's call must never take the service down",
+    ("src/bap_browser/code/worker.py", "run"): "the script is the agent's own: anything may go wrong in it",
+    ("src/bap_browser/doctor.py", "_try"): "it reports why a browser did not launch, whatever the reason",
+    (
+        "src/bap_browser/driver/core.py",
+        "_judge_request",
+    ): "an address that cannot be judged is not loaded",
+}
 A_VIEWER_NUMBER = re.compile(r"^(export )?const [A-Z][A-Z0-9_]* = -?[0-9][0-9_.]*;")
 
 # Which part of the engine may use which. A part may import only parts on a lower line. A new
 # import upward fails the check: the boundary is held by the import graph, not by a reader's care.
 LAYERS = (
-    ("errors", "results", "env_file"),
+    ("errors", "results", "env_file", "address", "private_file"),
     ("config", "keys"),
     ("policy", "config_doc", "desktop_app", "browser_extension"),
     ("driver", "code", "settings"),
@@ -128,6 +148,8 @@ def _python(root: Path, path: Path, product: bool) -> Iterator[Found]:
         tree = ast.parse(text)
     except SyntaxError:
         return
+    if product:
+        yield from _broad_excepts(tree, relative, lines)
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("bap_browser"):
             for name in node.names:
@@ -135,12 +157,6 @@ def _python(root: Path, path: Path, product: bool) -> Iterator[Found]:
                     yield Found("private-import", relative, node.lineno, f"{node.module}.{name.name}")
             if product:
                 yield from _layer(root, path, node)
-        if product and isinstance(node, ast.ExceptHandler):
-            caught = node.type
-            if caught is None or (
-                isinstance(caught, ast.Name) and caught.id in ("Exception", "BaseException")
-            ):
-                yield Found("broad-except", relative, node.lineno, lines[node.lineno - 1].strip())
     if product and path.name != "config.py":
         for node in tree.body:
             if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Constant):
@@ -148,6 +164,50 @@ def _python(root: Path, path: Path, product: bool) -> Iterator[Found]:
             value = node.value.value
             if isinstance(value, int | float) and not isinstance(value, bool):
                 yield Found("tunable-outside-config", relative, node.lineno, lines[node.lineno - 1].strip())
+
+
+def _broad_excepts(tree: ast.Module, relative: str, lines: list[str]) -> Iterator[Found]:
+    """Every `except Exception` that is not in a function named as a boundary."""
+    at_a_boundary: set[int] = set()
+    for function in ast.walk(tree):
+        if (
+            isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef)
+            and (relative, function.name) in BOUNDARIES
+        ):
+            at_a_boundary |= {id(node) for node in ast.walk(function)}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler) or id(node) in at_a_boundary:
+            continue
+        caught = node.type
+        if caught is None or (isinstance(caught, ast.Name) and caught.id in ("Exception", "BaseException")):
+            yield Found("broad-except", relative, node.lineno, lines[node.lineno - 1].strip())
+
+
+def _copies(root: Path) -> Iterator[Found]:
+    """Functions of the engine that are the same, statement for statement, in two files."""
+    seen: dict[str, list[tuple[str, int, str]]] = defaultdict(list)
+    for path in _files(root, SRC, ".py"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            # What a function says of itself is not what it does.
+            does = [
+                one
+                for one in node.body
+                if not (isinstance(one, ast.Expr) and isinstance(one.value, ast.Constant))
+            ]
+            if len(does) >= SHORTEST_COPY:
+                written = ast.dump(ast.Module(body=does, type_ignores=[]))
+                seen[written].append((path.relative_to(root).as_posix(), node.lineno, node.name))
+    for places in seen.values():
+        if len({path for path, _, _ in places}) > 1:
+            first = places[0]
+            for path, line, name in places[1:]:
+                yield Found("duplicate-code", path, line, f"{name} is the same as {first[2]} in {first[0]}")
 
 
 def _layer(root: Path, path: Path, node: ast.ImportFrom) -> Iterator[Found]:
@@ -174,6 +234,12 @@ def _viewer(root: Path, path: Path) -> Iterator[Found]:
             yield Found("skipped-test", relative, number, line.strip())
         if not test and path.name != "options.ts" and A_VIEWER_NUMBER.match(line):
             yield Found("tunable-outside-config", relative, number, line.strip())
+        if (
+            not test
+            and path.suffix == ".tsx"
+            and (A_READ_ATTRIBUTE.search(line) or TEXT_IN_A_TAG.search(line))
+        ):
+            yield Found("literal-in-viewer", relative, number, line.strip())
     if not test and path.name not in LISTS and len(lines) > LONGEST_VIEWER_FILE:
         yield Found("large-file", relative, len(lines), f"{len(lines)} lines, over {LONGEST_VIEWER_FILE}")
 
@@ -197,6 +263,7 @@ def scan(root: Path = ROOT) -> list[Found]:
             found += _python(root, path, product=False)
     for path in _files(root, VIEWER, ".ts", ".tsx"):
         found += _viewer(root, path)
+    found += _copies(root)
     found += _links(root)
     return found
 
@@ -266,7 +333,8 @@ def main(arguments: list[str] | None = None) -> int:
         print("\n".join(stale))
         return 1
     total = sum(count for paths in counted(found).values() for count in paths.values())
-    print(f"No new bad pattern. {total} from before are in the baseline, to be cleaned up.")
+    left = "Nothing is" if total == 0 else f"{total} from before {'is' if total == 1 else 'are'}"
+    print(f"No new bad pattern. {left} in the baseline, to be cleaned up.")
     return 0
 
 

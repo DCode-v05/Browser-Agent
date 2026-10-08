@@ -8,7 +8,7 @@ import pytest
 from bap_browser.bench import runner
 from bap_browser.bench.runner import Line, Measured
 from bap_browser.bench.scenarios import SCENARIOS
-from bap_browser.config import Config
+from bap_browser.config import Bench, Config
 from bap_browser.errors import ConfigError
 from bap_browser.tools import TOOLS
 
@@ -54,12 +54,12 @@ def test_a_budget_file_that_cannot_be_read_stops_the_bench(tmp_path: Path) -> No
     ],
 )
 def test_a_line_is_judged_on_its_median_and_its_slowest_runs(samples: list[float], state: str) -> None:
-    assert runner.judge(LINE, "chromium", samples).state == state
+    assert runner.judge(LINE, "chromium", samples, Bench()).state == state
 
 
 def test_the_report_has_a_row_for_every_line_and_a_count_of_each_state() -> None:
     measured = [
-        runner.judge(LINE, "chromium", [2.0] * 30),
+        runner.judge(LINE, "chromium", [2.0] * 30, Bench()),
         Measured("drag.refs", "chromium", "NOT RUN", target_ms=120, fail_ms=240, note="no scenario yet"),
     ]
     lines = runner.report(measured).splitlines()
@@ -78,8 +78,8 @@ def test_the_report_has_a_row_for_every_line_and_a_count_of_each_state() -> None
 
 
 def test_a_failure_counts_once_it_is_seen_in_two_runs_one_after_the_other(tmp_path: Path) -> None:
-    slow = runner.judge(LINE, "chromium", [20.0] * 30)
-    fine = runner.judge(LINE, "msedge", [2.0] * 30)
+    slow = runner.judge(LINE, "chromium", [20.0] * 30, Bench())
+    fine = runner.judge(LINE, "msedge", [2.0] * 30, Bench())
     assert slow.state == "FAIL"
     assert runner.failed_before(tmp_path) == set()
     assert runner.blocking([slow, fine], runner.failed_before(tmp_path)) == []
@@ -90,7 +90,7 @@ def test_a_failure_counts_once_it_is_seen_in_two_runs_one_after_the_other(tmp_pa
     assert before == {("snapshot.small", "chromium")}
     assert runner.blocking([slow, fine], before) == [slow]
     # The same line on another browser failed for the first time: it does not count yet.
-    elsewhere = runner.judge(LINE, "msedge", [20.0] * 30)
+    elsewhere = runner.judge(LINE, "msedge", [20.0] * 30, Bench())
     assert runner.blocking([elsewhere], before) == []
 
 

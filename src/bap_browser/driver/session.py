@@ -7,11 +7,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Literal
 
+from bap_browser.address import without_credentials
 from bap_browser.config import Config
 from bap_browser.driver.base import Driver, Happened, PageDialog
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BrowserError
-from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
 

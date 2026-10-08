@@ -13,7 +13,7 @@ from bap_browser.errors import BapError
 
 # Stands in for the app: it says what it was started with, and stays open until it is ended.
 STAND_IN = """
-import json, os, time
+import json, os, threading
 from pathlib import Path
 
 Path(__file__).parent.joinpath("started.json").write_text(
@@ -26,7 +26,7 @@ Path(__file__).parent.joinpath("started.json").write_text(
     ),
     encoding="utf-8",
 )
-time.sleep(60)
+threading.Event().wait()
 """
 
 

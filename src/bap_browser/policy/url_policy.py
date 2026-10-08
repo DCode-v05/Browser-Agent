@@ -17,8 +17,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
+from bap_browser.address import NOT_VALID, canonical_address, parse_ip, site_identity, site_pattern
 from bap_browser.config import Safety
-from bap_browser.policy.address import NOT_VALID, canonical_address, parse_ip, site_identity, site_pattern
 
 Resolver = Callable[[str], Awaitable[list[str]]]
 

@@ -1,6 +1,7 @@
 // The live connection: one WebSocket to the session service (spec 4.8). Text messages are events,
 // binary messages are picture frames, and the first message the viewer sends carries the token.
 
+import { PAGE } from '../options';
 import type { ClientCommand, ServerEvent } from '../protocol';
 import type { Connection, ConnectionHandlers } from './connection';
 
@@ -29,13 +30,12 @@ export interface SocketOptions {
   releaseAfterMs?: number;
 }
 
-const OPEN = 1;
-const FRAME = 1;
+/** What the wire says in numbers: a socket that is open, and a message that is a picture. */
+const WIRE = { open: 1, picture: 1 } as const;
 /** The close codes after which trying again changes nothing: a token the service does not accept,
  * and a session it does not have. */
 const FINAL = [4401, 4404];
 const DEFAULT_RECONNECT_MS = [500, 1000, 2000, 5000];
-const DEFAULT_RELEASE_AFTER_MS = 1000;
 
 export class SocketConnection implements Connection {
   private readonly createSocket: (url: string) => SocketLike;
@@ -61,7 +61,7 @@ export class SocketConnection implements Connection {
   constructor(private readonly options: SocketOptions) {
     this.createSocket = options.createSocket ?? ((url) => new WebSocket(url) as unknown as SocketLike);
     this.reconnectMs = options.reconnectMs ?? DEFAULT_RECONNECT_MS;
-    this.releaseAfterMs = options.releaseAfterMs ?? DEFAULT_RELEASE_AFTER_MS;
+    this.releaseAfterMs = options.releaseAfterMs ?? PAGE.releaseAfterMs;
   }
 
   start(handlers: ConnectionHandlers): void {
@@ -73,7 +73,7 @@ export class SocketConnection implements Connection {
   }
 
   send(command: ClientCommand): void {
-    if (this.socket?.readyState === OPEN) this.socket.send(JSON.stringify(command));
+    if (this.socket?.readyState === WIRE.open) this.socket.send(JSON.stringify(command));
   }
 
   now(): number {
@@ -124,7 +124,7 @@ export class SocketConnection implements Connection {
   private receive(data: unknown): void {
     if (data instanceof ArrayBuffer) {
       const bytes = new Uint8Array(data);
-      if (bytes[0] === FRAME) this.showFrame(new Blob([bytes.subarray(1)], { type: 'image/jpeg' }));
+      if (bytes[0] === WIRE.picture) this.showFrame(new Blob([bytes.subarray(1)], { type: 'image/jpeg' }));
       return;
     }
     if (typeof data !== 'string') return;

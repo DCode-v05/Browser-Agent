@@ -9,10 +9,10 @@ from typing import Any
 import pytest
 from fakes import FakeDriver
 
+from bap_browser.address import presentable_address
 from bap_browser.config import Config
 from bap_browser.driver import BrowserSession
 from bap_browser.driver.base import Box, TabInfo
-from bap_browser.policy.address import presentable_address
 from bap_browser.tools import Toolkit
 from bap_browser.tools.sentences import label_for, summary_for
 

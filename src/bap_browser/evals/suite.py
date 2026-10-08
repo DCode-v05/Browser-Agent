@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
 import secrets
 import time
@@ -33,6 +32,7 @@ from urllib.parse import quote
 from bap_browser.config import Evals
 from bap_browser.driver.session import ApprovalOutcome
 from bap_browser.evals.record import Recorder
+from bap_browser.private_file import add_line
 from bap_browser.service.session import ServiceSession
 
 Mode = Literal["agent", "reference"]
@@ -440,10 +440,7 @@ class Reports:
         self.folder = Path(settings.dir) / system / "suite"
 
     def keep(self, report: Mapping[str, Any]) -> None:
-        self.folder.mkdir(parents=True, exist_ok=True)
-        handle = os.open(self.folder / RUNS, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(handle, "a", encoding="utf-8") as file:
-            file.write(json.dumps(report, ensure_ascii=False) + "\n")
+        add_line(self.folder / RUNS, json.dumps(report, ensure_ascii=False))
 
     def all(self) -> list[dict[str, Any]]:
         """The reports, oldest first. A line that cannot be read is passed over."""

@@ -1,12 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { App, preferencesFrom } from './App';
+import { App } from './App';
+import { preferencesFrom } from './preferences';
 import { authFrom, type AuthState, type Role } from './auth/api';
 import { SignIn } from './auth/SignIn';
 import { Studio } from './Studio';
 import { desktopOpener, factsFrom, NO_FACTS, roomsFrom } from './studio/rooms';
 import { systemsFrom, type Me } from './systems/api';
+import { PAGE } from './options';
 import { W } from './wording';
 import { socketAddress, takeToken } from './connection/address';
 import type { Connection } from './connection/connection';
@@ -22,9 +24,6 @@ import './styles/base.css';
 import './styles/app.css';
 import './styles/settings.css';
 
-const HEARTBEAT_MS = 2000;
-/** How often the window asks the service where its pages stand. */
-const ROOMS_MS = 1500;
 const PAGE_KEY = 'bap-browser.page';
 /** The token of a visit someone signed in for, kept for the life of the tab (spec 4.11). */
 const VISIT_KEY = 'bap-browser.visit';
@@ -142,7 +141,7 @@ function connectionFor(session: string): Connection {
 }
 
 function createConnection(): Connection {
-  if (recorded) return new DemoConnection(recording, { pace, heartbeatMs: HEARTBEAT_MS });
+  if (recorded) return new DemoConnection(recording, { pace, heartbeatMs: PAGE.heartbeatMs });
   if (token) return connectionFor(query.get('session') ?? 'default');
   // Opened without its token: there is no session this page may show.
   return { start: (handlers) => handlers.onStatus('refused'), send: () => undefined, now: () => Date.now() / 1000, close: () => undefined };
@@ -187,7 +186,7 @@ createRoot(document.getElementById('root')!).render(
         rooms={rooms}
         loadRooms={loadRooms}
         connectionFor={connectionFor}
-        pollMs={ROOMS_MS}
+        pollMs={PAGE.roomsPollMs}
         opensOn={tabStorage.getItem(PAGE_KEY) ?? undefined}
         onPage={(room) => tabStorage.setItem(PAGE_KEY, room)}
         openDesktop={openDesktop}

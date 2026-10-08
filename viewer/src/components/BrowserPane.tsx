@@ -31,9 +31,9 @@ interface Props {
 
 export function BrowserPane({ state, view, now, showPointer, options, onCommand, onRelease }: Props) {
   return (
-    <section className="browser" aria-label="Browser">
+    <section className="browser" aria-label={W.parts.browser}>
       {state.session && state.tabs.length > 0 && (
-        <div className="tabs" role="tablist" aria-label="Browser tabs">
+        <div className="tabs" role="tablist" aria-label={W.parts.tabs}>
           {state.tabs.map((tab) => (
             <button
               key={tab.id}
@@ -45,7 +45,7 @@ export function BrowserPane({ state, view, now, showPointer, options, onCommand,
               onClick={() => onCommand({ type: 'select_tab', id: tab.id })}
             >
               <span className="tab-title">{tab.title || tab.url}</span>
-              {tab.attention && <span className="tab-attention" aria-label="needs attention" />}
+              {tab.attention && <span className="tab-attention" aria-label={W.parts.needsAttention} />}
             </button>
           ))}
         </div>
@@ -64,7 +64,7 @@ function AddressBar({ state, view, now }: { state: ViewerState; view: StateView;
   return (
     <div className="address" data-blocked={blocked}>
       <Icon name={blocked ? 'blocked' : url.startsWith('https://') ? 'lock' : 'globe'} />
-      <div className="address-url" role="group" aria-label="Address">
+      <div className="address-url" role="group" aria-label={W.parts.address}>
         {blocked && state.blocked ? state.blocked.url : url}
       </div>
       <FrameBadge state={state} view={view} now={now} />

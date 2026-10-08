@@ -20,7 +20,6 @@ from bap_browser.config import Agent
 from bap_browser.tools import ToolDefinition
 
 # The provider's own explanation of a refusal is passed on, but not at any length.
-LONGEST_REFUSAL = 300
 
 
 class OpenAIModel:
@@ -61,7 +60,7 @@ class OpenAIModel:
         output = [item for item in answer.get("output") or [] if isinstance(item, dict)]
         if answer.get("status") == "failed":
             reason = (answer.get("error") or {}).get("message") or "no reason was given"
-            raise ModelError(f"The model could not answer: {str(reason)[:LONGEST_REFUSAL]}")
+            raise ModelError(f"The model could not answer: {str(reason)[: self._settings.refusal_chars]}")
         text = "".join(
             part.get("text", "")
             for item in output
@@ -145,7 +144,7 @@ class OpenAIModel:
             said = json.loads(refused.read())["error"]["message"]
         except (ValueError, KeyError, TypeError):
             return f"The model provider answered HTTP {refused.code}."
-        return f"The model provider answered HTTP {refused.code}: {str(said)[:LONGEST_REFUSAL]}"
+        return f"The model provider answered HTTP {refused.code}: {str(said)[: self._settings.refusal_chars]}"
 
 
 def _usage(said: Any) -> Usage | None:

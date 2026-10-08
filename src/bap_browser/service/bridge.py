@@ -37,8 +37,6 @@ NO_EXTENSION = "The browser on the person's machine is not connected."
 # What the agent is told when the extension did not let a call through (spec 8.8).
 NOT_ALLOWED = "The person has not allowed actions on {site}."
 NO_ANSWER = "The person did not answer, so this action was cancelled."
-# How much longer than the person's own time to answer the core waits for the extension's word.
-ANSWER_MARGIN_S = 5
 
 
 # What `_answer` gives for a command it does not answer itself: the command is the tab's.
@@ -213,7 +211,7 @@ class Bridge:
         """Asks the extension whether the agent may read or act on a site (spec 8.8). The extension
         decides from what the person chose, and asks them when they have not. None when the call may
         go on; otherwise what the agent is told."""
-        wait_s = self._permissions.preview_timeout_s + ANSWER_MARGIN_S
+        wait_s = self._permissions.preview_timeout_s + self._settings.answer_margin_s
         try:
             answer = await self._ask("permit", {"kind": kind, "url": url, "summary": summary}, wait_s)
         except BridgeError as failed:

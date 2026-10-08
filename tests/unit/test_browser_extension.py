@@ -97,12 +97,12 @@ def test_a_session_is_made_known_to_the_extension_and_forgotten_again(tmp_path: 
 def test_the_folder_a_person_loads_the_extension_from_is_one_a_file_chooser_shows(tmp_path: Path) -> None:
     """A folder whose name begins with a dot is hidden from the browser's file chooser on a Mac and
     on Linux: a person could not choose it."""
-    from bap_browser.cli import _extension_folder  # pyright: ignore[reportPrivateUsage]
+    from bap_browser.cli import extension_folder
     from bap_browser.config import Config, Server
 
-    default = _extension_folder(Config())
+    default = extension_folder(Config())
     assert default.is_absolute()
     assert not default.name.startswith("."), default
     assert not any(part.startswith(".") for part in Path(Config().server.extension_dir).parts)
-    chosen = _extension_folder(Config(server=Server(extension_dir=str(tmp_path / "ext"))))
+    chosen = extension_folder(Config(server=Server(extension_dir=str(tmp_path / "ext"))))
     assert chosen == (tmp_path / "ext").resolve()

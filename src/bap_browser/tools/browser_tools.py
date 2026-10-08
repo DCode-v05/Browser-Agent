@@ -5,153 +5,51 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
-from typing import Literal
-
-from pydantic import Field, model_validator
 
 from bap_browser import keys
-from bap_browser.driver.base import ActionOutcome, Driver, LoadState, LogLevel, Place, TabInfo
+from bap_browser.driver.base import ActionOutcome, Driver, LogLevel, Place, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BapError, BrowserError, PolicyBlocked
 from bap_browser.policy.files import allowed_file
+from bap_browser.tools.arguments import (
+    CheckArgs,
+    ClickArgs,
+    ConsoleArgs,
+    DialogArgs,
+    DragArgs,
+    EvaluateArgs,
+    FillFormArgs,
+    FindArgs,
+    FormField,
+    NavigateArgs,
+    NetworkArgs,
+    NoArgs,
+    PressKeyArgs,
+    RefArgs,
+    RequestHumanArgs,
+    RunArgs,
+    ScreenshotArgs,
+    ScrollArgs,
+    SelectArgs,
+    SnapshotArgs,
+    TabsArgs,
+    TargetArgs,
+    TextArgs,
+    TypeArgs,
+    UploadArgs,
+    WaitArgs,
+    ZoomArgs,
+)
 from bap_browser.tools.human_checks import notice_for
-from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition
+from bap_browser.tools.registry import Shown
 
 # The code tool (spec 7). The toolkit runs it: its steps are tool calls of their own.
 RUN_A_SCRIPT = "browser_run"
 
-Modifier = Literal["Alt", "Control", "Meta", "Shift"]
 # What a person is shown in place of an address that could not be read.
 UNREADABLE = "That address"
-TAB_PATTERN = r"^t\d+$"
 # From the least serious to the most.
 LOG_LEVELS: tuple[LogLevel, ...] = ("debug", "info", "warning", "error")
-
-
-class NavigateArgs(Args):
-    url: str
-
-
-class SnapshotArgs(Args):
-    mode: Literal["interactive", "all"] | None = None
-    ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    max_chars: int | None = Field(default=None, ge=1)
-    include_bboxes: bool = False
-
-
-class NoArgs(Args):
-    pass
-
-
-class PlaceArgs(Args):
-    """An element by ref, or a point of the page in pixels from its top left."""
-
-    ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    x: float | None = Field(default=None, ge=0)
-    y: float | None = Field(default=None, ge=0)
-
-    @property
-    def point(self) -> tuple[float, float] | None:
-        return (self.x, self.y) if self.x is not None and self.y is not None else None
-
-    @property
-    def place(self) -> str:
-        """The place as a result names it: the ref, or the point."""
-        return self.ref or f"({self.x:g}, {self.y:g})"
-
-
-def _one_place(args: PlaceArgs, *, required: bool) -> None:
-    half_a_point = (args.x is None) != (args.y is None)
-    if half_a_point or (args.ref is not None and args.x is not None):
-        raise ValueError("give either ref, or both x and y")
-    if required and args.ref is None and args.x is None:
-        raise ValueError("give ref, or both x and y")
-
-
-class TargetArgs(PlaceArgs):
-    @model_validator(mode="after")
-    def _has_one_place(self) -> TargetArgs:
-        _one_place(self, required=True)
-        return self
-
-
-class ClickArgs(TargetArgs):
-    button: Literal["left", "right", "middle"] = "left"
-    click_count: int = Field(default=1, ge=1, le=3)
-    # Pydantic copies the default for each call. A plain default, unlike a factory, appears in the schema.
-    modifiers: list[Modifier] = Field(default=[])
-
-
-class TextArgs(Args):
-    ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    max_chars: int | None = Field(default=None, ge=1)
-
-
-class FindArgs(Args):
-    query: str = Field(min_length=1)
-    limit: int | None = Field(default=None, ge=1)
-
-
-class ScrollArgs(PlaceArgs):
-    direction: Literal["up", "down", "left", "right"]
-    amount: int = Field(default=1, ge=1, le=20)
-
-    @model_validator(mode="after")
-    def _has_at_most_one_place(self) -> ScrollArgs:
-        _one_place(self, required=False)
-        return self
-
-
-class RefArgs(Args):
-    ref: str = Field(pattern=REF_PATTERN)
-
-
-class PressKeyArgs(Args):
-    keys: str
-    repeat: int = Field(default=1, ge=1)
-    ref: str | None = Field(default=None, pattern=REF_PATTERN)
-
-
-class SelectArgs(Args):
-    ref: str = Field(pattern=REF_PATTERN)
-    values: list[str] = Field(min_length=1)
-
-
-class CheckArgs(Args):
-    ref: str = Field(pattern=REF_PATTERN)
-    checked: bool
-
-
-class FormField(Args):
-    ref: str = Field(pattern=REF_PATTERN)
-    value: str | bool
-
-
-class FillFormArgs(Args):
-    fields: list[FormField] = Field(min_length=1)
-
-
-class WaitArgs(Args):
-    text: str | None = Field(default=None, min_length=1)
-    text_gone: str | None = Field(default=None, min_length=1)
-    load_state: LoadState | None = None
-    seconds: float | None = Field(default=None, ge=0)
-    timeout_s: float | None = Field(default=None, gt=0)
-
-    @model_validator(mode="after")
-    def _waits_for_one_thing(self) -> WaitArgs:
-        given = [self.text, self.text_gone, self.load_state, self.seconds]
-        if sum(value is not None for value in given) != 1:
-            raise ValueError("give exactly one of text, text_gone, load_state, seconds")
-        return self
-
-
-class TypeArgs(Args):
-    text: str
-    ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    clear: bool = True
-    submit: bool = False
-    slowly: bool = False
 
 
 async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | None = None) -> str:
@@ -427,12 +325,6 @@ async def wait(session: BrowserSession, args: WaitArgs) -> str:
     )
 
 
-class RequestHumanArgs(Args):
-    reason: str = Field(min_length=1, max_length=300)
-    kind: Literal["login", "verification", "payment", "other"] = "other"
-    timeout_s: float | None = Field(default=None, gt=0)
-
-
 async def request_human(session: BrowserSession, args: RequestHumanArgs) -> str:
     if session.ask_person is None:
         raise BrowserError(
@@ -448,11 +340,6 @@ async def request_human(session: BrowserSession, args: RequestHumanArgs) -> str:
         "timed_out": "timed_out: nobody answered in time.",
     }[outcome]
     return f"{said}\n{change}"
-
-
-class ScreenshotArgs(Args):
-    full_page: bool | None = None
-    annotate: bool | None = None
 
 
 async def screenshot(session: BrowserSession, args: ScreenshotArgs) -> Shown:
@@ -478,10 +365,6 @@ async def screenshot(session: BrowserSession, args: ScreenshotArgs) -> Shown:
     return Shown(text, shot.picture)
 
 
-class ZoomArgs(Args):
-    region: list[float] = Field(min_length=4, max_length=4)
-
-
 async def zoom(session: BrowserSession, args: ZoomArgs) -> Shown:
     driver = await session.driver()
     x0, y0, x1, y1 = args.region
@@ -491,21 +374,6 @@ async def zoom(session: BrowserSession, args: ZoomArgs) -> Shown:
         f"{shot.width} by {shot.height} pixels.",
         shot.picture,
     )
-
-
-class DragArgs(Args):
-    from_ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    from_xy: list[float] | None = Field(default=None, min_length=2, max_length=2)
-    to_ref: str | None = Field(default=None, pattern=REF_PATTERN)
-    to_xy: list[float] | None = Field(default=None, min_length=2, max_length=2)
-
-    @model_validator(mode="after")
-    def _one_start_and_one_end(self) -> DragArgs:
-        if (self.from_ref is None) == (self.from_xy is None):
-            raise ValueError("give either from_ref or from_xy")
-        if (self.to_ref is None) == (self.to_xy is None):
-            raise ValueError("give either to_ref or to_xy")
-        return self
 
 
 def _end_of_drag(driver: Driver, ref: str | None, xy: Sequence[float] | None) -> tuple[Place, str]:
@@ -525,11 +393,6 @@ async def drag(session: BrowserSession, args: DragArgs) -> str:
     return await _after_action(session, driver, text, ActionOutcome("", done.navigated_to))
 
 
-class DialogArgs(Args):
-    action: Literal["accept", "dismiss"]
-    prompt_text: str | None = None
-
-
 async def handle_dialog(session: BrowserSession, args: DialogArgs) -> str:
     driver = await session.driver()
     dialog = await driver.answer_dialog(args.action == "accept", args.prompt_text)
@@ -537,12 +400,6 @@ async def handle_dialog(session: BrowserSession, args: DialogArgs) -> str:
     if dialog.kind == "beforeunload":
         return f"{done} the dialog that asked whether to leave the page."
     return f"{done} the dialog '{dialog.text}'."
-
-
-class TabsArgs(Args):
-    action: Literal["list", "new", "switch", "close"]
-    tab_id: str | None = Field(default=None, pattern=TAB_PATTERN)
-    url: str | None = None
 
 
 def _tab_list(session: BrowserSession, tabs: Sequence[TabInfo]) -> str:
@@ -590,12 +447,6 @@ async def tabs(session: BrowserSession, args: TabsArgs) -> str:
     return f"Closed {closed}. {active} is the active tab." + await _the_page_now(session, driver)
 
 
-class ConsoleArgs(Args):
-    level: LogLevel | None = None
-    clear: bool = False
-    limit: int | None = Field(default=None, ge=1)
-
-
 def _newest(session: BrowserSession, lines: Sequence[str], limit: int | None, what: str) -> str:
     """The newest lines of a log, oldest first, never more than the cap."""
     most = session.config.browser.capture.read_limit
@@ -619,13 +470,6 @@ async def console(session: BrowserSession, args: ConsoleArgs) -> str:
     return _newest(session, lines, args.limit, "console message")
 
 
-class NetworkArgs(Args):
-    filter: str | None = Field(default=None, min_length=1)
-    failed_only: bool = False
-    clear: bool = False
-    limit: int | None = Field(default=None, ge=1)
-
-
 async def network(session: BrowserSession, args: NetworkArgs) -> str:
     driver = await session.driver()
     lines: list[str] = []
@@ -639,10 +483,6 @@ async def network(session: BrowserSession, args: NetworkArgs) -> str:
     if not lines:
         return "No request matches." if args.filter or args.failed_only else "No request has been made."
     return _newest(session, lines, args.limit, "request")
-
-
-class EvaluateArgs(Args):
-    expression: str = Field(min_length=1)
 
 
 async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
@@ -660,11 +500,6 @@ async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
     if len(text) > cap:
         return f"{head}\n{text[:cap]}\n\u2026 {len(text) - cap} more characters not shown."
     return f"{head}\n{text}"
-
-
-class UploadArgs(Args):
-    ref: str = Field(pattern=REF_PATTERN)
-    paths: list[str] = Field(min_length=1)
 
 
 async def upload_file(session: BrowserSession, args: UploadArgs) -> str:
@@ -702,180 +537,6 @@ async def downloads(session: BrowserSession, args: NoArgs) -> str:
     return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + "\n".join(lines)
 
 
-class RunArgs(Args):
-    code: str = Field(min_length=1)
-    timeout_s: int | None = Field(default=None, ge=1)
-
-
 async def run(session: BrowserSession, args: RunArgs) -> str:
     """The toolkit runs a script itself: its steps are tool calls, which no single tool makes."""
     raise BrowserError("browser_run is run by the toolkit.", reason="it cannot run here")
-
-
-TOOLS: tuple[ToolDefinition, ...] = (
-    ToolDefinition(
-        "browser_navigate",
-        "Open a URL in the current tab and return the page snapshot. A URL with no scheme gets https://.",
-        NavigateArgs,
-        navigate,
-    ),
-    ToolDefinition("browser_go_back", "Go back one page in history.", NoArgs, go_back),
-    ToolDefinition("browser_go_forward", "Go forward one page in history.", NoArgs, go_forward),
-    ToolDefinition("browser_reload", "Reload the page.", NoArgs, reload),
-    ToolDefinition(
-        "browser_snapshot",
-        "Read the page as text: one line per element, each with a ref such as e12. "
-        "mode 'interactive' (default) lists controls and headings; 'all' adds text and structure. "
-        "Give ref to read only that element's subtree.",
-        SnapshotArgs,
-        snapshot,
-    ),
-    ToolDefinition(
-        "browser_get_text",
-        "The visible text of the page, or of one element by ref. No refs: use it to read, not to act.",
-        TextArgs,
-        get_text,
-    ),
-    ToolDefinition(
-        "browser_find",
-        "Find elements by words in their name or text. Returns matching snapshot lines with refs, "
-        "best first. Cheaper than a snapshot of a large page.",
-        FindArgs,
-        find,
-    ),
-    ToolDefinition(
-        "browser_screenshot",
-        "A picture of what the browser shows, or of the whole page with full_page. Use it only when "
-        "the text of the page is not enough. annotate draws each element's ref on the picture.",
-        ScreenshotArgs,
-        screenshot,
-    ),
-    ToolDefinition(
-        "browser_zoom",
-        "A closer picture of a region [x0, y0, x1, y1] of the last screenshot, in its pixels.",
-        ZoomArgs,
-        zoom,
-    ),
-    ToolDefinition(
-        "browser_click",
-        "Click an element by its ref from the latest snapshot, or a point by x and y in page pixels.",
-        ClickArgs,
-        click,
-    ),
-    ToolDefinition(
-        "browser_hover",
-        "Move the pointer over an element by ref, or to x and y, to open a menu or a tooltip.",
-        TargetArgs,
-        hover,
-    ),
-    ToolDefinition(
-        "browser_drag",
-        "Drag from an element (from_ref) or a point (from_xy: [x, y]) to an element (to_ref) or a "
-        "point (to_xy).",
-        DragArgs,
-        drag,
-    ),
-    ToolDefinition(
-        "browser_type",
-        "Type text into an element by ref, or into the focused element when no ref is given. "
-        "clear replaces what is there; submit presses Enter afterwards.",
-        TypeArgs,
-        type_text,
-    ),
-    ToolDefinition(
-        "browser_fill_form",
-        "Fill several fields in one call. value is text for a text field, a label or value for a "
-        "dropdown, true or false for a checkbox or radio button.",
-        FillFormArgs,
-        fill_form,
-    ),
-    ToolDefinition(
-        "browser_select_option",
-        "Choose options of a dropdown (select element) by label or value.",
-        SelectArgs,
-        select_option,
-    ),
-    ToolDefinition(
-        "browser_set_checked",
-        "Set a checkbox, radio button or switch to checked or not checked.",
-        CheckArgs,
-        set_checked,
-    ),
-    ToolDefinition(
-        "browser_press_key",
-        "Press a key or a chord such as Enter, Escape, ArrowDown or Control+a, on the focused element "
-        "or on ref.",
-        PressKeyArgs,
-        press_key,
-    ),
-    ToolDefinition(
-        "browser_scroll",
-        "Scroll by steps. With ref, or x and y, scrolls the box under that place; otherwise the page.",
-        ScrollArgs,
-        scroll,
-    ),
-    ToolDefinition("browser_scroll_to", "Scroll an element into view.", RefArgs, scroll_to),
-    ToolDefinition(
-        "browser_wait",
-        "Wait for one of: text to appear, text_gone to disappear, a load_state, or seconds.",
-        WaitArgs,
-        wait,
-    ),
-    ToolDefinition(
-        "browser_handle_dialog",
-        "Answer the alert, confirm or prompt dialog a page has opened: accept or dismiss. "
-        "prompt_text is what to enter in a prompt.",
-        DialogArgs,
-        handle_dialog,
-    ),
-    ToolDefinition(
-        "browser_tabs",
-        "List the tabs, open a new one (empty, or on url), switch to one or close one by tab_id.",
-        TabsArgs,
-        tabs,
-    ),
-    ToolDefinition(
-        "browser_console",
-        "The page's console messages and errors, oldest first. level is the least serious to show.",
-        ConsoleArgs,
-        console,
-    ),
-    ToolDefinition(
-        "browser_network",
-        "The requests the page made: method, status, type, address. filter keeps the addresses that "
-        "hold that text.",
-        NetworkArgs,
-        network,
-    ),
-    ToolDefinition(
-        "browser_evaluate",
-        "Run a JavaScript expression in the page and return its value as JSON. A person is asked first.",
-        EvaluateArgs,
-        evaluate,
-    ),
-    ToolDefinition(
-        "browser_upload_file",
-        "Give files to a file field, or to the button that opens a file chooser. paths are file names "
-        "in the upload folder. A person is asked first.",
-        UploadArgs,
-        upload_file,
-    ),
-    ToolDefinition(
-        "browser_downloads", "The files downloaded in this session, with size and path.", NoArgs, downloads
-    ),
-    ToolDefinition(
-        "browser_request_human",
-        "Ask the person watching to do a step you must not do: a sign-in, a CAPTCHA or other human "
-        "check, a code, a payment. Waits until they answer. Never try to solve such a step yourself.",
-        RequestHumanArgs,
-        request_human,
-    ),
-    ToolDefinition(
-        RUN_A_SCRIPT,
-        "Do several steps in one call with a short Python script. `browser` has the tools as async "
-        'methods (`await browser.click(find="Next")`); print() and the last expression come back; '
-        "`state` is kept between scripts. No imports. Each step is checked like a single call.",
-        RunArgs,
-        run,
-    ),
-)

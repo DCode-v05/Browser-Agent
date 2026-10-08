@@ -7,6 +7,8 @@
       "spec": "6",
       "source": [
         "src/bap_browser/tools/browser_tools.py",
+        "src/bap_browser/tools/arguments.py",
+        "src/bap_browser/tools/offered.py",
         "src/bap_browser/tools/toolkit.py",
         "src/bap_browser/tools/registry.py",
         "src/bap_browser/tools/sentences.py",
@@ -65,6 +67,10 @@
         "src/bap_browser/driver/snapshot.py",
         "src/bap_browser/driver/page_script.py",
         "src/bap_browser/driver/playwright_driver.py",
+        "src/bap_browser/driver/acting.py",
+        "src/bap_browser/driver/watching.py",
+        "src/bap_browser/driver/core.py",
+        "src/bap_browser/driver/browser_parts.py",
         "src/bap_browser/driver/base.py"
       ],
       "tests": [
@@ -84,7 +90,7 @@
       "title": "Which addresses the browser may open",
       "spec": "8.1",
       "source": [
-        "src/bap_browser/policy/address.py",
+        "src/bap_browser/address.py",
         "src/bap_browser/policy/url_policy.py",
         "src/bap_browser/policy/files.py"
       ],
@@ -136,8 +142,11 @@
         "viewer/src/components/Timeline.tsx",
         "viewer/src/wording.ts",
         "viewer/src/tokens.css",
+        "src/bap_browser/service/events.py",
         "src/bap_browser/service/app.py",
-        "src/bap_browser/service/events.py"
+        "src/bap_browser/service/viewer_socket.py",
+        "viewer/src/preferences.ts",
+        "viewer/src/options.ts"
       ],
       "tests": [
         "tests/viewer/test_states.py",
@@ -247,7 +256,9 @@
         "src/bap_browser/evals/record.py",
         "src/bap_browser/evals/summary.py",
         "src/bap_browser/evals/checks.py",
-        "viewer/src/systems/SystemsPage.tsx"
+        "src/bap_browser/agent/timed.py",
+        "src/bap_browser/private_file.py",
+        "viewer/src/systems/Evaluation.tsx"
       ],
       "tests": [
         "tests/unit/test_evals.py",
@@ -337,7 +348,8 @@
       "spec": "16",
       "source": [
         "src/bap_browser/mcp/server.py",
-        "src/bap_browser/service/server.py"
+        "src/bap_browser/service/server.py",
+        "src/bap_browser/service/wrapping.py"
       ],
       "tests": [
         "tests/service/test_mcp.py",

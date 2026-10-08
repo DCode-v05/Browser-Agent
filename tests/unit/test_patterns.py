@@ -114,6 +114,13 @@ def test_code_that_follows_the_rules_is_found_clean(tmp_path: Path) -> None:
         ("skipped-test", "viewer/src/A.test.tsx", "it.only('a', () => undefined);\n"),
         (
             "fixed-wait-in-test",
+            "tests/unit/test_a.py",
+            "import asyncio\n\n\nasync def test_a() -> None:\n    await asyncio.sleep(2)\n",
+        ),
+        ("literal-in-viewer", "viewer/src/A.tsx", 'export const a = <div aria-label="Steps" />;\n'),
+        ("literal-in-viewer", "viewer/src/A.tsx", "export const a = <span>Elapsed</span>;\n"),
+        (
+            "fixed-wait-in-test",
             "tests/viewer/test_a.py",
             "async def test_a(page):\n    await page.wait_for_timeout(500)\n",
         ),
@@ -152,6 +159,16 @@ def test_a_rule_finds_what_it_is_for(tmp_path: Path, rule: str, path: str, text:
         ),
         # A test's own suppression is the test's business.
         ("tests/unit/test_a.py", "x = f()  # type: ignore[arg-type]\n"),
+        # A test that cannot run on some system says where, before it starts.
+        (
+            "tests/unit/test_a.py",
+            'import pytest\n\n\n@pytest.mark.skipif(False, reason="no links here")\ndef test_a() -> None: ...\n',
+        ),
+        # A string from the list of strings, and a name that is not for a person to read.
+        (
+            "viewer/src/A.tsx",
+            'export const a = <div aria-label={W.parts.steps} className="rows" role="log" />;\n',
+        ),
         # The list of every string a person reads is long by its nature.
         ("viewer/src/wording.ts", "export const a = null;\n" * 501),
     ],
@@ -177,6 +194,26 @@ def test_what_is_in_the_baseline_passes_more_fails_and_less_asks_for_the_baselin
     assert patterns.judge([], {"broad-except": {"src/bap_browser/gone.py": 1}})[1] == [
         "broad-except: src/bap_browser/gone.py has 0, the baseline still allows 1"
     ]
+
+
+def test_except_exception_is_right_only_in_a_function_named_as_a_boundary(tmp_path: Path) -> None:
+    broad = "def {name}() -> None:\n    try:\n        x = None\n    except Exception:\n        x = None\n"
+    path = "src/bap_browser/tools/toolkit.py"
+    assert found_in(tmp_path / "a", {**CLEAN, path: broad.format(name="_outcome")}) == []
+    assert found_in(tmp_path / "b", {**CLEAN, path: broad.format(name="call")}) == [("broad-except", path, 4)]
+    for (file, _), why in patterns.BOUNDARIES.items():
+        assert (REPOSITORY / file).is_file() and why, file
+
+
+def test_the_same_function_in_two_files_is_found_and_one_that_differs_is_not(tmp_path: Path) -> None:
+    body = "    path.mkdir()\n    text = path.read_text()\n    return text.strip()\n"
+    files = {
+        **CLEAN,
+        "src/bap_browser/driver/a.py": "def read(path):\n" + body,
+        "src/bap_browser/tools/b.py": 'def _read(path):\n    """Reads it."""\n' + body,
+        "src/bap_browser/service/c.py": "def read(path):\n" + body.replace("strip", "lower"),
+    }
+    assert found_in(tmp_path, files) == [("duplicate-code", "src/bap_browser/tools/b.py", 1)]
 
 
 def test_a_long_file_is_over_the_size_or_not_whatever_its_length(tmp_path: Path) -> None:

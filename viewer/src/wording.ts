@@ -585,6 +585,16 @@ export const W = {
     refused: 'Not connected',
   },
 
+  /** The names of the parts of the page, for whoever finds their way by them. */
+  parts: {
+    activity: 'Activity',
+    browser: 'Browser',
+    tabs: 'Browser tabs',
+    address: 'Address',
+    steps: 'Steps',
+    needsAttention: 'needs attention',
+    elapsed: 'Elapsed',
+  },
   topBar: {
     session: 'Session',
     agent: 'Agent',

@@ -9,7 +9,7 @@ from typing import Any
 
 from bap_browser.config import Config
 from bap_browser.evals.suite import SETS
-from bap_browser.tools.browser_tools import TOOLS
+from bap_browser.tools.offered import TOOLS
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 MAP = REPOSITORY / "docs" / "feature-map.json"

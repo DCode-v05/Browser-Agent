@@ -15,9 +15,9 @@ from __future__ import annotations
 import ast
 import asyncio
 import builtins
+import io
 import json
 import math
-import os
 import re
 import sys
 import traceback
@@ -287,10 +287,17 @@ def limit_memory(megabytes: int) -> None:
         pass
 
 
+class Nowhere(io.TextIOBase):
+    """A stream that keeps nothing of what is written to it."""
+
+    def write(self, text: str) -> int:
+        return len(text)
+
+
 def main() -> None:
     lines, out = sys.stdin.buffer, sys.stdout.buffer
     # Nothing a script prints, and nothing Python prints by itself, reaches the core's channel.
-    sys.stdout = sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    sys.stdout = sys.stderr = Nowhere()
 
     def tell(message: dict[str, Any]) -> None:
         out.write(json.dumps(message, ensure_ascii=False).encode() + b"\n")

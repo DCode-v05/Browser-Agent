@@ -11,8 +11,8 @@ from typing import Any, cast
 from fakes import FakeDriver
 
 from bap_browser.config import Config
-from bap_browser.service.app import _serve_viewer  # pyright: ignore[reportPrivateUsage]
 from bap_browser.service.session import ServiceSession
+from bap_browser.service.viewer_socket import serve_viewer
 
 
 class Viewer:
@@ -42,7 +42,7 @@ async def served(session: ServiceSession, commands: list[dict[str, Any]], backlo
     """Serves one viewer that sends these commands all at once and leaves when they have been done."""
     viewer = Viewer(commands)
     _, subscriber = session.hub.subscribe()
-    serving = asyncio.create_task(_serve_viewer(cast(Any, viewer), session, subscriber, backlog))
+    serving = asyncio.create_task(serve_viewer(cast(Any, viewer), session, subscriber, backlog))
     await viewer.all_read.wait()
     for _ in range(8):
         await asyncio.sleep(0)

@@ -127,8 +127,8 @@ async def test_an_answer_that_comes_late_does_not_fail_the_action_it_held_up(
     quick = {"timeouts": {"action_ms": 500, "page_reply_ms": 500}}
     async with on_the_dialogs_page(make_config, tmp_path, site, **quick) as (tools, page):
         await tools.call("browser_click", {"ref": ref_of(page, 'button "Ask to proceed"')})
-        # A model takes longer to answer than a click is given to finish.
-        await asyncio.sleep(1.5)
+        # A model takes longer to answer than a click is given to finish: three times as long here.
+        await asyncio.sleep(3 * quick["timeouts"]["action_ms"] / 1000)
         answered = await tools.call("browser_handle_dialog", {"action": "accept"})
         assert not answered.is_error
         assert "\nClicked " in answered.text and "did not answer" not in answered.text, answered.text
@@ -155,9 +155,10 @@ async def test_a_dialog_nobody_answers_is_dismissed_and_the_agent_is_told(
     async with on_the_dialogs_page(make_config, tmp_path, site, dialogs={"timeout_s": 1}) as (tools, page):
         button = ref_of(page, 'button "Ask to proceed"')
         await tools.call("browser_click", {"ref": button})
-        await asyncio.sleep(1.5)
-        read = await tools.call("browser_get_text", {})
-        assert not read.is_error
+        # While the dialog is open the page cannot be read. It can again once the dialog is gone.
+        async with asyncio.timeout(10):
+            while (read := await tools.call("browser_get_text", {})).is_error:
+                await asyncio.sleep(0.05)
         assert read.text.startswith(
             "[The dialog went away unanswered, and the action it had interrupted finished: "
             f'Clicked {button} (button "Ask to proceed")]\n'

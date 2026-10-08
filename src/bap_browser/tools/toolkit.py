@@ -13,19 +13,21 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
+from bap_browser.address import presentable_address
 from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError, PolicyBlocked
-from bap_browser.policy.address import presentable_address
 from bap_browser.results import Picture, ToolResult
-from bap_browser.tools.browser_tools import RUN_A_SCRIPT, TOOLS, RunArgs
+from bap_browser.tools.arguments import RunArgs
+from bap_browser.tools.browser_tools import RUN_A_SCRIPT
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
 from bap_browser.tools.observer import StepObserver
+from bap_browser.tools.offered import TOOLS
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition, describe_problem
-from bap_browser.tools.sentences import label_for, summary_for
+from bap_browser.tools.sentences import Room, label_for, summary_for
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +187,9 @@ class Toolkit:
         self._steps += 1
         step = self._steps
         if self._observer:
-            self._observer.step_started(step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None), None)
+            self._observer.step_started(
+                step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None, self._room()), None
+            )
         started = time.perf_counter()
         checked = self._check(RUN_A_SCRIPT, arguments)
         if isinstance(checked, CannotRun):
@@ -200,7 +204,7 @@ class Toolkit:
         ms = (time.perf_counter() - started) * 1000
         self._log.write(RUN_A_SCRIPT, logged, result, ms)
         if self._observer:
-            summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure)
+            summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure, self._room())
             if ran.failure is None:
                 # Each step is a row of its own. This row says how many there were.
                 summary += f": {ran.steps} step{'' if ran.steps == 1 else 's'}"
@@ -225,7 +229,7 @@ class Toolkit:
             step = self._steps
             target = await self._locate(name, arguments)
             if self._observer:
-                label = redact(label_for(name, arguments, target))
+                label = redact(label_for(name, arguments, target, self._room()))
                 self._observer.step_started(step, name, label, target.box if target else None)
             started = time.perf_counter()
             checked = self._check(name, arguments)
@@ -249,7 +253,7 @@ class Toolkit:
             ms = (time.perf_counter() - started) * 1000
             self._log.write(name, logged, result, ms)
             if self._observer:
-                summary = redact(summary_for(name, arguments, target, outcome.failure))
+                summary = redact(summary_for(name, arguments, target, outcome.failure, self._room()))
                 self._observer.step_finished(
                     step, outcome.failure is None, ms, len(result.text), summary, tabs
                 )
@@ -295,7 +299,7 @@ class Toolkit:
             address = judged.url
         if address is None:
             address = next((tab.url for tab in await self.tabs() if tab.active), "")
-        summary = self._session.redact(label_for(name, arguments, target))
+        summary = self._session.redact(label_for(name, arguments, target, self._room()))
         refused = await ask("read" if name in READS else "act", address, summary)
         if refused is None:
             return None
@@ -325,7 +329,7 @@ class Toolkit:
         if ask is None:
             outcome = "allowed" if config.control.approval_without_viewer == "allow" else "unwatched"
         else:
-            doing = label_for(name, arguments, target)
+            doing = label_for(name, arguments, target, self._room())
             try:
                 summary = self._session.redact(f"{doing} on {site}" if site else doing)
                 outcome = await ask(name, summary, site, consequential)
@@ -405,6 +409,10 @@ class Toolkit:
         held, self._held = self._held, None
         done = await held
         return f"[The dialog went away unanswered, and the action it had interrupted finished: {done.text}]\n"
+
+    def _room(self) -> Room:
+        """How much room a sentence has, as this session's configuration says now."""
+        return Room.of(self._session.config.viewer)
 
     async def _outcome(self, name: str, tool: ToolDefinition, args: Args) -> Outcome:
         """The result of a tool's handler. It never raises: every failure is a result."""

@@ -18,10 +18,11 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.service.accounts import Accounts
-from bap_browser.service.app import LARGEST_VIEWER_MESSAGE, create_app
+from bap_browser.service.app import create_app
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
+from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE
 from bap_browser.settings.store import SettingsStore
 
 

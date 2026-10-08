@@ -144,7 +144,7 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
       </div>
       {view.since > 0 && view.key !== 'ended' && view.key !== 'disconnected' && view.key !== 'refused' && (
         <span className="status-time">
-          <span className="sr-only">Elapsed </span>
+          <span className="sr-only">{W.parts.elapsed} </span>
           {formatElapsed(now - view.since)}
         </span>
       )}

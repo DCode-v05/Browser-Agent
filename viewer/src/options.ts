@@ -31,6 +31,20 @@ export const DEFAULT_OPTIONS: ViewerOptions = {
   workingMs: 8000,
 };
 
+/** Values that are the page's own: the service has no say in them. */
+export const PAGE = {
+  /** How often a recorded session says its picture is current, in milliseconds. */
+  heartbeatMs: 2000,
+  /** How often the window asks the service where its pages stand, in milliseconds. */
+  roomsPollMs: 1500,
+  /** How often a run of a task set that is under way is asked about, in milliseconds. */
+  suitePollMs: 1500,
+  /** How many lines of a browser's log its card shows. */
+  logLinesShown: 20,
+  /** How long after the pointer has left the live picture a held key is let go, in milliseconds. */
+  releaseAfterMs: 1000,
+} as const;
+
 /** True when a key event is the release chord, such as "Ctrl+Alt+Enter". */
 export function matchesChord(event: { key: string; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; metaKey: boolean }, chord: string): boolean {
   const parts = chord.split('+').map((part) => part.trim().toLowerCase());
