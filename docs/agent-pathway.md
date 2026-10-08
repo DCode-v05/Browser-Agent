@@ -33,9 +33,10 @@ Where a thing goes. If you are about to put it somewhere else, stop.
 | The thing | Its one place |
 |---|---|
 | A tunable value | `src/bap_browser/config.py`; for the viewer, `viewer/src/options.ts` |
+| A file for the person alone to read | Written with `src/bap_browser/private_file.py` |
 | A string a person reads | `viewer/src/wording.ts` |
 | A colour, a size, a duration, a font | `viewer/src/tokens.css` |
-| A tool an agent calls | `src/bap_browser/tools/browser_tools.py`, added to `TOOLS` |
+| A tool an agent calls | What it does in `src/bap_browser/tools/browser_tools.py`, what it is given in `tools/arguments.py`, and its entry in `TOOLS` of `tools/offered.py` |
 | An address of the service | `src/bap_browser/service/app.py`, and a row in `docs/feature-map.json` |
 | A setting a person can change | `src/bap_browser/settings/catalogue.py`. The settings screen draws itself from it |
 | An event to the viewer | Published by `service/session.py`, typed in `viewer/src/protocol.ts`, applied in `viewer/src/state/reducer.ts` |

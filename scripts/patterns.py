@@ -81,7 +81,7 @@ BOUNDARIES = {
     ("src/bap_browser/code/worker.py", "run"): "the script is the agent's own: anything may go wrong in it",
     ("src/bap_browser/doctor.py", "_try"): "it reports why a browser did not launch, whatever the reason",
     (
-        "src/bap_browser/driver/playwright_driver.py",
+        "src/bap_browser/driver/core.py",
         "_judge_request",
     ): "an address that cannot be judged is not loaded",
 }
@@ -333,7 +333,8 @@ def main(arguments: list[str] | None = None) -> int:
         print("\n".join(stale))
         return 1
     total = sum(count for paths in counted(found).values() for count in paths.values())
-    print(f"No new bad pattern. {total} from before are in the baseline, to be cleaned up.")
+    left = "Nothing is" if total == 0 else f"{total} from before {'is' if total == 1 else 'are'}"
+    print(f"No new bad pattern. {left} in the baseline, to be cleaned up.")
     return 0
 
 

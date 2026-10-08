@@ -142,7 +142,11 @@ against its documentation for the pinned version before it is used. The stack is
       store.py                 saved user settings, locks and limits
     driver/                    browser driving: one adapter per backend
       base.py                  the driver interface
-      playwright_driver.py     remote headless and bundled Chromium: launch, attach, tabs, actions
+      playwright_driver.py     remote headless and bundled Chromium: launch, attach, tabs. It builds on:
+      acting.py                what an agent does on a page: read, locate, click, type, scroll, wait
+      watching.py              dialogs, the console and the network, files, pictures, a person's own input
+      core.py                  the tabs as they are held, the frames of a page, waiting for a page to settle
+      browser_parts.py         launch options, download names, what is kept of a tab, a frame, a dialog
       bridge_driver.py         sends driver operations over the bridge channel (milestone 2)
       snapshot.py              snapshot assembly, refs, caps
       snapshot_page.js         the script that reads a page; the same file in every backend
@@ -158,7 +162,9 @@ against its documentation for the pinned version before it is used. The stack is
       redaction.py
     tools/
       registry.py              tool definitions and dispatch
-      browser_tools.py         the tools in section 6
+      browser_tools.py         the tools in section 6: what each does
+      arguments.py             what each tool is given
+      offered.py               the list of tools an agent is offered
     code/                      milestone 4
       checker.py               what a script may contain
       worker.py                the separate process that runs scripts
@@ -4702,7 +4708,7 @@ stage's own last line: a stage that printed nothing has not passed. CI runs the 
 many were in the code when the rule was written. A correction goes to the highest layer that holds
 it: the code, then a check, then words, then review.
 
-`scripts/patterns.py` holds ten of them by reading the code:
+`scripts/patterns.py` holds twelve of them by reading the code:
 
 | Rule | What it refuses |
 |---|---|
@@ -4716,6 +4722,15 @@ it: the code, then a check, then words, then review.
 | `fixed-wait-in-test` | A test that waits a fixed time |
 | `large-file` | A file over 700 lines of Python, or 500 of the viewer |
 | `tracked-link` | A symbolic link in the repository |
+| `duplicate-code` | A function of the engine that is the same, statement for statement, in two files |
+| `literal-in-viewer` | A string a person reads or hears, written into a component and not taken from `wording.ts` |
+
+Three of the rules say what they leave alone. `broad-except` allows `except Exception` in the four
+functions named in `BOUNDARIES`, each with its reason: where an agent's call, an agent's script, a
+browser that will not launch, or an address that cannot be judged must not take anything else down.
+`skipped-test` allows `skipif`, which says before a test starts where it cannot run.
+`fixed-wait-in-test` means a wait of a second or more written as a number; a short sleep in a loop
+that looks again is how a test waits for a thing.
 
 What was in the code already is counted, rule by rule and file by file, in
 `scripts/patterns_baseline.json`. A count may go down and may never go up: a new case fails, and a
@@ -4734,6 +4749,43 @@ exists, and every tool and every address of the service is in it.
 `.claude/skills/develop/` is the pathway as steps an agent runs. `.claude/skills/garden/` is how a
 mistake becomes a rule: name the pattern, count it, choose the highest layer, add the rule with its
 test, fix what is quick and put the rest in the baseline.
+
+### 20.6 The first clean-up
+
+On 2026-10-08 the baseline held 51 cases. The same day 50 were cleaned up, each at the highest layer
+that holds it, and the baseline holds one.
+
+| What was wrong | What was done |
+|---|---|
+| 8 silenced checks | Each fixed where it was: lambdas became functions, a private field got a method, a stream that keeps nothing got a class |
+| 5 private names used by tests | Made public: `build_parser`, `extension_folder`, `serve_viewer` |
+| `config` imported `policy`; `evals` imported `agent` | `address.py` moved below the configuration, with nothing of the engine in it. What times the model and the tools of a task moved to `agent/timed.py`; the record of a task knows nothing of the agent |
+| 22 numbers outside the configuration | 11 became settings (below). The four codes a WebSocket is closed with became a named set. The viewer's own five went to `options.ts` |
+| 4 `except Exception` | All four are boundaries, and are named as such in the check |
+| 1 skipped test | It says with `skipif` where it cannot run |
+| 3 fixed waits | Two wait for the thing: a call the service holds (`ServiceSession.held`), a dialog that is gone. One waits past a configured time, written as a multiple of it |
+| 5 long files | The driver became a chain of four classes in four files, divided so that no call goes from a lower one to a higher; the tools' arguments and the list of tools got files of their own; the viewer's connection and the wrappers left `service/app.py`; two viewer files were split |
+| The same file-writing code in three places | One helper, `private_file.py`: a file for its owner alone, written whole or a line added |
+| 7 strings in components | Moved to `wording.ts` |
+
+Settings added, each with the value the number had:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `agent.refusal_chars` | 300 | How much of the model provider's own words of a refusal is shown |
+| `bench.warn_over` | 1.05 | A median over the target times this is a warning |
+| `bench.p95_fail_times` | 2 | A p95 at this many times the fail value fails the line |
+| `code.step_line_chars` | 120 | How much of a step's first line a script's report keeps |
+| `code.result_room` | 12 | How many results of `max_output_chars` one message from the worker has room for |
+| `browser.timeouts.settle_frames` | 2 | Animation frames waited after an action |
+| `browser.screenshot.shrink_piece_bytes` | 32768 | How many bytes of a picture the page script turns into text at a time |
+| `bridge.answer_margin_s` | 5 | How much longer than the person's own time the core waits for the extension's word |
+| `control.key_name_max_chars` | 32 | The longest name of a key a viewer's command may carry |
+| `viewer.row_chars` | 59 | The longest sentence a row of the timeline holds |
+| `viewer.shortest_name_chars` | 12 | What is left of an element's name when a row has to be shortened |
+
+Left in the baseline: one test that says the extension does not dial in again, by waiting 1.5 s and
+looking. To wait for the thing it needs the extension to say that it has given up, which it does not.
 
 Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.

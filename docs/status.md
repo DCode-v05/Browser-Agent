@@ -471,6 +471,43 @@ Not built: the clean-up of the 51 cases in the baseline; rules 12 and 16 to 18 o
 and not made, because `CLAUDE.md` is yours to change: a line there pointing at the pathway and the
 gate.
 
+### 1q. Finished on 2026-10-08: the baseline cleaned up, and the rules that were words made checks
+
+What 1p left undone. Spec section 20.6 lists each change.
+
+| Left undone in 1p | Now |
+|---|---|
+| The 51 cases in the baseline | 50 cleaned up, each in the code. 1 left |
+| Rule 12, strings in components, held by review only | A check, `literal-in-viewer`. The 7 it found were moved to `wording.ts` |
+| Rule 16, a helper written twice, words only | A check, `duplicate-code`, for a function that is the same in two files. The three file-writers that differed by one argument are one helper, `private_file.py` |
+| Rule 17, a second folder's packages, words only | Held by the rule against a link in the repository and by `.gitignore` |
+| Rule 18, a report says what was seen | Still words: it is about what is said, not about the code |
+| A line in `CLAUDE.md` pointing at the pathway and the gate | Added, at your word |
+
+The largest change is the driver. It was one class of 112 methods in one file of 1,923 lines. The
+methods were sorted by which calls which: there was no cycle among them, and a division into four
+parts was found in which no call goes from a lower part to a higher. The four files were made from
+the old one by a script that moved each method whole and changed nothing in it but the names of
+seven private helpers.
+
+| File | Lines | What is in it |
+|---|---|---|
+| `driver/playwright_driver.py` | 274 | Starting a browser, its tabs, opening an address |
+| `driver/acting.py` | 601 | What an agent does on a page |
+| `driver/watching.py` | 433 | Dialogs, the console and the network, files, pictures, a person's own input |
+| `driver/core.py` | 504 | The tabs as they are held, frames, waiting for a page to settle |
+| `driver/browser_parts.py` | 247 | Launch options, download names, what is kept of a tab |
+
+Eleven numbers became settings, with the values they had (spec 20.6). Nothing a person sees changed.
+
+Proof: the gate passes all ten stages. Counts are in the gate's own lines below.
+
+What is left: one test in `tests/viewer/test_takeover.py` that waits 1.5 s to say that the extension
+does not dial in again. To wait for the thing, the extension has to say that it has given up.
+
+Not checked: My Chrome, which was not connected. The driver's four files are the same code for all
+three browsers, and were run on the Cloud and the Built-in browser.
+
 ### 2. Not started
 
 | What | Note |

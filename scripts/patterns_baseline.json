@@ -1,8 +1,5 @@
 {
   "fixed-wait-in-test": {
     "tests/viewer/test_takeover.py": 1
-  },
-  "large-file": {
-    "src/bap_browser/driver/playwright_driver.py": 1
   }
 }
