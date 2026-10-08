@@ -508,6 +508,38 @@ does not dial in again. To wait for the thing, the extension has to say that it 
 Not checked: My Chrome, which was not connected. The driver's four files are the same code for all
 three browsers, and were run on the Cloud and the Built-in browser.
 
+### 1r. Checked on 2026-10-08: the browser part on a remote machine, and one test corrected
+
+The browser part was run on the team's shared machine (Amazon Linux, 32 CPUs, no screen), reached
+over SSH. The code and the built viewer were copied there and given an environment of their own;
+nothing was added to the machine's shared one, and no key was put there.
+
+| Check on that machine | Result |
+|---|---|
+| `bap-browser doctor` | A browser launches. Everything needed is in place |
+| The scripted sign-up, with no model | Passed |
+| `tests/e2e` | 171 of 172 at first; 172 of 172 after the correction below |
+| `bap-browser bench` | 23 OK, 9 warnings, 0 failures, 8 not measured |
+| A real task | Passed, with the model on a laptop and the tools called over MCP through an SSH tunnel: 10 steps |
+| The viewer | Watched from the laptop through the same tunnel, with the live picture |
+
+What it found:
+
+- One test asked for more than it meant. After a labelled picture, a plain one was expected to be
+  the same to the byte as the one before. On that machine 3 pixels of a native list box's rounded
+  corners were one shade of grey apart. The labels were removed, as the test's name asks. The test
+  now compares two pictures as a person sees them (`tests/support/pictures.py`): no colour of any
+  pixel more than 2 shades out of 255 apart. A label left behind is 183 shades from the page.
+- Seven of the nine speed warnings are the same on the laptop. A click, a hover, a checkbox and a
+  scroll wait some frames of 16.7 ms each: 66.7 or 83.3 ms against a target of 50 or 60. On the
+  laptop a click at a point even passes its limit (16.7 against 15). Whether to wait fewer frames or
+  to set those targets to what the waits cost is yours to decide; nothing was changed.
+- Two warnings are that machine's: finding an element and pressing a key take about four times as
+  long there as on the laptop.
+
+Not checked there: the person's own Chrome, the three-browser window (it needs a model key on the
+machine), the task sets, and more than one session at a time.
+
 ### 2. Not started
 
 | What | Note |
