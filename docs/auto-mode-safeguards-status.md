@@ -1,6 +1,6 @@
 # Auto Mode and safeguards: status
 
-Last brought up to date: 2026-10-08. Built on the branch `feature/auto-mode-safeguards`, with `main` brought in; it goes into `main` by a pull request.
+Last brought up to date: 2026-10-09. **It is in `main`** since 2026-10-08 (pull request #33; CI on Linux: 1983 tests passed, types and lint clean). Its branch is deleted.
 
 - What is being built: spec section 18, `docs/bap-browser-spec.md`.
 - The review it answers: `docs/index.html` (10 high, 18 medium, 10 low points).
