@@ -33,7 +33,6 @@ TASK_STOPPED = "A person stopped the task, so nothing was done."
 ENDED = "The session has ended."
 # Which button a pointer command names, as browsers number them.
 BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
-LONGEST_KEY_NAME = 32
 
 NO_PERSON_IN_A_RUN = (
     "No person is here during an evaluation run. Go on without that step, or stop and say what is left."
@@ -102,6 +101,8 @@ class ServiceSession:
         self._ended_by: EndReason | None = None
         # Held while an action runs, so that a person takes the browser only between actions.
         self._acting = asyncio.Lock()
+        self.held = 0
+        """How many of the agent's calls wait now for the agent to be driving again."""
         self._changed = asyncio.Condition()
         self._tabs: list[dict[str, Any]] | None = None
         self._address_at_takeover = ""
@@ -316,7 +317,7 @@ class ServiceSession:
                         self._held_buttons.pop(button, None)
                     await driver.pointer(action, x, y, button)
             elif kind == "key" and action in ("down", "up"):
-                if isinstance(key, str) and 0 < len(key) <= LONGEST_KEY_NAME:
+                if isinstance(key, str) and 0 < len(key) <= self.config.control.key_name_max_chars:
                     if action == "up":
                         self._held_keys = [held for held in self._held_keys if held != key]
                     elif key not in self._held_keys:
@@ -415,6 +416,7 @@ class ServiceSession:
                 return
             if self.control != "agent":
                 remaining = deadline - asyncio.get_running_loop().time()
+                self.held += 1
                 try:
                     async with asyncio.timeout(max(remaining, 0)), self._changed:
                         await self._changed.wait_for(
@@ -423,6 +425,8 @@ class ServiceSession:
                 except TimeoutError:
                     yield Admission(refused=HELD.get(self.control, ENDED))
                     return
+                finally:
+                    self.held -= 1
                 continue
             await self._acting.acquire()
             if self.control == "agent":

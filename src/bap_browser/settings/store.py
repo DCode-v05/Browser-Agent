@@ -20,7 +20,6 @@ and what of the evaluations users may see.
 from __future__ import annotations
 
 import json
-import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -30,6 +29,7 @@ from typing import Any, Literal
 from bap_browser import __version__
 from bap_browser.config import Config, deep_merge, defaults
 from bap_browser.errors import ConfigError
+from bap_browser.private_file import write_json
 from bap_browser.settings.catalogue import (
     BY_ID,
     CATALOGUE,
@@ -367,7 +367,7 @@ class SettingsStore:
         policy = {part: lines for part, lines in self._policy.items() if lines}
         if policy:
             kept[POLICY] = policy
-        _write(self._path, kept)
+        write_json(self._path, kept, indent=2, sort_keys=True)
 
 
 def known_surface(surface: str | None) -> bool:
@@ -441,13 +441,3 @@ def _read(path: Path) -> tuple[_Layer, _Layer, dict[str, dict[str, bool]], str |
                 str(line): allowed for line, allowed in lines.items() if isinstance(allowed, bool)
             }
     return _layer(data), _layer(user), policy, preferred if isinstance(preferred, str) else None
-
-
-def _write(path: Path, kept: Mapping[str, Any]) -> None:
-    """The file is for the person who runs the service alone to read, and is never left half written."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_name(path.name + ".partial")
-    handle = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(handle, "w", encoding="utf-8") as file:
-        json.dump(kept, file, indent=2, sort_keys=True)
-    os.replace(partial, path)

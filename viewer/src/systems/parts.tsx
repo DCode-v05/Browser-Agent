@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon, type IconName } from '../components/Icon';
+import { PAGE } from '../options';
 import type { Backend } from '../protocol';
 import { W } from '../wording';
 import type { LogAnswer, SystemInfo } from './api';
@@ -16,7 +17,6 @@ export const BACKEND_ICON: Record<Backend, IconName> = {
 /** The states in which a system has no session. */
 export const NOT_RUNNING = new Set(['starting', 'waiting', 'failed', 'off', 'ended']);
 /** How many lines of a log are shown at once. The file holds the rest. */
-const LOG_LINES_SHOWN = 20;
 
 export function CardHead({ system, word }: { system: SystemInfo; word: string }) {
   return (
@@ -67,7 +67,7 @@ export function SwitchRow({ title, description, label, on, onChange }: { title: 
 }
 
 export function LogLines({ log }: { log: LogAnswer }) {
-  const lines = log.lines.slice(-LOG_LINES_SHOWN).reverse();
+  const lines = log.lines.slice(-PAGE.logLinesShown).reverse();
   if (lines.length === 0) return <p className="system-note">{W.systems.logEmpty}</p>;
   return (
     <div className="system-log">

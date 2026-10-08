@@ -84,7 +84,7 @@
       "title": "Which addresses the browser may open",
       "spec": "8.1",
       "source": [
-        "src/bap_browser/policy/address.py",
+        "src/bap_browser/address.py",
         "src/bap_browser/policy/url_policy.py",
         "src/bap_browser/policy/files.py"
       ],

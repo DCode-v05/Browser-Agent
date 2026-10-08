@@ -62,10 +62,6 @@ TAKES_TEXT = frozenset({"textbox", "searchbox", "combobox", "spinbutton"})
 NOT_UNDONE = "Earlier steps were carried out and are not undone."
 # What the worker needs from the environment to start at all. Nothing else is handed to it.
 KEPT_IN_THE_ENVIRONMENT = ("SYSTEMROOT",)
-# How long one line of a step may be when it is listed in the result.
-STEP_LINE_CHARS = 120
-# What a script printed and its value come back in one message, each character written as up to six.
-ROOM_FOR_A_RESULT = 12
 
 Step = Callable[[str, dict[str, Any]], Awaitable[ToolResult]]
 
@@ -189,7 +185,7 @@ class ScriptRunner:
     async def _call(self, name: str, arguments: dict[str, Any], steps: list[tuple[bool, str]]) -> ToolResult:
         result = await self._step(f"browser_{name}", arguments)
         first_line = result.text.split("\n", 1)[0]
-        steps.append((not result.is_error, first_line[:STEP_LINE_CHARS]))
+        steps.append((not result.is_error, first_line[: self._settings().step_line_chars]))
         return result
 
     def _report(self, done: Mapping[str, Any], steps: list[tuple[bool, str]], state_lost: bool) -> Ran:
@@ -244,7 +240,7 @@ class ScriptRunner:
                 # No secret reaches it, and no token: it is handed almost nothing.
                 env={name: os.environ[name] for name in KEPT_IN_THE_ENVIRONMENT if name in os.environ},
                 cwd=tempfile.gettempdir(),
-                limit=settings.max_message_chars + ROOM_FOR_A_RESULT * settings.max_output_chars,
+                limit=settings.max_message_chars + settings.result_room * settings.max_output_chars,
             )
         except OSError as failed:
             raise _WorkerLost(f"the worker could not be started ({failed})") from failed

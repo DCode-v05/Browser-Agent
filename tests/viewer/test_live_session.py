@@ -69,7 +69,9 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
         await page.get_by_role("heading", name="Paused").wait_for()
         assert session.control == "paused"
         before = await steps_shown.count()
-        await page.wait_for_timeout(1800)
+        async with asyncio.timeout(20):
+            while session.held == 0:
+                await asyncio.sleep(0.05)
         assert await steps_shown.count() == before
         await shot("live-2-paused")
 

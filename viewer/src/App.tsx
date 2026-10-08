@@ -20,28 +20,12 @@ import { initialState, reduce, unseenNotices, type Notice } from './state/reduce
 import { lookOf, tellPanel, type Look } from './state/look';
 import { formatSize } from './state/timeline';
 import { describeState, type ControlName, type StateKey } from './state/view';
-import type { SettingsAnswer, SettingsSource } from './settings/types';
+import { DEFAULT_PREFERENCES, preferencesFrom, type Preferences } from './preferences';
+import type { SettingsSource } from './settings/types';
 import { W } from './wording';
-
-export interface Preferences {
-  colourMode: 'system' | 'light' | 'dark';
-  showAgentPointer: boolean;
-}
-
-export const DEFAULT_PREFERENCES: Preferences = { colourMode: 'system', showAgentPointer: true };
 
 /** The commands that take hold only when the agent's action in progress has finished. */
 const TAKES_A_MOMENT: Partial<Record<ClientCommand['type'], ControlName>> = { pause: 'pause', resume: 'resume', take_over: 'take_over', hand_back: 'hand_back' };
-
-/** The preferences the viewer itself acts on, read from the settings answer. */
-export function preferencesFrom(answer: SettingsAnswer): Preferences {
-  const value = (id: string) => answer.groups.flatMap((group) => group.settings).find((setting) => setting.id === id)?.value;
-  const mode = value('colour_mode');
-  return {
-    colourMode: mode === 'light' || mode === 'dark' ? mode : 'system',
-    showAgentPointer: value('show_agent_pointer') !== false,
-  };
-}
 
 export interface AppProps {
   /** Opens the session's connection. Called once. */
@@ -417,7 +401,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           />
         )}
         {!full && (
-          <section className="activity" aria-label="Activity">
+          <section className="activity" aria-label={W.parts.activity}>
             {status}
             {cards}
             {state.chat.enabled && (

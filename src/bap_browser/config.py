@@ -14,8 +14,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, ValidationError, field_validator
 
+from bap_browser.address import site_pattern
 from bap_browser.errors import ConfigError
-from bap_browser.policy.address import site_pattern
 
 ENV_PREFIX = "BAP_BROWSER__"
 CONFIG_PATH_ENV = "BAP_BROWSER_CONFIG"
@@ -90,6 +90,9 @@ class Timeouts(Section):
         5000, "Longest wait for the page to answer. A page too busy to answer fails the call"
     )
     popup_adopt_ms: int = setting(3000, "Longest wait for a new tab to load before it is reported")
+    settle_frames: int = setting(
+        2, "Animation frames waited after an action, for a navigation it started to show itself"
+    )
     wait_max_s: int = setting(30, "Ceiling for `browser_wait`")
     idle_session_s: int = setting(900, "Close a session unused for this long; 0 means never")
 
@@ -116,6 +119,9 @@ class Screenshot(Section):
     max_dimension: int = setting(1568, "Longest side sent to the model")
     full_page: bool = setting(False, "Default area")
     annotate_by_default: bool = setting(False, "Draw ref labels")
+    shrink_piece_bytes: int = setting(
+        32768, "How many bytes of a picture the page script turns into text at a time when it shrinks one"
+    )
 
 
 class Text(Section):
@@ -291,6 +297,7 @@ class Control(Section):
         300, "How long an agent's call waits while a person is in control or the session is paused"
     )
     approval_timeout_s: int = setting(180, "Then a pending approval is denied")
+    key_name_max_chars: int = setting(32, "The longest name of a key a viewer's command may carry")
     approval_timeout_choices_s: list[int] = setting([60, 180, 300, 600], "The waits a person may choose from")
     handoff_timeout_s: int = setting(900, "Then a request for a person returns `timed_out`")
     approval_without_viewer: Literal["deny", "allow"] = setting("deny", "Or `allow`")
@@ -330,6 +337,9 @@ class Bridge(Section):
     heartbeat_s: int = setting(15, "How often a bridge reports that it is alive")
     dead_after_s: int = setting(45, "A channel silent for this long is closed")
     op_timeout_ms: int = setting(15000, "One driver operation")
+    answer_margin_s: int = setting(
+        5, "How much longer than the person's own time to answer the core waits for the extension's word"
+    )
     reconnect_grace_s: int = setting(30, "How long a tool call waits for a bridge that is reconnecting")
     max_message_mb: int = setting(16, "Largest message accepted on the channel")
 
@@ -382,6 +392,10 @@ class Viewer(Section):
     show_agent_pointer: bool = setting(
         True, "Draw the target highlight and the agent's pointer over the live picture"
     )
+    row_chars: int = setting(59, "The longest sentence a row of the timeline holds")
+    shortest_name_chars: int = setting(
+        12, "What is left of an element's name when a row of the timeline has to be shortened"
+    )
 
 
 class Agent(Section):
@@ -411,6 +425,7 @@ class Agent(Section):
     max_steps: int = setting(40, "Tool calls after which the loop stops")
     max_tokens: int = setting(4096, "The most a single reply may be")
     max_task_chars: int = setting(4000, "Longest task a person may send from the viewer's chat")
+    refusal_chars: int = setting(300, "How much of the model provider's own words of a refusal is shown")
 
     @field_validator("base_url", mode="after")
     @classmethod
@@ -455,6 +470,10 @@ class Code(Section):
         1_000_000, "The most a script may hand the core at once: the arguments of one step, or its result"
     )
     max_memory_mb: int = setting(512, "What the worker may hold, on a system that enforces such a limit")
+    step_line_chars: int = setting(120, "How much of a step's first line a script's report keeps")
+    result_room: int = setting(
+        12, "How many results of `max_output_chars` one message from the worker has room for"
+    )
 
 
 class Auth(Section):
@@ -487,6 +506,8 @@ class Evals(Section):
 class Bench(Section):
     runs: int = setting(30, "Samples per line")
     warmup: int = setting(5, "Runs thrown away first")
+    warn_over: float = setting(1.05, "A median over the target times this is a warning")
+    p95_fail_times: int = setting(2, "A p95 at this many times the fail value fails the line")
     budget_file: str = setting("perf/budget.json", "The performance budget")
     results_dir: str = setting(".bap-browser/bench", "Where bench results are written")
 
@@ -519,6 +540,10 @@ class Config(Section):
     def sources(self) -> Mapping[str, str]:
         """Where each value that was set came from, for a person who asks (spec 9.12)."""
         return self._sources
+
+    def came_from(self, sources: Mapping[str, str]) -> None:
+        """Keeps where each value that was set came from. For whoever loads a configuration."""
+        self._sources = dict(sources)
 
 
 def defaults() -> Config:
@@ -567,7 +592,7 @@ def load_config_with_sources(
         for key in _leaf_keys(layer):
             sources[key] = name
     config = _validate(data, sources)
-    config._sources = dict(sources)  # pyright: ignore[reportPrivateUsage]
+    config.came_from(sources)
     return config, sources
 
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from bap_browser import browser_extension
 from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
+from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.evals.record import Outcome, Recorder, TaskRecord
@@ -279,8 +280,8 @@ async def do_task(
     try:
         answer = await run_agent(
             await with_where_the_browser_is(task, session),
-            session.toolkit if trace is None else trace.tools(session.toolkit),
-            model if trace is None else trace.model(model),
+            session.toolkit if trace is None else TimedTools(session.toolkit, trace),
+            model if trace is None else TimedModel(model, trace),
             config.agent,
             on_text=lambda text: session.said("agent", text),
             ended=lambda: session.control == "ended",

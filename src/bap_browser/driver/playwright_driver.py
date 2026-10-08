@@ -30,6 +30,7 @@ from playwright.async_api import (
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from bap_browser.address import without_credentials
 from bap_browser.config import Config, QualityLevel
 from bap_browser.driver.base import (
     ActionOutcome,
@@ -60,13 +61,10 @@ from bap_browser.driver.page_script import PageScript
 from bap_browser.driver.screenshots import size_of
 from bap_browser.driver.snapshot import NOTICE, WHOLE_PAGE, matching_lines, snapshot_arguments
 from bap_browser.errors import BadInput, BrowserError, ConfigError, PolicyBlocked, StaleRef
-from bap_browser.policy.address import without_credentials
 from bap_browser.results import Picture
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
-# How many bytes of a picture the page script turns into text at a time.
-SHRINK_PIECE = 32768
 # A ref inside a frame: the frame's name, then the element's.
 FRAME_REF = re.compile(r"(f\d+)e\d+")
 # The operations that give a point of the page, and the one that gives a box.
@@ -74,8 +72,6 @@ GIVE_A_POINT = frozenset({"prepare", "wheelPoint"})
 GIVE_A_BOX = frozenset({"locate"})
 # Before these, a frame that is out of sight is brought into view: the pointer has to reach it.
 NEED_THE_FRAME_IN_VIEW = frozenset({"prepare", "wheelPoint"})
-# After an action, two animation frames are enough for a navigation it started to show itself.
-SETTLE_FRAMES = 2
 NOT_STARTED = "The browser has not been started."
 NO_TAB = "No tab is open. Open a page with browser_navigate."
 DIALOG_KINDS: tuple[DialogKind, ...] = ("alert", "confirm", "prompt", "beforeunload")
@@ -1121,14 +1117,18 @@ class PlaywrightDriver:
     async def hover(self, ref: str) -> ActionOutcome:
         tab = self._current()
         point = await self._point_under_pointer(tab, ref)
-        await tab.script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        await tab.script.frames_passed(
+            self._config.browser.timeouts.settle_frames, self._config.browser.timeouts.frame_ms
+        )
         return ActionOutcome(point["describe"])
 
     async def hover_at(self, x: float, y: float) -> ActionOutcome:
         tab = self._current()
         described = await self._describe_at(tab, x, y)
         await self._move_to(tab, x, y)
-        await tab.script.frames_passed(SETTLE_FRAMES, self._config.browser.timeouts.frame_ms)
+        await tab.script.frames_passed(
+            self._config.browser.timeouts.settle_frames, self._config.browser.timeouts.frame_ms
+        )
         return ActionOutcome(described)
 
     async def _move_to(self, tab: _Tab, x: float, y: float) -> None:
@@ -1476,7 +1476,7 @@ class PlaywrightDriver:
                 "width": width,
                 "height": height,
                 "quality": settings.jpeg_quality / 100,
-                "piece": SHRINK_PIECE,
+                "piece": settings.shrink_piece_bytes,
             },
             wait_ms=self._config.browser.timeouts.action_ms,
         )

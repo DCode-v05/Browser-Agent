@@ -40,7 +40,7 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
     <section className="timeline">
       <h3 className="panel-title">{W.timeline.title}</h3>
       <div className="rows-scroll">
-      <div className="rows" role="log" aria-label="Steps" onKeyDown={move}>
+      <div className="rows" role="log" aria-label={W.parts.steps} onKeyDown={move}>
         {rows.map((row) =>
           row.kind === 'idle' ? (
             <div key={row.key} className="idle" role="separator">

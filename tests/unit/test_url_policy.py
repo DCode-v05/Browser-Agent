@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 
+from bap_browser.address import parse_ip
 from bap_browser.config import Safety
-from bap_browser.policy.address import parse_ip
 from bap_browser.policy.url_policy import UrlPolicy, host_matches
 
 PUBLIC = "93.184.216.34"

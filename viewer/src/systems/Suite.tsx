@@ -5,14 +5,13 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '../components/Icon';
 import { Button } from '../components/StatusPanel';
+import { PAGE } from '../options';
 import { W } from '../wording';
 import type { SetName, SuiteAnswer, SuiteMode, SuiteOverall, SuiteRun, SuiteSet, SuiteTotals, SystemsApi } from './api';
 import { count, dollars, percent, spanOf } from './format';
 import { TableScroll } from './parts';
 
 const S = W.systems.suite;
-/** How often a run under way is asked about. */
-const RUNNING_POLL_MS = 1500;
 
 /** The day and the time a run began. */
 function when(seconds: number): string {
@@ -66,7 +65,7 @@ export function SuiteCard({ system, api }: { system: string; api: SystemsApi }) 
   useEffect(() => {
     if (!underWay) return;
     let current = true;
-    const timer = setInterval(() => void api.suite(system).then((told) => current && show(told)), RUNNING_POLL_MS);
+    const timer = setInterval(() => void api.suite(system).then((told) => current && show(told)), PAGE.suitePollMs);
     return () => {
       current = false;
       clearInterval(timer);

@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from bap_browser import keys
+from bap_browser.address import presentable_address
 from bap_browser.config import Logging
-from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
 # What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.

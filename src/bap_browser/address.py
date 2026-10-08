@@ -38,7 +38,7 @@ def canonical_address(url: str) -> str:
     if url.lower().startswith(SCHEMES_WRITTEN_WITHOUT_SLASHES):
         return url
     # A browser reads \ as / in a web address, up to the query.
-    head = re.match(r"[^?#]*", url).group()  # type: ignore[union-attr]
+    head = re.split(r"[?#]", url, maxsplit=1)[0]
     url = head.replace("\\", "/") + url[len(head) :]
     if not HAS_SCHEME.match(url):
         url = "https://" + url

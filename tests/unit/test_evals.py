@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from bap_browser.agent.models import Message, ModelError, Reply, ToolCall, Usage
+from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
 from bap_browser.evals import Recorder, summarise, trace_of
 from bap_browser.evals.record import cost_of
@@ -81,8 +82,8 @@ async def a_task(
         waited_s=lambda: waited[0],
         redact=lambda text: text.replace("Lisbon", "[hidden]"),
     )
-    tools = trace.tools(Tools(lambda seconds: waited.__setitem__(0, waited[0] + seconds)))
-    model = trace.model(Says(reply))
+    tools = TimedTools(Tools(lambda seconds: waited.__setitem__(0, waited[0] + seconds)), trace)
+    model = TimedModel(Says(reply), trace)
     try:
         for step in steps:
             await model.complete("", [], [])
