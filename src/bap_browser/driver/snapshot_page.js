@@ -131,6 +131,104 @@
     return el.childNodes;
   }
 
+  // Text that is rendered and that no person can see (spec 18.5): too faint, too small, moved off
+  // the page, clipped to nothing, or in the colour of what is behind it. `a.unseen` holds the
+  // limits; without it nothing is tested. Only text is left out: a control stays where it is.
+  const looked = new WeakMap(); // element -> what was found, kept until the document changes
+  let unseenTexts = []; // what one read left out, for the rules that read it in the agent's place
+  const UNSEEN_KEPT = 20; // passages of one read
+  const UNSEEN_FROM = 20; // characters: shorter text is no passage
+
+  function parts(colour) {
+    const found = /rgba?\(([^)]+)\)/.exec(colour || '');
+    return found ? found[1].split(/[,\/\s]+/).filter(Boolean).map(parseFloat) : null;
+  }
+  const alphaOf = (colour) => {
+    const found = parts(colour);
+    return found && found.length > 3 ? found[3] : found ? 1 : 0;
+  };
+  function luminance(colour) {
+    const [r, g, b] = colour.map((part) => {
+      const share = part / 255;
+      return share <= 0.03928 ? share / 12.92 : ((share + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrast(one, other) {
+    const [light, dark] = [luminance(one), luminance(other)].sort((x, y) => y - x);
+    return (light + 0.05) / (dark + 0.05);
+  }
+  // The colour behind an element's text. Null when a picture is behind it: that cannot be told.
+  function behind(el) {
+    for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.backgroundImage !== 'none') return null;
+      if (alphaOf(style.backgroundColor) > 0.5) return parts(style.backgroundColor);
+    }
+    return [255, 255, 255];
+  }
+  function clippedAway(el, style) {
+    if (/inset\(\s*(5\d|[6-9]\d|100)(\.\d+)?%/.test(style.clipPath) || /circle\(\s*0/.test(style.clipPath)) return true;
+    if (/rect\(\s*0(px)?[,\s]+0(px)?[,\s]+0(px)?[,\s]+0(px)?\s*\)/.test(style.clip)) return true;
+    if (style.overflow === 'visible') return false;
+    const box = el.getBoundingClientRect();
+    return box.width <= 1 && box.height <= 1 && (el.scrollWidth > 1 || el.scrollHeight > 1);
+  }
+  function offThePage(el, style) {
+    let box = el.getBoundingClientRect();
+    if (parseFloat(style.textIndent) < 0) {
+      // The text is drawn where its indent puts it, which may be outside the box of its element.
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      box = range.getBoundingClientRect();
+    }
+    if (!box.width && !box.height) return false;
+    const doc = document.documentElement;
+    return box.right + scrollX <= 0 || box.bottom + scrollY <= 0 || box.top + scrollY >= doc.scrollHeight + innerHeight;
+  }
+  function look(el, a) {
+    const kept = looked.get(el);
+    if (kept && kept.stamp === changes) return kept;
+    const limits = a.unseen;
+    const root = el.parentElement ? null : el.getRootNode();
+    const parent = el.parentElement || (root && root.host) || null;
+    const above = parent && parent !== document.documentElement ? look(parent, a) : { opacity: 1, around: '' };
+    const style = getComputedStyle(el);
+    let opacity = above.opacity * parseFloat(style.opacity || '1');
+    const filtered = /opacity\(\s*([\d.]+)(%?)\s*\)/.exec(style.filter || '');
+    if (filtered) opacity *= parseFloat(filtered[1]) / (filtered[2] ? 100 : 1);
+    // What hides an element hides everything in it.
+    let around = above.around;
+    if (!around) {
+      if (opacity <= limits.minOpacity) around = 'faint';
+      else if (offThePage(el, style)) around = 'off the page';
+      // Sites clip short texts away for screen readers ("Skip to content"). Those are kept.
+      else if (clippedAway(el, style) && (el.textContent || '').trim().length > limits.screenReaderChars) around = 'clipped';
+    }
+    let why = around;
+    if (!why) {
+      const ink = style.webkitTextFillColor || style.color;
+      if (parseFloat(style.fontSize) < limits.minFontPx) why = 'small';
+      else if (alphaOf(ink) <= limits.minOpacity) why = 'colour';
+      else if (limits.contrast) {
+        const back = behind(el);
+        const fore = parts(ink);
+        if (back && fore && contrast(fore, back) < limits.minContrast) why = 'colour';
+      }
+    }
+    const found = { stamp: changes, opacity, around, why };
+    looked.set(el, found);
+    return found;
+  }
+  // Whether the text an element holds itself is left out. What is left out is kept for the rules.
+  function leftOut(el, text, a) {
+    if (!a.unseen || !el || el.nodeType !== 1 || !text.trim()) return false;
+    if (!look(el, a).why) return false;
+    const passage = clean(text, a.maxText || 300);
+    if (passage.length >= UNSEEN_FROM && unseenTexts.length < UNSEEN_KEPT) unseenTexts.push(passage);
+    return true;
+  }
+
   // The rendered text inside an element, without the text of form controls.
   function textOf(el, limit, a) {
     let out = '';
@@ -146,7 +244,7 @@
       }
       for (const child of kids(node, a)) {
         if (child.nodeType === 3) {
-          if (shown === SHOWN) out += child.nodeValue;
+          if (shown === SHOWN && !leftOut(node, child.nodeValue, a)) out += child.nodeValue;
         } else if (child.nodeType === 1) walk(child);
       }
       if (!INLINE_TAGS.has(tag)) out += ' ';
@@ -187,7 +285,8 @@
     if (tag === 'IMG') return clean(el.getAttribute('alt') || el.getAttribute('title') || '', limit);
     if (tag === 'IFRAME') return clean(el.getAttribute('title') || el.getAttribute('name') || '', limit);
     if (NAMED_BY_CONTENT.has(role)) {
-      const text = textOf(el, limit, a);
+      // A control with no other name keeps one that nobody sees: an icon button has nothing else.
+      const text = textOf(el, limit, a) || (a.unseen ? textOf(el, limit, { ...a, unseen: null }) : '');
       if (text) return text;
     }
     return clean(el.getAttribute('title') || '', limit);
@@ -294,7 +393,7 @@
 
     const visit = (node, depth, indent, named, parentShown) => {
       if (node.nodeType === 3) {
-        if (a.mode === 'all' && !named && parentShown) {
+        if (a.mode === 'all' && !named && parentShown && !leftOut(node.parentElement, node.nodeValue, a)) {
           const text = clean(node.nodeValue, a.maxText);
           if (text) emit('  '.repeat(indent) + '- text ' + quote(text));
         }
@@ -329,6 +428,7 @@
       root = resolve(a.ref);
       if (!root) return { error: 'stale' };
     }
+    unseenTexts = [];
     try {
       // A frame read as part of its page has no heading of its own.
       if (!a.embedded) {
@@ -341,7 +441,7 @@
       if (error !== STOP) throw error;
     }
     if (truncated) lines.push(a.notice);
-    return { text: lines.join('\n'), next: state.next, truncated, frames: framesMet };
+    return { text: lines.join('\n'), next: state.next, truncated, frames: framesMet, unseen: unseenTexts };
   }
 
   // Resolves at the next animation frame, or after `ms` on a page that is not being painted.
@@ -377,12 +477,13 @@
   };
 
   // Shared with the action operations added to this file.
-  globalThis.__bapParts = { INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
+  globalThis.__bapParts = { look, INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
 })();
 
 // Operations that prepare an element for an action. The driver then sends the real input events.
 (() => {
   if (globalThis.__bap.withActions) return;
+  const shared = globalThis.__bapParts;
   const { INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE } =
     globalThis.__bapParts;
 
@@ -661,12 +762,29 @@
     const el = a.ref ? resolve(a.ref) : document.body;
     if (a.ref && !el) return { error: 'stale' };
     if (!el) return { text: '', more: 0 };
-    const all = (el.innerText ?? el.textContent ?? '')
+    let all = el.innerText ?? el.textContent ?? '';
+    const unseen = [];
+    if (a.unseen) {
+      // The browser gives the text as it is laid out. What nobody can see is taken out of it again.
+      let from = 0;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const piece = node.nodeValue.replace(/\s+/g, ' ').trim();
+        const holder = node.parentElement;
+        if (!piece || !holder || visibility(holder) !== SHOWN || !shared.look(holder, a).why) continue;
+        const at = all.indexOf(piece, from);
+        if (at < 0) continue;
+        all = all.slice(0, at) + all.slice(at + piece.length);
+        from = at;
+        if (piece.length >= 20 && unseen.length < 20) unseen.push(clean(piece, 300));
+      }
+    }
+    all = all
       .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
     const shown = Array.from(all).slice(0, a.maxChars).join('');
-    return { text: shown, more: all.length - shown.length };
+    return { text: shown, more: all.length - shown.length, unseen };
   }
 
   // The nearest thing around an element that scrolls by itself: a list, a panel, a dialog.

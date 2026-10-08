@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chat</title>
+</head>
+<body>
+<h1>Team chat</h1>
+<label>Message <input id="box" name="message"></label>
+<ul id="said"></ul>
+<script>
+const box = document.getElementById('box');
+box.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  const line = document.createElement('li');
+  line.textContent = box.value;
+  document.getElementById('said').append(line);
+  document.title = 'sent';
+});
+</script>
+</body>
+</html>

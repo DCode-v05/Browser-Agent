@@ -18,8 +18,10 @@ def snapshot_arguments(
     max_chars: int,
     include_bboxes: bool,
     next_ref: int,
+    unseen: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
+        "unseen": unseen,
         "mode": mode,
         "ref": ref,
         "maxChars": max_chars,

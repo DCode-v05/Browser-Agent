@@ -251,6 +251,11 @@ class Driver(Protocol):
         """What the page says it is about, in a few words: its headings and its buttons."""
         ...
 
+    def unseen(self) -> list[str]:
+        """The text the last read of the active tab left out because no person can see it (spec
+        18.5). It is not given to the agent; the rules that look for planted text read it."""
+        ...
+
     def where(self) -> tuple[str, str]:
         """The active tab and the address it shows, as known without asking the page. Empty when no tab is open."""
         ...

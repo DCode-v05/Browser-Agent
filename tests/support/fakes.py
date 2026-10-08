@@ -106,6 +106,8 @@ class FakeDriver:
         self.focused: Located | None = None
         """The element that has the focus."""
         self.said: list[str] = []
+        self.hidden: list[str] = []
+        """The text the last read left out because no person can see it."""
         """The page's headings and buttons."""
         self.mark: str | None = None
         """What the page says of itself after a step. The same twice means that nothing changed;
@@ -249,6 +251,9 @@ class FakeDriver:
 
     def where(self) -> tuple[str, str]:
         return self.active_tab, self.url
+
+    def unseen(self) -> list[str]:
+        return self.hidden
 
     async def locate(self, ref: str, *, press: bool = False) -> Located:
         if ref in self.elements:

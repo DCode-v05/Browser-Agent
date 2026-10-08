@@ -250,6 +250,8 @@ class _Tab:
     opening: list[tuple[str, str]] | None = None
     """While the agent's own navigation is under way: the addresses the policy refused on its way."""
     main_frame_id: str = ""
+    unseen: list[str] = field(default_factory=list[str])
+    """The text the last read left out because no person can see it."""
     frames: dict[str, _InnerFrame] = field(default_factory=dict[str, "_InnerFrame"])
     """The frames read so far, by name."""
     frame_names: dict[str, str] = field(default_factory=dict[str, str])
@@ -824,6 +826,23 @@ class PlaywrightDriver:
         tab = self._active
         return ("", "") if tab is None else (tab.id, tab.page.url)
 
+    def unseen(self) -> list[str]:
+        tab = self._active
+        return [] if tab is None else list(tab.unseen)
+
+    def _unseen_limits(self) -> dict[str, Any] | None:
+        """What the page script is told about text nobody can see, or None when it is not looked for."""
+        incoming = self._config.safeguards.incoming
+        if not incoming.unseen_text:
+            return None
+        return {
+            "minOpacity": incoming.min_opacity,
+            "minFontPx": incoming.min_font_px,
+            "minContrast": incoming.min_contrast,
+            "contrast": incoming.contrast,
+            "screenReaderChars": incoming.screen_reader_max_chars,
+        }
+
     async def change_mark(self) -> str | None:
         tab = self._active
         if tab is None:
@@ -869,11 +888,15 @@ class PlaywrightDriver:
             max_chars=max_chars,
             include_bboxes=include_bboxes,
             next_ref=self._next_ref,
+            unseen=self._unseen_limits(),
         )
         arguments |= {"prefix": frame.name if frame else "", "embedded": embedded, "indent": indent}
         data = await (frame.script if frame else tab.script).call("snapshot", arguments)
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
+        if not embedded:
+            tab.unseen = []
+        tab.unseen += [str(text) for text in data.get("unseen", ())]
         # Numbering continues across navigations, tabs and frames, so an old ref can never point at a
         # new element.
         self._next_ref = data["next"]
@@ -1189,9 +1212,13 @@ class PlaywrightDriver:
         return tab.page.url
 
     async def text(self, ref: str | None, max_chars: int) -> tuple[str, int]:
-        data = await self._ask(self._current(), "text", {"ref": ref, "maxChars": max_chars})
+        tab = self._current()
+        data = await self._ask(
+            tab, "text", {"ref": ref, "maxChars": max_chars, "unseen": self._unseen_limits()}
+        )
         if data.get("error") == "stale":
             raise StaleRef(ref or "")
+        tab.unseen = [str(text) for text in data.get("unseen", ())]
         return data["text"], data["more"]
 
     async def find(self, query: str, limit: int) -> Found:

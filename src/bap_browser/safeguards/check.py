@@ -861,7 +861,8 @@ class Check:
                             "unsure",
                             f"this step carries text that was read on {copy.site} to {step.site}",
                             held_high=True,
-                            sample=copy.sample,
+                            # The person is shown what would leave as it would leave, not as it is compared.
+                            sample=leaving,
                             leaves=(copy.site, step.site),
                         )
                     )
