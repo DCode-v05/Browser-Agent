@@ -42,6 +42,15 @@ A real task needs a model key. Copy `.env.example` to `.env` and put your key on
 `OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
 `agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
+## Evaluations
+
+In `bap-browser studio`, each browser's page has an Evaluations view: what its tasks took and cost,
+a checklist of real steps, and **task sets**: 50 tasks with a known right end, done on a practice
+site and checked by code. They measure how many small and long tasks the agent finishes, whether a
+person is asked before a step that orders, sends or deletes, and how often text planted in a page
+makes the agent do what nobody asked for. A set is run with the agent, or by its reference
+solutions with no model. `docs/systems-guide.md`, Part 2, says how.
+
 ## Desktop app
 
 ```bash

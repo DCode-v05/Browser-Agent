@@ -293,11 +293,12 @@ class Studio:
             latest = self._reports[room.id].latest()
             runs = {
                 name: {
+                    **told["last"]["totals"],
                     "mode": told["last"]["mode"],
                     "started": told["last"]["started"],
+                    # How many times each task was tried, not how many tries there were in all.
                     "trials": told["last"]["trials"],
                     "stopped": told["last"]["stopped"],
-                    **told["last"]["totals"],
                 }
                 for name, told in latest.items()
             }
@@ -341,14 +342,14 @@ class Studio:
         self, room: Room, session: ServiceSession, service: Service, progress: Progress
     ) -> None:
         recorder = suite_recorder(self._config.evals, room.id, room.backend)
-        model = self._model_for(service) if progress.mode == "agent" else None
+        by_the_agent = progress.mode == "agent"
 
         async def do(words: str) -> Any:
-            assert model is not None
             # Whoever watches the page sees each task in the chat, as if a person had sent it.
             session.said("person", words)
-            # Each task starts with nothing remembered of the one before it.
-            return await _do(words, session, model, session.config, [], recorder)
+            # Each task starts with nothing remembered of the one before it: a conversation of its
+            # own, and a model client of its own, which keeps the turns of one conversation.
+            return await _do(words, session, self._model_for(service), session.config, [], recorder)
 
         try:
             async with room.turn:
@@ -358,7 +359,7 @@ class Studio:
                     progress.set,
                     trials=progress.trials,
                     mode=progress.mode,
-                    do=do if model is not None else None,
+                    do=do if by_the_agent else None,
                     settings=self._config.evals,
                     model=session.config.agent.model,
                     progress=progress,

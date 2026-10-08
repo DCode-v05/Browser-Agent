@@ -442,6 +442,15 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         parity = page.get_by_role("article", name="Task sets, browser by browser")
         row = parity.get_by_role("row", name="Long tasks")
         await row.get_by_text("0% passed").wait_for()
+        await row.get_by_text("Done by the agent").wait_for()
+        side_by_side = (await opened.ask("GET", "/api/suite"))[1]["systems"]
+        built_in = next(one for one in side_by_side if one["system"] == "builtin")["runs"]["long"]
+        assert (built_in["mode"], built_in["trials"], built_in["tasks"], built_in["pass_rate"]) == (
+            "agent",
+            2,
+            4,
+            0.0,
+        )
         assert "Not run" in await row.inner_text()
         assert await view.accessibility_violations() == [] and view.errors == []
 
@@ -706,7 +715,7 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         await browsers.wait_for()
         assert [
             await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
-        ] == ["The browsers", "Evaluations of all systems"]
+        ] == ["The browsers", "Evaluations of all systems", "Task sets, browser by browser"]
         rows = browsers.get_by_role("row")
         model = (await opened.ask("GET", "/api/systems"))[1]["systems"][0]["model"]
         assert [" ".join(text.split()) for text in await rows.all_inner_texts()][1:] == [
