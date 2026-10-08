@@ -14,7 +14,8 @@ import type { Surface } from '../protocol';
 import type { Setting, SettingsAnswer } from '../settings/types';
 import { W } from '../wording';
 import { Access, BrowsersCard, OverallCard, type Passwords } from './Access';
-import type { Check, Evals, LogAnswer, Me, Overall, Policy, PolicyChange, SystemAction, SystemInfo, SystemsApi, TaskRow, TaskTrace } from './api';
+import type { Check, Evals, LogAnswer, Me, Overall, Policy, PolicyChange, SuiteOverall, SystemAction, SystemInfo, SystemsApi, TaskRow, TaskTrace } from './api';
+import { ParityCard, SuiteCard } from './Suite';
 import { clock, count, dollars, percent, spanOf } from './format';
 import { CardHead, LogLines, NOT_RUNNING, SwitchRow, TableScroll } from './parts';
 import { SettingsList } from './SettingsList';
@@ -187,11 +188,14 @@ export function SystemsPage({ api, pollMs, wordFor, passwords, onOpen }: PagePro
   const { policy, change: changePolicy } = usePolicy(api, 'admin');
   const [overall, setOverall] = useState<Overall | null>(null);
 
+  const [parity, setParity] = useState<SuiteOverall | null>(null);
   const loadOverall = useCallback(() => void api.overall().then((told) => told && setOverall(told)), [api]);
+  const loadParity = useCallback(() => void api.suiteOverall().then((told) => told && setParity(told)), [api]);
   useEffect(() => {
     if (view !== 'overview') return;
     let current = true;
     void api.overall().then((told) => current && told && setOverall(told));
+    void api.suiteOverall().then((told) => current && told && setParity(told));
     return () => {
       current = false;
     };
@@ -226,6 +230,7 @@ export function SystemsPage({ api, pollMs, wordFor, passwords, onOpen }: PagePro
         <>
           <BrowsersCard systems={systems} policy={policy} wordFor={wordFor} onOpen={onOpen} />
           <OverallCard overall={overall} nameOf={nameOf} onRefresh={loadOverall} />
+          <ParityCard overall={parity} nameOf={nameOf} onRefresh={loadParity} />
         </>
       )}
     </section>
@@ -548,6 +553,8 @@ function Evaluation({ system, api, word, sees }: { system: SystemInfo; api: Syst
               )}
             </>
           )}
+
+          {may.checklist && <SuiteCard system={system.id} api={api} />}
 
           {may.traces && evals.recent.length > 0 && (
             <>

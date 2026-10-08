@@ -2300,3 +2300,71 @@
     font-size: var(--text-caption);
   }
 }
+
+/* The task sets of a browser (spec 12.7) */
+
+.suite-tries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.suite-select {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.suite-sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.suite-set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+}
+
+.suite-set-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.suite-set-title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-emphasis);
+}
+
+.suite-set-size {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.system-note[data-tone='running'] {
+  color: var(--agent);
+  font-weight: var(--weight-medium);
+}
+
+.system-table tr[data-passed='false'] th {
+  color: var(--danger);
+}

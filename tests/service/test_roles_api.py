@@ -78,6 +78,19 @@ class Running:
         self.asked.append(("check", system))
         return {"passed": 11, "failed": 0, "checks": []}
 
+    def suite(self, system: str) -> dict[str, Any]:
+        return {"system": system, "sets": [], "running": None}
+
+    def suite_overall(self) -> dict[str, Any]:
+        return {"sets": [], "systems": []}
+
+    def start_suite(self, system: str, name: str, trials: int, mode: Any) -> str | None:
+        self.asked.append(("start_suite", system, name, trials, mode))
+        return None
+
+    async def stop_suite(self, system: str) -> bool:
+        return False
+
 
 @dataclass
 class Window:
@@ -287,6 +300,7 @@ async def test_what_is_the_admins_alone_is_refused_to_a_user(window: Open) -> No
         ("POST", "/api/auth/password", {"role": "user", "password": "one they chose themselves"}),
         ("GET", "/api/config", None),
         ("GET", "/api/evals", None),
+        ("GET", "/api/suite", None),
         ("POST", "/api/browsing-data/clear", None),
         ("POST", "/api/desktop", None),
         ("POST", "/api/systems/cloud/stop", None),
@@ -452,6 +466,10 @@ async def test_a_user_sees_of_the_evaluations_what_the_admin_lets_users_see(wind
     assert evals["may"] == {"cost": True, "traces": True, "checklist": True}
     assert (await one.ask("GET", "/api/systems/cloud/evals/t1", token=user))[1]["cost_usd"] == 0.02
     assert (await one.ask("POST", "/api/systems/cloud/checks", token=user))[0] == 200
+    # The task sets go with the checklist: who may run the one may run the other.
+    run = {"set": "short", "trials": 1, "mode": "reference"}
+    assert (await one.ask("GET", "/api/systems/cloud/suite", token=user))[0] == 200
+    assert (await one.ask("POST", "/api/systems/cloud/suite", run, token=user))[0] == 202
     # Where a system's files are is the admin's to know.
     listed = (await one.ask("GET", "/api/systems", token=user))[1]["systems"][0]
     assert "log" not in listed and "records" not in listed
@@ -471,6 +489,9 @@ async def test_a_user_sees_of_the_evaluations_what_the_admin_lets_users_see(wind
         0
     ] == 403
     assert (await one.ask("POST", "/api/systems/cloud/checks", token=user))[0] == 403
+    assert (await one.ask("GET", "/api/systems/cloud/suite", token=user))[0] == 403
+    assert (await one.ask("POST", "/api/systems/cloud/suite", run, token=user))[0] == 403
+    assert (await one.ask("POST", "/api/systems/cloud/suite/stop", token=user))[0] == 403
 
     await one.ask("PATCH", "/api/admin/policy", {"sees": {"evaluations": False, "log": True}}, token=admin)
     assert (await one.ask("GET", "/api/systems/cloud/evals", token=user))[0] == 403

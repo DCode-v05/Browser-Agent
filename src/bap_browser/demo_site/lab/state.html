@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>State of the practice site</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>State of the practice site</h1>
+<p class="lead">What was done here, for the check that follows a run.</p>
+<pre id="state" style="white-space: pre-wrap; word-break: break-all"></pre>
+</main>
+<script>
+document.body.prepend(bar('state.html'));
+document.getElementById('state').textContent = 'LABSTATE' + JSON.stringify(load()) + 'ENDSTATE';
+</script>
+</body>
+</html>

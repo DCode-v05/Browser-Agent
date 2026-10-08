@@ -1,0 +1,18 @@
+/* The lab's own few rules, beside the demo site's. */
+header nav a { color: #5b6472; text-decoration: none; }
+header nav a:hover { color: #1c2430; }
+main.lab { max-width: 720px; display: block; }
+.said { margin: 0 0 16px; padding: 10px 12px; border-radius: 9px; background: #eaf8f0; color: #137a43; font-weight: 600; }
+.items { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 10px; }
+.items li { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e3ded3; border-radius: 12px; padding: 12px 14px; }
+.items li > span:first-child, .items li > a:first-child { flex: 1; min-width: 0; }
+.items a { color: #1c2430; font-weight: 600; text-decoration: none; }
+.items .unread a { font-weight: 800; }
+button.small, a.small { font: inherit; font-weight: 600; padding: 7px 12px; border-radius: 9px; border: 1px solid #d6d0c4; background: #fff; color: #1c2430; cursor: pointer; text-decoration: none; }
+button.small:hover, a.small:hover { background: #f6f3ec; }
+button.danger { color: #b3261e; border-color: #e7b7b3; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+textarea { width: 100%; box-sizing: border-box; min-height: 110px; font: inherit; padding: 10px 12px; border: 1px solid #d6d0c4; border-radius: 9px; }
+h2 { font-size: 18px; margin: 26px 0 10px; }
+.total { font-weight: 700; margin: 0 0 18px; }
+.offscreen { position: absolute; left: -9999px; }

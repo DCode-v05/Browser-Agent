@@ -6,6 +6,7 @@ import asyncio
 import sys
 import webbrowser
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from bap_browser import browser_extension
@@ -13,7 +14,7 @@ from bap_browser.agent.loop import Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, ModelError, Said, ToolOutput
 from bap_browser.config import Config
 from bap_browser.driver.playwright_driver import PlaywrightDriver
-from bap_browser.evals.record import Outcome, Recorder
+from bap_browser.evals.record import Outcome, Recorder, TaskRecord
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
@@ -235,6 +236,15 @@ async def _next_task(tasks: asyncio.Queue[str], session: ServiceSession) -> str 
         await asyncio.gather(waiting, ended, return_exceptions=True)
 
 
+@dataclass(frozen=True)
+class Did:
+    """What came of one task: how it ended, what the agent answered, and its record where one is kept."""
+
+    outcome: Outcome
+    answer: str
+    record: TaskRecord | None
+
+
 async def _do(
     task: str,
     session: ServiceSession,
@@ -242,7 +252,7 @@ async def _do(
     config: Config,
     history: list[Message],
     recorder: Recorder | None = None,
-) -> None:
+) -> Did:
     """Runs one task and says how it went in the chat. With `recorder`, what the task took is
     kept: its time, its steps, its tokens and how it ended (spec 12.6)."""
     begun = len(history)
@@ -265,6 +275,7 @@ async def _do(
     )
     outcome: Outcome = "ended"
     answer = ""
+    record: TaskRecord | None = None
     try:
         answer = await run_agent(
             await _with_where_the_browser_is(task, session),
@@ -290,9 +301,10 @@ async def _do(
             session.said("agent", str(stopped), failed=not session.task_stopped())
     finally:
         if trace is not None:
-            trace.finish(outcome, answer)
+            record = trace.finish(outcome, answer)
         _tidy(history, begun)
         session.working(False)
+    return Did(outcome, answer, record)
 
 
 NOWHERE = ("", "about:blank")

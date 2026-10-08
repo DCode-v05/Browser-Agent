@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Practice site made ready</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1 id="done">Making ready</h1>
+<p class="lead">The practice site is put back to how it begins.</p>
+</main>
+<script>
+document.body.prepend(bar('reset.html'));
+let patch = {};
+try {
+  patch = JSON.parse(new URLSearchParams(location.search).get('seed') || '{}');
+} catch {
+  patch = {};
+}
+save(seeded(patch));
+document.getElementById('done').textContent = 'Ready';
+</script>
+</body>
+</html>

@@ -477,6 +477,11 @@ class Evals(Section):
     recent_tasks: int = setting(20, "The tasks the window lists for a browser, newest first")
     max_tasks_read: int = setting(2000, "The newest records a summary is made from")
     step_budget_ms: int = setting(2000, "The checklist's limit for one step in the browser")
+    suite_trials: int = setting(3, "How many times a run of a task set does each task, unless told otherwise")
+    suite_max_trials: int = setting(10, "The most times a run may do each task")
+    suite_trial_timeout_s: int = setting(300, "Then one try of a task is ended and counted as failed")
+    suite_runs_shown: int = setting(8, "The earlier runs of a task set whose pass rates are shown")
+    suite_answer_chars: int = setting(2000, "How much of a task's words and answer the record of a run keeps")
 
 
 class Bench(Section):

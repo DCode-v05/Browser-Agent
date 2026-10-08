@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Account</title>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<script src="lab.js"></script>
+<main class="narrow lab">
+<p class="said" id="said" role="status" hidden></p>
+<h1>Account</h1>
+<p class="lead" id="gone" hidden>This account was deleted.</p>
+<form class="card" id="profile">
+  <div class="field"><label for="name">Display name</label><input id="name" type="text" autocomplete="off"></div>
+  <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="off"></div>
+  <div class="field"><label for="country">Country</label><select id="country"><option>United Kingdom</option><option>India</option><option>Germany</option><option>Japan</option><option>Brazil</option></select></div>
+  <label class="check"><input id="newsletter" type="checkbox"> Send me the newsletter</label>
+  <button class="primary" type="submit">Save changes</button>
+</form>
+<div class="actions"><button class="small danger" type="button" id="delete">Delete account</button></div>
+</main>
+<script>
+document.body.prepend(bar('account.html'));
+function draw() {
+  const profile = load().profile;
+  document.getElementById('name').value = profile.name;
+  document.getElementById('email').value = profile.email;
+  document.getElementById('country').value = profile.country;
+  document.getElementById('newsletter').checked = profile.newsletter;
+  document.getElementById('gone').hidden = !profile.deleted;
+}
+document.getElementById('profile').addEventListener('submit', (event) => {
+  event.preventDefault();
+  change((state) => {
+    Object.assign(state.profile, {
+      name: document.getElementById('name').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      country: document.getElementById('country').value,
+      newsletter: document.getElementById('newsletter').checked,
+    });
+    state.profile.saved += 1;
+  });
+  draw();
+  said('Your changes are saved.');
+});
+document.getElementById('delete').addEventListener('click', () => {
+  change((state) => {
+    state.profile.deleted = true;
+  });
+  draw();
+  said('Your account is deleted.');
+});
+draw();
+</script>
+</body>
+</html>
