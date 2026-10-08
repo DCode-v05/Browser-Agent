@@ -48,7 +48,10 @@ async def test_what_is_typed_stays_out_of_the_log_and_out_of_element_names(
     make_config: Callable[..., Config], tmp_path: Path, site: str
 ) -> None:
     card, note = "4111 1111 1111 1111", "my pin is 9731"
-    async with open_session(make_config(tmp_path)) as session:
+    # Nobody watches here, and a card number is a person's to allow (spec 18.6). This test is about
+    # what is kept of what was typed, so the deployment waves that question through.
+    unasked = {"outgoing": {"sensitive_fields": False}}
+    async with open_session(make_config(tmp_path, safeguards=unasked)) as session:
         tools = Toolkit(session)
         page = await tools.call("browser_navigate", {"url": f"{site}/richtext.html"})
         await tools.call("browser_type", {"ref": ref_of(page.text, 'textbox "Card number"'), "text": card})
@@ -98,7 +101,9 @@ async def test_a_browser_that_went_away_is_said_to_be_gone_and_a_navigation_star
 async def test_a_form_is_filled_in_one_call_and_submitted_with_a_key(
     make_config: Callable[..., Config], tmp_path: Path, site: str
 ) -> None:
-    async with open_session(make_config(tmp_path)) as session:
+    # A password is a person's to allow (spec 18.6), and nobody watches here: see the test above.
+    unasked = {"outgoing": {"sensitive_fields": False}}
+    async with open_session(make_config(tmp_path, safeguards=unasked)) as session:
         tools = Toolkit(session)
         page = (await tools.call("browser_navigate", {"url": f"{site}/form.html"})).text
         name = ref_of(page, 'textbox "Full name"')

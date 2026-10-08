@@ -162,6 +162,7 @@ async def test_a_viewer_that_signs_in_is_sent_what_happened_then_the_picture_the
     kinds = [item["type"] if isinstance(item, dict) else "picture" for item in items]
     assert kinds == [
         "session_started",
+        "auto_changed",
         "tab_changed",
         "step_started",
         "step_finished",
@@ -169,8 +170,8 @@ async def test_a_viewer_that_signs_in_is_sent_what_happened_then_the_picture_the
         "caught_up",
     ]
     # A picture is one type byte and then the JPEG.
-    assert items[4] == b"\x01\xff\xd8 a picture"
-    assert before <= items[5]["ts"] <= time.time()
+    assert items[5] == b"\x01\xff\xd8 a picture"
+    assert before <= items[6]["ts"] <= time.time()
 
 
 async def test_what_happens_next_reaches_every_viewer(running: Running) -> None:

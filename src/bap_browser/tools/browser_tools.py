@@ -427,6 +427,17 @@ async def wait(session: BrowserSession, args: WaitArgs) -> str:
     )
 
 
+class BeginTaskArgs(Args):
+    task: str = Field(min_length=1)
+    sites: list[str] = Field(default=[])
+
+
+async def begin_task(session: BrowserSession, args: BeginTaskArgs) -> str:
+    if session.begin_task is None:
+        raise BrowserError("This session takes no task.", reason="it takes no task")
+    return await session.begin_task(args.task, args.sites)
+
+
 class RequestHumanArgs(Args):
     reason: str = Field(min_length=1, max_length=300)
     kind: Literal["login", "verification", "payment", "other"] = "other"
@@ -862,6 +873,14 @@ TOOLS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         "browser_downloads", "The files downloaded in this session, with size and path.", NoArgs, downloads
+    ),
+    ToolDefinition(
+        "browser_begin_task",
+        "Say what the person asked you to do, once, before you read any page: `task` in their own "
+        "words, and `sites`, the web sites it needs. The person is shown it, and your steps are "
+        "judged against it. Changing it later needs the person's yes.",
+        BeginTaskArgs,
+        begin_task,
     ),
     ToolDefinition(
         "browser_request_human",

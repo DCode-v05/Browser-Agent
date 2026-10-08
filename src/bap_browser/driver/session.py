@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Literal
 
 from bap_browser.config import Config
@@ -24,9 +25,33 @@ seconds go in; the outcome (`done`, `could_not`, `timed_out`) and what changed m
 
 
 ApprovalOutcome = Literal["allowed", "allowed_site", "denied", "expired", "unwatched"]
-AskApproval = Callable[[str, str, str, bool], Awaitable[ApprovalOutcome]]
-"""Asks a person whether an action may be done: the tool, what it will do in a sentence, and the
-site go in, and whether such an action is asked about every time; their answer comes out."""
+
+
+@dataclass(frozen=True)
+class Question:
+    """What a person is asked before an action is done (spec 8.2, 18.10)."""
+
+    tool: str
+    summary: str
+    """What the action will do, in a sentence."""
+    site: str
+    every_time: bool = False
+    """It cannot be allowed for the whole site: it is asked about every time."""
+    must_be_seen: bool = False
+    """A rule noticed something about the step. With nobody watching the answer is no, whatever
+    the deployment says of other questions."""
+    why: tuple[str, ...] = ()
+    """Each reason for asking, in the engine's own words."""
+    leaves: tuple[str, str, str] | None = None
+    """Text that would leave: the text, the site it was read on, and the site it goes to."""
+    amount: str = ""
+    """The amount of money the page shows at the control, as the page wrote it."""
+    said: str = ""
+    """In Auto Mode: the sentence of the model that rated the step."""
+
+
+AskApproval = Callable[[Question], Awaitable[ApprovalOutcome]]
+"""Asks a person whether an action may be done. Their answer comes out."""
 
 
 AskSite = Callable[[str, str, str], Awaitable[str | None]]
@@ -51,6 +76,12 @@ class BrowserSession:
         """Told when a call the bridge was asked about has finished: what was allowed once is over."""
         self.ask_approval: AskApproval | None = None
         """Set by whoever can reach a person. None when there is nobody to ask."""
+        self.watched: Callable[[], bool] = lambda: False
+        """Whether a person is watching this session now. Set by whoever shows it to people."""
+        self.begin_task: Callable[[str, Sequence[str]], Awaitable[str]] | None = None
+        """Takes the task an outside agent declares, and its sites. Set by the tool layer."""
+        self.tool_names: tuple[str, ...] = ()
+        """The tools on offer. Text of a page that names one of them is talking to an agent."""
         self._closed = False
         self.spend = Spend()
         """What the engine's own model calls have cost in this session (spec 18.8)."""
@@ -81,6 +112,10 @@ class BrowserSession:
             self._news.append(event)
         if self.on_event is not None:
             self.on_event(event)
+
+    def note(self, text: str) -> None:
+        """Something the agent must be told with its next result, that did not happen in the browser."""
+        self._news.append(Happened("notice", text))
 
     def take_news(self) -> list[str]:
         """What happened in the browser by itself since this was last asked."""

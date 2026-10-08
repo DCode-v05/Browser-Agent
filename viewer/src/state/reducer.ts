@@ -3,6 +3,7 @@
 
 import type {
   ApprovalOutcome,
+  AutoState,
   Backend,
   Box,
   ControlState,
@@ -10,12 +11,19 @@ import type {
   EndReason,
   HelpKind,
   HelpOutcome,
+  LimitKind,
+  LimitScope,
+  Mode,
   ServerEvent,
   TabInfo,
+  TaskSite,
 } from '../protocol';
 
 /** `refused`: the service did not accept the token. Trying again would change nothing. */
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'refused';
+
+/** How a safeguards check decided a step, for its timeline row's mark (spec 18.10). */
+export type StepMark = { kind: 'checked' } | { kind: 'allowed' } | { kind: 'refused'; reason: string };
 
 export interface Step {
   n: number;
@@ -32,6 +40,7 @@ export interface Step {
   url?: string;
   /** The picture on screen when the step finished. */
   picture?: string;
+  mark?: StepMark;
 }
 
 export interface Approval {
@@ -43,6 +52,14 @@ export interface Approval {
   everyTime: boolean;
   requestedAt: number;
   expiresAt: number;
+  /** Why the person is asked, each reason in words (spec 18.10). */
+  why?: string[];
+  /** What leaves to another site, copied from this one (the exception of 18.6). */
+  leaves?: { text: string; fromSite: string; toSite: string };
+  /** As the page shows it, e.g. "$84.00". */
+  amount?: string;
+  /** The check model's own sentence, in Auto Mode only. */
+  said?: string;
 }
 
 export interface HelpRequest {
@@ -97,6 +114,50 @@ export interface SessionInfo {
   startedAt: number;
 }
 
+/** The task the agent is on, and the sites it touches (spec 18.3, 18.10). */
+export interface TaskInfo {
+  task: string;
+  from: 'person' | 'agent';
+  sites: TaskSite[];
+}
+
+/** The newest word from the service on the "Ask before" setting and Auto Mode's own run state. */
+export interface AutoInfo {
+  mode: Mode;
+  state: AutoState;
+  why?: string;
+}
+
+/** A step the safeguards refused, kept so a person can allow it once (spec 18.4, 18.10). */
+export interface RefusedStep {
+  step: number;
+  /** Present when the step can be allowed once; absent for a hard stop, which has no such button. */
+  id: string | null;
+  label: string;
+  reason: string;
+  allowed: boolean;
+}
+
+export interface FlaggedPage {
+  id: number;
+  tab: string;
+  site: string;
+}
+
+export interface LimitInfo {
+  kind: LimitKind;
+  limit: number;
+  scope: LimitScope;
+  more?: number;
+}
+
+/** "Nobody is answering" (spec 18.10): a timeline row placed among the steps by its own time. */
+export interface UnansweredMarker {
+  key: string;
+  count: number;
+  at: number;
+}
+
 export interface ViewerState {
   connection: ConnectionStatus;
   session: SessionInfo | null;
@@ -123,6 +184,13 @@ export interface ViewerState {
   frame: { src: string; at: number } | null;
   /** Goes up when the settings changed, so the settings screen reads them again. */
   settingsVersion: number;
+  /** Null before an `auto_changed` has arrived: nothing is shown of the mode until then. */
+  auto: AutoInfo | null;
+  task: TaskInfo | null;
+  refused: RefusedStep[];
+  flagged: FlaggedPage[];
+  limit: LimitInfo | null;
+  unanswered: UnansweredMarker[];
 }
 
 export const initialState: ViewerState = {
@@ -146,6 +214,12 @@ export const initialState: ViewerState = {
   ended: null,
   frame: null,
   settingsVersion: 0,
+  auto: null,
+  task: null,
+  refused: [],
+  flagged: [],
+  limit: null,
+  unanswered: [],
 };
 
 export type Action =
@@ -247,12 +321,21 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
           everyTime: event.every_time === true,
           requestedAt: event.ts,
           expiresAt: event.ts + event.expires_in_s,
+          why: event.why,
+          leaves: event.leaves && { text: event.leaves.text, fromSite: event.leaves.from_site, toSite: event.leaves.to_site },
+          amount: event.amount,
+          said: event.said,
         },
       };
 
     case 'approval_closed': {
       if (state.approval?.id !== event.id) return state;
-      return withNotice({ ...state, approval: null }, { kind: 'approval', outcome: event.outcome, summary: state.approval.summary });
+      // The step that waited for this answer is the one still running: "you allowed" marks it.
+      const steps =
+        event.outcome === 'allowed' || event.outcome === 'allowed_site'
+          ? state.steps.map((step) => (step.status === 'running' ? { ...step, mark: { kind: 'allowed' as const } } : step))
+          : state.steps;
+      return withNotice({ ...state, approval: null, steps }, { kind: 'approval', outcome: event.outcome, summary: state.approval.summary });
     }
 
     case 'help_requested':
@@ -307,7 +390,47 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
         dialog: null,
         chat: { ...state.chat, working: false },
         ended: { reason: event.reason, detail: event.detail, at: event.ts },
+        // A limit bar has nothing left to limit once the session is over.
+        limit: null,
       };
+
+    case 'task_set':
+      return { ...state, task: { task: event.task, from: event.from, sites: event.sites } };
+
+    case 'task_ended':
+      return { ...state, task: null };
+
+    case 'sites_changed':
+      return state.task ? { ...state, task: { ...state.task, sites: event.sites } } : state;
+
+    case 'check_decided': {
+      const mark: StepMark | null = event.stage === 'reviewer' && event.outcome === 'run' ? { kind: 'checked' } : event.outcome === 'refuse' ? { kind: 'refused', reason: event.reason } : null;
+      const steps = mark ? state.steps.map((step) => (step.n === event.step ? { ...step, mark } : step)) : state.steps;
+      if (event.outcome !== 'refuse') return { ...state, steps };
+      const label = state.steps.find((step) => step.n === event.step)?.label ?? '';
+      const refused: RefusedStep = { step: event.step, id: event.refused_id ?? null, label, reason: event.reason, allowed: false };
+      return { ...state, steps, refused: [...state.refused, refused] };
+    }
+
+    case 'refused_allowed':
+      return { ...state, refused: state.refused.map((item) => (item.id === event.id ? { ...item, allowed: true } : item)) };
+
+    case 'page_flagged': {
+      const id = (state.flagged.at(-1)?.id ?? 0) + 1;
+      return { ...state, flagged: [...state.flagged, { id, tab: event.tab, site: event.site }] };
+    }
+
+    case 'auto_changed':
+      return { ...state, auto: { mode: event.mode, state: event.state, why: event.why } };
+
+    case 'limit_reached':
+      return { ...state, limit: { kind: event.kind, limit: event.limit, scope: event.scope, more: event.more } };
+
+    case 'limit_lifted':
+      return { ...state, limit: null };
+
+    case 'questions_unanswered':
+      return { ...state, unanswered: [...state.unanswered, { key: `unanswered-${state.unanswered.length + 1}`, count: event.count, at: event.ts }] };
 
     default:
       // An event from a newer service than this viewer knows. It changes nothing here.

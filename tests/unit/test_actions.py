@@ -39,7 +39,6 @@ ACTIONS = Actions()
         ("Authorize app", "grants"),
         ("Grant access", "grants"),
         ("Confirm seat", "commits"),
-        ("Finish", "commits"),
         ("पुष्टि करें", "commits"),
     ],
 )
@@ -52,6 +51,10 @@ def test_a_control_is_classed_by_what_its_name_says_it_does(name: str, kind: str
     [
         "Next",
         "Search",
+        # Wizards say these at every step: they are not what makes a step final.
+        "Finish",
+        "Proceed",
+        "Complete profile",
         # Words that open something more often than they send it are not in the lists.
         "Reply",
         "Share",

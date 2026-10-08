@@ -157,6 +157,82 @@ const BESIDE: Beat[] = [
   start(3, 'browser_click', 'Clicking "Find booking" (button)'),
 ];
 
+// Auto Mode and safeguards (spec 18.10): the same signup run, with the new events layered on.
+
+const AUTO_ON: Beat[] = [
+  SESSION_STARTED,
+  tab('New tab', 'about:blank'),
+  { after: 0, event: { type: 'auto_changed', mode: 'auto', state: 'on' } },
+  {
+    after: 0,
+    event: {
+      type: 'task_set',
+      task: 'Create an account on example.com with my name and email, then choose India as the country.',
+      from: 'person',
+      sites: [
+        { host: 'example.com', grade: 'named' },
+        { host: 'cdn.example', grade: 'added_read' },
+      ],
+    },
+  },
+  ...OPENING.slice(2),
+  { after: 100, event: { type: 'check_decided', step: 4, stage: 'reviewer', outcome: 'run', findings: [], reason: '' } },
+  CHOOSING_COUNTRY,
+];
+
+const REFUSED: Beat[] = [
+  ...OPENING,
+  ...TO_UPLOAD,
+  {
+    after: 200,
+    event: {
+      type: 'check_decided',
+      step: 6,
+      stage: 'reviewer',
+      outcome: 'refuse',
+      findings: ['sending_step'],
+      reason: 'this step would send something to other people, and the task did not ask for it',
+      refused_id: 'r1',
+    },
+  },
+  finish(6, 'Not done: this step would send something to other people, and the task did not ask for it.', { ok: true, takes: 10 }),
+];
+
+const FLAGGED: Beat[] = [...OPENING, { after: 300, event: { type: 'page_flagged', tab: 't1', site: 'example.com', rule: 'planted_instruction', count: 1 } }];
+
+const AUTO_PAUSED: Beat[] = [
+  ...OPENING,
+  { after: 0, event: { type: 'auto_changed', mode: 'auto', state: 'on' } },
+  CHOOSING_COUNTRY,
+  { after: 300, event: { type: 'auto_changed', mode: 'auto', state: 'paused', why: '3 steps in a row were refused' } },
+];
+
+const LIMIT_REACHED: Beat[] = [...OPENING, CHOOSING_COUNTRY, { after: 300, event: { type: 'limit_reached', kind: 'calls', limit: 500, scope: 'task', more: 100 } }];
+
+const EXTENDED_APPROVAL: Beat[] = [
+  ...OPENING,
+  ...TO_UPLOAD,
+  {
+    after: 250,
+    event: {
+      type: 'approval_requested',
+      id: 'a2',
+      tool: 'browser_upload_file',
+      summary: 'Upload cv.pdf to example.com',
+      site: 'example.com',
+      expires_in_s: 180,
+      why: ['this step sends a file to another site', 'the task did not name this site'],
+      leaves: { text: 'Lovelace, Ada — passport 4471', from_site: 'mail.example', to_site: 'example.com' },
+      amount: '$84.00',
+      said: 'The task does not mention a payment, but the page shows one before the file is sent.',
+    },
+    approval: {
+      allowed: [finish(6, 'Uploaded cv.pdf', { frame: '05-file', takes: 420 })],
+      denied: [finish(6, 'Could not upload cv.pdf: a person did not approve it', { ok: false, takes: 60 })],
+    },
+  },
+];
+
 /** One recording per state of spec 9.3 (and a few more), each stopping in that state. */
 export const STATES: Record<string, RecordedSession> = {
   no_agent: { name: 'no_agent', beats: [] },
@@ -188,6 +264,12 @@ export const STATES: Record<string, RecordedSession> = {
     name: 'own_browser',
     beats: [TAKEOVER_CHROME_START, tab('Sign up', SIGNUP), ...OPENING.slice(2).map((beat) => ({ ...beat, frame: undefined })), CHOOSING_COUNTRY],
   },
+  auto_on: { name: 'auto_on', beats: AUTO_ON },
+  refused: { name: 'refused', beats: REFUSED },
+  flagged: { name: 'flagged', beats: FLAGGED },
+  auto_paused: { name: 'auto_paused', beats: AUTO_PAUSED },
+  limit_reached: { name: 'limit_reached', beats: LIMIT_REACHED },
+  extended_approval: { name: 'extended_approval', beats: EXTENDED_APPROVAL },
 };
 
 export const SESSIONS: Record<string, RecordedSession> = { signup: SIGNUP_SESSION };

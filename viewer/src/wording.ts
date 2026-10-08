@@ -82,6 +82,11 @@ export const W = {
       newSession: 'Starts a new browser and a new conversation on this page.',
       copyConfig: 'Copies the version, the browser and the changed configuration, as text.',
       copyFolder: "Copies the folder's path, to paste into Chrome's file chooser.",
+      resumeAuto: 'Turns Auto Mode back on. You are asked about risky steps until you do.',
+      allowMore: 'Lets the task go on, without reaching its limit again at once.',
+      endTask: 'Ends the task the agent is on. The session goes on.',
+      dropSite: 'Takes this site off the task. The agent cannot act on it until it is added again.',
+      allowRefused: 'Lets the agent do this one refused step. It is refused again the next time.',
     },
   },
 
@@ -102,6 +107,9 @@ export const W = {
       hintEveryTime: 'The agent waits. This step is asked about every time: it is allowed once, or not at all.',
       later: 'Look first',
     },
+    why: (reason: string) => `Why you are asked: ${reason}`,
+    leaves: (text: string, fromSite: string, toSite: string) => `Will type, copied from ${fromSite}: '${text}', to ${toSite}`,
+    amount: (amount: string) => `The page shows ${amount}`,
     outcome: {
       allowed: 'Allowed once',
       allowed_site: 'Allowed on this site',
@@ -593,5 +601,60 @@ export const W = {
     newStep: (text: string) => text,
     approval: (summary: string) => `Approval needed: ${summary}. Press A to go to it.`,
     help: (reason: string) => `The agent asked for help: ${reason}. Press A to go to it.`,
+  },
+
+  // Auto Mode and safeguards (spec 18.10).
+  autoMode: {
+    mode: {
+      every_action: 'Asks every step',
+      risky: 'Asks for risky steps',
+      auto: 'Auto',
+      auto_paused: 'Auto, paused',
+      auto_waiting_for_task: 'Auto starts with the next task',
+      auto_unavailable: 'Auto is unavailable',
+    },
+    notice: {
+      title: 'Auto',
+      body: [
+        'The agent works without asking you at each step. Fixed rules and a second model look at each step first. Steps that look safe run. A step the rules know as paying, sending, deleting or giving an app access is asked of you when your task asked for it, and refused when it did not. Typing a password or a card number is always asked of you.',
+        'Auto asks you less. It does not make the agent safe. The second model can be wrong, and a page can try to fool it. The rules know only the words and the sites they were given. Each step is judged by itself, and the task you gave is trusted. Stay near for anything that matters, and keep tasks narrow.',
+      ],
+      turnOn: 'Turn on Auto',
+      notNow: 'Not now',
+    },
+    task: {
+      line: (text: string) => `Task: ${text}`,
+      byAgent: 'Declared by the agent',
+      site: {
+        mayAct: (host: string) => `${host}, may act`,
+        readOnly: (host: string) => `${host}, read only`,
+      },
+      drop: (host: string) => `Drop ${host}`,
+    },
+    mark: {
+      checked: 'checked',
+      allowed: 'you allowed',
+      refused: (reason: string) => `Refused: ${reason}`,
+    },
+    refusedList: {
+      title: 'Refused',
+      allowed: 'Allowed once',
+    },
+    flagged: {
+      title: 'A page was flagged',
+      notice: (site: string) => `Hidden instructions were found on ${site} and withheld from the agent.`,
+    },
+    paused: {
+      bar: (why: string) => `Auto is paused: ${why}. You are asked about risky steps now.`,
+      resume: 'Resume Auto',
+    },
+    limit: {
+      calls: (scope: string, limit: number) => `This ${scope} reached its limit of ${limit} steps.`,
+      minutes: (scope: string, limit: number) => `This ${scope} reached its limit of ${limit} minutes.`,
+      spend: (scope: string, amount: string) => `This ${scope} reached its spending limit of ${amount} for model calls.`,
+      allowMore: (more: number) => `Allow ${more} more`,
+      endTask: 'End task',
+    },
+    unanswered: (count: number) => `${count} ${count === 1 ? 'question' : 'questions'} ran out unanswered. Further ones are refused until you are back.`,
   },
 } as const;

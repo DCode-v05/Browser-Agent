@@ -308,6 +308,8 @@ class Studio:
         finds this one."""
         before = self.sessions.get(room.id)
         self.sessions[room.id] = room.session = session
+        if self.service is not None:
+            session.served_at(self.service.address)
         if before is not None:
             before.hub.start_over()
 

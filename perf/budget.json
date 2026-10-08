@@ -281,6 +281,13 @@
       "scenario": "Resume the agent after hand-back",
       "target_ms": 100.0,
       "fail_ms": 250.0
+    },
+    {
+      "id": "begin_task.set",
+      "tool": "browser_begin_task",
+      "scenario": "Set a task with three sites",
+      "target_ms": 5.0,
+      "fail_ms": 20.0
     }
   ]
 }

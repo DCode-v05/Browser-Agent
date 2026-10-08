@@ -49,6 +49,7 @@ class Service:
         whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
         may sign in as the admin or as a user (spec 4.11)."""
         self._config = config
+        self._sessions = sessions
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
         self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
@@ -130,6 +131,9 @@ class Service:
         self.port = listener.getsockname()[1]
         if self.bridge is not None:
             self.bridge.own_address = self.address
+        for session in self._sessions.values():
+            # The start page and the demo site are served from here: they are no stranger's pages.
+            session.served_at(self.address)
         self._server = uvicorn.Server(
             uvicorn.Config(
                 self._app,

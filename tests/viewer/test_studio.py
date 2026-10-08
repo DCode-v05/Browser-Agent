@@ -590,7 +590,7 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         assert await systems.get_by_role("switch", name="Use this browser").count() == 0
         # Every switch says what it lets a user do, and works.
         switches = await users.get_by_role("switch").all()
-        assert len(switches) == 13
+        assert len(switches) == 17
         assert await users.locator(".system-row-hint:empty").count() == 0
         cost = users.get_by_role("switch", name="What users may see: What the tasks cost")
         await turned(cost, False)

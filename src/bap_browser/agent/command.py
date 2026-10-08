@@ -200,6 +200,7 @@ async def chat_in_own_chrome(
         session.browser.site_done = bridge.permit_done
         await _unless_stopped(session.start(), service)
         sessions[session.name] = session
+        session.served_at(service.address)
         browser_extension.announce(extension, service.viewer_address, bridge=service.bridge_address)
         await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
         tell("Type a task in the side panel's chat. Press Ctrl+C to end.")
@@ -247,7 +248,7 @@ async def _do(
     """Runs one task and says how it went in the chat. With `recorder`, what the task took is
     kept: its time, its steps, its tokens and how it ended (spec 12.6)."""
     begun = len(history)
-    session.working(True)
+    session.working(True, task)
     # A person may have chosen another model for this browser since the last task (spec 10.2).
     use = getattr(model, "use", None)
     if callable(use):

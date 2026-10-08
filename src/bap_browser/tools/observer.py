@@ -6,9 +6,10 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from bap_browser.driver.base import Box, TabInfo
+from bap_browser.safeguards.check import CheckObserver
 
 
-class StepObserver(Protocol):
+class StepObserver(CheckObserver, Protocol):
     def step_started(self, step: int, tool: str, label: str, target: Box | None) -> None:
         """A call is about to run. `label` says what the agent is doing; `target` is where on the page."""
         ...
@@ -21,6 +22,11 @@ class StepObserver(Protocol):
 
     def navigation_blocked(self, url: str, reason: str) -> None:
         """The policy refused an address."""
+        ...
+
+    def task_declared(self, limit_lifted: bool) -> None:
+        """An outside agent stated its task (spec 18.3). `limit_lifted` says that a limit which had
+        stopped the task before no longer holds."""
         ...
 
     def limit_reached(self, kind: str, limit: float, on_a_task: bool) -> None:

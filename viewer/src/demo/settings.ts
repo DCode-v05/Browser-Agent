@@ -75,6 +75,7 @@ const CATALOGUE: Entry[] = [
     choices: [
       { value: 'risky', label: 'Risky actions', hint: 'Uploads, page scripts and whatever your organisation lists' },
       { value: 'every_action', label: 'Every action', hint: 'Each click, key press and page change' },
+      { value: 'auto', label: 'Auto', hint: 'Fixed rules and a second model check each step; asks you less' },
     ],
     default: 'risky',
     locked: false,

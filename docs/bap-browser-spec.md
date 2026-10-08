@@ -2359,6 +2359,7 @@ Median milliseconds. Reference is Chromium / Chrome / Edge on small local pages 
 | `browser_downloads` | Click until a small file is on disk | 122 / 189 / 391 | 200 | 500 |
 | `browser_request_human` | Raise the request in the viewer | none | 20 | 50 |
 | `browser_request_human` | Resume the agent after hand-back | none | 100 | 250 |
+| `browser_begin_task` | Set a task with three sites | none | 5 | 20 |
 | `browser_run` (milestone 4) | Added time beyond the script's own steps, worker warm | none | 10 | 30 |
 | `browser_run` (milestone 4) | First call, including starting the worker | none | 300 | 800 |
 
@@ -3732,7 +3733,7 @@ into.
 | `sends` | send, sent, sending, post, submit, publish, tweet, भेजें, पोस्ट करें, जमा करें, सबमिट | Enter or Ctrl+Enter pressed in a message box; a typing step with `submit: true` there; the submit button of a form that holds a message box |
 | `deletes` | delete, deleting, remove, erase, discard, clear all, cancel order, unsubscribe, deactivate, close account, हटाएं, हटाएँ, मिटाएं, रद्द करें | |
 | `grants` | authorize, authorise, grant, grant access, allow access | The page is a grant-access screen (18.6) and the control agrees to it |
-| `commits` | confirm, finish, complete, proceed, पुष्टि करें | A word of `permissions.consequential_words` that is in no class above |
+| `commits` | confirm, पुष्टि करें. Not finish, complete or proceed: a wizard says those at every step | A word of `permissions.consequential_words` that is in no class above |
 
 - A message box is a text area, an editable block, or a field whose name or label holds message, comment, reply, review, post, body, subject, to or recipient. A search box (a `search` field, or the one text field of its form) is not.
 - A word in Latin letters is matched whole and without regard to case. A word in another script is looked for anywhere in the name.
@@ -3766,14 +3767,14 @@ running on a model's word.
 | `consequential_word` | The class `commits` | Unsure | 18.4, 8.6 |
 | `cross_site_text` | Text read on one site is about to be typed or sent to another | Unsure, and held at high for the reviewer | 18.6 |
 | `hidden_characters_out` | What the agent types or opens holds characters nobody can see | Unsure | 18.5 |
-| `long_address` | The agent opens a long address: in Auto Mode on a site outside the task, in `risky` on a site the session has not been to | Unsure | 18.6 |
+| `long_address` | The agent opens a long address on a site the session has not been to and the task does not name | Unsure, settled once for the site | 18.6 |
 | `download_kept` | A file arrived on the person's own machine; or an archive, an HTML file or an SVG file arrived on any backend | Unsure, after the step | 18.6 |
 | `site_outside_task` | A site that is not one of the task's | Unsure, in Auto Mode, cloud and built-in | 18.3 |
 | `first_action_on_added_site` | The first acting step on a site of grade `added, read` | Unsure, in Auto Mode | 18.3 |
-| `step_on_sensitive_site` | An acting step on a sensitive site | Unsure; refuse when nobody is watching | 18.7 |
+| `step_on_sensitive_site` | An acting step on a sensitive site | Unsure, in Auto Mode: in the other modes the person agreed when the site was entered. Refuse, in every mode, when nobody is watching | 18.7 |
 | `step_on_flagged_page` | An acting step while the page is flagged | Unsure | 18.5 |
-| `ip_host` | The host is a bare public IP address | Unsure | 18.7 |
-| `young_domain` | The domain was registered a few days ago (optional) | Unsure | 18.7 |
+| `ip_host` | A step presses or types on a site whose host is a bare public IP address | Unsure, in Auto Mode only, settled once for the site. A weak sign: it is for the reviewer to weigh, and no person is asked about it | 18.7 |
+| `young_domain` | The domain was registered a few days ago (optional) | Unsure, in Auto Mode only, as `ip_host` | 18.7 |
 | `unseen_text`, `invisible_characters` | Text or characters a person cannot see were left out | Note. The page is not flagged for this alone | 18.5 |
 | `planted_instruction`, `command_lure`, `fake_engine_words` | The scan found text that talks to an agent | Note, and the page is flagged | 18.5 |
 
@@ -4244,7 +4245,7 @@ by a message, and pastes what they were sent.
 | `lookalike_site` | The site's registrable name is not a protected name, and either (a) the first label of its registrable name is close to the first label of a protected name; or (b) the first label of a protected name stands in the host as a whole label, or as a part between hyphens, with a lure word beside it | Person: "This site looks like paypal.com and is not it." |
 | `mixed_script_site` | The host is an international name (`xn--`) and one of its labels mixes writing systems, or becomes a protected name when its look-alike letters are read as Latin ones | Person |
 | `data_address` | The agent asks to open a `data:` or `blob:` address. A page that is such an address and holds a sensitive field: typing there is refused | Person; refuse |
-| `ip_host` | The host is a bare public IP address | Unsure |
+| `ip_host` | The host is a bare public IP address, and a step presses or types there | Unsure, in Auto Mode only |
 
 - **Close** means an edit distance of 1 for labels of 5 to 8 letters and of 2 for longer ones, a swap of two neighbouring letters counting as 1, after look-alike letters are read as the Latin ones. Labels under 5 letters are not measured. A label in `safeguards.sites.common_words` is never close to anything: ordinary words and well-known names that happen to sit one letter from a protected name.
 - **A lure word** is one of `safeguards.sites.lure_words`: login, signin, sign-in, logon, secure, security, verify, verification, account, update, support, billing, payment, wallet, auth, confirm, recover, unlock, bank, help. So `paypal.secure-login.example` and `paypal-login.example` are look-alikes, and `paypal.reviews.example` is not.
@@ -4512,7 +4513,7 @@ admin's 0.
 | `outgoing.filter_bits` / `filter_hashes` | 1048576 / 4 | The memory of one site: 128 kilobytes |
 | `outgoing.remember_chars_per_site` / `remember_sites` | 250000 / 16 | When a site's memory begins again; how many sites |
 | `outgoing.secrets_per_site` | 2000 | Short secrets remembered for one site |
-| `outgoing.decode_min_chars` | 12 | The shortest packed run that is unpacked |
+| `outgoing.decode_min_chars` | 8 | The shortest packed run that is unpacked: a code of six digits is eight characters of Base64 |
 | `outgoing.question_chars` | 300 | How much of the text the person is shown |
 | `outgoing.long_address_chars` | 200 | A long address |
 | `outgoing.grant_access` | `true` | Ask before agreeing to give an app access |

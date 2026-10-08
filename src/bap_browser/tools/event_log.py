@@ -14,7 +14,7 @@ from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
 # What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.
-TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression"})
+TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression", "task"})
 ADDRESS_ARGUMENTS = frozenset({"url"})
 # A key press that types a character is typed text. A named key, such as Enter, is not.
 KEYS_ARGUMENT = "keys"
@@ -62,8 +62,17 @@ class EventLog:
         self._settings = settings
         self._path = Path(settings.event_log) if settings.event_log else None
 
-    def write(self, tool: str, arguments: Mapping[str, Any], result: ToolResult, ms: float) -> None:
-        """`arguments` are written as given: the caller has already taken out what must not be kept."""
+    def write(
+        self,
+        tool: str,
+        arguments: Mapping[str, Any],
+        result: ToolResult,
+        ms: float,
+        check: Mapping[str, Any] | None = None,
+    ) -> None:
+        """`arguments` are written as given: the caller has already taken out what must not be kept.
+        `check` is what the check decided about the call (spec 18.9): never page text, typed text
+        or a model's own sentence."""
         if self._path is None:
             return
         line: dict[str, Any] = {"ts": round(time.time(), 3), "tool": tool}
@@ -73,6 +82,7 @@ class EventLog:
             "ok": not result.is_error,
             "ms": round(ms, 1),
             "chars": len(result.text),
+            **({"check": dict(check)} if check is not None else {}),
             # The first line says what was done. What follows is the page, which can hold anything.
             "result": result.text.split("\n", 1)[0][: self._settings.max_result_chars],
         }

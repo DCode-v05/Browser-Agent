@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App, type AppProps } from './App';
 import type { Connection, ConnectionHandlers } from './connection/connection';
@@ -500,6 +500,41 @@ describe('settings', () => {
     expect(await within(dialog).findByText('Saved')).toBeInTheDocument();
   });
 
+  describe('choosing Auto (spec 18.10)', () => {
+    afterEach(() => localStorage.removeItem('bap-browser.auto-notice-accepted'));
+
+    it('shows the first-time notice; "Not now" leaves the setting as it was', async () => {
+      const { user, dialog } = await open();
+      await user.click(within(dialog).getByRole('tab', { name: 'Approvals' }));
+      await user.click(within(dialog).getByRole('radio', { name: /^Auto/ }));
+      const notice = screen.getByRole('alertdialog', { name: 'Auto' });
+      expect(within(notice).getByText(/The agent works without asking you at each step\./)).toBeInTheDocument();
+      expect(within(dialog).getByRole('radio', { name: /^Auto/ })).not.toBeChecked();
+      await user.click(within(notice).getByRole('button', { name: 'Not now' }));
+      expect(screen.queryByRole('alertdialog', { name: 'Auto' })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole('radio', { name: /^Auto/ })).not.toBeChecked();
+      expect(within(dialog).queryByText('Saved')).not.toBeInTheDocument();
+    });
+
+    it('"Turn on Auto" saves the setting as it would have been', async () => {
+      const { user, dialog } = await open();
+      await user.click(within(dialog).getByRole('tab', { name: 'Approvals' }));
+      await user.click(within(dialog).getByRole('radio', { name: /^Auto/ }));
+      await user.click(within(screen.getByRole('alertdialog', { name: 'Auto' })).getByRole('button', { name: 'Turn on Auto' }));
+      expect(within(dialog).getByRole('radio', { name: /^Auto/ })).toBeChecked();
+      expect(await within(dialog).findByText('Saved')).toBeInTheDocument();
+    });
+
+    it('is not shown again once it has been accepted', async () => {
+      localStorage.setItem('bap-browser.auto-notice-accepted', 'true');
+      const { user, dialog } = await open();
+      await user.click(within(dialog).getByRole('tab', { name: 'Approvals' }));
+      await user.click(within(dialog).getByRole('radio', { name: /^Auto/ }));
+      expect(screen.queryByRole('alertdialog', { name: 'Auto' })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole('radio', { name: /^Auto/ })).toBeChecked();
+    });
+  });
+
   it('a setting that starts a new browser says it applies to the next session', async () => {
     const { user, dialog } = await open();
     await user.click(within(dialog).getByRole('switch', { name: 'Stay signed in to sites' }));
@@ -920,5 +955,90 @@ describe("beside a browser that is a window on the person's own screen", () => {
     const question = screen.getByRole('alertdialog');
     await user.click(within(question).getByRole('button', { name: 'Stop session' }));
     expect(types(sent)).toEqual(['stop']);
+  });
+});
+
+describe('Auto Mode and safeguards (spec 18.10)', () => {
+  it('the mode chip and the task line, with its sites as chips', () => {
+    show('auto_on');
+    expect(button('Auto')).toBeInTheDocument();
+    expect(screen.getByText('Task: Create an account on example.com with my name and email, then choose India as the country.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'example.com, may act' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'cdn.example, read only' })).toBeInTheDocument();
+  });
+
+  it('a checked step carries its mark in the timeline', () => {
+    show('auto_on');
+    const log = screen.getByRole('log', { name: 'Steps' });
+    expect(within(log).getByText('checked')).toBeInTheDocument();
+  });
+
+  it('activating the mode chip opens settings, the same way the settings control does', async () => {
+    const { user } = show('auto_on');
+    await user.click(button('Auto'));
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  it('a chip\'s button drops that site from the task', async () => {
+    const { sent, user } = show('auto_on');
+    await user.click(screen.getByRole('button', { name: 'Drop cdn.example' }));
+    expect(sent).toEqual([{ type: 'drop_site', host: 'cdn.example' }]);
+    expect(await screen.findByRole('group', { name: 'example.com, may act' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /cdn\.example/ })).not.toBeInTheDocument();
+  });
+
+  it('a refused step is marked in the timeline, and listed under "Refused" with "Allow once"', async () => {
+    const { sent, user } = show('refused');
+    const log = screen.getByRole('log', { name: 'Steps' });
+    expect(within(log).getByText('Refused: this step would send something to other people, and the task did not ask for it')).toBeInTheDocument();
+    const list = screen.getByRole('group', { name: 'Refused' });
+    expect(within(list).getByText('Uploading cv.pdf')).toBeInTheDocument();
+    await user.click(within(list).getByRole('button', { name: 'Allow once' }));
+    expect(sent).toEqual([{ type: 'allow_refused', id: 'r1' }]);
+    expect(await within(list).findByText('Allowed once')).toBeInTheDocument();
+    expect(within(list).queryByRole('button', { name: 'Allow once' })).not.toBeInTheDocument();
+  });
+
+  it('a flagged page warns, and can be closed', async () => {
+    const { user } = show('flagged');
+    expect(screen.getByText('Hidden instructions were found on example.com and withheld from the agent.')).toBeInTheDocument();
+    const card = screen.getByRole('group', { name: 'A page was flagged' });
+    await user.click(within(card).getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText('Hidden instructions were found on example.com and withheld from the agent.')).not.toBeInTheDocument();
+  });
+
+  it('Auto paused offers Resume Auto, which turns Auto back on', async () => {
+    const { sent, user } = show('auto_paused');
+    expect(button('Auto, paused')).toBeInTheDocument();
+    expect(screen.getByText('Auto is paused: 3 steps in a row were refused. You are asked about risky steps now.')).toBeInTheDocument();
+    await user.click(button('Resume Auto'));
+    expect(sent).toEqual([{ type: 'resume_auto' }]);
+    expect(await button('Auto')).toBeInTheDocument();
+    expect(screen.queryByText(/Auto is paused/)).not.toBeInTheDocument();
+  });
+
+  it('a limit reached offers Allow more and End task, and goes away once allowed', async () => {
+    const { sent, user } = show('limit_reached');
+    expect(screen.getByText('This task reached its limit of 500 steps.')).toBeInTheDocument();
+    await user.click(button('Allow 100 more'));
+    expect(sent).toEqual([{ type: 'extend_limit' }]);
+    await waitFor(() => expect(screen.queryByText('This task reached its limit of 500 steps.')).not.toBeInTheDocument());
+  });
+
+  it('End task sends the command and the limit bar goes away', async () => {
+    const { sent, user } = show('limit_reached');
+    await user.click(button('End task'));
+    expect(sent).toEqual([{ type: 'end_task' }]);
+    await waitFor(() => expect(screen.queryByText('This task reached its limit of 500 steps.')).not.toBeInTheDocument());
+  });
+
+  it('the approval question gains why, what leaves, the amount and the check\'s sentence', () => {
+    show('extended_approval');
+    const popup = screen.getByRole('dialog', { name: 'The agent needs your approval' });
+    expect(within(popup).getByText('Why you are asked: this step sends a file to another site')).toBeInTheDocument();
+    expect(within(popup).getByText('Why you are asked: the task did not name this site')).toBeInTheDocument();
+    expect(within(popup).getByText("Will type, copied from mail.example: 'Lovelace, Ada — passport 4471', to example.com")).toBeInTheDocument();
+    expect(within(popup).getByText('The page shows $84.00')).toBeInTheDocument();
+    expect(within(popup).getByText('The task does not mention a payment, but the page shows one before the file is sent.')).toBeInTheDocument();
   });
 });

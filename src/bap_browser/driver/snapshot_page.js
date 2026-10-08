@@ -550,18 +550,102 @@
     return { describe: described, hadText };
   }
 
-  // What an element is and where, without touching the page.
+  const isTextField = (el) =>
+    el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(inputType(el))) || el.isContentEditable;
+
+  // The control that a press at a point lands on: the element there, or the control it is part of.
+  function pressedAt(x, y) {
+    const hit = elementAt(x, y);
+    for (let el = hit; el && el !== document.documentElement; el = el.parentElement || el.getRootNode().host) {
+      if (INTERACTIVE.has(roleOf(el))) return el;
+    }
+    return hit;
+  }
+
+  const textFieldsOf = (form) => Array.from(form.querySelectorAll('input, textarea, [contenteditable]')).filter(isTextField);
+
+  // A box people search in: a search field, or the one field of its form.
+  function isSearchBox(el) {
+    if (el.tagName !== 'INPUT') return roleOf(el) === 'searchbox';
+    const form = el.form;
+    return inputType(el) === 'search' || roleOf(el) === 'searchbox' || (Boolean(form) && textFieldsOf(form).length === 1);
+  }
+
+  // Whether pressing an element sends the form it is in.
+  function sendsItsForm(el) {
+    const type = (el.getAttribute('type') || '').toLowerCase();
+    if (el.tagName === 'BUTTON') return type !== 'button' && type !== 'reset';
+    return el.tagName === 'INPUT' && (type === 'submit' || type === 'image');
+  }
+
+  // The nearest part of the page around a control that says more than the control itself.
+  const LEVELS_AROUND = 4;
+  function blockAround(el) {
+    const own = (el.innerText || '').length;
+    let around = el;
+    for (let up = 0; up < LEVELS_AROUND && around.parentElement && around.parentElement !== document.body; up++) {
+      around = around.parentElement;
+      if ((around.innerText || '').length > own) break;
+    }
+    return around;
+  }
+
+  // What the check needs to know of an element besides its name (spec 18.4, 18.6): of a field,
+  // what kind of thing is typed into it; of a control that is pressed, what pressing it sends
+  // and what stands near it.
+  const FIELDS_OF_A_FORM = 20;
+  function facts(el, a) {
+    const tag = el.tagName;
+    const out = { document: tag === 'IFRAME' && el.src ? el.src : location.href };
+    if (isTextField(el)) {
+      const type = tag === 'INPUT' ? inputType(el) : '';
+      out.inputType = type;
+      out.autocomplete = (el.getAttribute('autocomplete') || '').trim().toLowerCase();
+      out.attributes = [el.getAttribute('name'), el.id].filter(Boolean).map((text) => clean(text, a.maxName));
+      out.dots = type !== 'password' && (getComputedStyle(el).webkitTextSecurity || 'none') !== 'none';
+      out.multiline = tag !== 'INPUT';
+      out.search = isSearchBox(el);
+    } else if (a.press) {
+      const form = el.form || el.closest('form');
+      if (form && sendsItsForm(el)) {
+        out.sendsForm = textFieldsOf(form)
+          .slice(0, FIELDS_OF_A_FORM)
+          .map((field) => [roleOf(field) || 'textbox', nameOf(field, roleOf(field), a) || '', field.tagName !== 'INPUT', isSearchBox(field)]);
+      }
+      out.around = [form ? clean(form.innerText || '', a.maxAround) : '', clean(blockAround(el).innerText || '', a.maxAround)];
+    }
+    return out;
+  }
+
+  // What an element is and where, without touching the page. Without a ref: the control at a
+  // point, or the element that has the focus.
   function locate(a) {
-    const el = resolve(a.ref);
-    if (!el) return { error: 'stale' };
+    const el = a.ref ? resolve(a.ref) : a.focused ? focused() : pressedAt(a.x, a.y);
+    if (a.ref && !el) return { error: 'stale' };
+    if (!el || el === document.body || el === document.documentElement) return { error: 'nothing' };
     const point = target(el);
     const shown = point && point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight;
     const secret = el.tagName === 'INPUT' && inputType(el) === 'password';
-    return { ...identify(el, a), secret, kind: kindOf(el), box: shown ? point.box.split(',').map(Number) : null };
+    return {
+      ...identify(el, a),
+      secret,
+      kind: kindOf(el),
+      box: shown ? point.box.split(',').map(Number) : null,
+      ...facts(el, a),
+    };
   }
 
-  const isTextField = (el) =>
-    el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(inputType(el))) || el.isContentEditable;
+  // What the page says it is about, in a few words: its headings and its buttons (spec 18.6).
+  function gist(a) {
+    const said = [];
+    for (const el of document.querySelectorAll('h1, h2, h3, [role=heading], button, [role=button], input[type=submit]')) {
+      if (said.length >= a.limit) break;
+      if (visibility(el) !== SHOWN) continue;
+      const text = clean(el.innerText || el.value || el.getAttribute('aria-label') || '', a.maxName);
+      if (text) said.push(text);
+    }
+    return said;
+  }
 
   const isNativeCheck = (el) => el.tagName === 'INPUT' && (inputType(el) === 'checkbox' || inputType(el) === 'radio');
 
@@ -820,6 +904,6 @@
     return { data: btoa(text) };
   }
 
-  Object.assign(operations, { locate, prepare, holds, focus, text, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label, shrink, frameBox, intoView });
+  Object.assign(operations, { locate, gist, prepare, holds, focus, text, scrolled, wheelPoint, at, reveal, focusOn, select, checkable, waitText, area, label, shrink, frameBox, intoView });
   globalThis.__bap.withActions = true;
 })();

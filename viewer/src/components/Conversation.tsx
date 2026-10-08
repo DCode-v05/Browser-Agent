@@ -6,10 +6,11 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type R
 
 import type { ClientCommand } from '../protocol';
 import type { Step, ViewerState } from '../state/reducer';
-import { formatDuration } from '../state/timeline';
+import { formatDuration, markText } from '../state/timeline';
 import { transcript } from '../state/transcript';
 import type { ControlName, StateView } from '../state/view';
 import { W } from '../wording';
+import { ModeChip, TaskLine } from './AutoMode';
 import { agentStatus } from './ChatPanel';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
@@ -46,6 +47,11 @@ function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number
             <span className="talk-row-text">{step.status === 'running' ? step.label : (step.summary ?? step.label)}</span>
             {step.status === 'failed' && <span className="sr-only">{W.timeline.failed}</span>}
             {step.status === 'running' && <span className="sr-only">{W.timeline.running}</span>}
+            {step.mark && (
+              <span className="row-mark" data-kind={step.mark.kind}>
+                {markText(step.mark)}
+              </span>
+            )}
             {step.ms !== undefined && <span className="talk-row-time">{formatDuration(step.ms)}</span>}
           </button>
         </li>
@@ -147,6 +153,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           <span className="agent-status-dot" aria-hidden="true" />
           {W.chat.status[status]}
         </span>
+        <ModeChip auto={state.auto} onClick={onOpenSettings} />
         <span className="top-bar-space" />
         <Button kind="quiet" icon="settings" onClick={onOpenSettings} ref={settingsRef} label={W.buttons.openSettings}>
           {null}
@@ -157,6 +164,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           </Button>
         )}
       </header>
+      <TaskLine task={state.task} onDrop={(host) => onCommand({ type: 'drop_site', host })} />
 
       <div className="talk-scroll">
         <div className="talk-items" role="log" aria-label={W.chat.messages}>

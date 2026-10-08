@@ -54,6 +54,8 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
 
         one = await tools.call("browser_upload_file", {"ref": field, "paths": ["cv.txt"]})
         assert one.text.startswith(f'Uploaded cv.txt via {field} (button "Your CV").'), one.text
+        # The page reads the file before it says what was chosen, and that takes it a moment.
+        await tools.call("browser_wait", {"text": "Chosen: cv.txt"})
         assert "Chosen: cv.txt (my cv)" in (await tools.call("browser_get_text", {})).text
 
         # A button that opens the file chooser takes them too, by full path as well as by name.
@@ -61,6 +63,7 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
             "browser_upload_file", {"ref": button, "paths": ["cv.txt", str(folder / "photo.txt")]}
         )
         assert two.text.startswith(f'Uploaded cv.txt, photo.txt via {button} (button "Attach files").')
+        await tools.call("browser_wait", {"text": "photo.txt (my photo)"})
         assert (
             "Chosen: cv.txt (my cv), photo.txt (my photo)" in (await tools.call("browser_get_text", {})).text
         )
@@ -115,7 +118,7 @@ async def test_an_upload_waits_for_a_person_and_is_not_offered_where_it_could_ne
         return {tool.name for tool in Toolkit(session).definitions()}
 
     everything = offered(javascript={"allow_evaluate": True})
-    assert len(everything) == 28
+    assert len(everything) == 29
     assert everything - offered() == {"browser_evaluate"}
     assert everything - offered(javascript={"allow_evaluate": True}, uploads={"enabled": False}) == {
         "browser_upload_file"

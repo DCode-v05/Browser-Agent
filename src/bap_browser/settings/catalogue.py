@@ -23,7 +23,19 @@ Patch = dict[str, Any]
 SURFACES = ("web", "mobile", "desktop")
 EVERYWHERE = SURFACES
 NOT_ON_MOBILE = ("web", "desktop")
-GROUPS = ("Browser", "Agent", "Approvals", "Sites", "Files", "Privacy", "Live view", "Appearance", "Advanced")
+GROUPS = (
+    "Browser",
+    "Agent",
+    "Approvals",
+    "Safety",
+    "Sites",
+    "Files",
+    "Limits",
+    "Privacy",
+    "Live view",
+    "Appearance",
+    "Advanced",
+)
 CLOUD = "remote_headless"
 # The name of the event log, in the data folder, for a person who turns it on where the deployment has none.
 EVENT_LOG_NAME = "events.jsonl"
@@ -167,6 +179,49 @@ class Choice(Entry):
         return {"choices": choices}
 
 
+# How much each way of asking asks: the least first.
+ASKS = {"auto": 0, "risky": 1, "every_action": 2}
+
+
+@dataclass(frozen=True, kw_only=True)
+class AskBefore(Choice):
+    """When the agent stops for a person. Auto asks least. It is the one value a user may choose
+    although it is looser than the admin's (spec 18.4): only where the admin offers it, and not
+    where the admin asks before every action."""
+
+    def offered(self, config: Config) -> tuple[Option, ...]:
+        auto = config.safety.auto_mode.offered and not (
+            self.tighten and config.safety.ask_before == "every_action"
+        )
+        return tuple(option for option in self.options if option.value != "auto" or auto)
+
+    def _too_loose(self, value: str, config: Config) -> bool:
+        if not self.tighten or value == "auto":
+            return False
+        return ASKS[value] < ASKS[str(self.deployed(config))]
+
+
+@dataclass(frozen=True, kw_only=True)
+class StepLimit(Choice):
+    """The most steps one task may take. A lower number is stricter. 0 means no limit, and is the
+    loosest value there is (spec 18.11)."""
+
+    def offered(self, config: Config) -> tuple[Option, ...]:
+        deployed = config.limits.max_calls
+        steps = sorted({*config.limits.max_calls_choices, *([deployed] if deployed else [])})
+        unlimited = () if deployed else (Option("0", "No limit"),)
+        return (*unlimited, *(Option(str(count), f"{count} steps") for count in steps))
+
+    def _too_loose(self, value: str, config: Config) -> bool:
+        deployed = config.limits.max_calls
+        if not self.tighten or not deployed:
+            return False
+        return int(value) == 0 or int(value) > deployed
+
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
+        return {self.key: int(str(value))}
+
+
 @dataclass(frozen=True, kw_only=True)
 class ApprovalWait(Choice):
     """How long an approval waits, among the waits the deployment offers. The value is in seconds."""
@@ -212,6 +267,20 @@ class Switch(Entry):
 
     def fixed_by_deployment(self, config: Config) -> bool:
         return self.tighten and not self.deployed(config)
+
+
+@dataclass(frozen=True, kw_only=True)
+class Guard(Switch):
+    """A safeguard that is on or off. Here on is the strict value: where the deployment has it on,
+    a user cannot turn it off."""
+
+    def problem(self, value: Any, config: Config) -> Reason | None:
+        if not isinstance(value, bool):
+            return "not_a_choice"
+        return "would_loosen" if not value and self.fixed_by_deployment(config) else None
+
+    def fixed_by_deployment(self, config: Config) -> bool:
+        return self.tighten and bool(self.deployed(config))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -402,7 +471,7 @@ CATALOGUE: tuple[Entry, ...] = (
         dropdown=True,
         per_system=True,
     ),
-    Choice(
+    AskBefore(
         id="ask_before",
         user=True,
         per_system=True,
@@ -415,7 +484,21 @@ CATALOGUE: tuple[Entry, ...] = (
         options=(
             Option("risky", "Risky actions", "Uploads, page scripts and whatever the admin lists"),
             Option("every_action", "Every action", "Each click, key press and page change"),
+            Option(
+                "auto",
+                "Auto",
+                "A check looks at each step. Safe steps run, and you are asked only about the risky ones",
+            ),
         ),
+    ),
+    Switch(
+        id="offer_auto",
+        per_system=True,
+        group="Approvals",
+        surfaces=EVERYWHERE,
+        title="Offer Auto",
+        description='Let people choose Auto for "Ask before". It asks less: a check decides each step, and it can be wrong.',
+        key="safety.auto_mode.offered",
     ),
     ApprovalWait(
         id="approval_wait",
@@ -441,6 +524,61 @@ CATALOGUE: tuple[Entry, ...] = (
         tighten=True,
         dropdown=True,
         options=(Option("session", "Until the session ends"), Option("none", "Never")),
+    ),
+    Choice(
+        id="scan_pages",
+        user=True,
+        per_system=True,
+        group="Safety",
+        surfaces=EVERYWHERE,
+        title="Check pages for hidden instructions",
+        description="A web page can hold text that tries to give the agent orders. What is found is kept from the agent, and you are told.",
+        key="safeguards.incoming.scan",
+        tighten=True,
+        options=(
+            Option("off", "Off", "Pages are not checked"),
+            Option("local", "On this computer", "Fixed rules only. Nothing leaves this computer"),
+            Option(
+                "local_then_model",
+                "On this computer, then a model",
+                "What the rules find suspicious is sent to the model for a second opinion",
+            ),
+        ),
+    ),
+    Guard(
+        id="cross_site_text",
+        user=True,
+        per_system=True,
+        group="Safety",
+        surfaces=EVERYWHERE,
+        title="Copying between sites",
+        description="Ask me before the agent types or sends, on one site, text that it read on another.",
+        key="safeguards.outgoing.cross_site_text",
+        tighten=True,
+    ),
+    SiteList(
+        id="sensitive_sites",
+        user=True,
+        per_system=True,
+        group="Safety",
+        surfaces=EVERYWHERE,
+        title="Sensitive sites",
+        description="Sites the agent may enter only with your yes, such as your bank. They are added to the ones already listed.",
+        key="safeguards.sites.sensitive.more",
+        adds_to_deployment=True,
+    ),
+    StepLimit(
+        id="task_limit",
+        user=True,
+        per_system=True,
+        group="Limits",
+        surfaces=EVERYWHERE,
+        title="Steps in one task",
+        description="The most steps the agent may take for one task before it stops and waits for you.",
+        key="limits.max_calls",
+        tighten=True,
+        options=(),
+        dropdown=True,
     ),
     SiteList(
         id="blocked_sites",

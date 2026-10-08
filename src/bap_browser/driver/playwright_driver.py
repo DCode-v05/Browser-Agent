@@ -761,8 +761,68 @@ class PlaywrightDriver:
         await self._wait_for_load(tab)
         return tab.page.url
 
-    async def locate(self, ref: str) -> Located:
-        return await self._locate(self._current(), ref)
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        return await self._locate(self._current(), ref, press=press)
+
+    async def locate_point(self, x: float, y: float) -> Located | None:
+        return await self._locate_without_a_ref({"x": x, "y": y})
+
+    async def locate_focus(self) -> Located | None:
+        return await self._locate_without_a_ref({"focused": True})
+
+    async def _locate_without_a_ref(self, how: dict[str, Any]) -> Located | None:
+        tab = self._active
+        if tab is None:
+            return None
+        found = await tab.script.call("locate", {**how, **self._what_to_locate(press=True)})
+        return None if found.get("error") else self._located(found)
+
+    def _what_to_locate(self, *, press: bool) -> dict[str, Any]:
+        return {
+            "press": press,
+            "maxName": self._config.browser.snapshot.max_name_chars,
+            "maxAround": self._config.safeguards.money.around_chars,
+        }
+
+    @staticmethod
+    def _located(found: dict[str, Any]) -> Located:
+        box = Box(*found["box"]) if found["box"] else None
+        return Located(
+            found["role"],
+            found["name"],
+            box,
+            found["secret"],
+            found["kind"],
+            document=found.get("document", ""),
+            input_type=found.get("inputType", ""),
+            autocomplete=found.get("autocomplete", ""),
+            attributes=tuple(found.get("attributes", ())),
+            dots=bool(found.get("dots", False)),
+            multiline=bool(found.get("multiline", False)),
+            search=bool(found.get("search", False)),
+            sends_form=tuple(
+                (str(role), str(name), bool(multiline), bool(search))
+                for role, name, multiline, search in found.get("sendsForm", ())
+            ),
+            around=tuple(found.get("around", ())),
+        )
+
+    async def gist(self) -> list[str]:
+        tab = self._active
+        if tab is None:
+            return []
+        said = await tab.script.call(
+            "gist",
+            {
+                "limit": self._config.safeguards.outgoing.consent_texts,
+                "maxName": self._config.browser.snapshot.max_name_chars,
+            },
+        )
+        return [str(text) for text in said]
+
+    def where(self) -> tuple[str, str]:
+        tab = self._active
+        return ("", "") if tab is None else (tab.id, tab.page.url)
 
     async def change_mark(self) -> str | None:
         tab = self._active
@@ -776,14 +836,11 @@ class PlaywrightDriver:
         in_frames = [await frame.script.stamp(wait_ms) for frame in list(tab.frames.values())]
         return f"{tab.id} {tab.commits} {tab.page.url} {in_the_page} {in_frames}"
 
-    async def _locate(self, tab: _Tab, ref: str) -> Located:
-        found = await self._ask(
-            tab, "locate", {"ref": ref, "maxName": self._config.browser.snapshot.max_name_chars}
-        )
-        if found.get("error") == "stale":
+    async def _locate(self, tab: _Tab, ref: str, *, press: bool = False) -> Located:
+        found = await self._ask(tab, "locate", {"ref": ref, **self._what_to_locate(press=press)})
+        if found.get("error"):
             raise StaleRef(ref)
-        box = Box(*found["box"]) if found["box"] else None
-        return Located(found["role"], found["name"], box, found["secret"], found["kind"])
+        return self._located(found)
 
     async def snapshot(self, *, mode: str, ref: str | None, max_chars: int, include_bboxes: bool) -> str:
         tab = self._current()

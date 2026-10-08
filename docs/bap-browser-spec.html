@@ -5533,6 +5533,13 @@ system-level lines lean on published figures.</p>
 <td>250</td>
 </tr>
 <tr>
+<td><code>browser_begin_task</code></td>
+<td>Set a task with three sites</td>
+<td>none</td>
+<td>5</td>
+<td>20</td>
+</tr>
+<tr>
 <td><code>browser_run</code> (milestone 4)</td>
 <td>Added time beyond the script's own steps, worker warm</td>
 <td>none</td>
@@ -9979,7 +9986,7 @@ into.</p>
 </tr>
 <tr>
 <td><code>commits</code></td>
-<td>confirm, finish, complete, proceed, पुष्टि करें</td>
+<td>confirm, पुष्टि करें. Not finish, complete or proceed: a wizard says those at every step</td>
 <td>A word of <code>permissions.consequential_words</code> that is in no class above</td>
 </tr>
 </tbody>
@@ -10100,8 +10107,8 @@ running on a model's word.</p>
 </tr>
 <tr>
 <td><code>long_address</code></td>
-<td>The agent opens a long address: in Auto Mode on a site outside the task, in <code>risky</code> on a site the session has not been to</td>
-<td>Unsure</td>
+<td>The agent opens a long address on a site the session has not been to and the task does not name</td>
+<td>Unsure, settled once for the site</td>
 <td>18.6</td>
 </tr>
 <tr>
@@ -10125,7 +10132,7 @@ running on a model's word.</p>
 <tr>
 <td><code>step_on_sensitive_site</code></td>
 <td>An acting step on a sensitive site</td>
-<td>Unsure; refuse when nobody is watching</td>
+<td>Unsure, in Auto Mode: in the other modes the person agreed when the site was entered. Refuse, in every mode, when nobody is watching</td>
 <td>18.7</td>
 </tr>
 <tr>
@@ -10136,14 +10143,14 @@ running on a model's word.</p>
 </tr>
 <tr>
 <td><code>ip_host</code></td>
-<td>The host is a bare public IP address</td>
-<td>Unsure</td>
+<td>A step presses or types on a site whose host is a bare public IP address</td>
+<td>Unsure, in Auto Mode only, settled once for the site. A weak sign: it is for the reviewer to weigh, and no person is asked about it</td>
 <td>18.7</td>
 </tr>
 <tr>
 <td><code>young_domain</code></td>
 <td>The domain was registered a few days ago (optional)</td>
-<td>Unsure</td>
+<td>Unsure, in Auto Mode only, as <code>ip_host</code></td>
 <td>18.7</td>
 </tr>
 <tr>
@@ -10923,8 +10930,8 @@ by a message, and pastes what they were sent.</p>
 </tr>
 <tr>
 <td><code>ip_host</code></td>
-<td>The host is a bare public IP address</td>
-<td>Unsure</td>
+<td>The host is a bare public IP address, and a step presses or types there</td>
+<td>Unsure, in Auto Mode only</td>
 </tr>
 </tbody>
 </table></div>
@@ -11587,8 +11594,8 @@ admin's 0.</p>
 </tr>
 <tr>
 <td><code>outgoing.decode_min_chars</code></td>
-<td>12</td>
-<td>The shortest packed run that is unpacked</td>
+<td>8</td>
+<td>The shortest packed run that is unpacked: a code of six digits is eight characters of Base64</td>
 </tr>
 <tr>
 <td><code>outgoing.question_chars</code></td>

@@ -58,6 +58,23 @@ class Located:
     """A password field. Nothing about what it holds, not even its length, is told to anyone."""
     kind: FieldKind = "other"
     """How it is filled in a form: by typing, by ticking, or by choosing an option."""
+    # What the check needs to know of it besides its name (spec 18.4, 18.6).
+    document: str = ""
+    """The address of the document it is in: the page's, or a frame's own."""
+    input_type: str = ""
+    autocomplete: str = ""
+    attributes: tuple[str, ...] = ()
+    """Its `name` and `id` attributes, where it has them."""
+    dots: bool = False
+    """What is typed into it is drawn as dots, as in a password field, whatever its type."""
+    multiline: bool = False
+    """A text area or an editable block."""
+    search: bool = False
+    sends_form: tuple[tuple[str, str, bool, bool], ...] = ()
+    """When pressing it sends a form: that form's text fields, each as its role, its name, whether
+    it takes several lines and whether it is a search box."""
+    around: tuple[str, ...] = ()
+    """The text near a control that is pressed: of its form, then of the block around it."""
 
 
 @dataclass(frozen=True)
@@ -189,6 +206,7 @@ class Happened:
         "download",
         "blocked",
         "file_chooser",
+        "notice",
     ]
     text: str
     """As the agent is told, in the state block of its next result."""
@@ -217,7 +235,25 @@ class Driver(Protocol):
 
     async def navigate(self, url: str) -> str: ...
 
-    async def locate(self, ref: str) -> Located: ...
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        """What an element is. With `press`, also what pressing it would send and what stands near it."""
+        ...
+
+    async def locate_point(self, x: float, y: float) -> Located | None:
+        """The control that a press at a point of the page lands on. None when nothing is there."""
+        ...
+
+    async def locate_focus(self) -> Located | None:
+        """The element that has the focus, where typed keys go. None when nothing has it."""
+        ...
+
+    async def gist(self) -> list[str]:
+        """What the page says it is about, in a few words: its headings and its buttons."""
+        ...
+
+    def where(self) -> tuple[str, str]:
+        """The active tab and the address it shows, as known without asking the page. Empty when no tab is open."""
+        ...
 
     async def change_mark(self) -> str | None:
         """A value that is the same as the last time only when the active tab shows the same

@@ -1,7 +1,20 @@
 // Steps become timeline rows (spec 9.7): one sentence per step, consecutive reads collapsed into
 // one row with a count, and a divider where the session sat idle.
 
-import type { Step } from './reducer';
+import { W } from '../wording';
+import type { Step, StepMark, UnansweredMarker } from './reducer';
+
+/** A step's mark in its timeline row (spec 18.10): checked, allowed, or why it was refused. */
+export function markText(mark: StepMark): string {
+  switch (mark.kind) {
+    case 'checked':
+      return W.autoMode.mark.checked;
+    case 'allowed':
+      return W.autoMode.mark.allowed;
+    case 'refused':
+      return W.autoMode.mark.refused(mark.reason);
+  }
+}
 
 const READ_TOOLS = new Set(['browser_snapshot', 'browser_get_text']);
 
@@ -17,7 +30,9 @@ export type Row =
       ms?: number;
       status: Step['status'];
     }
-  | { kind: 'idle'; key: string; seconds: number };
+  | { kind: 'idle'; key: string; seconds: number }
+  /** "Nobody is answering" (spec 18.10). */
+  | { kind: 'unanswered'; key: string; count: number };
 
 function endOf(step: Step): number {
   return step.startedAt + (step.ms ?? 0) / 1000;
@@ -27,10 +42,22 @@ function isQuietRead(step: Step): boolean {
   return READ_TOOLS.has(step.tool) && step.status === 'ok';
 }
 
-export function buildRows(steps: Step[], idleDividerS: number): Row[] {
+export function buildRows(steps: Step[], idleDividerS: number, unanswered: UnansweredMarker[] = []): Row[] {
+  // Steps and "nobody is answering" markers are merged by when each happened.
+  type Entry = { at: number; order: number; step?: Step; marker?: UnansweredMarker };
+  const entries: Entry[] = [
+    ...steps.map((step, order): Entry => ({ at: step.startedAt, order, step })),
+    ...unanswered.map((marker, order): Entry => ({ at: marker.at, order: steps.length + order, marker })),
+  ].sort((a, b) => a.at - b.at || a.order - b.order);
+
   const rows: Row[] = [];
   let previous: Step | undefined;
-  for (const step of steps) {
+  for (const entry of entries) {
+    if (entry.marker) {
+      rows.push({ kind: 'unanswered', key: entry.marker.key, count: entry.marker.count });
+      continue;
+    }
+    const step = entry.step!;
     const gap = previous ? step.startedAt - endOf(previous) : 0;
     const idle = gap >= idleDividerS;
     if (idle) rows.push({ kind: 'idle', key: `idle-${step.n}`, seconds: Math.floor(gap) });

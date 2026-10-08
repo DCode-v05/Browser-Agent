@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ServerEvent } from '../protocol';
+import type { ServerEvent, TaskSite } from '../protocol';
 import { initialState, reduce, unseenNotices, type ViewerState } from './reducer';
 
 const T0 = 1_759_480_000;
@@ -201,6 +201,139 @@ describe('blocked pages, downloads, settings', () => {
   it('a settings change bumps the settings version so the screen reads them again', () => {
     const state = play([started, { type: 'settings_changed', changes: { ask_before: 'every_action' } }]);
     expect(state.settingsVersion).toBe(initialState.settingsVersion + 1);
+  });
+});
+
+describe('Auto Mode and safeguards (spec 18.10)', () => {
+  const sites: TaskSite[] = [{ host: 'example.com', grade: 'named' }];
+
+  it('nothing is shown of the mode before an auto_changed arrives', () => {
+    expect(initialState.auto).toBeNull();
+  });
+
+  it('auto_changed keeps the mode, the run state and why', () => {
+    const state = play([started, { type: 'auto_changed', mode: 'auto', state: 'paused', why: '3 steps in a row were refused', ts: T0 + 5 }]);
+    expect(state.auto).toEqual({ mode: 'auto', state: 'paused', why: '3 steps in a row were refused' });
+  });
+
+  it('a task is set, and its line goes away when the task ends; the sites stay in sites_changed', () => {
+    const set = play([started, { type: 'task_set', task: 'Check in for flight SK4821', from: 'person', sites, ts: T0 + 1 }]);
+    expect(set.task).toEqual({ task: 'Check in for flight SK4821', from: 'person', sites });
+    const changed = play([{ type: 'sites_changed', sites: [...sites, { host: 'maps.example', grade: 'added_read' }] }], set);
+    expect(changed.task?.sites).toHaveLength(2);
+    const ended = play([{ type: 'task_ended', ts: T0 + 2 }], changed);
+    expect(ended.task).toBeNull();
+  });
+
+  it('sites_changed with no task does nothing', () => {
+    expect(play([started, { type: 'sites_changed', sites }]).task).toBeNull();
+  });
+
+  it('a task declared by an agent is marked as that', () => {
+    expect(play([started, { type: 'task_set', task: 'Buy the cheapest flight', from: 'agent', sites, ts: T0 + 1 }]).task?.from).toBe('agent');
+  });
+
+  it('check_decided marks the step "checked" when the reviewer lets it run', () => {
+    const state = play([started, stepStarted(4, 'browser_click', 'Clicking "Search"'), { type: 'check_decided', step: 4, stage: 'reviewer', outcome: 'run', findings: [], reason: '', ts: T0 + 4 }]);
+    expect(state.steps[0].mark).toEqual({ kind: 'checked' });
+  });
+
+  it('a rule that settles it without the reviewer carries no mark', () => {
+    const state = play([started, stepStarted(4, 'browser_click', 'Clicking "Search"'), { type: 'check_decided', step: 4, stage: 'rule', outcome: 'run', findings: [], reason: '', ts: T0 + 4 }]);
+    expect(state.steps[0].mark).toBeUndefined();
+  });
+
+  it('a refused step is marked with the reason and joins the "Refused" list, with "Allow once" where an id is given', () => {
+    const state = play([
+      started,
+      stepStarted(6, 'browser_upload_file', 'Uploading cv.pdf'),
+      {
+        type: 'check_decided',
+        step: 6,
+        stage: 'reviewer',
+        outcome: 'refuse',
+        findings: ['sending_step'],
+        reason: 'this step would send something to other people, and the task did not ask for it',
+        refused_id: 'r1',
+        ts: T0 + 6,
+      },
+    ]);
+    expect(state.steps[0].mark).toEqual({ kind: 'refused', reason: 'this step would send something to other people, and the task did not ask for it' });
+    expect(state.refused).toEqual([
+      { step: 6, id: 'r1', label: 'Uploading cv.pdf', reason: 'this step would send something to other people, and the task did not ask for it', allowed: false },
+    ]);
+  });
+
+  it('a hard stop refusal has no id, so it has no "Allow once" button', () => {
+    const state = play([started, stepStarted(2, 'browser_navigate', 'Opening 10.0.0.5'), { type: 'check_decided', step: 2, stage: 'rule', outcome: 'refuse', findings: ['listed_bad_site'], reason: 'the site is known bad', ts: T0 + 2 }]);
+    expect(state.refused[0].id).toBeNull();
+  });
+
+  it('"Allow once" marks the refused entry as allowed, by its id', () => {
+    const refused = play([
+      started,
+      stepStarted(6, 'browser_upload_file', 'Uploading cv.pdf'),
+      { type: 'check_decided', step: 6, stage: 'reviewer', outcome: 'refuse', findings: [], reason: 'refused', refused_id: 'r1', ts: T0 + 6 },
+    ]);
+    const allowed = play([{ type: 'refused_allowed', id: 'r1', ts: T0 + 7 }], refused);
+    expect(allowed.refused[0].allowed).toBe(true);
+  });
+
+  it('an approval carries why it is asked, what leaves, the amount and the check\'s sentence', () => {
+    const state = play([
+      started,
+      {
+        type: 'approval_requested',
+        id: 'a1',
+        tool: 'browser_upload_file',
+        summary: 'Upload cv.pdf to example.com',
+        site: 'example.com',
+        expires_in_s: 180,
+        why: ['this step sends a file to another site'],
+        leaves: { text: 'Lovelace, Ada', from_site: 'mail.example', to_site: 'example.com' },
+        amount: '$84.00',
+        said: 'The task does not mention a payment.',
+        ts: T0 + 1,
+      },
+    ]);
+    expect(state.approval).toMatchObject({
+      why: ['this step sends a file to another site'],
+      leaves: { text: 'Lovelace, Ada', fromSite: 'mail.example', toSite: 'example.com' },
+      amount: '$84.00',
+      said: 'The task does not mention a payment.',
+    });
+  });
+
+  it('the step that waited for an approval is marked "you allowed" once it is allowed, not when it is denied', () => {
+    const requested: ServerEvent = { type: 'approval_requested', id: 'a1', tool: 'browser_upload_file', summary: 'Upload cv.pdf', site: 'example.com', expires_in_s: 180, ts: T0 + 6 };
+    const allowed = play([started, stepStarted(6, 'browser_upload_file', 'Uploading cv.pdf'), requested, { type: 'approval_closed', id: 'a1', outcome: 'allowed' }]);
+    expect(allowed.steps[0].mark).toEqual({ kind: 'allowed' });
+    const denied = play([started, stepStarted(6, 'browser_upload_file', 'Uploading cv.pdf'), requested, { type: 'approval_closed', id: 'a1', outcome: 'denied' }]);
+    expect(denied.steps[0].mark).toBeUndefined();
+  });
+
+  it('a flagged page is kept, with an id that grows', () => {
+    const state = play([
+      started,
+      { type: 'page_flagged', tab: 't1', site: 'shop.example', rule: 'planted_instruction', count: 1, ts: T0 + 1 },
+      { type: 'page_flagged', tab: 't1', site: 'shop.example', rule: 'planted_instruction', count: 2, ts: T0 + 2 },
+    ]);
+    expect(state.flagged).toEqual([
+      { id: 1, tab: 't1', site: 'shop.example' },
+      { id: 2, tab: 't1', site: 'shop.example' },
+    ]);
+  });
+
+  it('a limit reached is kept until it is lifted, or the session ends', () => {
+    const reached = play([started, { type: 'limit_reached', kind: 'calls', limit: 500, scope: 'task', more: 100, ts: T0 + 1 }]);
+    expect(reached.limit).toEqual({ kind: 'calls', limit: 500, scope: 'task', more: 100 });
+    expect(play([{ type: 'limit_lifted', ts: T0 + 2 }], reached).limit).toBeNull();
+    expect(play([{ type: 'session_ended', reason: 'person', ts: T0 + 2 }], reached).limit).toBeNull();
+  });
+
+  it('questions that ran out unanswered are kept as timeline markers', () => {
+    const state = play([started, { type: 'questions_unanswered', count: 3, ts: T0 + 1 }, { type: 'questions_unanswered', count: 1, ts: T0 + 2 }]);
+    expect(state.unanswered.map((marker) => marker.count)).toEqual([3, 1]);
   });
 });
 

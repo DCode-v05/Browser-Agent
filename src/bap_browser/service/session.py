@@ -12,12 +12,14 @@ from typing import Any, Literal
 
 from bap_browser.config import Config
 from bap_browser.driver.base import Box, Driver, Happened, MouseButton, TabInfo
-from bap_browser.driver.session import ApprovalOutcome, BrowserSession
+from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BapError
+from bap_browser.policy.sites import origin_of
+from bap_browser.safeguards.task import TaskSite
 from bap_browser.service.events import EventHub
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools.gate import Admission
-from bap_browser.tools.toolkit import Toolkit
+from bap_browser.tools.toolkit import DECLARES_A_TASK, Toolkit
 
 ControlState = Literal["agent", "paused", "person_requested", "person", "ended"]
 HelpOutcome = Literal["done", "could_not", "timed_out"]
@@ -67,6 +69,7 @@ class ServiceSession:
         self.browser = BrowserSession(config, driver)
         self.browser.ask_person = self._ask_person_timed
         self.browser.ask_approval = self._ask_approval_timed
+        self.browser.watched = lambda: self.hub.viewers > 0
         # How long the agent's calls have waited for a person in all, in seconds (spec 12.6).
         self.waited_for_a_person_s = 0.0
         self.browser.on_event = self._happened
@@ -77,6 +80,11 @@ class ServiceSession:
         # Questions that ran out unanswered in a row. Past a limit, further ones are not waited for.
         self._unanswered = 0
         self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
+        if on_task is not None:
+            # In a chat the person's own messages are the task. An agent cannot put its own in their place.
+            self.toolkit.leave_out(DECLARES_A_TASK)
+        # How Auto Mode stands, as viewers were last told (spec 18.10).
+        self._auto_told: dict[str, Any] | None = None
         # The request for a person that is open now, and how it was answered.
         self._help: str | None = None
         self._help_outcome: HelpOutcome | None = None
@@ -130,6 +138,7 @@ class ServiceSession:
             # The person watches the browser itself, so a viewer need not show its picture.
             started["on_screen"] = True
         self.hub.publish(started)
+        self._tell_auto()
         self._publish_tabs(await self.toolkit.tabs())
         viewer = self.config.viewer
         if self._pictures:
@@ -151,6 +160,7 @@ class ServiceSession:
         self.browser.reconfigure(config)
         self.toolkit.reconfigure()
         self.hub.publish({"type": "settings_changed", "changes": dict(changes)})
+        self._tell_auto()
         driver = self.browser.started_driver
         if self._pictures and driver is not None and config.viewer.quality != before.viewer.quality:
             await driver.stop_frames()
@@ -201,8 +211,18 @@ class ServiceSession:
             await self._input(kind, command)
         elif kind == "task":
             self.give_task(command.get("text"))
-        elif kind in ("stop_task", "end_task"):
+        elif kind == "stop_task":
             await self._stop_task()
+        elif kind == "end_task":
+            await self._end_task()
+        elif kind == "resume_auto" and self.toolkit.check.resume():
+            self._tell_auto()
+        elif kind == "allow_refused" and isinstance(command.get("id"), str):
+            if self.toolkit.check.allow_once(command["id"]) is not None:
+                self.hub.publish({"type": "refused_allowed", "id": command["id"], "ts": self._clock()})
+        elif kind == "drop_site" and isinstance(command.get("host"), str):
+            if self.toolkit.check.task.drop(command["host"]):
+                self.sites_changed(self.toolkit.check.task.sites())
         elif kind == "extend_limit" and self.toolkit.allow_more():
             self._limit_lifted()
         elif kind == "new_session" and self.control == "ended" and self._on_restart is not None:
@@ -282,11 +302,21 @@ class ServiceSession:
             await self._answer_help("could_not")
         await self._announce()
 
-    def working(self, on_a_task: bool) -> None:
-        """Tells viewers whether the agent is on a task or waits for one."""
+    def working(self, on_a_task: bool, task: str | None = None) -> None:
+        """Tells viewers whether the agent is on a task or waits for one. `task` is what the
+        person asked for, when the agent begins it: the check judges each step against it (spec 18.3)."""
         self._on_a_task = on_a_task
         self._task_stopped = False
         self.hub.publish({"type": "task_changed", "working": on_a_task, "ts": self._clock()})
+        book = self.toolkit.check.task
+        if on_a_task and task is not None:
+            driver = self.browser.started_driver
+            book.person_said(task, driver.where()[1] if driver is not None else "")
+            self._task_set()
+        elif not on_a_task and book.set and book.source == "person":
+            book.end()
+            self.hub.publish({"type": "task_ended", "ts": self._clock()})
+            self._tell_auto()
         # The steps of a task are counted from where it begins (spec 18.8).
         if self.toolkit.task_began() if on_a_task else self.toolkit.task_ended():
             self._limit_lifted()
@@ -402,6 +432,83 @@ class ServiceSession:
             }
         )
 
+    def check_decided(
+        self,
+        step: int,
+        stage: str,
+        outcome: str,
+        findings: Sequence[str],
+        reason: str,
+        said: str = "",
+        refused_id: str | None = None,
+    ) -> None:
+        event: dict[str, Any] = {
+            "type": "check_decided",
+            "step": step,
+            "stage": stage,
+            "outcome": outcome,
+            "findings": list(findings),
+            "reason": reason,
+        }
+        if said:
+            # A model wrote this sentence. It goes to the people watching, and to no log.
+            event["said"] = self.browser.redact(said)
+        if refused_id is not None:
+            event["refused_id"] = refused_id
+        self.hub.publish({**event, "ts": self._clock()})
+
+    def sites_changed(self, sites: Sequence[TaskSite]) -> None:
+        self.hub.publish({"type": "sites_changed", "sites": _shown(sites)})
+
+    def auto_changed(self) -> None:
+        self._tell_auto()
+
+    def _tell_auto(self) -> None:
+        """Tells viewers how the session asks, and how Auto Mode stands, when either has changed."""
+        check = self.toolkit.check
+        state, why = check.auto_state()
+        told: dict[str, Any] = {"type": "auto_changed", "mode": check.mode, "state": state}
+        if why:
+            told["why"] = why
+        if told != self._auto_told:
+            self._auto_told = told
+            self.hub.publish({**told, "ts": self._clock()})
+
+    def _task_set(self) -> None:
+        """A task is set: it is shown to the person at once, with its sites."""
+        book = self.toolkit.check.task
+        self.toolkit.check.task_began()
+        self.hub.publish(
+            {
+                "type": "task_set",
+                "task": self.browser.redact(book.text or ""),
+                "from": book.source,
+                "sites": _shown(book.sites()),
+                "ts": self._clock(),
+            }
+        )
+        self._tell_auto()
+
+    def task_declared(self, limit_lifted: bool) -> None:
+        if limit_lifted:
+            self._limit_lifted()
+        self._task_set()
+
+    async def _end_task(self) -> None:
+        """A person ended the task: the one from the chat, or the one an agent declared."""
+        book = self.toolkit.check.task
+        if book.source == "agent" and book.set:
+            book.end()
+            if self.toolkit.task_ended():
+                self._limit_lifted()
+            self.hub.publish({"type": "task_ended", "ts": self._clock()})
+            self._tell_auto()
+        await self._stop_task()
+
+    def served_at(self, address: str) -> None:
+        """Where the service that shows this session listens: pages from there are the core's own."""
+        self.toolkit.check.task.own_origins.add(origin_of(address))
+
     def limit_reached(self, kind: str, limit: float, on_a_task: bool) -> None:
         limits = self.config.limits
         event: dict[str, Any] = {
@@ -495,12 +602,10 @@ class ServiceSession:
         finally:
             self.waited_for_a_person_s += time.monotonic() - since
 
-    async def _ask_approval_timed(
-        self, tool: str, summary: str, site: str, every_time: bool
-    ) -> ApprovalOutcome:
+    async def _ask_approval_timed(self, question: Question) -> ApprovalOutcome:
         since = time.monotonic()
         try:
-            return await self._ask_approval(tool, summary, site, every_time)
+            return await self._ask_approval(question)
         finally:
             self.waited_for_a_person_s += time.monotonic() - since
 
@@ -549,15 +654,17 @@ class ServiceSession:
 
     # The agent's action needs a person's yes (spec 8.2).
 
-    async def _ask_approval(self, tool: str, summary: str, site: str, every_time: bool) -> ApprovalOutcome:
+    async def _ask_approval(self, question: Question) -> ApprovalOutcome:
         """Runs inside the agent's call, which keeps the browser while the person decides, so nothing
-        else happens on the page meanwhile. No answer in time means no. `every_time` marks an action
-        that cannot be allowed for the whole site: it pays, sends or deletes."""
+        else happens on the page meanwhile. No answer in time means no. A question marked
+        `every_time` cannot be answered for the whole site, and one that `must_be_seen` is never
+        answered for a person who is not there (spec 18.4)."""
+        every_time = question.every_time
         self._approvals += 1
         self._approval, self._approval_outcome = f"a{self._approvals}", None
         control = self.config.control
         watched = self.hub.viewers > 0
-        if not watched and control.approval_without_viewer == "allow":
+        if not watched and control.approval_without_viewer == "allow" and not question.must_be_seen:
             self._approval = None
             return "allowed"
         if watched and self._unanswered >= self.config.limits.unanswered_in_a_row:
@@ -568,11 +675,12 @@ class ServiceSession:
             {
                 "type": "approval_requested",
                 "id": self._approval,
-                "tool": tool,
-                "summary": summary,
-                "site": site,
+                "tool": question.tool,
+                "summary": question.summary,
+                "site": question.site,
                 "expires_in_s": control.approval_timeout_s,
                 **({"every_time": True} if every_time else {}),
+                **self._reasons(question),
                 "ts": self._clock(),
             }
         )
@@ -600,6 +708,21 @@ class ServiceSession:
                 ENDED_BY_A_PERSON if self._ended_by == "person" else ENDED, reason="the session ended"
             )
         return outcome
+
+    def _reasons(self, question: Question) -> dict[str, Any]:
+        """Why a person is asked, what would leave and what it costs (spec 18.10). The text that
+        would leave is shown here and nowhere else: a person cannot decide without seeing it."""
+        told: dict[str, Any] = {}
+        if question.why:
+            told["why"] = list(question.why)
+        if question.leaves is not None:
+            text, from_site, to_site = question.leaves
+            told["leaves"] = {"text": self.browser.redact(text), "from_site": from_site, "to_site": to_site}
+        if question.amount:
+            told["amount"] = self.browser.redact(question.amount)
+        if question.said:
+            told["said"] = self.browser.redact(question.said)
+        return told
 
     def _count_unanswered(self, ran_out: bool) -> None:
         """Keeps count of the questions nobody answered in a row, and says so when further ones
@@ -640,6 +763,10 @@ class ServiceSession:
         if shown != self._tabs:
             self._tabs = shown
             self.hub.publish({"type": "tab_changed", "tabs": shown})
+
+
+def _shown(sites: Sequence[TaskSite]) -> list[dict[str, str]]:
+    return [{"host": site.host, "grade": site.grade} for site in sites]
 
 
 def _number(value: Any, lowest: float, highest: float, *, cut_to: float | None = None) -> float | None:

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from fakes import SNAPSHOT, FakeDriver
+from fakes import SNAPSHOT, FakeDriver, QuietObserver
 
 from bap_browser.config import Config
 from bap_browser.driver import BrowserSession
@@ -16,7 +16,7 @@ from bap_browser.tools import Toolkit
 TABS = "\n[tabs] t1* about:blank"
 
 
-class Seen:
+class Seen(QuietObserver):
     def __init__(self) -> None:
         self.events: list[tuple[Any, ...]] = []
 

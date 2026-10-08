@@ -531,7 +531,7 @@ class Actions(Section):
         "A control whose name holds one of these gives access",
     )
     commits: list[str] = setting(
-        ["confirm", "finish", "complete", "proceed", "पुष्टि करें"],
+        ["confirm", "पुष्टि करें"],
         "A control whose name holds one of these makes something final",
     )
     message_words: list[str] = setting(
@@ -598,10 +598,13 @@ class Outgoing(Section):
     remember_chars_per_site: int = setting(250_000, "After so much text a site's memory begins again")
     remember_sites: int = setting(16, "The most sites remembered, the newest kept")
     secrets_per_site: int = setting(2000, "The most short secrets remembered for one site")
-    decode_min_chars: int = setting(12, "The shortest run of Base64 or hexadecimal that is unpacked")
+    decode_min_chars: int = setting(8, "The shortest run of Base64 or hexadecimal that is unpacked")
     question_chars: int = setting(300, "How much of the text that would leave the person is shown")
     long_address_chars: int = setting(200, "An address whose path and query are longer than this is long")
     grant_access: bool = setting(True, "Ask before agreeing to give an app access to an account")
+    consent_texts: int = setting(
+        40, "How many headings and buttons of a page are read to tell a screen that gives an app access"
+    )
     consent_addresses: list[str] = setting(
         [
             "accounts.google.com/o/oauth2/*",
@@ -670,6 +673,7 @@ class Money(Section):
     max_amount: float = setting(0, "The most one paying step may show. 0 means no cap")
     max_session_total: float = setting(0, "The most the approved paying steps of a session may add up to")
     currency: str = setting("", "The currency the caps are in, as a three-letter code. Empty means any")
+    around_chars: int = setting(1500, "How much of the text around a paying control is read for an amount")
 
 
 class AbuseCh(Section):
@@ -731,6 +735,7 @@ class SensitiveSites(Section):
         ],
         "Government services",
     )
+    more: list[str] = setting([], "Other sites that need a person's yes: a deployment's, and a person's own")
 
 
 class SiteChecks(Section):
@@ -853,6 +858,9 @@ class Limits(Section):
     rate_wait_s: int = setting(10, "How long a call waits for the minute to allow it before it is refused")
     max_model_spend_usd: float = setting(
         0, "What the engine's own model calls may cost in one session, in US dollars. 0 means no limit"
+    )
+    max_calls_choices: list[int] = setting(
+        [100, 250, 500, 1000], "The limits of steps a person may choose from in the settings screen"
     )
     extend_calls: int = setting(100, 'The steps "Allow more" adds')
     extend_minutes: int = setting(15, 'The minutes "Allow more" adds')

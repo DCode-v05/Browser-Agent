@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import PICTURE, FakeDriver
+from fakes import PICTURE, FakeDriver, QuietObserver
 from mcp import Client
 from model_stand_in import ModelStandIn, response, said
 
@@ -33,7 +33,7 @@ NOW = 1_759_480_000.0
 CONFIRM = PageDialog("d1", "confirm", "Proceed?", "t1")
 
 
-class Seen:
+class Seen(QuietObserver):
     def __init__(self) -> None:
         self.rows: list[str] = []
 

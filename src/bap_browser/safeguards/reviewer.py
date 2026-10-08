@@ -165,9 +165,10 @@ def ruling(verdict: Verdict, *, held_high: bool, page_flagged: bool) -> Ruling:
     return "ask" if asked == "no" and page_flagged else "run"
 
 
-def why_refused(verdict: Verdict) -> str:
-    """Why a step was refused, in the engine's own words."""
-    would = WOULD.get(verdict.category)
+def why_refused(verdict: Verdict, by_the_rules: str = "") -> str:
+    """Why a step was refused, in the engine's own words. `by_the_rules` is the category the fixed
+    rules give the step: it is what is said when the model named none."""
+    would = WOULD.get(verdict.category) or WOULD.get(by_the_rules)
     if would is None:
         return TOO_RISKY
     asked_for = verdict.asked_for in ("exactly", "in_substance")

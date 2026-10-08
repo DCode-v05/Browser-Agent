@@ -7,6 +7,7 @@ import type { Surface } from '../protocol';
 import type { ChangeResult, ConfigAnswer, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
 import { valueInWords } from '../settings/words';
 import { W } from '../wording';
+import { acceptAutoNotice, autoNoticeAccepted, FirstTimeNotice } from './AutoMode';
 import { Icon } from './Icon';
 import { Button, Confirm } from './StatusPanel';
 import { isShown, trapTab } from './focus';
@@ -31,6 +32,8 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   const [pane, setPane] = useState<'groups' | 'settings'>('groups');
   const [status, setStatus] = useState<RowStatus | null>(null);
   const [asking, setAsking] = useState<Setting | null>(null);
+  /** The "Ask before" setting, while the first-time notice asks whether to turn Auto on. */
+  const [turningOnAuto, setTurningOnAuto] = useState<Setting | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
   const lastSave = useRef<Promise<boolean> | null>(null);
@@ -57,6 +60,11 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   }, [loaded]);
 
   function save(setting: Setting, value: SettingValue): Promise<boolean> {
+    // Turning Auto on shows the first-time notice, once per person and browser (spec 18.10).
+    if (setting.id === 'ask_before' && value === 'auto' && !autoNoticeAccepted()) {
+      setTurningOnAuto(setting);
+      return Promise.resolve(false);
+    }
     lastSave.current = change(setting, value);
     return lastSave.current;
   }
@@ -217,6 +225,16 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
           cancel={W.buttons.cancel}
           onConfirm={() => run(asking)}
           onCancel={() => setAsking(null)}
+        />
+      )}
+      {turningOnAuto && (
+        <FirstTimeNotice
+          onAccept={() => {
+            acceptAutoNotice();
+            void save(turningOnAuto, 'auto');
+            setTurningOnAuto(null);
+          }}
+          onDismiss={() => setTurningOnAuto(null)}
         />
       )}
     </div>
