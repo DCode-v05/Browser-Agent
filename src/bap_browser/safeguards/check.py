@@ -244,7 +244,8 @@ class Check:
         self._refused_in_a_row = 0
         self._refused_in_all = 0
         self._paused = ""
-        self._refused: dict[str, tuple[str, str]] = {}
+        # The steps the reviewer refused: what makes each the same step, its label and its site.
+        self._refused: dict[str, tuple[str, str, str]] = {}
         self._allowed_once: dict[str, float] = {}
         self._reviewer: ModelClient | None = None
         self._reviewer_key = ""
@@ -287,8 +288,11 @@ class Check:
         entry = self._refused.pop(refused_id, None)
         if entry is None:
             return None
-        key, label = entry
+        key, label, site = entry
         self._allowed_once[key] = self._clock() + self._session.config.safety.auto_mode.allow_once_s
+        if self._settled.get(("site_outside_task", site)) is False:
+            # The refusal had settled the site as outside the task. The person's word is above it.
+            del self._settled[("site_outside_task", site)]
         self._session.note(
             f"the person allowed a step that was refused: {label}. Do it again if it is still needed"
         )
@@ -349,6 +353,8 @@ class Check:
         unsure = [finding for finding in findings if finding.outcome == "unsure"]
         confirm = policy == "confirm" or (self.mode == "every_action" and step.acts)
         if unsure and not asking and not confirm and self._allowed_now(step):
+            # Their yes to this very step settles what a yes to a question about it settles.
+            self._agreed(step, unsure)
             return self._decided(step, began, "person", True, unsure)
         if asking or (unsure and (confirm or self.auto_state()[0] != "on")):
             return await self._ask(step, began, asking + unsure)
@@ -502,7 +508,7 @@ class Check:
         if verdict is not None:
             # What the reviewer refused, a person may allow once. A hard stop has no such way round.
             refused_id = f"r{len(self._refused) + self._refused_in_all + 1}"
-            self._refused[refused_id] = (self._same_step(step), step.label)
+            self._refused[refused_id] = (self._same_step(step), step.label, step.site)
             self._count_a_refusal()
         self._declined(step, findings)
         if self._observer is not None:
@@ -926,7 +932,10 @@ class Check:
                 )
             )
         kind = self._kind_of_site(host)
-        auto = self.auto_state()[0] == "on"
+        state = self.auto_state()[0]
+        # Paused, the mode is still Auto: what it watches is still watched. Only who is asked
+        # changes, from the reviewer to the person (spec 18.4).
+        auto = state in ("on", "paused")
         if kind is not None:
             if not self._is_settled("sensitive_site", site):
                 found.append(Finding("sensitive_site", "person", f"{host} is {kind}", site_wide=True))
@@ -939,7 +948,7 @@ class Check:
         pressing_or_typing = step.tool in PRESS or step.tool in TYPE
         # A weak sign by itself: it is for the reviewer to weigh, not for a person to be asked about.
         if (
-            auto
+            state == "on"
             and sites.ip_hosts
             and pressing_or_typing
             and is_bare_public_ip(host)

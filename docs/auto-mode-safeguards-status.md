@@ -59,12 +59,13 @@ pull request can be merged (first row of "Pending").**
 ## Found by running it (`/verify`, 2026-10-08): to put right
 
 The service was started for real and driven as an agent over MCP, with the viewer open in a browser
-and a stand-in for the model provider. Most of it did what the spec says. These did not:
+and a stand-in for the model provider. Most of it did what the spec says. These did not. The first
+two are put right; the others are open:
 
 | # | What happened | What the spec says | Weight |
 |---|---|---|---|
-| 1 | After Auto Mode paused (3 refusals in a row), a step to a site outside the task ran at once, with nobody watching and nobody asked. `evil.test` was opened this way right after three refusals | 18.4: while paused, every unsure step is asked of the person; with nobody watching it is refused | **A hole.** Three refused tries switch the guard off |
-| 2 | "Allow once" on a step refused for leaving the task's sites did nothing: the viewer said "Allowed once", and the same step was refused again with "that was settled" | 18.4: the person's "Allow once" lets that step run once | A person's word is not followed |
+| 1 | After Auto Mode paused (3 refusals in a row), a step to a site outside the task ran at once, with nobody watching and nobody asked. `evil.test` was opened this way right after three refusals | 18.4: while paused, every unsure step is asked of the person; with nobody watching it is refused | **Put right** (`safeguards/check.py`, `tests/unit/test_auto_mode.py`): paused, the mode is still Auto, and what it finds goes to the person. Seen again on the running service: the same two steps are refused, and the other site is never reached |
+| 2 | "Allow once" on a step refused for leaving the task's sites did nothing: the viewer said "Allowed once", and the same step was refused again with "that was settled" | 18.4: the person's "Allow once" lets that step run once | **Put right**: the person's yes lifts what the check's own refusal had settled, and counts as their answer about the site. Seen again on the running service: the allowed step runs and the page is read; a step that was not allowed stays refused |
 | 3 | A refusal because nobody was watching settles a site as "outside the task" for the whole task. The person who comes back is never asked, and the list of refused steps offers no "Allow once" for it | Not said either way. To decide | Design |
 | 4 | With nobody watching, an agent that has read one flagged page can do nothing more in that tab: not leave the page, not open another tab | 18.5 says every acting step on a flagged page is unsure, so this follows. To decide whether leaving the page should be let through | Design |
 | 5 | A call whose client gave up waiting still asks the person, and leaves no line in the event log whatever they answer | 18.9: one line for every decision | A gap in the record |

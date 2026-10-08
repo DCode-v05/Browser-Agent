@@ -366,3 +366,40 @@ async def test_on_a_persons_own_browser_the_extension_decides_about_a_new_site_n
     opened = await on.tools.call("browser_navigate", {"url": "https://maps.example/route"})
     assert not opened.is_error and on.model.requests == []
     assert asked == [("act", "https://maps.example/route")]
+
+
+async def test_while_auto_is_paused_a_site_outside_the_task_goes_to_the_person_and_not_past_everyone(
+    auto,
+) -> None:
+    on = await auto(*[rated("high", "no", "leaves_task") for _ in range(3)])
+    for host in ("one", "two", "three"):
+        assert (await on.tools.call("browser_navigate", {"url": f"https://{host}.example/"})).is_error
+    assert on.told("auto_changed")[-1]["state"] == "paused"
+    # Paused, the mode is still Auto, and the site is still not the task's: the person is asked
+    # where the model was, and no model is.
+    opening = asyncio.create_task(on.tools.call("browser_navigate", {"url": "https://four.example/"}))
+    request, opened = await on.answer(opening, "deny")
+    assert request["why"] == ["four.example is not one of the sites of the task"]
+    assert opened.is_error and len(on.model.requests) == 3
+    # With nobody watching it is refused. Three refusals are no way out of the task's sites.
+    on.leave()
+    alone = await asyncio.wait_for(on.tools.call("browser_navigate", {"url": "https://five.example/"}), 3)
+    assert alone.is_error and "no one is watching" in alone.text
+    assert on.driver.url == HERE, "the browser went nowhere"
+
+
+async def test_a_person_can_allow_once_a_step_that_was_refused_for_leaving_the_tasks_sites(auto) -> None:
+    on = await auto(rated("high", "no", "leaves_task"))
+    refused = await on.tools.call("browser_navigate", {"url": "https://docs.example/guide"})
+    assert refused.text.startswith("Not done: this step leaves the sites of the task")
+    decided = on.told("check_decided")[-1]
+    await on.session.handle({"type": "allow_refused", "id": decided["refused_id"]})
+    opened = await asyncio.wait_for(
+        on.tools.call("browser_navigate", {"url": "https://docs.example/guide"}), 3
+    )
+    assert not opened.is_error, opened.text
+    # Their yes is their answer about the site, as if they had been asked: it is read from then
+    # on, and the first step that acts there is checked again.
+    assert on.told("sites_changed")[-1]["sites"][-1] == {"host": "docs.example", "grade": "added_read"}
+    assert not (await on.tools.call("browser_snapshot", {})).is_error
+    assert len(on.model.requests) == 1, "the allowed step was not rated again"
