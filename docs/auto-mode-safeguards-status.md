@@ -56,6 +56,23 @@ pull request can be merged (first row of "Pending").**
 | More of the attack set | An agent that is fooled on purpose, with its report of reached / tried / done; and about eight more pages as real-browser tests (a redirect, a frame from another site, a tab that was open before the task, shared hosts, a leak through a picture's address, decoy passages, the part of an address after `#`, two more harmless pages). Their rules are tested without a browser today | Medium |
 | Two downloads of one name at the same moment | Both can be given the same place to wait in; the second is then said not to be kept. Seen by the review, not reproduced; it was so before this work for ordinary downloads too | Small |
 
+## Found by running it (`/verify`, 2026-10-08): to put right
+
+The service was started for real and driven as an agent over MCP, with the viewer open in a browser
+and a stand-in for the model provider. Most of it did what the spec says. These did not:
+
+| # | What happened | What the spec says | Weight |
+|---|---|---|---|
+| 1 | After Auto Mode paused (3 refusals in a row), a step to a site outside the task ran at once, with nobody watching and nobody asked. `evil.test` was opened this way right after three refusals | 18.4: while paused, every unsure step is asked of the person; with nobody watching it is refused | **A hole.** Three refused tries switch the guard off |
+| 2 | "Allow once" on a step refused for leaving the task's sites did nothing: the viewer said "Allowed once", and the same step was refused again with "that was settled" | 18.4: the person's "Allow once" lets that step run once | A person's word is not followed |
+| 3 | A refusal because nobody was watching settles a site as "outside the task" for the whole task. The person who comes back is never asked, and the list of refused steps offers no "Allow once" for it | Not said either way. To decide | Design |
+| 4 | With nobody watching, an agent that has read one flagged page can do nothing more in that tab: not leave the page, not open another tab | 18.5 says every acting step on a flagged page is unsure, so this follows. To decide whether leaving the page should be let through | Design |
+| 5 | A call whose client gave up waiting still asks the person, and leaves no line in the event log whatever they answer | 18.9: one line for every decision | A gap in the record |
+| 6 | The planted words of a dialog are withheld, but the page is not flagged and the person is not told | 18.5: a withheld instruction flags the page | Small |
+| 7 | A held file is listed as "waits for the person's yes" in the same result whose news line says it was not kept | — | Small, wording |
+| 8 | The question about copied text says "Will type" for an address that is opened, and shows packed text (Base64) as it is, not what it stands for | — | Small, wording |
+| 9 | A site entry that is no site is "left out, because this deployment does not allow them" | — | Small, wording |
+
 ## What changes for people who use it today
 
 | Change | Why |
