@@ -26,7 +26,7 @@ STARTER: dict[str, Any] = {
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
     # Settings and secrets come from the environment, and from a .env file in the folder the command is run in.
     apply_env_file(Path(".env"))
     try:
@@ -36,7 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def _parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bap-browser", description="A browser that AI agents can use and a person can watch."
     )
@@ -264,7 +264,7 @@ def _serve(args: argparse.Namespace) -> int:
     return 130
 
 
-def _extension_folder(config: Config) -> Path:
+def extension_folder(config: Config) -> Path:
     """Where the extension is put for a person to load into their Chrome. A folder a file chooser
     shows: one whose name begins with a dot is hidden from it."""
     return Path(config.server.extension_dir).expanduser().resolve()
@@ -294,7 +294,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser.agent.studio import run_studio
     from bap_browser.safeguards.model import ModelClient
 
-    extension = browser_extension.install(_extension_folder(config))
+    extension = browser_extension.install(extension_folder(config))
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(Interrupted, KeyboardInterrupt):
         asyncio.run(
@@ -322,14 +322,14 @@ def _agent(args: argparse.Namespace) -> int:
             )
         from bap_browser import browser_extension
 
-        extension = browser_extension.install(_extension_folder(config))
+        extension = browser_extension.install(extension_folder(config))
     elif args.extension:
         if not args.chat:
             raise ConfigError("the extension shows the chat. Use --extension together with --chat")
         from bap_browser import browser_extension
 
         # Beside the file that says where the service is: both are this machine's own state.
-        extension = browser_extension.install(_extension_folder(config))
+        extension = browser_extension.install(extension_folder(config))
         config = browser_extension.with_extension(with_visible_browser(config), extension)
     elif args.show_browser:
         config = with_visible_browser(config)
@@ -345,7 +345,11 @@ def _agent(args: argparse.Namespace) -> int:
         from bap_browser.agent.demo import TASK, demo_script
 
         task = args.task or TASK
-        model_for = lambda service: demo_script(f"{service.address}/demo-site", args.pace)  # noqa: E731
+
+        def scripted(service: Service) -> Model:
+            return demo_script(f"{service.address}/demo-site", args.pace)
+
+        model_for = scripted
     else:
         if not args.task and not args.chat:
             raise ConfigError(
@@ -367,9 +371,11 @@ def _agent(args: argparse.Namespace) -> int:
         from bap_browser.safeguards.model import ModelClient
 
         task = args.task
-        model_for = lambda service: OpenAIModel(  # noqa: E731
-            config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
-        )
+
+        def hosted(service: Service) -> Model:
+            return OpenAIModel(config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop"))
+
+        model_for = hosted
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     try:

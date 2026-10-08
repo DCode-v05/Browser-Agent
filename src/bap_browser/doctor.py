@@ -47,7 +47,7 @@ async def launch_and_open(config: Config, channel: str) -> str:
     # Imported here so that the other commands start without loading the browser library.
     from playwright.async_api import async_playwright
 
-    from bap_browser.driver.playwright_driver import launch_options
+    from bap_browser.driver.browser_parts import launch_options
 
     browser_settings = config.browser.model_copy(
         update={"channel": channel, "headless": True, "cdp_url": None, "user_data_dir": None, "args": []}

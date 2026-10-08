@@ -1,5 +1,6 @@
 import pytest
 
+from bap_browser.config_safeguards import SiteChecks
 from bap_browser.safeguards.lookalikes import is_bare_public_ip, lookalike_of, mixed_script_of
 
 PROTECTED = ["paypal.com", "amazon.com", "skylark-air.example", "apple.com"]
@@ -14,7 +15,7 @@ HONEST_CYRILLIC_XN = "xn--b1agh1afp"  # a Cyrillic word meaning "hello", looks l
 
 
 def lookalike(host: str) -> str | None:
-    return lookalike_of(host, PROTECTED, lure_words=LURE_WORDS, common_words=COMMON_WORDS)
+    return lookalike_of(host, PROTECTED, SiteChecks(lure_words=LURE_WORDS, common_words=COMMON_WORDS))
 
 
 NOT_A_LOOKALIKE = [
@@ -62,7 +63,7 @@ def test_lured_lookalikes(host: str) -> None:
 
 def test_a_protected_label_under_5_letters_is_never_measured_for_closeness() -> None:
     # "lebay" is one letter from "ebay", but "ebay" is only 4 letters: under the floor.
-    assert lookalike_of("lebay.example", ["ebay.com"], lure_words=[], common_words=[]) is None
+    assert lookalike_of("lebay.example", ["ebay.com"], SiteChecks(lure_words=[], common_words=[])) is None
 
 
 def test_a_host_label_under_5_letters_is_never_measured_for_closeness() -> None:
@@ -72,13 +73,16 @@ def test_a_host_label_under_5_letters_is_never_measured_for_closeness() -> None:
 
 def test_a_4_letter_protected_label_is_still_measured_for_the_lure_rule() -> None:
     # Too short for (a) (under 5 letters), but (b) only skips labels under 4.
-    assert lookalike_of("ebay-login.example", ["ebay.com"], lure_words=LURE_WORDS, common_words=[]) == (
-        "ebay.com"
-    )
+    assert lookalike_of(
+        "ebay-login.example", ["ebay.com"], SiteChecks(lure_words=LURE_WORDS, common_words=[])
+    ) == ("ebay.com")
 
 
 def test_a_protected_label_under_4_letters_is_skipped_for_the_lure_rule() -> None:
-    assert lookalike_of("ok-login.example", ["ok.com"], lure_words=LURE_WORDS, common_words=[]) is None
+    assert (
+        lookalike_of("ok-login.example", ["ok.com"], SiteChecks(lure_words=LURE_WORDS, common_words=[]))
+        is None
+    )
 
 
 def test_the_cyrillic_lookalike_is_allowed_to_be_found_here_too() -> None:

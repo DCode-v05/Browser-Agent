@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from bap_browser import keys
+from bap_browser.address import presentable_address
 from bap_browser.config import Logging
-from bap_browser.policy.address import presentable_address
 from bap_browser.results import ToolResult
 
 logger = stdlib_logging.getLogger(__name__)

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,11 +25,11 @@ from typing import Any
 from bap_browser import browser_extension
 from bap_browser.agent.command import (
     AGENT_NAME,
-    _do,  # pyright: ignore[reportPrivateUsage]
-    _next_task,  # pyright: ignore[reportPrivateUsage]
-    _paired,  # pyright: ignore[reportPrivateUsage]
-    _unless_stopped,  # pyright: ignore[reportPrivateUsage]
+    do_task,
+    next_task,
+    paired,
     tell,
+    unless_stopped,
 )
 from bap_browser.agent.models import Message, Model
 from bap_browser.config import Config
@@ -37,10 +38,14 @@ from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
 from bap_browser.evals.checks import run_checklist
+from bap_browser.evals.suite import SETS, Mode, Progress, Reports, run_set, suite_recorder
+from bap_browser.evals.suite import described as set_described
 from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
+
+logger = logging.getLogger(__name__)
 
 CLOUD, CHROME, BUILT_IN = "cloud", "chrome", "builtin"
 # The folder, inside the data folder, where the built-in browser keeps its sign-ins.
@@ -82,6 +87,9 @@ class Room:
     """Why it failed, in words for the person."""
     restart: asyncio.Event = field(default_factory=asyncio.Event)
     """Set when a new session is wanted on the page, or when whether it is wanted has changed."""
+    turn: asyncio.Lock = field(default_factory=asyncio.Lock)
+    """Held by whoever has the agent of this page working: a person's task, or a run of a task set.
+    The other waits its turn."""
 
     def described(self, extension: Path) -> dict[str, Any]:
         """What the window is told about this page, to draw its tab and what is behind it."""
@@ -128,6 +136,10 @@ class Studio:
         settings.systems = tuple(room.id for room in self.rooms)
         # A checklist runs on one browser at a time, and not on one that is being checked already.
         self._checking: set[str] = set()
+        # The task sets (spec 12.7): each browser's reports, and the run that is under way on it.
+        self._reports = {room.id: Reports(config.evals, room.id) for room in self.rooms}
+        self._runs: dict[str, Progress] = {}
+        self._running: set[asyncio.Task[None]] = set()
         self.service: Service | None = None
 
     # What the window asks (the HTTP surface).
@@ -244,7 +256,7 @@ class Studio:
             return "This browser has no session. Start it first."
         if session.control != "agent":
             return "The agent is not driving this browser now. Hand it back, or resume it, first."
-        if session.busy or system in self._checking:
+        if session.busy or system in self._checking or system in self._runs:
             return "This browser is busy. Run the checklist when its task is finished."
         self._checking.add(system)
         try:
@@ -253,6 +265,110 @@ class Studio:
             self._checking.discard(system)
         self._recorders[system].keep_checklist(result)
         return result
+
+    # The task sets (spec 12.7).
+
+    def suite(self, system: str) -> dict[str, Any]:
+        """The task sets of a browser: what each is, how its newest run went, and the run under way."""
+        room = self._room(system)
+        assert room is not None
+        latest = self._reports[system].latest()
+        running = self._runs.get(system)
+        settings = self._config.evals
+        return {
+            "system": system,
+            "model": self._configured(room).agent.model,
+            "sets": [
+                {**set_described(name), **latest.get(name, {"last": None, "earlier": []})} for name in SETS
+            ],
+            "running": running.told() if running is not None else None,
+            "trials": settings.suite_trials,
+            "max_trials": settings.suite_max_trials,
+        }
+
+    def suite_overall(self) -> dict[str, Any]:
+        """The newest run of each set on each browser, side by side: the admin's view of the whole."""
+        lines: list[dict[str, Any]] = []
+        for room in self.rooms:
+            latest = self._reports[room.id].latest()
+            runs = {
+                name: {
+                    **told["last"]["totals"],
+                    "mode": told["last"]["mode"],
+                    "started": told["last"]["started"],
+                    # How many times each task was tried, not how many tries there were in all.
+                    "trials": told["last"]["trials"],
+                    "stopped": told["last"]["stopped"],
+                }
+                for name, told in latest.items()
+            }
+            lines.append({"system": room.id, "runs": runs})
+        return {"sets": [set_described(name) for name in SETS], "systems": lines}
+
+    def start_suite(self, system: str, name: str, trials: int, mode: Mode) -> str | None:
+        """Begins a run of a task set on a browser. None when it began; otherwise why not."""
+        room, service = self._room(system), self.service
+        assert room is not None and service is not None
+        session = room.session
+        if name not in SETS:
+            return "There is no task set of that name."
+        if not 1 <= trials <= self._config.evals.suite_max_trials:
+            return f"A task is tried between 1 and {self._config.evals.suite_max_trials} times."
+        if session is None or session.control == "ended":
+            return "This browser has no session. Start it first."
+        if session.control != "agent":
+            return "The agent is not driving this browser now. Hand it back, or resume it, first."
+        if session.busy or system in self._checking or system in self._runs:
+            return "This browser is busy. Run the task set when its task is finished."
+        progress = Progress(name, mode, trials, set_described(name)["tasks"])
+        self._runs[system] = progress
+        running = asyncio.create_task(self._run_suite(room, session, service, progress))
+        self._running.add(running)
+        running.add_done_callback(self._running.discard)
+        return None
+
+    async def stop_suite(self, system: str) -> bool:
+        """Ends the run under way on a browser after the task it is on. False when there is none."""
+        progress, room = self._runs.get(system), self._room(system)
+        if progress is None or room is None:
+            return False
+        progress.stop.set()
+        if room.session is not None:
+            # The task it is on is stopped as a person stops one from the chat.
+            await room.session.handle({"type": "stop_task"})
+        return True
+
+    async def _run_suite(
+        self, room: Room, session: ServiceSession, service: Service, progress: Progress
+    ) -> None:
+        recorder = suite_recorder(self._config.evals, room.id, room.backend)
+        by_the_agent = progress.mode == "agent"
+
+        async def do(words: str) -> Any:
+            # Whoever watches the page sees each task in the chat, as if a person had sent it.
+            session.said("person", words)
+            # Each task starts with nothing remembered of the one before it: a conversation of its
+            # own, and a model client of its own, which keeps the turns of one conversation.
+            return await do_task(words, session, self._model_for(service), session.config, [], recorder)
+
+        try:
+            async with room.turn:
+                report = await run_set(
+                    session,
+                    service.address,
+                    progress.set,
+                    trials=progress.trials,
+                    mode=progress.mode,
+                    do=do if by_the_agent else None,
+                    settings=self._config.evals,
+                    model=session.config.agent.model,
+                    progress=progress,
+                )
+            await asyncio.to_thread(self._reports[room.id].keep, report)
+        except BapError as failed:
+            logger.warning("the run of the task set %s on %s ended: %s", progress.set, room.id, failed)
+        finally:
+            self._runs.pop(room.id, None)
 
     # The browsers themselves.
 
@@ -275,11 +391,11 @@ class Studio:
             asyncio.create_task(self._own_browser(built_in)),
         ]
         try:
-            await _unless_stopped(asyncio.gather(*working), service)
+            await unless_stopped(asyncio.gather(*working), service)
         finally:
-            for task in working:
+            for task in (*working, *self._running):
                 task.cancel()
-            await asyncio.gather(*working, return_exceptions=True)
+            await asyncio.gather(*working, *self._running, return_exceptions=True)
             for room in self.rooms:
                 if room.session is not None:
                     await room.session.close()
@@ -319,10 +435,11 @@ class Studio:
         model = self._model_for(self.service)
         history: list[Message] = []
         while True:
-            task = await _next_task(tasks, session)
+            task = await next_task(tasks, session)
             if task is None:
                 return
-            await _do(task, session, model, session.config, history, self._recorders[room.id])
+            async with room.turn:
+                await do_task(task, session, model, session.config, history, self._recorders[room.id])
 
     async def _own_browser(self, room: Room) -> None:
         """A page whose browser this process starts itself. Each time a person asks for a new
@@ -410,7 +527,7 @@ class Studio:
         """Waits for the extension to dial in. False when the browser was turned off meanwhile."""
         assert self.service is not None and self.service.bridge is not None
         pairing = asyncio.ensure_future(
-            _paired(self.service.bridge, self._extension, self.service, self._config.bridge.pairing_ttl_s)
+            paired(self.service.bridge, self._extension, self.service, self._config.bridge.pairing_ttl_s)
         )
         changed = asyncio.ensure_future(room.restart.wait())
         try:

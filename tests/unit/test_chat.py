@@ -7,7 +7,7 @@ from typing import Any
 
 from fakes import FakeDriver
 
-from bap_browser.agent.command import NOT_RUN, _do
+from bap_browser.agent.command import NOT_RUN, do_task
 from bap_browser.agent.models import Message, Reply, Said, ToolCall, ToolOutput
 from bap_browser.config import Config
 from bap_browser.errors import ModelError
@@ -115,7 +115,7 @@ async def test_a_task_is_done_and_answered_in_the_chat(make_config, tmp_path: Pa
     model = Replies(Reply("I will read the page.", (read,)), Reply("It says Fake."))
     history: list[Message] = []
     try:
-        await _do("What is on the page?", session, model, session.config, history)
+        await do_task("What is on the page?", session, model, session.config, history)
         assert [(event["type"], event.get("text", event.get("working"))) for event in chat(session)] == [
             ("task_changed", True),
             ("message", "I will read the page."),
@@ -138,8 +138,8 @@ async def test_the_next_task_goes_on_from_the_conversation_so_far(make_config, t
     model = Replies(Reply("Done."), Reply("Done again."))
     history: list[Message] = []
     try:
-        await _do("First", session, model, session.config, history)
-        await _do("Second", session, model, session.config, history)
+        await do_task("First", session, model, session.config, history)
+        await do_task("Second", session, model, session.config, history)
     finally:
         await session.close()
     assert model.seen[1] == [Said("user", "First"), Said("assistant", "Done."), Said("user", "Second")]
@@ -155,8 +155,8 @@ async def test_a_task_that_fails_is_answered_and_the_session_goes_on(make_config
     )
     history: list[Message] = []
     try:
-        await _do("First", session, model, session.config, history)
-        await _do("Second", session, model, session.config, history)
+        await do_task("First", session, model, session.config, history)
+        await do_task("Second", session, model, session.config, history)
         messages = [event for event in chat(session) if event["type"] == "message"]
         assert [(message["text"], message.get("failed", False)) for message in messages] == [
             ("The model provider could not be reached: timed out", True),
@@ -165,7 +165,7 @@ async def test_a_task_that_fails_is_answered_and_the_session_goes_on(make_config
         assert session.control == "agent"
         # Every call the model made has a result, so the conversation can go on.
         assert history[-1] == ToolOutput(second, NOT_RUN, True)
-        await _do("Third", session, model, session.config, history)
+        await do_task("Third", session, model, session.config, history)
         assert chat(session)[-2]["text"] == "Fine."
     finally:
         await session.close()
@@ -201,7 +201,7 @@ async def test_a_person_stops_the_task_and_the_session_goes_on(make_config, tmp_
         Reply("", (ToolCall("a", "browser_snapshot", {}),)), Reply("The second one is done.")
     )
     try:
-        await _do("First task", session, model, session.config, history)
+        await do_task("First task", session, model, session.config, history)
         said = messages(session)[-1]
         assert (said["role"], said["text"]) == ("agent", "Stopped before the task was finished.")
         assert "failed" not in said, "a task a person stopped has not failed"
@@ -209,7 +209,7 @@ async def test_a_person_stops_the_task_and_the_session_goes_on(make_config, tmp_
         assert not [call for call in session.browser.started_driver.calls if call[0] == "snapshot"]  # type: ignore[union-attr]
         assert session.control == "agent"
 
-        await _do("Second task", session, model, session.config, history)
+        await do_task("Second task", session, model, session.config, history)
         assert messages(session)[-1]["text"] == "The second one is done."
     finally:
         await session.close()

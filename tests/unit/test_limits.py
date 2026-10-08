@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from bap_browser.config import Limits as LimitSettings
+from bap_browser.config_safeguards import Limits as LimitSettings
 from bap_browser.safeguards.limits import NOTHING_CHANGED, TOO_MANY_CALLS, Limits, Reached, same_step
 from bap_browser.safeguards.model import Spend
 
@@ -205,3 +205,17 @@ def test_a_new_task_forgets_the_steps_of_the_last() -> None:
         watched.acted(click, changed=False)
     watched.begin_task()
     assert not watched.goes_in_circles(click)
+
+
+async def test_the_engines_own_work_on_a_session_is_no_agents_step() -> None:
+    # A run of a task set does more in a minute than any agent, and is not an agent (spec 12.7).
+    waits = Waits()
+    counted = limits(waits, max_calls=3, max_calls_per_minute=2, rate_wait_s=0, repeat_refuse=2)
+    with counted.own_work():
+        assert [await counted.admit() for _ in range(10)] == [None] * 10
+        counted.acted("click e1", changed=False)
+        assert counted.goes_in_circles("click e1") is None
+    assert waits.taken == [], "it waited for nothing"
+    # An agent's own steps are counted from nothing, and held to the rate, as before.
+    assert [await counted.admit() for _ in range(2)] == [None, None]
+    assert await counted.admit() == TOO_MANY_CALLS

@@ -31,7 +31,9 @@ TABLE = {
 
 
 def verdict(risk: str = "low", asked_for: str = "exactly", category: str = "none") -> Verdict:
-    return read_verdict({"risk": risk, "asked_for": asked_for, "category": category, "reason": "Because."})
+    return read_verdict(
+        {"risk": risk, "asked_for": asked_for, "category": category, "reason": "Because."}, 120
+    )
 
 
 @pytest.mark.parametrize("risk", TABLE)
@@ -82,12 +84,12 @@ def test_the_floor_only_ever_raises_a_risk() -> None:
 )
 def test_an_answer_that_is_not_of_the_shape_asked_for_counts_as_no_answer(answer: dict) -> None:
     with pytest.raises(ModelError):
-        read_verdict(answer)
+        read_verdict(answer, 120)
 
 
 def test_the_models_sentence_is_made_one_line_and_cut() -> None:
     read = read_verdict(
-        {"risk": "low", "asked_for": "no", "category": "none", "reason": "One\n  two. " + "x" * 300}
+        {"risk": "low", "asked_for": "no", "category": "none", "reason": "One\n  two. " + "x" * 300}, 120
     )
     assert read.reason.startswith("One two. x") and len(read.reason) == 120
 

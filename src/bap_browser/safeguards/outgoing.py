@@ -19,7 +19,7 @@ from decimal import Decimal
 from typing import Literal
 from urllib.parse import unquote, urlsplit
 
-from bap_browser.config import ArrivingFiles, Outgoing
+from bap_browser.config_safeguards import ArrivingFiles, Outgoing
 
 # How the first bytes of a program look: Windows, Linux, macOS, and a script that names its interpreter.
 PROGRAM_BEGINNINGS = (
@@ -32,8 +32,6 @@ PROGRAM_BEGINNINGS = (
     b"\xca\xfe\xba\xbe",
     b"#!",
 )
-# How much of a file is read to tell a program from what its name says it is.
-FIRST_BYTES = max(len(beginning) for beginning in PROGRAM_BEGINNINGS)
 SIGNS = {
     "$": "USD",
     "€": "EUR",
@@ -61,8 +59,6 @@ _DIGITS = re.compile(r"\d{6,}")
 _GROUPED = re.compile(r"(?<![\d.-])\d{1,6}(?:[ .-]\d{1,6}){1,7}(?![\d.-]?\d)")
 _A_DATE = re.compile(r"\d{4}[ .-]\d{1,2}[ .-]\d{1,2}|\d{1,2}[ .-]\d{1,2}[ .-]\d{4}")
 _A_WORD = re.compile(r"[A-Za-z0-9_-]{8,}")
-# A phone or card number is told from other grouped digits by how many it has.
-DIGITS_OF_A_LONG_NUMBER = 10
 _POSTAL_PIN = re.compile(r"\b(?:postal|zip|area|code)\W+pin\b|\bpin\W+(?:code|postal|zip|area)\b")
 _GRANTS = re.compile(
     r"wants to access your|is requesting access|would like to access|grant access|authori[sz]e\s+\w",
@@ -143,7 +139,7 @@ class CopyMemory:
             for _ in hashes:
                 bits[place >> 3] |= 1 << (place & 7)
                 place = (place + stride) % count
-        for secret in short_secrets(text):
+        for secret in short_secrets(text, settings.grouped_number_digits):
             read.secrets[hash(secret) ^ salt] = None
         while len(read.secrets) > settings.secrets_per_site:
             del read.secrets[next(iter(read.secrets))]
@@ -177,7 +173,7 @@ class CopyMemory:
         if best is not None:
             return best
         for form in forms:
-            for secret in short_secrets(form):
+            for secret in short_secrets(form, self._settings().grouped_number_digits):
                 key = hash(secret) ^ self._salt
                 if (own is not None and key in own.secrets) or any(secret in words for words in aware):
                     continue
@@ -219,7 +215,7 @@ class CopyMemory:
         return best
 
 
-def short_secrets(text: str) -> list[str]:
+def short_secrets(text: str, grouped_number_digits: int) -> list[str]:
     """The short secrets in a text, each in the form it is compared in: a number of six or more
     digits; a phone or card number, its separators taken out; a word of eight or more characters
     that holds both a letter and a digit; an email address."""
@@ -230,7 +226,7 @@ def short_secrets(text: str) -> list[str]:
         found[match.group()] = None
     for match in _GROUPED.finditer(text):
         digits = re.sub(r"\D", "", match.group())
-        if len(digits) >= DIGITS_OF_A_LONG_NUMBER and not _A_DATE.fullmatch(match.group()):
+        if len(digits) >= grouped_number_digits and not _A_DATE.fullmatch(match.group()):
             found[digits] = None
     for match in _A_WORD.finditer(text):
         word = match.group()

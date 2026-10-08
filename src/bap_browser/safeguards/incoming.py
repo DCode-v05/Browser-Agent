@@ -12,7 +12,7 @@ import secrets
 import unicodedata
 from urllib.parse import urlsplit, urlunsplit
 
-from bap_browser.config import Incoming
+from bap_browser.config_safeguards import Incoming
 
 CUT = "…"
 
@@ -28,8 +28,8 @@ _FILLERS = frozenset({0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800, 0x034F, 0x17B4, 0x
 _ALWAYS_KEPT_FORMAT = frozenset(
     {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x08E2, 0x110BD}
 )
-_ZWJ = 0x200D
-_ZWNJ = 0x200C
+_ZWJ = ord("\N{ZERO WIDTH JOINER}")
+_ZWNJ = ord("\N{ZERO WIDTH NON-JOINER}")
 
 # unicodedata.name() of a letter or mark of these scripts starts with one of these words.
 _JOINING_SCRIPTS = frozenset(

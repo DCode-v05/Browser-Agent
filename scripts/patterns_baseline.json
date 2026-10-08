@@ -1,0 +1,5 @@
+{
+  "fixed-wait-in-test": {
+    "tests/viewer/test_takeover.py": 1
+  }
+}

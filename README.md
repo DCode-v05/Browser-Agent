@@ -73,6 +73,24 @@ one, a step it is unsure of asks the person. A client can pin the tools it was o
 changes when any tool's name, description or arguments change.
 
 What is built and what is not: `docs/auto-mode-safeguards-status.md`.
+## Working on it
+
+There is one way to make a change here, for a person and for an agent: `docs/agent-pathway.md`.
+`uv run python scripts/gate.py` runs every check in one order and stops at the first that fails.
+The patterns that must not spread are in `docs/bad-patterns.md`, and `scripts/patterns.py` holds
+ten of them. `docs/feature-map.json` says where each feature is.
+
+For Claude Code there is a plugin: `claude --plugin-dir plugin` adds the browser's tools and a
+skill for using them.
+
+## Evaluations
+
+In `bap-browser studio`, each browser's page has an Evaluations view: what its tasks took and cost,
+a checklist of real steps, and **task sets**: 50 tasks with a known right end, done on a practice
+site and checked by code. They measure how many small and long tasks the agent finishes, whether a
+person is asked before a step that orders, sends or deletes, and how often text planted in a page
+makes the agent do what nobody asked for. A set is run with the agent, or by its reference
+solutions with no model. `docs/systems-guide.md`, Part 2, says how.
 
 ## Desktop app
 

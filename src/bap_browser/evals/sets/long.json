@@ -1,0 +1,367 @@
+{
+  "title": "Long tasks",
+  "lead": "Whether the agent finishes a task of many steps over several pages.",
+  "tasks": [
+    {
+      "id": "buy-and-tell",
+      "title": "Buy three things, then write the total to someone",
+      "task": "Buy the Blue running shoes and two pairs of Wool socks, delivered to 12 Canal Street, Leeds by Express delivery. Then write to grace@example.com with the subject Order placed and tell her the total of the order.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.items",
+          "has": "blue-shoes"
+        },
+        {
+          "state": "orders.0.items.length",
+          "is": 3
+        },
+        {
+          "state": "orders.0.total",
+          "is": 108
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        },
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "grace@example.com",
+            "subject": "Order placed",
+            "body": "~108"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Blue running shoes to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ],
+        [
+          "open",
+          "basket.html"
+        ],
+        [
+          "type",
+          "Delivery address",
+          "12 Canal Street, Leeds"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ],
+        [
+          "open",
+          "mail.html?compose=1"
+        ],
+        [
+          "type",
+          "To",
+          "grace@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Order placed"
+        ],
+        [
+          "type",
+          "Message",
+          "The order is placed. The total is $108.00."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ]
+    },
+    {
+      "id": "tidy-inbox",
+      "title": "Delete, reply and answer from the inbox",
+      "task": "Go through the inbox: delete the message from Shop Daily, reply yes to Grace Hopper's lunch, and then tell me the due date of invoice INV-1042.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m4"
+        },
+        {
+          "state": "mail.inbox.length",
+          "is": 3
+        },
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "grace@example.com",
+            "body": "~yes"
+          }
+        },
+        {
+          "answer": "30 March"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ],
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Yes, Friday at 12:30 works for me."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ],
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "answer",
+          "The invoice is due on 30 March."
+        ]
+      ]
+    },
+    {
+      "id": "account-and-notes",
+      "title": "Change the account, then tidy the notes",
+      "task": "Change the account's display name to Ada King, its country to Germany and turn the newsletter on, and save. Then, in Notes, delete the note about stamps and add two notes: Renew passport, and Book train.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Ada King"
+        },
+        {
+          "state": "profile.country",
+          "is": "Germany"
+        },
+        {
+          "state": "profile.newsletter",
+          "is": true
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        },
+        {
+          "state": "notes.items",
+          "lacks": "~stamps"
+        },
+        {
+          "state": "notes.items",
+          "has": "~renew passport"
+        },
+        {
+          "state": "notes.items",
+          "has": "~book train"
+        },
+        {
+          "state": "notes.items.length",
+          "is": 3
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Ada King"
+        ],
+        [
+          "select",
+          "Country",
+          "Germany"
+        ],
+        [
+          "check",
+          "Send me the newsletter",
+          true
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ],
+        [
+          "open",
+          "notes.html"
+        ],
+        [
+          "click",
+          "button",
+          "Delete note: Buy stamps"
+        ],
+        [
+          "type",
+          "New note",
+          "Renew passport"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ],
+        [
+          "type",
+          "New note",
+          "Book train"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ]
+    },
+    {
+      "id": "fix-basket-and-order",
+      "title": "Put a wrong basket right, order it, and note it",
+      "task": "The basket should hold only one Rain jacket and one Trail map. Fix it, then order it to 5 Mill Lane, York with Pick up in store, and add a note that says: Order sent",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.items.length",
+          "is": 2
+        },
+        {
+          "state": "orders.0.items",
+          "has": "rain-jacket"
+        },
+        {
+          "state": "orders.0.items",
+          "has": "trail-map"
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        },
+        {
+          "state": "notes.items",
+          "has": "~order sent"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Remove Red running shoes"
+        ],
+        [
+          "click",
+          "button",
+          "Remove Water bottle"
+        ],
+        [
+          "open",
+          "shop.html"
+        ],
+        [
+          "click",
+          "button",
+          "Add Rain jacket to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ],
+        [
+          "open",
+          "basket.html"
+        ],
+        [
+          "type",
+          "Delivery address",
+          "5 Mill Lane, York"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ],
+        [
+          "open",
+          "notes.html"
+        ],
+        [
+          "type",
+          "New note",
+          "Order sent"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "red-shoes",
+            "name": "Red running shoes",
+            "price": 79,
+            "qty": 1
+          },
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 1
+          }
+        ]
+      }
+    }
+  ]
+}

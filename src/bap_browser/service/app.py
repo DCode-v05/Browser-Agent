@@ -18,14 +18,13 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from starlette.applications import Starlette
-from starlette.datastructures import Headers
 from starlette.middleware import Middleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from bap_browser import browser_extension
@@ -35,25 +34,14 @@ from bap_browser.errors import BapError, ConfigError
 from bap_browser.service.accounts import ROLES, Accounts, BadPassword, LockedOut, Role
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.browsing_data import CLEAR, clear_browsing_data
-from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
+from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE, Close, command_of, send, serve_viewer
+from bap_browser.service.wrapping import McpEndpoint, ResponseHeaders, tools_on_offer
 from bap_browser.settings.store import SEES, Refused, SettingsStore, known_surface
-from bap_browser.tools.registry import tools_hash
 
-# The first byte of a binary message says what it carries.
-PICTURE = b"\x01"
-# Close codes the viewer acts on.
-REFUSED = 4401
-NO_SUCH_SESSION = 4404
-START_OVER = 1013
-NOT_THE_VIEWERS_ORIGIN = 1008
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
 LOCAL_CLIENTS = ("127.0.0.1", "::1")
-# A person's command is a few dozen bytes. Nothing larger is taken from a viewer.
-LARGEST_VIEWER_MESSAGE = 64 * 1024
-# A request that is refused is read no further than this before it is answered.
-LARGEST_REFUSED_REQUEST = 64 * 1024
 
 
 def create_app(
@@ -123,8 +111,8 @@ def create_app(
         the visit is over, or the admin now keeps this browser from users. None while it may stay."""
         role = role_of(given)
         if role is None:
-            return REFUSED
-        return None if may_use(role, name) else NO_SUCH_SESSION
+            return Close.REFUSED
+        return None if may_use(role, name) else Close.NO_SUCH_SESSION
 
     def show_out() -> None:
         """Ends the connection of every viewer that may no longer be where it is (spec 4.11)."""
@@ -139,21 +127,6 @@ def create_app(
     async def admin_page(request: Request) -> Response:
         """The admin's sign-in page. It is the viewer's own page: the page reads where it was opened."""
         return FileResponse(viewer / "index.html")
-
-    async def list_tools(request: Request) -> Response:
-        """The tools each session offers, and one value that changes when any of them does."""
-        role = allowed(request, "admin", "user")
-        if isinstance(role, Response):
-            return role
-        offered = {
-            name: {
-                "hash": tools_hash(session.toolkit.definitions()),
-                "tools": [tool.name for tool in session.toolkit.definitions()],
-            }
-            for name, session in sessions.items()
-            if may_use(role, name)
-        }
-        return JSONResponse({"sessions": offered})
 
     async def list_sessions(request: Request) -> Response:
         role = allowed(request, "admin", "user")
@@ -512,6 +485,58 @@ def create_app(
             return JSONResponse({"error": result}, status_code=409)
         return JSONResponse(result)
 
+    def may_run(role: Role) -> bool:
+        return sees(role, "evaluations") and sees(role, "checklist")
+
+    async def system_suite(request: Request) -> Response:
+        """The task sets of one browser, and how its runs of them went (spec 12.7)."""
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system))
+
+    async def run_suite(request: Request) -> Response:
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        asked = await _json_object(request) or {}
+        name, trials, mode = asked.get("set"), asked.get("trials"), asked.get("mode")
+        if not isinstance(name, str) or type(trials) is not int or mode not in ("agent", "reference"):
+            return Response(status_code=400)
+        why_not = systems.start_suite(system, name, trials, mode)
+        if why_not is not None:
+            return JSONResponse({"error": why_not}, status_code=409)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system), status_code=202)
+
+    async def stop_suite(request: Request) -> Response:
+        asking = a_system(request, "admin", "user")
+        if isinstance(asking, Response):
+            return asking
+        role, system = asking
+        assert systems is not None
+        if not may_run(role):
+            return Response(status_code=403)
+        if not await systems.stop_suite(system):
+            return JSONResponse({"error": "No run is under way on this browser."}, status_code=409)
+        return JSONResponse(await asyncio.to_thread(systems.suite, system))
+
+    async def overall_suite(request: Request) -> Response:
+        """The newest run of each task set on each browser: the admin's view of the whole."""
+        role = allowed(request, "admin")
+        if isinstance(role, Response):
+            return role
+        if systems is None:
+            return Response(status_code=404)
+        return JSONResponse(await asyncio.to_thread(systems.suite_overall))
+
     async def clear_data(request: Request) -> Response:
         """Clear browsing data: the one setting that is an action (spec 10.2)."""
         role = allowed(request, "admin")
@@ -539,23 +564,23 @@ def create_app(
         # A browser always says which page opened the connection. Only the viewer's own page may.
         own = {f"http://{socket.headers.get('host', '')}", f"https://{socket.headers.get('host', '')}"}
         if origin is not None and origin not in own | origins:
-            await socket.close(NOT_THE_VIEWERS_ORIGIN)
+            await socket.close(Close.NOT_THE_VIEWERS_ORIGIN)
             return
         await socket.accept()
         try:
             async with asyncio.timeout(config.server.auth_wait_s):
-                first = _command(await socket.receive())
+                first = command_of(await socket.receive())
         except (TimeoutError, WebSocketDisconnect):
             first = None
         role = role_of(first.get("token")) if first and first.get("type") == "auth" else None
         if role is None:
-            await socket.close(REFUSED)
+            await socket.close(Close.REFUSED)
             return
         name = socket.path_params["name"]
         # A browser the admin keeps from users is, for a user, not there.
         session = sessions.get(name) if may_use(role, name) else None
         if session is None:
-            await socket.close(NO_SUCH_SESSION)
+            await socket.close(Close.NO_SUCH_SESSION)
             return
         given = first.get("token") if first else None
         door: asyncio.Future[int] = asyncio.get_running_loop().create_future()
@@ -563,9 +588,9 @@ def create_app(
         replay, subscriber = session.hub.subscribe()
         try:
             for item in replay:
-                await _send(socket, item)
-            await _send(socket, {"type": "caught_up", "ts": time.time()})
-            await _serve_viewer(
+                await send(socket, item)
+            await send(socket, {"type": "caught_up", "ts": time.time()})
+            await serve_viewer(
                 socket,
                 session,
                 subscriber,
@@ -584,18 +609,18 @@ def create_app(
         """The extension dials in (spec 4.9). Only this product's extension may, and only with the token."""
         assert bridge is not None
         if socket.headers.get("origin") != browser_extension.ORIGIN:
-            await socket.close(NOT_THE_VIEWERS_ORIGIN)
+            await socket.close(Close.NOT_THE_VIEWERS_ORIGIN)
             return
         await socket.accept()
         try:
             async with asyncio.timeout(config.server.auth_wait_s):
-                first = _command(await socket.receive())
+                first = command_of(await socket.receive())
         except (TimeoutError, WebSocketDisconnect):
             first = None
         # A pairing token lets it in once; the key it is given then lets it come back after a cut.
         admitted = bridge.admit(first) if first and first.get("type") == "auth" else None
         if admitted is None or first is None:
-            await socket.close(REFUSED)
+            await socket.close(Close.REFUSED)
             return
         await socket.send_text(json.dumps(admitted))
         await bridge.serve_extension(socket, attached=first.get("attached") is True)
@@ -607,7 +632,7 @@ def create_app(
         scheme, _, given = socket.headers.get("authorization", "").partition(" ")
         local = socket.client is not None and socket.client.host in LOCAL_CLIENTS
         if not local or scheme.lower() != "bearer" or not signed_in(given):
-            await socket.close(REFUSED)
+            await socket.close(Close.REFUSED)
             return
         await socket.accept()
         await bridge.serve_driver(socket)
@@ -631,6 +656,7 @@ def create_app(
             Route("/api/admin/policy", read_policy, methods=["GET"]),
             Route("/api/admin/policy", change_policy, methods=["PATCH"]),
             Route("/api/evals", overall_evals, methods=["GET"]),
+            Route("/api/suite", overall_suite, methods=["GET"]),
             Route("/api/desktop", open_desktop, methods=["POST"]),
             Route("/api/settings", read_settings, methods=["GET"]),
             Route("/api/settings", change_settings, methods=["PATCH"]),
@@ -642,13 +668,12 @@ def create_app(
             Route("/api/systems/{system}/evals/{task}", system_trace, methods=["GET"]),
             Route("/api/systems/{system}/evals/{task}/rating", rate_task, methods=["POST"]),
             Route("/api/systems/{system}/checks", check_system, methods=["POST"]),
+            Route("/api/systems/{system}/suite", system_suite, methods=["GET"]),
+            Route("/api/systems/{system}/suite", run_suite, methods=["POST"]),
+            Route("/api/systems/{system}/suite/stop", stop_suite, methods=["POST"]),
             Route("/api/systems/{system}/{action}", manage_system, methods=["POST"]),
-            *(
-                [Route(config.mcp.http_path, _McpEndpoint(mcp, signed_in, origins))]
-                if mcp is not None
-                else []
-            ),
-            Route("/api/tools", list_tools, methods=["GET"]),
+            *([Route(config.mcp.http_path, McpEndpoint(mcp, signed_in, origins))] if mcp is not None else []),
+            Route("/api/tools", tools_on_offer(sessions, allowed, may_use), methods=["GET"]),
             WebSocketRoute("/api/sessions/{name}/ws", viewer_socket),
             *bridged,
             Mount("/demo-site", StaticFiles(directory=package / "demo_site", html=True)),
@@ -656,77 +681,9 @@ def create_app(
         ],
         middleware=[
             Middleware(TrustedHostMiddleware, allowed_hosts=hosts, www_redirect=False),
-            Middleware(_ResponseHeaders, embed_origins=config.viewer.embed_origins),
+            Middleware(ResponseHeaders, embed_origins=config.viewer.embed_origins),
         ],
     )
-
-
-async def _serve_viewer(
-    socket: WebSocket,
-    session: ServiceSession,
-    subscriber: Subscriber,
-    backlog: int,
-    shown_out: asyncio.Future[int] | None = None,
-    must_leave: Callable[[], int | None] = lambda: None,
-) -> None:
-    """Sends the viewer what happens, and does what the person asks, until either side stops, or
-    until the person may no longer be here: `shown_out` is then given the code to close with."""
-    waiting: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-    door = shown_out if shown_out is not None else asyncio.get_running_loop().create_future()
-
-    async def tell() -> None:
-        while True:
-            await _send(socket, await subscriber.next())
-
-    async def listen() -> None:
-        while True:
-            command = _command(await socket.receive())
-            if command is None:
-                continue
-            leave = must_leave()
-            if leave is not None:
-                if not door.done():
-                    door.set_result(leave)
-                return
-            if command.get("type") == "stop":
-                # Stop never waits its turn: a pause or a take-over ahead of it may be waiting for an
-                # action that does not end.
-                await session.handle(command)
-            elif waiting.qsize() < backlog:
-                waiting.put_nowait(command)
-            # Past the limit a command is dropped: the page is not keeping up with what is sent.
-
-    async def act() -> None:
-        # One at a time and in order: what a person types must reach the page as it was typed.
-        while True:
-            await session.handle(await waiting.get())
-
-    tasks = [asyncio.create_task(work()) for work in (tell, listen, act)]
-    try:
-        await asyncio.wait([*tasks, door], return_when=asyncio.FIRST_COMPLETED)
-    finally:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-    if door.done():
-        await socket.close(door.result())
-        return
-    failure = next(
-        (task.exception() for task in tasks if not task.cancelled() and task.exception()),
-        None,
-    )
-    if isinstance(failure, FellBehind):
-        # The viewer stopped reading. It connects again and is sent everything from the start.
-        await socket.close(START_OVER)
-    elif failure is not None and not isinstance(failure, WebSocketDisconnect):
-        raise failure
-
-
-async def _send(socket: WebSocket, item: dict[str, Any] | bytes) -> None:
-    if isinstance(item, bytes):
-        await socket.send_bytes(PICTURE + item)
-    else:
-        await socket.send_text(json.dumps(item, ensure_ascii=False, separators=(",", ":")))
 
 
 async def _json_object(request: Request) -> dict[str, Any] | None:
@@ -741,87 +698,3 @@ async def _json_object(request: Request) -> dict[str, Any] | None:
     except ValueError:
         return None
     return data if isinstance(data, dict) else None
-
-
-def _command(message: Message) -> dict[str, Any] | None:
-    """A viewer's message as a command, or None for anything that is not one."""
-    if message["type"] == "websocket.disconnect":
-        raise WebSocketDisconnect(message.get("code", 1000))
-    text = message.get("text")
-    if not isinstance(text, str) or len(text) > LARGEST_VIEWER_MESSAGE:
-        return None
-    try:
-        command = json.loads(text)
-    except ValueError:
-        return None
-    return command if isinstance(command, dict) else None
-
-
-class _McpEndpoint:
-    """The tools over MCP, for an agent in another process. It is let in by the service's token,
-    sent as a bearer token, like the API."""
-
-    def __init__(self, handle: ASGIApp, signed_in: Callable[[Any], bool], origins: set[str]) -> None:
-        self._handle = handle
-        self._signed_in = signed_in
-        self._origins = origins
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        headers = Headers(scope=scope)
-        origin = headers.get("origin")
-        # A browser says which page sends a request. A web page that is not the viewer's own has no
-        # business with the tools, whatever token it holds. An agent that is no browser says nothing.
-        own = {f"http://{headers.get('host', '')}", f"https://{headers.get('host', '')}"}
-        if origin is not None and origin not in own | self._origins:
-            await self._refuse(Response(status_code=403), scope, receive, send)
-            return
-        scheme, _, given = headers.get("authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not self._signed_in(given):
-            refusal = Response(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-            await self._refuse(refusal, scope, receive, send)
-            return
-        await self._handle(scope, receive, send)
-
-    @staticmethod
-    async def _refuse(refusal: Response, scope: Scope, receive: Receive, send: Send) -> None:
-        # What was sent is read first. An answer that closes the connection over a request still
-        # unread reaches the sender as a broken connection, not as a refusal.
-        read = 0
-        while read < LARGEST_REFUSED_REQUEST:
-            message = await receive()
-            read += len(message.get("body", b""))
-            if message["type"] != "http.request" or not message.get("more_body"):
-                break
-        await refusal(scope, receive, send)
-
-
-class _ResponseHeaders:
-    """Headers on every response: who may show the viewer inside their page, nothing guessed or leaked,
-    and no connection left open afterwards.
-
-    A browser that is closed cuts the idle connections it still holds, and on Windows Python's asyncio
-    can then fail to let go of such a connection. The agent's own browser loads the demo site from
-    this service and is closed at the end of every session, so each answer ends its connection.
-    """
-
-    def __init__(self, app: ASGIApp, embed_origins: list[str]) -> None:
-        self._app = app
-        ancestors = " ".join(["'self'", *embed_origins])
-        self._headers = [
-            (b"content-security-policy", f"frame-ancestors {ancestors}".encode()),
-            (b"x-content-type-options", b"nosniff"),
-            (b"referrer-policy", b"no-referrer"),
-            (b"connection", b"close"),
-        ]
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self._app(scope, receive, send)
-            return
-
-        async def send_with_headers(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                message = {**message, "headers": [*message.get("headers", []), *self._headers]}
-            await send(message)
-
-        await self._app(scope, receive, send_with_headers)

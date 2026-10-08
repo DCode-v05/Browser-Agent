@@ -1,0 +1,662 @@
+{
+  "title": "Short tasks",
+  "lead": "Whether the agent finishes a small task: one to ten steps on one page.",
+  "tasks": [
+    {
+      "id": "shop-add-one",
+      "title": "Put one product in the basket",
+      "task": "Put the Blue running shoes in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "blue-shoes",
+            "qty": 1
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Blue running shoes to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-add-two-kinds",
+      "title": "Put two different products in the basket",
+      "task": "Put one Rain jacket and one Water bottle in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "rain-jacket"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "water-bottle"
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 2
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Rain jacket to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Water bottle to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-add-twice",
+      "title": "Put two of one product in the basket",
+      "task": "Put two pairs of Wool socks in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "wool-socks",
+            "qty": 2
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-cheapest",
+      "title": "Find the cheapest product",
+      "task": "Put the cheapest product of the shop in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "trail-map"
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-price",
+      "title": "Read a price",
+      "task": "What does the Rain jacket cost? Answer with the price.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "120"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The Rain jacket costs $120.00."
+        ]
+      ]
+    },
+    {
+      "id": "basket-remove",
+      "title": "Take one product out of the basket",
+      "task": "Take the Wool socks out of the basket and leave the rest.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "basket",
+          "lacks": {
+            "id": "wool-socks"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "blue-shoes"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Remove Wool socks"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "blue-shoes",
+            "name": "Blue running shoes",
+            "price": 84,
+            "qty": 1
+          },
+          {
+            "id": "wool-socks",
+            "name": "Wool socks",
+            "price": 12,
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "basket-total",
+      "title": "Read the total of the basket",
+      "task": "What is the total of the basket?",
+      "start": "basket.html",
+      "pass": [
+        {
+          "answer": "156"
+        },
+        {
+          "state": "orders.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The total is $156.00."
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 1
+          },
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "order-place",
+      "title": "Order what is in the basket",
+      "task": "Order what is in the basket. Deliver it to 12 Canal Street, Leeds, by Express delivery.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.address",
+          "is": "~12 canal street"
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        },
+        {
+          "state": "orders.0.items",
+          "has": "blue-shoes"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "12 Canal Street, Leeds"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "blue-shoes",
+            "name": "Blue running shoes",
+            "price": 84,
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "order-from-shop",
+      "title": "Choose a product and order it",
+      "task": "Buy one Trail map: put it in the basket and order it to 5 Mill Lane, York, with Standard delivery.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.items",
+          "has": "trail-map"
+        },
+        {
+          "state": "orders.0.items.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.address",
+          "is": "~5 mill lane"
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Standard"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ],
+        [
+          "open",
+          "basket.html"
+        ],
+        [
+          "type",
+          "Delivery address",
+          "5 Mill Lane, York"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ]
+    },
+    {
+      "id": "mail-read",
+      "title": "Read a message and answer from it",
+      "task": "When does the flight in the message from Skylark Air leave, and from which gate?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "09:40"
+        },
+        {
+          "answer": "B12"
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Your booking SK4821"
+        ],
+        [
+          "answer",
+          "It leaves on 14 March at 09:40 from gate B12."
+        ]
+      ]
+    },
+    {
+      "id": "mail-count",
+      "title": "Count the messages",
+      "task": "How many messages are in the inbox? Answer with the number.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": [
+            "4",
+            "four"
+          ]
+        },
+        {
+          "state": "mail.deleted.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "There are 4 messages."
+        ]
+      ]
+    },
+    {
+      "id": "mail-reply",
+      "title": "Reply to a message",
+      "task": "Reply to Grace Hopper's message and say yes to lunch.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "grace@example.com",
+            "body": "~yes"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Yes, Friday at 12:30 works for me."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ]
+    },
+    {
+      "id": "mail-write",
+      "title": "Write a new message",
+      "task": "Write to sam@example.com with the subject Meeting and the message: See you at ten.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "sam@example.com",
+            "subject": "Meeting",
+            "body": "~see you at ten"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "sam@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Meeting"
+        ],
+        [
+          "type",
+          "Message",
+          "See you at ten."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ]
+    },
+    {
+      "id": "mail-delete",
+      "title": "Delete one message",
+      "task": "Delete the message from Shop Daily.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m4"
+        },
+        {
+          "state": "mail.inbox.length",
+          "is": 3
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ]
+    },
+    {
+      "id": "mail-invoice",
+      "title": "Find two facts in a message",
+      "task": "How much is invoice INV-1042 for, and when is it due?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "240"
+        },
+        {
+          "answer": "30 March"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "answer",
+          "It is for 240.00 USD and is due on 30 March."
+        ]
+      ]
+    },
+    {
+      "id": "account-name",
+      "title": "Change one field of the account",
+      "task": "Change the display name of the account to Ada King and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Ada King"
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Ada King"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ]
+    },
+    {
+      "id": "account-country",
+      "title": "Choose from a dropdown",
+      "task": "Set the country of the account to Japan and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.country",
+          "is": "Japan"
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        },
+        {
+          "state": "profile.name",
+          "is": "Ada Lovelace"
+        }
+      ],
+      "solution": [
+        [
+          "select",
+          "Country",
+          "Japan"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ]
+    },
+    {
+      "id": "account-email",
+      "title": "Change the email of the account",
+      "task": "Change the account's email to ada.king@example.com and save it.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.email",
+          "is": "ada.king@example.com"
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Email",
+          "ada.king@example.com"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ]
+    },
+    {
+      "id": "notes-add",
+      "title": "Add a note",
+      "task": "Add a note that says: Water the plants",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Water the plants"
+        },
+        {
+          "state": "notes.items.length",
+          "is": 3
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Water the plants"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ]
+    },
+    {
+      "id": "notes-delete",
+      "title": "Delete the right note",
+      "task": "Delete the note about the dentist.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "~dentist"
+        },
+        {
+          "state": "notes.items",
+          "has": "Buy stamps"
+        },
+        {
+          "state": "notes.items.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Call the dentist"
+        ]
+      ]
+    }
+  ]
+}

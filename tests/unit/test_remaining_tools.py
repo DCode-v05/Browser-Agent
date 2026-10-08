@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import struct
+import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,8 @@ from model_stand_in import ModelStandIn, response, said
 
 from bap_browser.agent.models import Said, ToolCall, ToolOutput
 from bap_browser.agent.openai_model import OpenAIModel
-from bap_browser.config import Agent, CheckModel, Config
+from bap_browser.config import Agent, Config
+from bap_browser.config_safeguards import CheckModel
 from bap_browser.driver import BrowserSession
 from bap_browser.driver.base import Happened, PageDialog, TabInfo
 from bap_browser.driver.screenshots import size_of
@@ -459,15 +461,23 @@ def test_a_file_is_taken_only_from_a_folder_uploads_may_come_from(tmp_path: Path
         allowed_file(folders, str(allowed))
 
 
+def _links_can_be_made() -> bool:
+    """Whether this system lets this user make a symbolic link. Windows does not, by default."""
+    with tempfile.TemporaryDirectory() as folder:
+        try:
+            (Path(folder) / "link").symlink_to(Path(folder) / "target")
+        except OSError:
+            return False
+    return True
+
+
+@pytest.mark.skipif(not _links_can_be_made(), reason="this system does not let this user make a link")
 def test_a_link_that_leads_out_of_the_folder_is_refused(tmp_path: Path) -> None:
     allowed, elsewhere = tmp_path / "uploads", tmp_path / "private"
     allowed.mkdir()
     elsewhere.mkdir()
     (elsewhere / "secret.txt").write_text("a secret", encoding="utf-8")
-    try:
-        (allowed / "innocent.txt").symlink_to(elsewhere / "secret.txt")
-    except OSError:
-        pytest.skip("links cannot be made here")
+    (allowed / "innocent.txt").symlink_to(elsewhere / "secret.txt")
     with pytest.raises(BadInput, match="is not in a folder uploads may come from"):
         allowed_file([str(allowed)], "innocent.txt")
 

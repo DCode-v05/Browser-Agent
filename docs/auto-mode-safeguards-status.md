@@ -1,6 +1,6 @@
 # Auto Mode and safeguards: status
 
-Last brought up to date: 2026-10-08. Branch `feature/auto-mode-safeguards`, not merged.
+Last brought up to date: 2026-10-08. Built on the branch `feature/auto-mode-safeguards`, with `main` brought in; it goes into `main` by a pull request.
 
 - What is being built: spec section 18, `docs/bap-browser-spec.md`.
 - The review it answers: `docs/index.html` (10 high, 18 medium, 10 low points).
@@ -11,9 +11,7 @@ Last brought up to date: 2026-10-08. Branch `feature/auto-mode-safeguards`, not 
 About 90% built. Every step is checked before it runs, Auto Mode works, what comes in and what goes
 out is guarded, files that arrive are judged, the service is hardened, and 26 attack pages are run in
 a real browser. What is left is listed under "Pending": mainly the optional outside lists, a few
-numbers and settings in the window, more attack pages, and the final check with the pull request.
-**The largest thing left is not in this branch: `main` has moved, and has to be merged in before a
-pull request can be merged (first row of "Pending").**
+numbers and settings in the window, and more attack pages.
 
 ## Completed (built, tested, committed and pushed)
 
@@ -41,14 +39,13 @@ pull request can be merged (first row of "Pending").**
 | The service and the record | Another web page cannot call the tools (`Origin` on `/mcp`); `GET /api/tools` and `bap-browser config show --tools` give one value for the tools on offer; the tools carry read-only hints; log lines older than 30 days are removed | `service/app.py`, `service/server.py`, `tools/event_log.py`, `tools/registry.py`, `mcp/server.py`, `cli.py` | `tests/unit/test_record.py`, `test_cli.py`, `tests/service/test_serve.py`, `test_service.py` |
 | The attack set, in a real browser | 26 attack pages and 4 harmless pages: planted instructions (plain, hidden, in attributes, in invisible characters, in the title, in the markup, in a dialog, in the console, arriving late, in an inbox, in Spanish), a page that imitates the engine, a button that talks to the check, sending by Enter and by "Post", paying, deleting, granting access, a password field, a sign-in form with no site of its own, a look-alike site, a leaked order number, a leaked code and email address, a very long address, downloads | `tests/site/attacks/`, `tests/site/harmless/`, `tests/e2e/test_attacks.py` | 40 tests |
 | An independent review of the newest code | Seven problems found and put right, each with a test: a dialog with a line break or an invisible character got past the rules; a download on a person's own Chrome was kept without a question; a held file that was locked or removed crashed the step; a held file outlived the session; a held file could be uploaded; the clean-up of old log lines could stop for good on one bad file, and broke a line at a rare character; a refusal at `/mcp` could reach the sender as a broken connection | `safeguards/reading.py`, `driver/`, `service/`, `tools/` | `test_reading.py`, `test_record.py`, `test_service_session.py`, `test_remaining_tools.py`, `test_attacks.py` |
+| `main` brought in | The 15 changes `main` gained meanwhile are merged (13 files conflicted), and the work passes the team's rules (`scripts/patterns.py`): files divided so that none is over 700 lines, the numbers of the safeguards in the configuration, `safeguards` in its own layer between the driver and the tools, the feature in `docs/feature-map.json`. A run of a task set (spec 12.7) is the engine's own work on a session: its calls are not counted against a task's limits | `config_safeguards.py`, `safeguards/findings.py`, `service/check_news.py`, `settings/kinds.py`, `driver/for_the_check.py`, `safeguards/limits.py` | The gate's stages; the team's task sets pass by their reference solutions (`tests/e2e/test_task_sets.py`) |
 | The documents | The spec for what changed while building, the README (what is on, how to turn Auto Mode on, how an agent connects), this page, the plan | `docs/`, `README.md` | Read them |
 
 ## Pending
 
 | Part | What is left | Size |
 |---|---|---|
-| **Bringing in `main`** | While this was built, `main` gained 15 changes: the driver was divided into four files, the tools and the service were moved into more files, task sets for evaluation were added, and every change must now pass a gate (`scripts/gate.py`: no file of the engine over 700 lines, imports one way between the parts, no tunable number outside `config.py`, and more). This branch conflicts with `main` in 13 files (23 places). To do: merge `main`, move the driver, tool and service changes into the new files, divide the files that are now too long (`config.py`, `safeguards/check.py`, `service/session.py`), give `safeguards` its place among the layers, see that the team's task sets still pass with the safeguards on, add the feature to `docs/feature-map.json` | **Large: 5 to 9 hours** |
-| The end | `/verify` (only a person can start it), then the pull request | Small |
 | Telling a connected agent that the tools changed | The spec asks for it (18.9). The tools over HTTP keep no connection, so there is nobody to tell. Either the endpoint is changed to keep one, or the spec says "a client compares the value of `/api/tools`". **Your decision** | Small or medium |
 | Optional outside lists | abuse.ch (known-bad sites and files) and the age of a domain. The settings exist and are off; nothing uses them yet | Medium |
 | The Systems page | The numbers of checked, asked and refused steps for each browser | Small |

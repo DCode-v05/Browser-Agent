@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from pictures import SAME_TO_THE_EYE, furthest_apart, look_the_same
 
 from bap_browser.agent.models import ref_of
 from bap_browser.config import Config
@@ -165,10 +166,13 @@ async def test_the_labels_of_a_marked_picture_do_not_stay_in_the_page(
     before = await driver.page.evaluate("document.documentElement.childElementCount")
     plain = await driver.screenshot(full_page=False, annotate=False)
     marked = await driver.screenshot(full_page=False, annotate=True)
-    assert marked.picture.data != plain.picture.data
+    assert not look_the_same(marked.picture.data, plain.picture.data), "no label was drawn"
     assert await driver.page.evaluate("document.documentElement.childElementCount") == before
     again = await driver.screenshot(full_page=False, annotate=False)
-    assert again.picture.data == plain.picture.data, "the labels were still drawn"
+    # As a person sees it, not byte for byte: a browser may draw the corner of a native control one
+    # shade apart once something has been drawn over it, on one machine and not on another.
+    apart = furthest_apart(again.picture.data, plain.picture.data)
+    assert apart <= SAME_TO_THE_EYE, f"the labels were still drawn: a pixel is {apart} shades apart"
 
 
 async def test_a_picture_in_the_other_format(

@@ -1,7 +1,7 @@
 import pytest
 
 from bap_browser.config import Browser, Config, Proxy
-from bap_browser.driver.playwright_driver import context_options, launch_options
+from bap_browser.driver.browser_parts import context_options, launch_options
 from bap_browser.errors import ConfigError
 
 

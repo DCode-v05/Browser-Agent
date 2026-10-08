@@ -8,16 +8,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal
 
+from bap_browser.address import without_credentials
 from bap_browser.config import Config
-from bap_browser.driver.base import Driver, Happened, PageDialog
+from bap_browser.driver.base import Driver, FileGuard, Happened, PageDialog
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BrowserError
-from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
-from bap_browser.safeguards.incoming import without_invisible
-from bap_browser.safeguards.model import Spend
-from bap_browser.safeguards.outgoing import judged_file
 
 SESSION_ENDED = "The session has ended."
 
@@ -85,8 +82,6 @@ class BrowserSession:
         self.tool_names: tuple[str, ...] = ()
         """The tools on offer. Text of a page that names one of them is talking to an agent."""
         self._closed = False
-        self.spend = Spend()
-        """What the engine's own model calls have cost in this session (spec 18.8)."""
         self.on_event: Callable[[Happened], None] | None = None
         """Set by whoever shows the session to a person. It is told at once what happens in the browser
         by itself: a tab that opens, a dialog, a file that was saved."""
@@ -99,7 +94,6 @@ class BrowserSession:
         their own files. Set by whoever knows which backend this is."""
         self._driver.listen(self._happened)
         self._driver.guard(self._judge)
-        self._driver.guard_files(self._judge_file)
 
     def reconfigure(self, config: Config) -> None:
         """Takes a changed configuration for what is decided call by call: the address policy and
@@ -113,15 +107,9 @@ class BrowserSession:
         decision = await self.policy.check(url)
         return decision.allowed, decision.reason
 
-    def _judge_file(self, name: str, first_bytes: bytes) -> tuple[Literal["keep", "ask", "delete"], str]:
-        """What is done with a file that arrived (spec 18.6): a file that can run programs is never
-        kept, whatever its name says; an archive, or any file on the person's own machine, waits
-        for their yes."""
-        shown, _ = without_invisible(name)
-        what = judged_file(shown, first_bytes, self.config.safeguards.downloads, own_machine=self.own_machine)
-        if what == "risky":
-            return "delete", "this kind of file can run programs"
-        return ("ask", "") if what == "ask" else ("keep", "")
+    def guard_files(self, judge: FileGuard) -> None:
+        """Whoever judges a file that arrives (spec 18.6), before the browser may keep it."""
+        self._driver.guard_files(judge)
 
     def _happened(self, event: Happened) -> None:
         if event.text:

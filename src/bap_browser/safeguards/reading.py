@@ -223,7 +223,7 @@ class Reader:
             return None
         if self._model is None or key != self._key:
             self._model = ModelClient(
-                config.agent, config.safeguards.model, key, "scan", spend=self._session.spend
+                config.agent, config.safeguards.model, key, "scan", spend=self._check.spend
             )
             self._key = key
         return self._model

@@ -8,30 +8,45 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
 from bap_browser import keys
+from bap_browser.address import presentable_address
+from bap_browser.config import Viewer
 from bap_browser.driver.base import POINT, Located
-from bap_browser.policy.address import presentable_address
 from bap_browser.tools.registry import REF_PATTERN
 
-# A row is under 60 characters.
-ROW_CHARS = 59
 CUT = "…"
-# What is left of an element's name when a row has to be shortened.
-SHORTEST_NAME = 12
+
+
+@dataclass(frozen=True)
+class Room:
+    """How much room a row of the timeline has for a sentence."""
+
+    row_chars: int
+    shortest_name_chars: int
+
+    @classmethod
+    def of(cls, viewer: Viewer) -> Room:
+        return cls(viewer.row_chars, viewer.shortest_name_chars)
+
+
+AS_SHIPPED = Room.of(Viewer())
 
 
 DIRECTIONS = ("up", "down", "left", "right")
 
 
-def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -> str:
+def label_for(
+    tool: str, arguments: Mapping[str, Any], target: Located | None, room: Room = AS_SHIPPED
+) -> str:
     """What the agent is doing: 'Clicking "Create account"'."""
     match tool:
         case "browser_navigate":
-            return _row("Opening ", _address(arguments), "")
+            return _row(room, "Opening ", _address(arguments), "")
         case "browser_go_back":
             return "Going back"
         case "browser_go_forward":
@@ -41,44 +56,46 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
         case "browser_snapshot" | "browser_get_text":
             return "Reading the page"
         case "browser_find":
-            return _row("Looking for ", _query(arguments), "")
+            return _row(room, "Looking for ", _query(arguments), "")
         case "browser_run":
             return "Running a script"
         case "browser_begin_task":
             return "Stating its task"
         case "browser_click":
-            return _row("Clicking ", _element(arguments, target), "")
+            return _row(room, "Clicking ", _element(arguments, target), "")
         case "browser_hover":
-            return _row("Pointing at ", _element(arguments, target), "")
+            return _row(room, "Pointing at ", _element(arguments, target), "")
         case "browser_type":
-            return _row(f"Typing {_count(arguments, target)}", _into(arguments, target), "")
+            return _row(room, f"Typing {_count(arguments, target)}", _into(arguments, target), "")
         case "browser_fill_form":
             return f"Filling {_fields(arguments)}"
         case "browser_select_option":
-            return _row("Choosing an option", _in(arguments, target), "")
+            return _row(room, "Choosing an option", _in(arguments, target), "")
         case "browser_set_checked":
             verb = "Clearing " if arguments.get("checked") is False else "Checking "
-            return _row(verb, _element(arguments, target), "")
+            return _row(room, verb, _element(arguments, target), "")
         case "browser_press_key":
-            return _fit(f"Pressing {_key(arguments)}")
+            return _fit(room, f"Pressing {_key(arguments)}")
         case "browser_scroll":
             return f"Scrolling{_direction(arguments)}"
         case "browser_scroll_to":
-            return _row("Scrolling to ", _element(arguments, target), "")
+            return _row(room, "Scrolling to ", _element(arguments, target), "")
         case "browser_wait":
             return f"Waiting{_awaited(arguments)}"
         case "browser_request_human":
-            return _row("Asking for help: ", _reason(arguments), "")
+            return _row(room, "Asking for help: ", _reason(arguments), "")
         case "browser_screenshot":
             return "Taking a screenshot"
         case "browser_zoom":
             return "Looking closer at the screenshot"
         case "browser_drag":
-            return _row("Dragging ", _dragged(arguments, target), "")
+            return _row(room, "Dragging ", _dragged(arguments, target), "")
         case "browser_handle_dialog":
             return "Dismissing the dialog" if arguments.get("action") == "dismiss" else "Accepting the dialog"
         case "browser_tabs":
-            return _fit(_TABS_DOING.get(_tab_action(arguments), "Looking at the tabs") + _tab(arguments))
+            return _fit(
+                room, _TABS_DOING.get(_tab_action(arguments), "Looking at the tabs") + _tab(arguments)
+            )
         case "browser_console":
             return "Reading the console"
         case "browser_network":
@@ -86,19 +103,25 @@ def label_for(tool: str, arguments: Mapping[str, Any], target: Located | None) -
         case "browser_evaluate":
             return "Running a script in the page"
         case "browser_upload_file":
-            return _row("Uploading ", _files(arguments), "")
+            return _row(room, "Uploading ", _files(arguments), "")
         case "browser_downloads":
             return "Listing the downloads"
-    return _fit(tool)
+    return _fit(room, tool)
 
 
-def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None, failure: str | None) -> str:
+def summary_for(
+    tool: str,
+    arguments: Mapping[str, Any],
+    target: Located | None,
+    failure: str | None,
+    room: Room = AS_SHIPPED,
+) -> str:
     """What happened: 'Clicked "Create account" (button)', or 'Could not click "Pay": it is covered'."""
     if failure is not None:
-        return _fit(_row("Could not ", _attempt(tool, arguments, target), "") + f": {failure}")
+        return _fit(room, _row(room, "Could not ", _attempt(tool, arguments, target), "") + f": {failure}")
     match tool:
         case "browser_navigate":
-            return _row("Opened ", _address(arguments), "")
+            return _row(room, "Opened ", _address(arguments), "")
         case "browser_go_back":
             return "Went back"
         case "browser_go_forward":
@@ -108,45 +131,45 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
         case "browser_snapshot" | "browser_get_text":
             return "Read the page"
         case "browser_find":
-            return _row("Looked for ", _query(arguments), "")
+            return _row(room, "Looked for ", _query(arguments), "")
         case "browser_run":
             return "Ran a script"
         case "browser_begin_task":
             return "Stated its task"
         case "browser_click":
             kind = f" ({target.role})" if target is not None and target.name else ""
-            return _row("Clicked ", _element(arguments, target), kind)
+            return _row(room, "Clicked ", _element(arguments, target), kind)
         case "browser_hover":
-            return _row("Pointed at ", _element(arguments, target), "")
+            return _row(room, "Pointed at ", _element(arguments, target), "")
         case "browser_type":
-            return _row(f"Typed {_count(arguments, target)}", _into(arguments, target), "")
+            return _row(room, f"Typed {_count(arguments, target)}", _into(arguments, target), "")
         case "browser_fill_form":
             return f"Filled {_fields(arguments)}"
         case "browser_select_option":
-            return _row("Chose an option", _in(arguments, target), "")
+            return _row(room, "Chose an option", _in(arguments, target), "")
         case "browser_set_checked":
             verb = "Cleared " if arguments.get("checked") is False else "Checked "
-            return _row(verb, _element(arguments, target), "")
+            return _row(room, verb, _element(arguments, target), "")
         case "browser_press_key":
-            return _fit(f"Pressed {_key(arguments)}")
+            return _fit(room, f"Pressed {_key(arguments)}")
         case "browser_scroll":
             return f"Scrolled{_direction(arguments)}"
         case "browser_scroll_to":
-            return _row("Scrolled to ", _element(arguments, target), "")
+            return _row(room, "Scrolled to ", _element(arguments, target), "")
         case "browser_wait":
             return f"Waited{_awaited(arguments)}"
         case "browser_request_human":
-            return _row("Asked for help: ", _reason(arguments), "")
+            return _row(room, "Asked for help: ", _reason(arguments), "")
         case "browser_screenshot":
             return "Took a screenshot"
         case "browser_zoom":
             return "Looked closer at the screenshot"
         case "browser_drag":
-            return _row("Dragged ", _dragged(arguments, target), "")
+            return _row(room, "Dragged ", _dragged(arguments, target), "")
         case "browser_handle_dialog":
             return "Dismissed the dialog" if arguments.get("action") == "dismiss" else "Accepted the dialog"
         case "browser_tabs":
-            return _fit(_TABS_DONE.get(_tab_action(arguments), "Looked at the tabs") + _tab(arguments))
+            return _fit(room, _TABS_DONE.get(_tab_action(arguments), "Looked at the tabs") + _tab(arguments))
         case "browser_console":
             return "Read the console"
         case "browser_network":
@@ -154,10 +177,10 @@ def summary_for(tool: str, arguments: Mapping[str, Any], target: Located | None,
         case "browser_evaluate":
             return "Ran a script in the page"
         case "browser_upload_file":
-            return _row("Uploaded ", _files(arguments), "")
+            return _row(room, "Uploaded ", _files(arguments), "")
         case "browser_downloads":
             return "Listed the downloads"
-    return _fit(tool)
+    return _fit(room, tool)
 
 
 def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) -> str:
@@ -343,17 +366,17 @@ def _count(arguments: Mapping[str, Any], target: Located | None) -> str:
     return f"{len(text)} character{'' if len(text) == 1 else 's'}"
 
 
-def _row(before: str, subject: str, after: str) -> str:
+def _row(room: Room, before: str, subject: str, after: str) -> str:
     """Joins the parts, shortening a quoted name first so that the words around it stay whole."""
     row = (before + subject + after).rstrip()
-    over = len(row) - ROW_CHARS
+    over = len(row) - room.row_chars
     if over > 0 and subject.startswith('"') and subject.endswith('"'):
         name = subject[1:-1]
-        keep = max(len(name) - over - len(CUT), SHORTEST_NAME)
+        keep = max(len(name) - over - len(CUT), room.shortest_name_chars)
         if keep < len(name):
             row = f'{before}"{name[:keep].rstrip()}{CUT}"{after}'
-    return _fit(row)
+    return _fit(room, row)
 
 
-def _fit(row: str) -> str:
-    return row if len(row) <= ROW_CHARS else row[: ROW_CHARS - len(CUT)].rstrip() + CUT
+def _fit(room: Room, row: str) -> str:
+    return row if len(row) <= room.row_chars else row[: room.row_chars - len(CUT)].rstrip() + CUT

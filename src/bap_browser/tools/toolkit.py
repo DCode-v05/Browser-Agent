@@ -14,23 +14,26 @@ from typing import Any
 from pydantic import ValidationError
 
 from bap_browser import keys
+from bap_browser.address import presentable_address, without_credentials
 from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BadInput, BapError, PolicyBlocked
-from bap_browser.policy.address import presentable_address, without_credentials
 from bap_browser.results import Picture, ToolResult
-from bap_browser.safeguards.check import NOT_APPROVED, OPENS_AN_ADDRESS, PRESS, Check, Step
+from bap_browser.safeguards.check import NOT_APPROVED, Check
+from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, Step
 from bap_browser.safeguards.incoming import quoted_name
 from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
 from bap_browser.safeguards.reading import Reader, as_written, from_page
-from bap_browser.tools.browser_tools import RUN_A_SCRIPT, TOOLS, RunArgs
+from bap_browser.tools.arguments import RunArgs
+from bap_browser.tools.browser_tools import RUN_A_SCRIPT
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
 from bap_browser.tools.observer import StepObserver
+from bap_browser.tools.offered import TOOLS
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition, describe_problem
-from bap_browser.tools.sentences import label_for, summary_for
+from bap_browser.tools.sentences import Room, label_for, summary_for
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +189,8 @@ class Toolkit:
         self._task_declared = False
         self.check = Check(session, observer)
         self.reader = Reader(session, self.check, observer)
-        self.limits = Limits(lambda: self._session.config.limits, session.spend)
+        self.limits = Limits(lambda: self._session.config.limits, self.check.spend)
+        session.guard_files(self.check.judge_file)
         # The limit the person watching has been told of, so that they are told once.
         self._reached: Reached | None = None
         # What the page said of itself after the last step (spec 18.8).
@@ -290,7 +294,9 @@ class Toolkit:
         self._steps += 1
         step = self._steps
         if self._observer:
-            self._observer.step_started(step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None), None)
+            self._observer.step_started(
+                step, RUN_A_SCRIPT, label_for(RUN_A_SCRIPT, arguments, None, self._room()), None
+            )
         started = time.perf_counter()
         checked = self._validated(RUN_A_SCRIPT, arguments)
         limited = (
@@ -312,7 +318,7 @@ class Toolkit:
         ms = (time.perf_counter() - started) * 1000
         self._log.write(RUN_A_SCRIPT, logged, result, ms, scan=withheld)
         if self._observer:
-            summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure)
+            summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure, self._room())
             if ran.failure is None:
                 # Each step is a row of its own. This row says how many there were.
                 summary += f": {ran.steps} step{'' if ran.steps == 1 else 's'}"
@@ -337,7 +343,7 @@ class Toolkit:
             step = self._steps
             target = await self._locate(name, arguments)
             if self._observer:
-                label = redact(label_for(name, arguments, target))
+                label = redact(label_for(name, arguments, target, self._room()))
                 self._observer.step_started(step, name, label, target.box if target else None)
             started = time.perf_counter()
             checked = self._validated(name, arguments)
@@ -369,7 +375,7 @@ class Toolkit:
             result = ToolResult(redact(as_written(text)), outcome.failure is not None, outcome.picture)
             ms = (time.perf_counter() - started) * 1000
             self._log.write(name, logged, result, ms, decided, withheld)
-            summary = redact(summary_for(name, arguments, target, outcome.failure))
+            summary = redact(summary_for(name, arguments, target, outcome.failure, self._room()))
             if done is not None and outcome.failure is None:
                 self.check.ran(done, summary)
             if self._observer:
@@ -457,7 +463,7 @@ class Toolkit:
             control=control,
             fields=tuple(fields),
             typed=_typed(name, arguments),
-            label=self._session.redact(label_for(name, arguments, target)),
+            label=self._session.redact(label_for(name, arguments, target, self._room())),
             on_a_site=name not in NEED_NO_SITE,
         )
 
@@ -609,6 +615,10 @@ class Toolkit:
         held, self._held = self._held, None
         done = await held
         return f"[The dialog went away unanswered, and the action it had interrupted finished: {done.text}]\n"
+
+    def _room(self) -> Room:
+        """How much room a sentence has, as this session's configuration says now."""
+        return Room.of(self._session.config.viewer)
 
     async def _outcome(self, name: str, tool: ToolDefinition, args: Args) -> Outcome:
         """The result of a tool's handler. It never raises: every failure is a result."""

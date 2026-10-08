@@ -50,7 +50,7 @@ def _ascii_form(text: str) -> str:
         return text
 
 
-def _parse_ip(host: str) -> IPAddress | None:
+def parsed_ip(host: str) -> IPAddress | None:
     text = host.strip()
     if text.startswith("[") and text.endswith("]"):
         text = text[1:-1]
@@ -62,14 +62,14 @@ def _parse_ip(host: str) -> IPAddress | None:
 
 def is_ip_address(host: str) -> bool:
     """Whether `host` is an IP address: IPv4, or IPv6 with or without its brackets."""
-    return _parse_ip(host) is not None
+    return parsed_ip(host) is not None
 
 
 def registrable_name(host: str) -> str:
     """The site a host belongs to: its public suffix and the one label before it. A host that is
     itself a public suffix, or an IP address, is its own site. Never raises."""
     host = host.strip().lower().removesuffix(".")
-    ip = _parse_ip(host)
+    ip = parsed_ip(host)
     if ip is not None:
         return str(ip)
     labels = host.split(".")

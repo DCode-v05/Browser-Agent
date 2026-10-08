@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from functools import lru_cache
 from typing import Literal
 
-from bap_browser.config import Actions
+from bap_browser.config_safeguards import Actions
 
 ActionClass = Literal["pays", "sends", "deletes", "grants", "commits"]
 # The order in which a name is tried: a "Pay and send" button pays.

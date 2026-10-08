@@ -12,6 +12,8 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Run as an MCP server: `uv run bap-browser mcp`
 - Run the whole path with no model key: `uv run bap-browser agent --demo --open` (the viewer must be built)
 - Show the configuration: `uv run bap-browser config show --sources`
+- Every check in one order, stopping at the first that fails: `uv run python scripts/gate.py` (`--quick` leaves out the tests that start a browser)
+- The bad patterns, read from the code: `uv run python scripts/patterns.py` (`--list` shows every place a rule matches)
 - Viewer install: `npm --prefix viewer install`
 - Viewer checks: `npm --prefix viewer run typecheck`, `run lint`, `run test`, `run build`
 - Viewer in a real browser: build it, then `uv run pytest tests/viewer -q` (screenshots land in `.bap-browser/viewer-shots/`)
@@ -24,6 +26,8 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Typed text, form values, password values and tokens never reach a log, an event or a result.
 - Tool results are short plain text written for a model. Failures are results, not crashes.
 - Work on a branch; small commits with tests passing; nothing is pushed.
+- A change is made by the one pathway in `docs/agent-pathway.md`. The rules of the code are in `docs/bad-patterns.md`; a new case of one fails the gate.
+- `docs/feature-map.json` says where each feature is: its spec section, its files, its tests.
 
 ## Gotchas
 - Windows long paths are off and this workspace path is long. If `uv sync` fails with "os error 3",

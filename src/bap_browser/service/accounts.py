@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import time
 from collections.abc import Callable
@@ -19,6 +18,7 @@ from pathlib import Path
 from typing import Literal, get_args
 
 from bap_browser.config import Auth
+from bap_browser.private_file import write_json
 
 Role = Literal["admin", "user"]
 ROLES: tuple[Role, ...] = get_args(Role)
@@ -70,7 +70,7 @@ class Accounts:
         kept = dict(self._kept)
         kept[role] = {"salt": salt.hex(), "hash": _hash(password, salt).hex()}
         self._kept = kept
-        _write(self._path, kept)
+        write_json(self._path, kept)
         self._visits = {
             token: visit for token, visit in self._visits.items() if visit[0] != role or token == keep
         }
@@ -137,13 +137,3 @@ def _read(path: Path) -> dict[Role, dict[str, str]]:
         if isinstance(one, dict):
             kept[role] = {str(name): str(value) for name, value in one.items()}
     return kept
-
-
-def _write(path: Path, kept: dict[Role, dict[str, str]]) -> None:
-    """For the person who runs the service alone to read, and never left half written."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_name(path.name + ".partial")
-    handle = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(handle, "w", encoding="utf-8") as file:
-        json.dump(kept, file)
-    os.replace(partial, path)

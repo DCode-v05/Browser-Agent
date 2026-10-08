@@ -92,7 +92,6 @@ VERDICT_SCHEMA: dict[str, Any] = {
     "required": ["risk", "asked_for", "category", "reason"],
     "additionalProperties": False,
 }
-LONGEST_REASON = 120
 
 # The engine's own words for why a step was refused. The model's sentence is never given to the agent.
 WOULD = {
@@ -131,7 +130,7 @@ class Shown:
     address: str | None = None
 
 
-def read_verdict(answer: Mapping[str, Any]) -> Verdict:
+def read_verdict(answer: Mapping[str, Any], reason_chars: int) -> Verdict:
     """The model's answer, when it is of the shape asked for. Otherwise the call counts as failed."""
     risk, asked, category, reason = (answer.get(key) for key in ("risk", "asked_for", "category", "reason"))
     if (
@@ -141,7 +140,7 @@ def read_verdict(answer: Mapping[str, Any]) -> Verdict:
         or not isinstance(reason, str)
     ):
         raise ModelError(NOT_THE_JSON)
-    return Verdict(risk, asked, category, " ".join(reason.split())[:LONGEST_REASON])
+    return Verdict(risk, asked, category, " ".join(reason.split())[:reason_chars])
 
 
 def risk_held(verdict: Verdict, *, held_high: bool) -> Risk:

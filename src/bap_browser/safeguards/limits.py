@@ -11,14 +11,16 @@ import asyncio
 import json
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Literal
 
-from bap_browser.config import Limits as LimitSettings
+from bap_browser.config_safeguards import Limits as LimitSettings
 from bap_browser.safeguards.model import Spend
 
-MINUTE_S = 60
+MINUTE_S = timedelta(minutes=1).total_seconds()
 STOP_AND_TELL = " Stop, and tell the person what is done and what is left."
 TOO_MANY_CALLS = "Too many calls at once. Wait a moment before the next step."
 NOTHING_CHANGED = "\nNothing on the page changed."
@@ -77,6 +79,19 @@ class Limits:
         # The reading call that last gave the same result, and how often in a row.
         self._reading: tuple[str, int] | None = None
         self._readings = 0
+        # How deep the engine's own work on the session is under way. Its calls are no agent's steps.
+        self._own_work = 0
+
+    @contextmanager
+    def own_work(self) -> Iterator[None]:
+        """While the engine itself works on the session (a task set done by its reference solution,
+        and the reading of what was done afterwards: spec 12.7), its calls are no agent's steps.
+        They are not counted, not held to the rate, and never said to go round in circles."""
+        self._own_work += 1
+        try:
+            yield
+        finally:
+            self._own_work -= 1
 
     @property
     def on_a_task(self) -> bool:
@@ -127,6 +142,8 @@ class Limits:
     async def admit(self) -> Reached | str | None:
         """Lets one call in, and counts it. Otherwise the limit that was reached, or what the agent
         is told when calls come too fast."""
+        if self._own_work:
+            return None
         reached = self.reached()
         if reached is not None:
             return reached
@@ -151,7 +168,7 @@ class Limits:
         """What the agent is told instead, when this acting step has been done so often with nothing
         changed that it is not run again. None when it may run."""
         refuse_at = self._settings().repeat_refuse
-        if step == self._step and self._times >= refuse_at - 1:
+        if not self._own_work and step == self._step and self._times >= refuse_at - 1:
             return IN_CIRCLES.format(nth=ordinal(refuse_at))
         return None
 

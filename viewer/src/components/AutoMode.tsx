@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 
+import type { ClientCommand } from '../protocol';
 import type { AutoInfo, LimitInfo, RefusedStep, TaskInfo } from '../state/reducer';
 import { W } from '../wording';
 import { Icon } from './Icon';
@@ -205,5 +206,27 @@ export function RefusedList({ refused, onAllow }: { refused: RefusedStep[]; onAl
         ))}
       </ul>
     </div>
+  );
+}
+
+/** What the check asks of a person beside the timeline: a pause to lift, a limit to raise, and
+ * the refused steps they may allow once (spec 18.10). */
+export function CheckBars({
+  auto,
+  limit,
+  refused,
+  send,
+}: {
+  auto: AutoInfo | null;
+  limit: LimitInfo | null;
+  refused: RefusedStep[];
+  send(command: ClientCommand): void;
+}) {
+  return (
+    <>
+      {auto?.state === 'paused' && <AutoPausedBar why={auto.why} onResume={() => send({ type: 'resume_auto' })} />}
+      {limit && <LimitBar limit={limit} onExtend={() => send({ type: 'extend_limit' })} onEndTask={() => send({ type: 'end_task' })} />}
+      {refused.length > 0 && <RefusedList refused={refused} onAllow={(id) => send({ type: 'allow_refused', id })} />}
+    </>
   );
 }

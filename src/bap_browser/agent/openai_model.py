@@ -15,7 +15,7 @@ from typing import Any
 from bap_browser.agent.models import Message, Reply, ToolCall, ToolOutput, Usage
 from bap_browser.config import Agent
 from bap_browser.errors import ModelError
-from bap_browser.safeguards.model import LONGEST_REFUSAL, ModelClient, output_text, tokens_of
+from bap_browser.safeguards.model import ModelClient, output_text, tokens_of
 from bap_browser.tools import ToolDefinition
 
 
@@ -59,7 +59,7 @@ class OpenAIModel:
         output = [item for item in answer.get("output") or [] if isinstance(item, dict)]
         if answer.get("status") == "failed":
             reason = (answer.get("error") or {}).get("message") or "no reason was given"
-            raise ModelError(f"The model could not answer: {str(reason)[:LONGEST_REFUSAL]}")
+            raise ModelError(f"The model could not answer: {str(reason)[: self._settings.refusal_chars]}")
         text = output_text(answer)
         calls = tuple(
             ToolCall(str(item.get("call_id")), str(item.get("name")), _arguments(item.get("arguments")))

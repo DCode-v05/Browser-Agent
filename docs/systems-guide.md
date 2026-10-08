@@ -287,6 +287,8 @@ and a user's own choices are under `user`, laid out the same way.
 | `evals.recent_tasks` | `20` | The tasks listed for a system |
 | `evals.max_tasks_read` | `2000` | The newest records a summary is made from |
 | `evals.step_budget_ms` | `2000` | The checklist's limit for one step |
+| `evals.suite_trials`, `evals.suite_max_trials` | `3`, `10` | How many times a run of a task set does each task, and the most it may |
+| `evals.suite_trial_timeout_s` | `300` | Then one try of a task is ended and counted as failed |
 | `settings.locked` | `[]` | Settings nobody may change from the window, the admin included. Was there before; it holds for each system too |
 | `auth.file` | `.bap-browser/accounts.json` | Where the two sign-in passwords are kept, as salted hashes |
 | `auth.min_chars`, `auth.max_chars` | `8`, `200` | The shortest and the longest password that is taken |
@@ -390,13 +392,47 @@ without a price.
 
 Those two numbers are an example. Put in your provider's own prices.
 
-### 2.7 The files
+### 2.7 Task sets
+
+The records above say what a task took. The task sets say whether the agent does a task right. Each
+is a file of tasks with a known right end, done on a practice site the service serves
+(`/demo-site/lab/`: a shop, a mailbox, an account, notes) and checked by code.
+
+| Set | Tasks | What it shows |
+|---|---|---|
+| Short tasks | 20 | How many small tasks the agent finishes |
+| Asking before risky steps | 16 | Whether you are asked before a step that orders, sends, deletes or publishes, and not before a harmless one |
+| Planted instructions | 10 | How often text planted in a page makes the agent do what nobody asked for. Lower is better |
+| Long tasks | 4 | How many tasks of many steps over several pages the agent finishes |
+
+In the Evaluations view of a system, under **Task sets**:
+
+1. Choose **Times each task is tried**: once, 3, 5 or 10 times. A task that passes once can fail the
+   next time; tried several times, a set also says how many tasks passed every time.
+2. Press **Run the reference solutions** to do every task by its written solution, with no model.
+   It takes seconds and costs nothing, and shows that this browser and the checks work.
+3. Press **Run with the agent** to have the agent do every task with its model. You see each task
+   in the chat of that system's page. It takes minutes and uses tokens: the 20 short tasks, once,
+   took 3 min 36 s and about 277,000 tokens in when this was written.
+4. While it runs the set says where it is ("Task 4 of 20, try 2 of 3"). **Stop the run** ends it
+   after the task it is on, and keeps what was done.
+5. **Show the tasks** lists each task of the newest run: how often it passed, how often a person
+   would have been asked, and why it did not pass.
+
+During a run nobody is asked: each approval is answered as the task says, and that it was asked is
+counted. The browser does one thing at a time, so a task you send from the chat waits until the run
+has ended. On the Systems page, under **All systems**, **Task sets, browser by browser** puts the
+newest run of each set on each browser side by side.
+
+### 2.8 The files
 
 | File | What it holds |
 |---|---|
 | `.bap-browser/evals/<system>/tasks.jsonl` | One line for each task, with its trace |
 | `.bap-browser/evals/<system>/ratings.json` | Your Good and Bad, by task |
 | `.bap-browser/evals/<system>/checks.json` | The checklist as it was last run |
+| `.bap-browser/evals/<system>/suite/runs.jsonl` | One line for each run of a task set, with every task and every try |
+| `.bap-browser/evals/<system>/suite/tasks.jsonl` | The full record of each try the agent made in a run |
 
 ---
 
@@ -426,6 +462,10 @@ answered 403 for what is the admin's, and 404 for a browser they may not use.
 | `GET /api/systems/{name}/evals/{task}` | One task with its trace |
 | `POST /api/systems/{name}/evals/{task}/rating` with `{"rating": "good"}` | Your word on an answer. `"bad"`, or `null` to take it back |
 | `POST /api/systems/{name}/checks` | Run the checklist |
+| `GET /api/systems/{name}/suite` | The task sets, their newest runs, and the run under way |
+| `POST /api/systems/{name}/suite` with `{"set": "short", "trials": 3, "mode": "agent"}` | Begin a run. `"reference"` for the reference solutions |
+| `POST /api/systems/{name}/suite/stop` | End the run under way after its task |
+| `GET /api/suite` | Admin: the newest run of each set on each system |
 
 A request that cannot be done answers 409 with `{"error": "…"}`, a sentence for a person.
 
@@ -464,7 +504,9 @@ A request that cannot be done answers 409 with `{"error": "…"}`, a sentence fo
 | Not there | Note |
 |---|---|
 | An account for each person | There is one admin, and one password that every user signs in with. Users share their settings and their preferred browser |
-| A judgement of an answer by another model | Outcome quality is how tasks ended, and your own Good and Bad |
+| A judgement of an answer by another model | Outcome quality is how tasks ended, your own Good and Bad, and the checks of the task sets, which are code |
+| A public benchmark, and runs on a schedule | The task sets are our own 50 tasks, and a run starts when a person presses its button or a program asks |
+| Protection against planted instructions | The set "Planted instructions" measures the agent as it is. The safeguards of spec section 18 are not built |
 | Cost without a price | Set the two prices in `config.json` (section 2.6) |
 | Systems outside the three-browser window | The Systems page belongs to `bap-browser studio`. The commands that run one session (`agent`, `mcp`) have one log, `.bap-browser/events.jsonl`, and no evaluations |
 | The checklist and the records, tried on My Chrome | They are the same code for the three systems. They were run on the Cloud and the Built-in browser; My Chrome was not connected when this was written |

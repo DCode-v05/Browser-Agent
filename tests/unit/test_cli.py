@@ -121,10 +121,10 @@ def test_settings_in_a_dot_env_file_beside_the_command_are_used(
 
 
 def test_the_agent_command_can_show_its_browser(make_config, tmp_path: Path) -> None:
-    from bap_browser.cli import _parser, with_visible_browser  # pyright: ignore[reportPrivateUsage]
+    from bap_browser.cli import build_parser, with_visible_browser
 
-    assert _parser().parse_args(["agent", "--show-browser", "--chat"]).show_browser is True
-    assert _parser().parse_args(["agent", "Read the page"]).show_browser is False
+    assert build_parser().parse_args(["agent", "--show-browser", "--chat"]).show_browser is True
+    assert build_parser().parse_args(["agent", "Read the page"]).show_browser is False
     config = make_config(tmp_path, browser={"channel": "chrome"})
     assert config.browser.headless is True and config.browser.viewport is not None
     shown = with_visible_browser(config)
@@ -135,18 +135,18 @@ def test_the_agent_command_can_show_its_browser(make_config, tmp_path: Path) -> 
 
 
 def test_the_extension_goes_with_the_chat(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
-    from bap_browser.cli import _parser  # pyright: ignore[reportPrivateUsage]
+    from bap_browser.cli import build_parser
 
-    assert _parser().parse_args(["agent", "--chat", "--extension"]).extension is True
-    assert _parser().parse_args(["agent", "--chat"]).extension is False
+    assert build_parser().parse_args(["agent", "--chat", "--extension"]).extension is True
+    assert build_parser().parse_args(["agent", "--chat"]).extension is False
     os.chdir(tmp_path)
     assert main(["agent", "--extension", "Read the page"]) == 2
     assert "Use --extension together with --chat" in capsys.readouterr().err
 
 
 def test_serve_is_a_command_with_the_browser_shown_or_not() -> None:
-    from bap_browser.cli import _parser  # pyright: ignore[reportPrivateUsage]
+    from bap_browser.cli import build_parser
 
-    args = _parser().parse_args(["serve", "--show-browser", "--open"])
+    args = build_parser().parse_args(["serve", "--show-browser", "--open"])
     assert (args.command, args.show_browser, args.open) == ("serve", True, True)
-    assert _parser().parse_args(["serve"]).show_browser is False
+    assert build_parser().parse_args(["serve"]).show_browser is False

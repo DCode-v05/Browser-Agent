@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from bap_browser.config import ArrivingFiles, Outgoing
+from bap_browser.config_safeguards import ArrivingFiles, Outgoing
 from bap_browser.safeguards.outgoing import (
     Amount,
     CopyMemory,
@@ -124,7 +124,7 @@ def test_the_short_secrets_of_a_text() -> None:
         "Order A7K29QX1B4ZP, code 481516, card 4111 1111 1111 1111, call +91-98765-43210, "
         "write to Ada.Lovelace@Example.com before 2026-10-07 or 07.10.2026. Room 12, version 3.11."
     )
-    assert sorted(short_secrets(text)) == sorted(
+    assert sorted(short_secrets(text, 10)) == sorted(
         ["a7k29qx1b4zp", "481516", "4111111111111111", "919876543210", "ada.lovelace@example.com"]
     )
 

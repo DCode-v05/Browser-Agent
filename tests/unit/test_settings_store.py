@@ -11,7 +11,8 @@ import pytest
 from bap_browser.config import Config
 from bap_browser.errors import ConfigError
 from bap_browser.settings import Refused, SettingsStore
-from bap_browser.settings.catalogue import CATALOGUE, SURFACES
+from bap_browser.settings.catalogue import CATALOGUE
+from bap_browser.settings.kinds import SURFACES
 
 MakeConfig = Callable[..., Config]
 

@@ -5,28 +5,15 @@ one, and a bare public IP address used as a host.
 
 from __future__ import annotations
 
-import ipaddress
 from collections.abc import Sequence
 
+from bap_browser.config_safeguards import SiteChecks
 from bap_browser.policy import sites
 
-IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
-# A protected name under this length is never measured for (b): too many short, ordinary words.
-SHORTEST_LURED_LABEL = 4
-# A label under this length is never measured for (a), on either side of the comparison.
-SHORTEST_MEASURED_LABEL = 5
-# (a) allows one edit for a protected label of this length, two for anything longer.
-LONGEST_LABEL_FOR_ONE_EDIT = 8
 
-
-def lookalike_of(
-    host: str,
-    protected: Sequence[str],
-    *,
-    lure_words: Sequence[str],
-    common_words: Sequence[str],
-) -> str | None:
-    """The protected name this host looks like and is not, or None. Never raises."""
+def lookalike_of(host: str, protected: Sequence[str], checks: SiteChecks) -> str | None:
+    """The protected name this host looks like and is not, or None. Never raises. `checks` says
+    which words lure, which are too common to count, and from what length a name is measured."""
     host = host.strip().lower().removesuffix(".")
     protected_sites = {sites.registrable_name(name) for name in protected}
     host_site = sites.registrable_name(host)
@@ -34,14 +21,14 @@ def lookalike_of(
         return None  # a protected site, named by itself or a subdomain, is never a look-alike
     host_label = host_site.split(".")[0]
     host_latin = sites.to_latin(host_label)
-    close_measured = host_latin not in {word.lower() for word in common_words}
-    lure_set = {word.lower() for word in lure_words}
+    close_measured = host_latin not in {word.lower() for word in checks.common_words}
+    lure_set = {word.lower() for word in checks.lure_words}
     host_labels = host.split(".")
     for name in protected:
         protected_label = sites.registrable_name(name).split(".")[0]
-        if close_measured and _close(host_label, host_latin, protected_label):
+        if close_measured and _close(host_label, host_latin, protected_label, checks):
             return name
-        if _stands_with_lure(host_labels, protected_label, lure_set):
+        if _stands_with_lure(host_labels, protected_label, lure_set, checks.lure_min_chars):
             return name
     return None
 
@@ -70,18 +57,8 @@ def mixed_script_of(host: str, protected: Sequence[str]) -> str | None:
 def is_bare_public_ip(host: str) -> bool:
     """Whether `host` is a public IP address: not a private, loopback or link-local one. Never
     raises."""
-    ip = _parse_ip(host)
+    ip = sites.parsed_ip(host)
     return ip is not None and not (ip.is_private or ip.is_loopback or ip.is_link_local)
-
-
-def _parse_ip(host: str) -> IPAddress | None:
-    text = host.strip()
-    if text.startswith("[") and text.endswith("]"):
-        text = text[1:-1]
-    try:
-        return ipaddress.ip_address(text)
-    except ValueError:
-        return None
 
 
 def _decoded(label: str) -> str:
@@ -94,24 +71,29 @@ def _decoded(label: str) -> str:
         return label
 
 
-def _close(host_label: str, host_latin: str, protected_label: str) -> bool:
+def _close(host_label: str, host_latin: str, protected_label: str, checks: SiteChecks) -> bool:
     """Rule (a): the host's label is close to the protected label, after look-alike letters are read
     as Latin ones. A label that came out equal only because of that reading counts; one that was
     already equal in plain Latin does not (too many honest sites share a first label across suffixes)."""
     protected_latin = sites.to_latin(protected_label)
-    if len(protected_latin) < SHORTEST_MEASURED_LABEL or len(host_latin) < SHORTEST_MEASURED_LABEL:
+    shortest = checks.lookalike_min_chars
+    if len(protected_latin) < shortest or len(host_latin) < shortest:
         return False
     distance = _edit_distance(host_latin, protected_latin)
     if distance == 0:
         return host_latin != host_label
-    threshold = 1 if len(protected_latin) <= LONGEST_LABEL_FOR_ONE_EDIT else 2
+    # One edit for a short name, two for a longer one.
+    threshold = 1 if len(protected_latin) <= checks.one_edit_max_chars else 2
     return distance <= threshold
 
 
-def _stands_with_lure(host_labels: list[str], protected_label: str, lure_words: set[str]) -> bool:
+def _stands_with_lure(
+    host_labels: list[str], protected_label: str, lure_words: set[str], shortest: int
+) -> bool:
     """Rule (b): the protected label stands in the host as a whole label or a hyphen-part of one, with
     a lure word beside it: another hyphen-part of the same label, or any part of another label."""
-    if len(protected_label) < SHORTEST_LURED_LABEL:
+    # A shorter name is too many short, ordinary words.
+    if len(protected_label) < shortest:
         return False
     for index, label in enumerate(host_labels):
         parts = label.split("-")

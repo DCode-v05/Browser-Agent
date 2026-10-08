@@ -1,6 +1,6 @@
 """The tool layer: what an agent calls."""
 
-from bap_browser.tools.browser_tools import TOOLS
+from bap_browser.tools.offered import TOOLS
 from bap_browser.tools.registry import ToolDefinition
 from bap_browser.tools.toolkit import Toolkit, tools_for
 

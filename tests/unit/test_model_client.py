@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 from model_stand_in import ModelStandIn, Slow, response, said, spent
 
-from bap_browser.config import Agent, CheckModel
+from bap_browser.config import Agent
+from bap_browser.config_safeguards import CheckModel
 from bap_browser.errors import ModelError
 from bap_browser.safeguards.model import ModelClient, Spend, Use
 

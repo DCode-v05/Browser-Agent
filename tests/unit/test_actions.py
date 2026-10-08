@@ -2,7 +2,7 @@
 
 import pytest
 
-from bap_browser.config import Actions
+from bap_browser.config_safeguards import Actions
 from bap_browser.safeguards.actions import class_of, holds, is_message_box
 
 ACTIONS = Actions()

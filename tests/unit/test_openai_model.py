@@ -11,7 +11,8 @@ from model_stand_in import ModelStandIn, called, response, said, thought
 from bap_browser.agent.loop import run_agent
 from bap_browser.agent.models import Reply, Said, ToolCall, ToolOutput
 from bap_browser.agent.openai_model import OpenAIModel
-from bap_browser.config import Agent, CheckModel, Config
+from bap_browser.config import Agent, Config
+from bap_browser.config_safeguards import CheckModel
 from bap_browser.driver import BrowserSession
 from bap_browser.errors import ModelError
 from bap_browser.safeguards.model import ModelClient

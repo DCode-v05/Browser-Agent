@@ -18,13 +18,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from bap_browser.config import Agent, CheckModel
+from bap_browser.config import Agent
+from bap_browser.config_safeguards import CheckModel
 from bap_browser.errors import ModelError
 
 Use = Literal["loop", "reviewer", "scan"]
 
-# The provider's own explanation of a refusal is passed on, but not at any length.
-LONGEST_REFUSAL = 300
 # What the provider answers when the account, not the moment, is the trouble. Waiting does not mend it.
 NOT_A_MATTER_OF_WAITING = ("insufficient_quota", "billing")
 NOT_THE_JSON = "The model's answer was not the JSON asked for."
@@ -214,7 +213,7 @@ class ModelClient:
         except (ValueError, KeyError, TypeError, AttributeError):
             said, kind = None, ""
         words = f"The model provider answered HTTP {code}"
-        words += "." if said is None else f": {str(said)[:LONGEST_REFUSAL]}"
+        words += "." if said is None else f": {str(said)[: self._agent.refusal_chars]}"
         waiting_mends_it = code in (408, 409, 429) or code >= 500
         if code == 429 and any(mark in kind for mark in NOT_A_MATTER_OF_WAITING):
             waiting_mends_it = False

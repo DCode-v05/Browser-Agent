@@ -21,17 +21,13 @@ from pathlib import Path
 from typing import Any, Literal
 
 from bap_browser.bench.scenarios import SCENARIOS, Scenario, ScenarioFailed, Stage
-from bap_browser.config import Config
+from bap_browser.config import Bench, Config
 from bap_browser.driver import open_session
 from bap_browser.errors import BapError, ConfigError
 from bap_browser.tools import Toolkit
 
 State = Literal["OK", "WARN", "FAIL", "NOT RUN", "ERROR"]
 STATES: tuple[State, ...] = ("OK", "WARN", "FAIL", "NOT RUN", "ERROR")
-# A median this far above the target still counts as OK (spec 11.2, rule 3).
-TOLERANCE = 1.05
-# The 95th percentile must stay under this many times the fail limit (rule 4).
-P95_LIMIT = 2
 
 
 @dataclass(frozen=True)
@@ -57,7 +53,10 @@ class Measured:
     @property
     def row(self) -> str:
         """`line id | browser | median | p95 | target | fail | state` (spec 12.3)."""
-        time_of = lambda value: "-" if value is None else f"{value:.1f}"  # noqa: E731
+
+        def time_of(value: float | None) -> str:
+            return "-" if value is None else f"{value:.1f}"
+
         said = f"{self.state} ({self.note})" if self.note else self.state
         return (
             f"{self.line:<22} | {self.browser:<9} | {time_of(self.median_ms):>7} | {time_of(self.p95_ms):>7} | "
@@ -73,13 +72,13 @@ def load_budget(path: Path) -> list[Line]:
         raise ConfigError(f"the budget file {path} could not be read: {failed}") from None
 
 
-def judge(line: Line, browser: str, samples_ms: Sequence[float]) -> Measured:
+def judge(line: Line, browser: str, samples_ms: Sequence[float], settings: Bench) -> Measured:
     median = statistics.median(samples_ms)
     ordered = sorted(samples_ms)
     p95 = ordered[min(len(ordered) - 1, round(0.95 * (len(ordered) - 1)))]
-    if median > line.fail_ms or p95 >= P95_LIMIT * line.fail_ms:
+    if median > line.fail_ms or p95 >= settings.p95_fail_times * line.fail_ms:
         state: State = "FAIL"
-    elif median > line.target_ms * TOLERANCE:
+    elif median > line.target_ms * settings.warn_over:
         state = "WARN"
     else:
         state = "OK"
@@ -130,7 +129,7 @@ async def run(
                 except (ScenarioFailed, BapError) as failed:
                     out.append(_unmeasured(line, channel, "ERROR", str(failed).splitlines()[0][:80]))
                     continue
-                out.append(judge(line, channel, samples))
+                out.append(judge(line, channel, samples, settings))
     return out
 
 

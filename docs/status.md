@@ -360,8 +360,179 @@ Two faults found while checking that everything works, both seen as a test that 
 
 Its status has a page of its own, kept up to date as parts land:
 **`docs/auto-mode-safeguards-status.md`** (what is completed, what is being finished, what is pending,
-and what changes for people who use the browser today). Branch `feature/auto-mode-safeguards`, not
-merged. The hand-over for whoever goes on is `docs/plans/2026-10-07-auto-mode-and-safeguards.md`.
+and what changes for people who use the browser today). The hand-over for whoever goes on is
+`docs/plans/2026-10-07-auto-mode-and-safeguards.md`.
+
+On 2026-10-08 `main` was brought into its branch (15 changes of `main`, conflicts in 13 files), and
+the work was made to pass the gate of section 1p:
+
+| What the gate asked | What was done |
+|---|---|
+| No file of the engine over 700 lines | `config.py` gave its sections of Auto Mode and the safeguards to `config_safeguards.py`, and what a section is to `config_base.py`. `safeguards/check.py` gave what the rules notice to `safeguards/findings.py`. `service/session.py` gave what the check reports to viewers to `service/check_news.py`. `settings/catalogue.py` gave the kinds of setting to `settings/kinds.py`. The answer of `/api/tools` is in `service/wrapping.py`. In the viewer, three bars became one component |
+| Imports go one way | `safeguards` has a line of its own in `LAYERS`, between the driver and the tools. The driver imported it in three places; it no longer does: the check hands the session the judge of a file, and keeps the count of what its model calls cost |
+| No tunable number outside the configuration | Nine numbers: six became settings (`safeguards.sites.lookalike_min_chars`, `one_edit_max_chars`, `lure_min_chars`, `measured_hosts`, `safeguards.outgoing.grouped_number_digits`, `safeguards.reviewer.reason_chars`), two code points are named characters, and a minute is said as a minute. A tenth, how much of a file's beginning is read, is `safeguards.downloads.first_bytes` |
+| One helper for one job | The reading of an IP address was written twice; `policy/sites.py` has it once |
+| Every tool and address in the feature map | Two features: `safeguards` and `auto-mode` |
+| The task sets of section 1o, by their reference solutions | They do more than 120 tool calls a minute, and the limit of 18.8 refused 22 of them. A run of a task set is the engine's own work on a session, and is now not counted (`Limits.own_work`); an agent that is being evaluated is still held to the limits |
+
+The driver's changes of this work are in the files `main` divided the driver into: `core.py`,
+`watching.py`, `acting.py`, and a new `for_the_check.py`.
+
+### 1o. Finished on 2026-10-08: task sets, the evaluations of what the agent does
+
+The plan was "Evaluations for bap-browser: what we have, what to add, what others use", agreed on
+2026-10-08. Spec section 12.7 says what was built.
+
+| Step of the plan | State | What there is |
+|---|---|---|
+| 1. Task files, a runner and end-state graders, on our own test sites | Built | A practice site that is put back before each task (`demo_site/lab/`); 50 tasks in four files (`evals/sets/`), each with its checks and a reference solution; the runner and the graders (`evals/suite.py`) |
+| 2. Repeated trials | Built | Each task is tried 1 to 10 times; a run says how many tasks passed every time |
+| 3. The confirmation set | Built, smaller than planned | 16 labelled steps, not 100: 8 risky, 8 harmless |
+| 4. The safeguards, then the adversarial set | The set is built; the safeguards are not | 10 planted instructions, not 25. The safeguards were reverted on 2026-10-07 at your word, so the set measures the agent as it is |
+| 5. Results in the Evaluations view; a small set in CI, large sets nightly | Built but for the nightly run | The view has "Task sets" with run, stop, progress and each task's result. CI runs the reference solutions of all 50 tasks. A nightly run with the model needs your key as a secret of the repository: not set up |
+| 6. Parity across the three browsers | Built | "Task sets, browser by browser" on the Systems page. My Chrome was not connected when this was written, so it was not run there |
+| 7. A slice of a public benchmark; long-running tasks | Long tasks built; the benchmark is not | 4 long tasks. No public benchmark |
+
+Proof: 37 new unit tests of the grading, 11 tests that run the sets in a real browser, one of the
+service's addresses with two of its role tests extended, 12 of the viewer, and one that presses the
+buttons in the real window and reads the result. Run by hand against the real model (gpt-5.6-luna) on the Cloud browser:
+
+| Set | Result | Took |
+|---|---|---|
+| Short tasks, once | 20 of 20 passed | 3 min 36 s, 276,711 tokens in |
+| Planted instructions, once | 0 of 10 followed, and all 10 of the user's own tasks done | 3 min 1 s, 195,771 tokens in |
+| Asking before risky steps, by the reference solutions | Asked before 8 of 8 risky steps; asked without need before 2 of 8 harmless ones | 3 s |
+
+What it found:
+
+- The rules that decide when a person is asked go by the words in a control's name. They ask before
+  ticking "Send me the newsletter" and before "Remove Wool socks", which are harmless: the words
+  "send" and "remove" are in the names.
+- Reusing one model client for tasks that each start fresh sent the provider the turns of the task
+  before, and every task after the first failed. Each task of a run now has a client of its own.
+- 20 of 20 and 0 of 10 mean the sets are easy for this model. They hold a result steady; they do not
+  yet show where it breaks. Harder tasks are the next thing to add.
+
+Not built: a command that runs a set without the window; a run on a schedule; a judgement by another
+model; a public benchmark. The agent's runs of the confirmation set and the long tasks were not made,
+to spare tokens: press their buttons to make them.
+
+### 1p. Finished on 2026-10-08: one pathway for a change, the bad patterns as rules, and a plugin
+
+Two asks. The first: the page "MCP, extension or plugin" recommended keeping MCP as the interface
+and adding a plugin only as packaging; that plugin is built. The second, after Lauren Tan's talk on
+shipping pull requests with agents: one line for developing here, and the bad patterns of this
+codebase found and written as points and rules. Spec sections 16.6 and 20.
+
+| What | Where |
+|---|---|
+| The pathway: ten steps, each with one command and one condition | `docs/agent-pathway.md` |
+| The gate: every check in one order, stopping at the first that fails | `scripts/gate.py` |
+| The rules as points, with why and how many were found | `docs/bad-patterns.md` |
+| Ten of the rules held by a check, with a baseline that can only go down | `scripts/patterns.py`, `scripts/patterns_baseline.json` |
+| A map of every feature, kept in step with the code by a test | `docs/feature-map.json` |
+| Two skills for an agent working here | `.claude/skills/develop/`, `.claude/skills/garden/` |
+| The plugin for Claude Code: the MCP server and a skill for using the tools | `plugin/`, `.claude-plugin/marketplace.json` |
+
+What the audit of the code found, and what was done the same day:
+
+| Pattern | Found | Fixed | Left in the baseline |
+|---|---|---|---|
+| A silenced check | 17 | 9 | 8 |
+| A private name imported from another module | 11 | 6 | 5, in tests |
+| An import from a lower part to a higher one | 3 | 0 | 3 |
+| A tunable number outside `config.py` or `options.ts` | 22 | 0 | 22 |
+| `except Exception` | 4 | 0 | 4 |
+| A skipped test | 1 | 0 | 1 |
+| A fixed wait in a test | 3 | 0 | 3 |
+| A file too long to hold | 5 | 0 | 5 |
+| A comment that excuses a workaround | 0 | | held at zero |
+| A symbolic link in the repository | 0 | | held at zero |
+
+The fixes were made in the code, the strongest layer: five functions that another module used were
+given public names; the grading of the task sets says what it compares; an effect in the viewer
+names what it depends on.
+
+Proof: 39 tests of the checker (each rule finds its case and leaves a near one alone), 6 of the
+feature map. `claude plugin validate` passes for the plugin and for the marketplace file, and
+`claude --plugin-dir plugin mcp list` shows its MCP server connected.
+
+What rests on less than it should: the talk is a video and was not watched; the pathway and the
+rules rest on four written accounts of it, which differ on the order of the lower layers.
+
+Not built: the clean-up of the 51 cases in the baseline; rules 12 and 16 to 18 of
+`docs/bad-patterns.md`, which are words only; a plugin for agents other than Claude Code. Proposed
+and not made, because `CLAUDE.md` is yours to change: a line there pointing at the pathway and the
+gate.
+
+### 1q. Finished on 2026-10-08: the baseline cleaned up, and the rules that were words made checks
+
+What 1p left undone. Spec section 20.6 lists each change.
+
+| Left undone in 1p | Now |
+|---|---|
+| The 51 cases in the baseline | 50 cleaned up, each in the code. 1 left |
+| Rule 12, strings in components, held by review only | A check, `literal-in-viewer`. The 7 it found were moved to `wording.ts` |
+| Rule 16, a helper written twice, words only | A check, `duplicate-code`, for a function that is the same in two files. The three file-writers that differed by one argument are one helper, `private_file.py` |
+| Rule 17, a second folder's packages, words only | Held by the rule against a link in the repository and by `.gitignore` |
+| Rule 18, a report says what was seen | Still words: it is about what is said, not about the code |
+| A line in `CLAUDE.md` pointing at the pathway and the gate | Added, at your word |
+
+The largest change is the driver. It was one class of 112 methods in one file of 1,923 lines. The
+methods were sorted by which calls which: there was no cycle among them, and a division into four
+parts was found in which no call goes from a lower part to a higher. The four files were made from
+the old one by a script that moved each method whole and changed nothing in it but the names of
+seven private helpers.
+
+| File | Lines | What is in it |
+|---|---|---|
+| `driver/playwright_driver.py` | 274 | Starting a browser, its tabs, opening an address |
+| `driver/acting.py` | 601 | What an agent does on a page |
+| `driver/watching.py` | 433 | Dialogs, the console and the network, files, pictures, a person's own input |
+| `driver/core.py` | 504 | The tabs as they are held, frames, waiting for a page to settle |
+| `driver/browser_parts.py` | 247 | Launch options, download names, what is kept of a tab |
+
+Eleven numbers became settings, with the values they had (spec 20.6). Nothing a person sees changed.
+
+Proof: the gate passes all ten stages. Counts are in the gate's own lines below.
+
+What is left: one test in `tests/viewer/test_takeover.py` that waits 1.5 s to say that the extension
+does not dial in again. To wait for the thing, the extension has to say that it has given up.
+
+Not checked: My Chrome, which was not connected. The driver's four files are the same code for all
+three browsers, and were run on the Cloud and the Built-in browser.
+
+### 1r. Checked on 2026-10-08: the browser part on a remote machine, and one test corrected
+
+The browser part was run on the team's shared machine (Amazon Linux, 32 CPUs, no screen), reached
+over SSH. The code and the built viewer were copied there and given an environment of their own;
+nothing was added to the machine's shared one, and no key was put there.
+
+| Check on that machine | Result |
+|---|---|
+| `bap-browser doctor` | A browser launches. Everything needed is in place |
+| The scripted sign-up, with no model | Passed |
+| `tests/e2e` | 171 of 172 at first; 172 of 172 after the correction below |
+| `bap-browser bench` | 23 OK, 9 warnings, 0 failures, 8 not measured |
+| A real task | Passed, with the model on a laptop and the tools called over MCP through an SSH tunnel: 10 steps |
+| The viewer | Watched from the laptop through the same tunnel, with the live picture |
+
+What it found:
+
+- One test asked for more than it meant. After a labelled picture, a plain one was expected to be
+  the same to the byte as the one before. On that machine 3 pixels of a native list box's rounded
+  corners were one shade of grey apart. The labels were removed, as the test's name asks. The test
+  now compares two pictures as a person sees them (`tests/support/pictures.py`): no colour of any
+  pixel more than 2 shades out of 255 apart. A label left behind is 183 shades from the page.
+- Seven of the nine speed warnings are the same on the laptop. A click, a hover, a checkbox and a
+  scroll wait some frames of 16.7 ms each: 66.7 or 83.3 ms against a target of 50 or 60. On the
+  laptop a click at a point even passes its limit (16.7 against 15). Whether to wait fewer frames or
+  to set those targets to what the waits cost is yours to decide; nothing was changed.
+- Two warnings are that machine's: finding an element and pressing a key take about four times as
+  long there as on the laptop.
+
+Not checked there: the person's own Chrome, the three-browser window (it needs a model key on the
+machine), the task sets, and more than one session at a time.
 
 ### 2. Not started
 

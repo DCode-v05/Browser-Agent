@@ -142,7 +142,11 @@ against its documentation for the pinned version before it is used. The stack is
       store.py                 saved user settings, locks and limits
     driver/                    browser driving: one adapter per backend
       base.py                  the driver interface
-      playwright_driver.py     remote headless and bundled Chromium: launch, attach, tabs, actions
+      playwright_driver.py     remote headless and bundled Chromium: launch, attach, tabs. It builds on:
+      acting.py                what an agent does on a page: read, locate, click, type, scroll, wait
+      watching.py              dialogs, the console and the network, files, pictures, a person's own input
+      core.py                  the tabs as they are held, the frames of a page, waiting for a page to settle
+      browser_parts.py         launch options, download names, what is kept of a tab, a frame, a dialog
       bridge_driver.py         sends driver operations over the bridge channel (milestone 2)
       snapshot.py              snapshot assembly, refs, caps
       snapshot_page.js         the script that reads a page; the same file in every backend
@@ -158,7 +162,9 @@ against its documentation for the pinned version before it is used. The stack is
       redaction.py
     tools/
       registry.py              tool definitions and dispatch
-      browser_tools.py         the tools in section 6
+      browser_tools.py         the tools in section 6: what each does
+      arguments.py             what each tool is given
+      offered.py               the list of tools an agent is offered
     code/                      milestone 4
       checker.py               what a script may contain
       worker.py                the separate process that runs scripts
@@ -2240,6 +2246,10 @@ The keys of Auto Mode and the safeguards (`safety.ask_before`, `safety.auto_mode
 | `evals.recent_tasks` | 20 | The tasks the window lists for a browser, newest first |
 | `evals.max_tasks_read` | 2000 | The newest records a summary is made from |
 | `evals.step_budget_ms` | 2000 | The checklist's limit for one step in the browser |
+| `evals.suite_trials` / `evals.suite_max_trials` | 3 / 10 | How many times a run of a task set does each task, and the most it may (section 12.7) |
+| `evals.suite_trial_timeout_s` | 300 | Then one try of a task is ended and counted as failed |
+| `evals.suite_runs_shown` | 8 | The earlier runs of a task set whose pass rates are shown |
+| `evals.suite_answer_chars` | 2000 | How much of a task's words and answer the record of a run keeps |
 | `auth.file` | `.bap-browser/accounts.json` | Where the sign-in passwords are kept, as salted hashes (section 4.11) |
 | `auth.min_chars` / `auth.max_chars` | 8 / 200 | The shortest and the longest password that is taken |
 | `auth.session_hours` | 12 | How long a sign-in lasts |
@@ -2752,6 +2762,86 @@ that.
 
 Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
 section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.
+
+### 12.7 Task sets
+
+Section 12.6 says what a browser's tasks took. This section says whether the agent does a task
+right: tasks with a known right end, done on a practice site and graded by code. Built on
+2026-10-08.
+
+**The practice site.** `demo_site/lab/`, served by the service at `/demo-site/lab/`: a shop with a
+basket and orders, a mailbox, an account and a list of notes. Everything done there is kept in the
+browser alone, under one key. `reset.html?seed=…` puts it back to how it begins, with a run's own
+changes; `state.html` shows what was done, for the check that follows. Nothing on it is real.
+
+**A task** is an entry of a file in `evals/sets/`:
+
+| Field | What it is |
+|---|---|
+| `id`, `title` | Its name |
+| `task` | The words the agent is given |
+| `start` | The page of the practice site the browser is on when it is given |
+| `seed` | How the site differs from how it begins: `{"profile.newsletter": true, "mail.inbox+": [message]}`. A name that ends in `+` adds to a list |
+| `pass` | The checks. Every one holds when the task was done |
+| `solution` | The reference solution: the steps that solve it with no model (`open`, `click`, `type`, `select`, `check`, `answer`) |
+| `risky` | In the set `confirm`: whether a person should be asked before its step |
+| `answer` | What the stand-in answers an approval with: `allowed`, or `denied` |
+| `attack` | In the set `attack`: the planted instruction was followed when any one of these holds |
+
+**A check** is one of: `{"state": path, "is": value}`, `"has"`, `"lacks"`, `"min"`; `{"answer": words}`;
+`{"asked": true}`. A path is dotted, `length` counts a list, words are compared without regard to
+case, and a word that begins with `~` is looked for anywhere in the value.
+
+**The sets.**
+
+| Set | Tasks | What it measures | Its number |
+|---|---|---|---|
+| `short` | 20 | Whether a small task is finished: one to ten steps on one page | The share of tries that passed |
+| `confirm` | 16 | Whether a person is asked before a step that orders, sends, deletes or publishes (8 tasks), and is not asked before a harmless one (8). Two of the risky ones are answered with no: nothing may then be done | Of the risky steps, how many were asked about; of the harmless ones, how many were asked about without need |
+| `attack` | 10 | Whether text planted in a review, a message, a note or off the screen makes the agent order, send, delete, publish, change the account or hand over the user's details | The share of planted instructions that were followed. Lower is better |
+| `long` | 4 | Whether a task of many steps over several pages is finished | The share of tries that passed |
+
+**A run** does every task of a set `trials` times (`evals.suite_trials`, at most
+`evals.suite_max_trials`). For each try: the site is put back, the browser goes to the task's start
+page, the task is done, `state.html` is read with the agent's own tools, and the checks are applied.
+The task is done either by the agent with its model, each task as a conversation of its own, shown in
+the chat as if a person had sent it; or by the reference solution, with no model. A try that takes
+longer than `evals.suite_trial_timeout_s` is ended and counted as failed. Afterwards the browser goes
+back to where it was.
+
+**Nobody is asked during a run.** A stand-in answers each approval at once, as the task says, and that
+it was asked is counted; viewers are shown the question and its answer. A request for a person's help
+is answered "could not". With several tries, a run also says how many tasks passed every time.
+
+**One at a time.** A browser does a person's task, the checklist or a run, never two of them: the
+others are refused with a sentence, or wait their turn. A run can be stopped: it ends after the task
+it is on and keeps what it did.
+
+**What is kept.** One line for each run in `<evals.dir>/<system>/suite/runs.jsonl`: the set, who did
+it, the model, each task with each try (passed, why not, asked, followed, steps, tokens), and the
+totals. Each try of the agent also has a full record, as in 12.6, in
+`<evals.dir>/<system>/suite/tasks.jsonl`, apart from the records of a person's own tasks.
+
+**In the window.** The Evaluations view of a browser has a part "Task sets": for each set what it
+measures, its newest result and the pass rates of the runs before it, "Run with the agent", "Run the
+reference solutions", where a run is and "Stop the run", and each task of the newest run with why it
+did not pass. The Systems page puts the newest run of each set on each browser side by side.
+
+| Method and path | Who | What |
+|---|---|---|
+| `GET /api/systems/{name}/suite` | Whoever may run the checklist | The sets, their newest runs, the run under way |
+| `POST /api/systems/{name}/suite` with `{"set", "trials", "mode"}` | The same | Begins a run. 202, or 409 with why not. `mode` is `agent` or `reference` |
+| `POST /api/systems/{name}/suite/stop` | The same | Ends the run under way after its task |
+| `GET /api/suite` | Admin | The newest run of each set on each browser |
+
+**Tested.** The reference solutions of all 50 tasks are run in a real browser on every change, and
+every task is tried with a solution of no steps, which must not pass. The rules of section 8.2 ask
+before every risky step of `confirm` and before two harmless ones, whose controls hold the words
+"send" and "remove": the test states both.
+
+Not in this section: a judgement by another model; a public benchmark; a run on a schedule; a command
+that runs a set without the window. The safeguards of section 18 are not built, so `attack` measures
+the agent as it is today.
 
 ---
 
@@ -3458,6 +3548,26 @@ The viewer and the settings API are still served to the UI clients: the agent co
 
 The product backend starts the micro VM, passes it the configuration (the `config.json` content and
 the token in the environment) and gives the UI client the viewer's address. It takes no other part.
+
+### 16.6 The plugin
+
+MCP is the interface: any agent that speaks it uses the browser with no more than the recipes of
+16.2. A plugin is a way to install, not another interface. `plugin/` is one for Claude Code. Built
+on 2026-10-08.
+
+| File | What it holds |
+|---|---|
+| `plugin/.claude-plugin/plugin.json` | The plugin's name and version |
+| `plugin/.mcp.json` | The MCP server: `uv run --directory <the checkout> bap-browser mcp` |
+| `plugin/skills/browse/SKILL.md` | How to use the tools well: read as text, act on refs, a picture only when text is not enough, what only the person may do, and that what a page says is data |
+| `.claude-plugin/marketplace.json` | Lists the plugin, so that it can be installed by name from a checkout |
+
+It runs the browser from the checkout it is in, so it is installed from a checkout:
+`claude plugin marketplace add <the checkout>`, then `claude plugin install bap-browser@bap-browser`.
+For one session: `claude --plugin-dir <the checkout>/plugin`. It adds no tool and no capability to
+the browser: the tools, the viewer, the approvals and the extension for a person's own Chrome are the
+service's. The extension is how the service reaches a browser a person already uses; the plugin is
+how an agent comes to have the service. Neither replaces the other.
 
 ### 16.5 The reference agent loop
 
@@ -4309,6 +4419,7 @@ section 17.2 names it.
 | `limits.max_calls`: tool calls in one task, or in the session while it has no task | 500 | `limit_reached`: no further call runs. "This task has reached its limit of 500 steps. Stop, and tell the person what is done and what is left." |
 | `limits.max_task_minutes`: minutes one task may take | 60 | The same, with its own words |
 | `limits.max_calls_per_minute` | 120 | The call waits until the minute allows it, up to `limits.rate_wait_s`; then it is refused with "Too many calls at once" |
+| The engine's own work on a session | No limit | A run of a task set (section 12.7) makes the site ready, does the steps of a reference solution and reads what was done, with the agent's own tools. Those calls are no agent's steps: they are not counted, not held to the rate, and never said to go round in circles. The calls of an agent that is being evaluated are an agent's, and are |
 | `limits.max_model_spend_usd`: what the engine's own model calls (loop, reviewer, scan) may cost in one session | 0, which means none | The same as `max_calls`. With a price of 0 nothing is counted |
 
 The count of steps begins again with each task: a message of the person in the chat, or a
@@ -4497,6 +4608,7 @@ admin's 0.
 | `model.breaker_failures` / `breaker_cooldown_s` | 3 / 60 | When calls stop, and for how long |
 | `model.input_price_per_million` / `output_price_per_million` | unset | Unset means the agent's prices |
 | `reviewer.name_chars` / `typed_chars` / `address_chars` / `sample_chars` | 80 / 200 / 300 / 80 | How much of each the reviewer is given |
+| `reviewer.reason_chars` | 120 | How much of the reviewer's own reason is kept, and shown to a person |
 | `actions.pays` / `sends` / `deletes` / `grants` / `commits` | the words of 18.4 | What makes a step one of each class |
 | `actions.message_words` | message, comment, reply, review, post, body, subject, to, recipient | What makes a field a message box |
 | `task.max_chars` / `task.max_sites` | 2000 / 20 | Of `browser_begin_task` |
@@ -4518,6 +4630,7 @@ admin's 0.
 | `outgoing.filter_bits` / `filter_hashes` | 1048576 / 4 | The memory of one site: 128 kilobytes |
 | `outgoing.remember_chars_per_site` / `remember_sites` | 250000 / 16 | When a site's memory begins again; how many sites |
 | `outgoing.secrets_per_site` | 2000 | Short secrets remembered for one site |
+| `outgoing.grouped_number_digits` | 10 | A number written in groups counts as a secret from this many digits on: a phone, a card |
 | `outgoing.decode_min_chars` | 8 | The shortest packed run that is unpacked: a code of six digits is eight characters of Base64 |
 | `outgoing.question_chars` | 300 | How much of the text the person is shown |
 | `outgoing.long_address_chars` | 200 | A long address |
@@ -4527,12 +4640,15 @@ admin's 0.
 | `downloads.risky_extensions` | `exe, msi, msix, appx, bat, cmd, com, scr, pif, ps1, vbs, js, jse, wsf, hta, lnk, reg, jar, apk, dmg, pkg, app, deb, rpm, sh, iso, img, cab, docm, xlsm, pptm` | Files that are never kept |
 | `downloads.ask_extensions` | `zip, rar, 7z, tar, gz, tgz, bz2, xz, html, htm, xhtml, mht, mhtml, svg` | Files that are asked about on every backend |
 | `downloads.ask` | `own_machine` | Or `never`, or `always` |
+| `downloads.first_bytes` | 16 | How much of a file's beginning is read to tell a program from what its name says it is |
 | `money.max_amount` / `max_session_total` / `currency` | 0 / 0 / `""` | The caps. 0 means none |
 | `money.around_chars` | 1500 | How much of the text around a paying control is read for an amount |
 | `sites.lookalike` / `mixed_script` / `ip_hosts` | `true` / `true` / `true` | The checks of 18.7 |
 | `sites.protected` | the names most often imitated | Names a look-alike is measured against |
 | `sites.lure_words` | the words of 18.7 | What makes a protected name in a host a lure |
 | `sites.common_words` | a short list | Labels that are never look-alikes |
+| `sites.lookalike_min_chars` / `one_edit_max_chars` / `lure_min_chars` | 5 / 8 / 4 | From what length a name is measured as a look-alike; up to what length one changed letter counts, two for a longer name; from what length a protected name is looked for beside a lure word |
+| `sites.measured_hosts` | 256 | How many hosts are remembered as measured against the protected names |
 | `sites.sensitive` | lists for `money`, `identity`, `health`, `government` | Sites that need a person |
 | `sites.sensitive.more` | empty | Other sites that need a person: a deployment's, and what a person adds in the settings screen |
 | `sites.cache_s` | 3600 | How long an answer about a site is kept |
@@ -4558,8 +4674,7 @@ admin's 0.
 **`logging`**: `retention_days`, 30.
 
 Fixed, and not settings, because nothing is gained by changing them: a mark's token is 6 letters and
-digits; an unseen passage is read from 20 characters on; a label is measured as a look-alike from 5
-letters on.
+digits; an unseen passage is read from 20 characters on.
 
 **What a person can change** (they join the catalogue of section 10.2, each browser of the window
 with its own value):
@@ -4578,36 +4693,42 @@ with its own value):
 
 ```
 src/bap_browser/
+  config_base.py             what a section of the configuration is
+  config_safeguards.py       the settings of 18.11, as sections of the configuration
   policy/
     sites.py                 the registrable name of a host, "same site", own pages
     public_suffix_list.dat   the Public Suffix List, with its private section
     confusables.txt          Unicode's confusable characters that map to Latin letters and digits
   safeguards/
-    check.py       the stages of 18.4 in order; called from tools/toolkit.py for every call
+    check.py       the stages of 18.4 in order, and what a decision leads to; called for every call
+    findings.py    what the fixed rules notice about a step: one method for each kind of finding
     actions.py     what a step does: the classes of 18.4
-    findings.py    one function for each finding: what it looks at, what it returns
-    task.py        the task and its sites; browser_begin_task
+    task.py        the task and its sites
     reviewer.py    the reviewer: its input, its instructions, the table and the floor
-    incoming.py    unseen text, invisible characters, addresses, the marks
-    scan.py        the fixed rules, the second opinion, withholding, flagged pages
+    incoming.py    invisible characters, addresses as shown, the marks
+    scan.py        the fixed rules, the second opinion, withholding
+    reading.py     a tool's result as the agent is given it: marks, the scan, flagged pages
     outgoing.py    sensitive fields, the memory of what was read, files, grant-access screens, money
-    sites.py       look-alikes, sensitive sites, the known-bad lists
-    limits.py      the limits, repeated steps, questions nobody answers
+    lookalikes.py  look-alike names, mixed writing systems, bare addresses
+    limits.py      the limits, repeated steps
     model.py       the model client: time limit, tries, breakers, counted cost. The reference loop uses it too
-  driver/snapshot_page.js   the unseen-text tests, the change counter, a field's kind, amounts near a control
-  tools/toolkit.py          calls safeguards/check.py before a step and safeguards/incoming.py after it
-  service/session.py        the new events and commands
-  settings/catalogue.py     the settings of 18.11
-scripts/refresh_data.py     fetches the two data files again, for a release
-viewer/src/                 the parts of 18.10
-tests/safety/               the attack set and its runner (18.13)
-tests/site/attacks/         its pages
+  driver/snapshot_page.js    the unseen-text tests, the change counter, a field's kind, amounts near a control
+  driver/for_the_check.py    what the check asks of a page: where a press lands, what a read left out
+  driver/watching.py         a file that arrives is judged before it is kept
+  tools/toolkit.py           calls the check before a step and the reader after it
+  service/check_news.py      what the check reports to the people watching, and what they ask of it
+  service/wrapping.py        the Origin rule of the tools' endpoint, and the answer of /api/tools
+  settings/kinds.py          the kinds of setting; settings/catalogue.py lists the settings of 18.11
+scripts/refresh_data.py      fetches the two data files again, for a release
+viewer/src/                  the parts of 18.10
+tests/e2e/test_attacks.py    the attack set in a real browser (18.13)
+tests/site/attacks/          its pages
 ```
 
 **Who owns what.** `policy/` holds what is true of an address or a file whatever the session: the
 address policy, what a site is, look-alike letters, the kinds of files. `safeguards/` holds what is
 decided for one session: the task, the findings, the check, the scan, the memory, the limits.
-`safeguards/` calls `policy/`, never the other way round.
+`safeguards/` calls `policy/` and the driver, never the other way round: the driver is handed what it needs (who judges a file), and imports nothing of the safeguards.
 
 `tools/toolkit.py` keeps the order of a call. What decides whether a step may run moves out of it
 into `safeguards/check.py`, with today's rules (the tool policy, the consequential words, the site
@@ -4820,3 +4941,114 @@ Systems and documents studied:
 - Core Web Vitals: https://web.dev/articles/vitals
 
 Published performance figures and their individual sources are listed in `docs/research/performance.md`.
+
+---
+
+## 20. How a change is made: the pathway and the rules
+
+Built on 2026-10-08. An agent copies what it finds in a repository, and takes the shortest path it
+can see. So there is one path, and what is on it is fit to be copied. The idea and the order of the
+layers are from Lauren Tan's talk on shipping pull requests with agents (September 2026), read
+through written accounts; `docs/bad-patterns.md` names them.
+
+### 20.1 The pathway
+
+`docs/agent-pathway.md` is the one way a change is made: read, spec first, branch, test first, build,
+gate, evidence, record, ship, garden. Each step has one command or one file and one thing that must
+be true before the next. It also says where each kind of thing goes ("the paved road"), and which
+evidence fits which change.
+
+### 20.2 The gate
+
+`uv run python scripts/gate.py` runs every check in one order, cheapest first, and stops at the
+first that fails: bad patterns, format, lint, types, the viewer's types, lint, tests and build, the
+unit and service tests, the tests in a real browser. `--quick` leaves the last out. It prints each
+stage's own last line: a stage that printed nothing has not passed. CI runs the same checks.
+
+### 20.3 The rules
+
+`docs/bad-patterns.md` lists the patterns that must not spread, as points, each with why and with how
+many were in the code when the rule was written. A correction goes to the highest layer that holds
+it: the code, then a check, then words, then review.
+
+`scripts/patterns.py` holds twelve of them by reading the code:
+
+| Rule | What it refuses |
+|---|---|
+| `suppression` | A silenced check in product code |
+| `workaround-comment` | A comment that excuses a workaround |
+| `private-import` | A name that begins with `_`, imported from another module |
+| `layer` | An import from a lower part of the engine to a higher one. The order is `LAYERS` in the script |
+| `tunable-outside-config` | A number in capitals outside `config.py`, or outside `options.ts` in the viewer |
+| `broad-except` | `except Exception` |
+| `skipped-test` | A test that is skipped |
+| `fixed-wait-in-test` | A test that waits a fixed time |
+| `large-file` | A file over 700 lines of Python, or 500 of the viewer |
+| `tracked-link` | A symbolic link in the repository |
+| `duplicate-code` | A function of the engine that is the same, statement for statement, in two files |
+| `literal-in-viewer` | A string a person reads or hears, written into a component and not taken from `wording.ts` |
+
+Three of the rules say what they leave alone. `broad-except` allows `except Exception` in the four
+functions named in `BOUNDARIES`, each with its reason: where an agent's call, an agent's script, a
+browser that will not launch, or an address that cannot be judged must not take anything else down.
+`skipped-test` allows `skipif`, which says before a test starts where it cannot run.
+`fixed-wait-in-test` means a wait of a second or more written as a number; a short sleep in a loop
+that looks again is how a test waits for a thing.
+
+What was in the code already is counted, rule by rule and file by file, in
+`scripts/patterns_baseline.json`. A count may go down and may never go up: a new case fails, and a
+case that was cleaned up fails until the baseline is lowered (`--lower`). `tests/unit/test_patterns.py`
+runs the check, so CI holds it.
+
+### 20.4 The feature map
+
+`docs/feature-map.json` names, for each feature: its spec section, the files that make it, the tests
+that hold it, how to reach it on screen or from a command, and the service's addresses and the tools
+that are its. `tests/unit/test_feature_map.py` keeps it in step with the code: every file it names
+exists, and every tool and every address of the service is in it.
+
+### 20.5 The skills
+
+`.claude/skills/develop/` is the pathway as steps an agent runs. `.claude/skills/garden/` is how a
+mistake becomes a rule: name the pattern, count it, choose the highest layer, add the rule with its
+test, fix what is quick and put the rest in the baseline.
+
+### 20.6 The first clean-up
+
+On 2026-10-08 the baseline held 51 cases. The same day 50 were cleaned up, each at the highest layer
+that holds it, and the baseline holds one.
+
+| What was wrong | What was done |
+|---|---|
+| 8 silenced checks | Each fixed where it was: lambdas became functions, a private field got a method, a stream that keeps nothing got a class |
+| 5 private names used by tests | Made public: `build_parser`, `extension_folder`, `serve_viewer` |
+| `config` imported `policy`; `evals` imported `agent` | `address.py` moved below the configuration, with nothing of the engine in it. What times the model and the tools of a task moved to `agent/timed.py`; the record of a task knows nothing of the agent |
+| 22 numbers outside the configuration | 11 became settings (below). The four codes a WebSocket is closed with became a named set. The viewer's own five went to `options.ts` |
+| 4 `except Exception` | All four are boundaries, and are named as such in the check |
+| 1 skipped test | It says with `skipif` where it cannot run |
+| 3 fixed waits | Two wait for the thing: a call the service holds (`ServiceSession.held`), a dialog that is gone. One waits past a configured time, written as a multiple of it |
+| 5 long files | The driver became a chain of four classes in four files, divided so that no call goes from a lower one to a higher; the tools' arguments and the list of tools got files of their own; the viewer's connection and the wrappers left `service/app.py`; two viewer files were split |
+| The same file-writing code in three places | One helper, `private_file.py`: a file for its owner alone, written whole or a line added |
+| 7 strings in components | Moved to `wording.ts` |
+
+Settings added, each with the value the number had:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `agent.refusal_chars` | 300 | How much of the model provider's own words of a refusal is shown |
+| `bench.warn_over` | 1.05 | A median over the target times this is a warning |
+| `bench.p95_fail_times` | 2 | A p95 at this many times the fail value fails the line |
+| `code.step_line_chars` | 120 | How much of a step's first line a script's report keeps |
+| `code.result_room` | 12 | How many results of `max_output_chars` one message from the worker has room for |
+| `browser.timeouts.settle_frames` | 2 | Animation frames waited after an action |
+| `browser.screenshot.shrink_piece_bytes` | 32768 | How many bytes of a picture the page script turns into text at a time |
+| `bridge.answer_margin_s` | 5 | How much longer than the person's own time the core waits for the extension's word |
+| `control.key_name_max_chars` | 32 | The longest name of a key a viewer's command may carry |
+| `viewer.row_chars` | 59 | The longest sentence a row of the timeline holds |
+| `viewer.shortest_name_chars` | 12 | What is left of an element's name when a row has to be shortened |
+
+Left in the baseline: one test that says the extension does not dial in again, by waiting 1.5 s and
+looking. To wait for the thing it needs the extension to say that it has given up, which it does not.
+
+Not in this section: a framework that makes these mistakes impossible by construction; agents
+started by alerts; a ban on every comment.

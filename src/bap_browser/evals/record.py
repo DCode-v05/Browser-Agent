@@ -9,20 +9,16 @@ time and whether it worked.
 from __future__ import annotations
 
 import json
-import os
 import secrets
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from bap_browser.agent.loop import Tools
-from bap_browser.agent.models import Message, Model, Reply
 from bap_browser.config import Agent, Evals
-from bap_browser.errors import ModelError
+from bap_browser.private_file import add_line, write_json
 from bap_browser.results import ToolResult
-from bap_browser.tools import ToolDefinition
 
 Outcome = Literal["answered", "failed", "stopped", "step_limit", "ended"]
 """How a task ended: the agent answered; the model could not; a person stopped it; it ran out of
@@ -88,7 +84,7 @@ class Recorder:
     """Keeps the records of one browser of the window."""
 
     def __init__(self, settings: Evals, system: str, backend: str) -> None:
-        self._settings = settings
+        self.settings = settings
         self.system = system
         self._backend = backend
         self.folder = Path(settings.dir) / system
@@ -110,18 +106,14 @@ class Recorder:
             backend=self._backend,
             model=agent.model,
             started=round(time.time(), 3),
-            task=redact(task)[: self._settings.max_task_chars] if keep_words else "",
+            task=redact(task)[: self.settings.max_task_chars] if keep_words else "",
         )
         return Trace(self, record, agent, keep_words=keep_words, waited_s=waited_s, redact=redact)
 
     def keep(self, record: TaskRecord) -> None:
-        if not self._settings.enabled:
+        if not self.settings.enabled:
             return
-        line = json.dumps(asdict(record), ensure_ascii=False)
-        self.folder.mkdir(parents=True, exist_ok=True)
-        handle = os.open(self.folder / TASKS, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(handle, "a", encoding="utf-8") as file:
-            file.write(line + "\n")
+        add_line(self.folder / TASKS, json.dumps(asdict(record), ensure_ascii=False))
 
     def tasks(self) -> list[dict[str, Any]]:
         """The newest records, oldest first. A line that cannot be read is passed over."""
@@ -130,7 +122,7 @@ class Recorder:
         except OSError:
             return []
         records: list[dict[str, Any]] = []
-        for line in lines[-self._settings.max_tasks_read :]:
+        for line in lines[-self.settings.max_tasks_read :]:
             try:
                 record = json.loads(line)
             except ValueError:
@@ -154,7 +146,7 @@ class Recorder:
             ratings.pop(task, None)
         else:
             ratings[task] = rating
-        _write(self.folder / RATINGS, ratings)
+        write_json(self.folder / RATINGS, ratings, ensure_ascii=False)
         return True
 
     def checklist(self) -> dict[str, Any] | None:
@@ -162,7 +154,7 @@ class Recorder:
         return _read(self.folder / CHECKS) or None
 
     def keep_checklist(self, result: Mapping[str, Any]) -> None:
-        _write(self.folder / CHECKS, result)
+        write_json(self.folder / CHECKS, result, ensure_ascii=False)
 
 
 class Trace:
@@ -182,7 +174,8 @@ class Trace:
         self.record = record
         self._agent = agent
         self._keep_words = keep_words
-        self._waited_s = waited_s
+        self.waited_s = waited_s
+        """How long the session has waited for a person in all, in seconds."""
         self._redact = redact
         self._began = time.perf_counter()
         self._done = False
@@ -190,17 +183,13 @@ class Trace:
     def _since(self, moment: float) -> float:
         return round((moment - self._began) * 1000, 1)
 
-    def model(self, inner: Model) -> Model:
-        return _TimedModel(inner, self)
-
-    def tools(self, inner: Tools) -> Tools:
-        return _TimedTools(inner, self)
-
-    def replied(self, began: float, reply: Reply | None) -> None:
+    def replied(self, began: float, *, ok: bool, tokens: tuple[int, int] | None = None) -> None:
+        """A reply of the model, begun at `began`. `tokens` is what it sent and what it wrote, where
+        the model said."""
         record, ms = self.record, round((time.perf_counter() - began) * 1000, 1)
-        span = Span("model", self._agent.model, self._since(began), ms, ok=reply is not None)
-        if reply is not None and reply.usage is not None:
-            span.input_tokens, span.output_tokens = reply.usage.input_tokens, reply.usage.output_tokens
+        span = Span("model", self._agent.model, self._since(began), ms, ok=ok)
+        if tokens is not None:
+            span.input_tokens, span.output_tokens = tokens
             record.tokens_known = True
             record.input_tokens += span.input_tokens
             record.output_tokens += span.output_tokens
@@ -211,7 +200,7 @@ class Trace:
     def stepped(self, began: float, waited_before: float, name: str, result: ToolResult) -> None:
         record, ms = self.record, round((time.perf_counter() - began) * 1000, 1)
         # A step that waited for a person is not slow: the wait is taken out of its time.
-        waited = min(round((self._waited_s() - waited_before) * 1000, 1), ms)
+        waited = min(round((self.waited_s() - waited_before) * 1000, 1), ms)
         record.spans.append(
             Span("tool", name, self._since(began), ms, ok=not result.is_error, waited_ms=max(waited, 0.0))
         )
@@ -229,44 +218,11 @@ class Trace:
         record.outcome = outcome
         record.duration_ms = round((time.perf_counter() - self._began) * 1000, 1)
         if self._keep_words:
-            record.answer = self._redact(answer)[: self._recorder._settings.max_task_chars]  # pyright: ignore[reportPrivateUsage]
+            record.answer = self._redact(answer)[: self._recorder.settings.max_task_chars]
         if record.tokens_known:
             record.cost_usd = cost_of(record.input_tokens, record.output_tokens, self._agent)
         self._recorder.keep(record)
         return record
-
-
-class _TimedModel:
-    def __init__(self, inner: Model, trace: Trace) -> None:
-        self._inner = inner
-        self._trace = trace
-
-    async def complete(
-        self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
-    ) -> Reply:
-        began = time.perf_counter()
-        try:
-            reply = await self._inner.complete(system, messages, tools)
-        except ModelError:
-            self._trace.replied(began, None)
-            raise
-        self._trace.replied(began, reply)
-        return reply
-
-
-class _TimedTools:
-    def __init__(self, inner: Tools, trace: Trace) -> None:
-        self._inner = inner
-        self._trace = trace
-
-    def definitions(self) -> list[ToolDefinition]:
-        return self._inner.definitions()
-
-    async def call(self, name: str, arguments: Mapping[str, Any] | None = None) -> ToolResult:
-        began, waited = time.perf_counter(), self._trace._waited_s()  # pyright: ignore[reportPrivateUsage]
-        result = await self._inner.call(name, arguments)
-        self._trace.stepped(began, waited, name, result)
-        return result
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -275,13 +231,3 @@ def _read(path: Path) -> dict[str, Any]:
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
-
-
-def _write(path: Path, data: Mapping[str, Any]) -> None:
-    """For the person alone to read, and never left half written."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_name(path.name + ".partial")
-    handle = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(handle, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False)
-    os.replace(partial, path)

@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from bap_browser.config import Incoming
+from bap_browser.config_safeguards import Incoming
 from bap_browser.safeguards import incoming
 
 # -- without_invisible ------------------------------------------------------------------------
