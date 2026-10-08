@@ -29,7 +29,7 @@ made twice is a missing check.
 
 ## The rules
 
-Rules 1 to 12 are held by `scripts/patterns.py`. What was in the code when a rule was written is
+Rules 1 to 12, and 19, are held by `scripts/patterns.py`. What was in the code when a rule was written is
 counted in `scripts/patterns_baseline.json`. That count may go down and may never go up: a new case
 fails the gate, and a cleaned-up case must be taken out of the baseline. This is "stop the bleeding
 first, then clean up".
@@ -51,6 +51,7 @@ layer that holds it. The last column says what is left.
 | 10 | **No symbolic link in the repository** (`tracked-link`) | It points at one machine's folders. On 2026-10-08 one replaced the viewer's packages on another checkout | None. Held at zero |
 | 11 | **One helper for one job** (`duplicate-code`). A function is not written again in a second file | The copy is changed and the first is not, and both are copied on | The check finds a function that is the same statement for statement: none. Three that differed by one argument were found by reading, and are one helper now (`private_file.py`) |
 | 12 | **Every string a person reads is in `viewer/src/wording.ts`** (`literal-in-viewer`) | A string in a component is not found when the wording changes, and is written again in the next component | 7 found. None left. The check finds what is read or heard of an element (`aria-label`, `title`, `alt`, `placeholder`) and plain text between tags; a string built in code is still held by review only |
+| 19 | **No character nobody can see, written as itself** (`invisible-character`). A joiner, a mark of direction, a no-break space or a control is written by its name or its number: `"\N{ZERO WIDTH JOINER}"`, `"\u200d"` | It is not seen in a review, in a diff or in an editor, and a tool on the way (a shell, an editor) can put one in, or turn its name into the character, with nobody noticing. On 2026-10-08 a script written through a shell did exactly that to a joiner | 3 found, in `address.py` and a test. None left |
 
 Rules that other checks already hold:
 

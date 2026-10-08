@@ -27,7 +27,7 @@ LABEL = r"[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?"
 HOST_NAME = re.compile(rf"{LABEL}(?:\.{LABEL})*")
 # Characters that browsers and Python's own rules for international names turn into different
 # names. Such a name has to be given in its xn-- form.
-READ_DIFFERENTLY = frozenset("ßς‌‍")
+READ_DIFFERENTLY = frozenset("ßς\u200c\u200d")
 
 
 def canonical_address(url: str) -> str:
