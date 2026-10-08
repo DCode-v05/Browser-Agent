@@ -389,10 +389,11 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
 
         # The same set done by the agent. This one's model answers at once and does nothing.
         status, told = await opened.ask(
-            "POST", "/api/systems/builtin/suite", {"set": "long", "trials": 2, "mode": "agent"}
+            "POST", "/api/systems/builtin/suite", {"set": "long", "trials": 10, "mode": "agent"}
         )
         assert status == 202 and told["running"]["mode"] == "agent"
-        # One run at a time on a browser, and no checklist under it.
+        # One run at a time on a browser, and no checklist under it. Ten tries of each task, so that
+        # the run is still under way when these are asked.
         again = await opened.ask(
             "POST", "/api/systems/builtin/suite", {"set": "short", "trials": 1, "mode": "reference"}
         )
@@ -402,12 +403,12 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
             while (told := (await opened.ask("GET", "/api/systems/builtin/suite"))[1])["running"] is not None:
                 await asyncio.sleep(0.2)
         last = next(one for one in told["sets"] if one["id"] == "long")
-        assert (last["last"]["mode"], last["last"]["trials"], last["last"]["stopped"]) == ("agent", 2, False)
+        assert (last["last"]["mode"], last["last"]["trials"], last["last"]["stopped"]) == ("agent", 10, False)
         assert last["last"]["totals"]["passed"] == 0 and last["last"]["totals"]["every_time"] == 0
         assert [run["pass_rate"] for run in last["earlier"]] == [1.0]
         # Each try of the agent has a record of its own, apart from the records of a person's tasks.
         records = (tmp_path / "evals" / "builtin" / "suite" / "tasks.jsonl").read_text("utf-8").splitlines()
-        assert len(records) == 8 and json.loads(records[0])["task"].startswith("Buy the Blue running shoes")
+        assert len(records) == 40 and json.loads(records[0])["task"].startswith("Buy the Blue running shoes")
         assert (await opened.ask("GET", "/api/systems/builtin/evals"))[1]["tasks"]["count"] == 0
         # The chat shows each task as it was given.
         await page.get_by_role("tab", name="Browser and chat").click()
@@ -447,7 +448,7 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         built_in = next(one for one in side_by_side if one["system"] == "builtin")["runs"]["long"]
         assert (built_in["mode"], built_in["trials"], built_in["tasks"], built_in["pass_rate"]) == (
             "agent",
-            2,
+            10,
             4,
             0.0,
         )
