@@ -1,0 +1,451 @@
+{
+  "about": "Every feature of bap-browser: where the spec says it, the files that make it, the tests that hold it, and how to reach it. Read it to get from a vague report to the right files. tests/unit/test_feature_map.py keeps it in step with the code: a new tool or a new address of the service fails that test until it is here.",
+  "features": [
+    {
+      "id": "tools",
+      "title": "The tools an agent calls",
+      "spec": "6",
+      "source": [
+        "src/bap_browser/tools/browser_tools.py",
+        "src/bap_browser/tools/toolkit.py",
+        "src/bap_browser/tools/registry.py",
+        "src/bap_browser/tools/sentences.py",
+        "src/bap_browser/tools/event_log.py"
+      ],
+      "tests": [
+        "tests/unit/test_registry.py",
+        "tests/unit/test_toolkit.py",
+        "tests/unit/test_more_tools.py",
+        "tests/unit/test_remaining_tools.py",
+        "tests/e2e/test_actions.py",
+        "tests/e2e/test_more_tools.py",
+        "tests/e2e/test_navigation.py",
+        "tests/e2e/test_tabs.py",
+        "tests/e2e/test_dialogs.py",
+        "tests/e2e/test_files_and_logs.py",
+        "tests/e2e/test_pictures.py"
+      ],
+      "reach": "Any MCP client: `uv run bap-browser mcp`. In process: `Toolkit(session).call(name, arguments)`.",
+      "addresses": [],
+      "tools": [
+        "browser_navigate",
+        "browser_go_back",
+        "browser_go_forward",
+        "browser_reload",
+        "browser_get_text",
+        "browser_find",
+        "browser_screenshot",
+        "browser_zoom",
+        "browser_click",
+        "browser_hover",
+        "browser_drag",
+        "browser_type",
+        "browser_fill_form",
+        "browser_select_option",
+        "browser_set_checked",
+        "browser_press_key",
+        "browser_scroll",
+        "browser_scroll_to",
+        "browser_wait",
+        "browser_handle_dialog",
+        "browser_tabs",
+        "browser_console",
+        "browser_network",
+        "browser_evaluate",
+        "browser_upload_file",
+        "browser_downloads"
+      ]
+    },
+    {
+      "id": "reading-a-page",
+      "title": "Reading a page as text with refs",
+      "spec": "5",
+      "source": [
+        "src/bap_browser/driver/snapshot_page.js",
+        "src/bap_browser/driver/snapshot.py",
+        "src/bap_browser/driver/page_script.py",
+        "src/bap_browser/driver/playwright_driver.py",
+        "src/bap_browser/driver/base.py"
+      ],
+      "tests": [
+        "tests/e2e/test_snapshot.py",
+        "tests/e2e/test_locate.py",
+        "tests/e2e/test_frames.py",
+        "tests/e2e/test_busy_page.py"
+      ],
+      "reach": "`browser_snapshot` on any page. The test pages are in `tests/site/`.",
+      "addresses": [],
+      "tools": [
+        "browser_snapshot"
+      ]
+    },
+    {
+      "id": "address-policy",
+      "title": "Which addresses the browser may open",
+      "spec": "8.1",
+      "source": [
+        "src/bap_browser/policy/address.py",
+        "src/bap_browser/policy/url_policy.py",
+        "src/bap_browser/policy/files.py"
+      ],
+      "tests": [
+        "tests/unit/test_url_policy.py",
+        "tests/e2e/test_address_policy.py",
+        "tests/e2e/test_network_policy.py"
+      ],
+      "reach": "`browser_navigate` to `http://169.254.169.254/`: it is refused, and the viewer shows a blocked page.",
+      "addresses": [],
+      "tools": []
+    },
+    {
+      "id": "approvals-and-help",
+      "title": "Asking a person: approvals, and a step only a person may do",
+      "spec": "8.2, 8.4",
+      "source": [
+        "src/bap_browser/service/session.py",
+        "src/bap_browser/driver/session.py",
+        "src/bap_browser/tools/human_checks.py",
+        "src/bap_browser/policy/redaction.py",
+        "viewer/src/components/ApprovalPopup.tsx",
+        "viewer/src/components/HelpPopup.tsx",
+        "viewer/src/components/Cards.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_approvals.py",
+        "tests/unit/test_request_human.py",
+        "tests/unit/test_redaction.py",
+        "tests/unit/test_what_reaches_a_watcher.py"
+      ],
+      "reach": "Viewer by hand: `npm --prefix viewer run dev`, then `?state=waiting_approval` or `?state=person_requested`. The pop-up is the dialog \"The agent needs your approval\".",
+      "addresses": [],
+      "tools": [
+        "browser_request_human"
+      ]
+    },
+    {
+      "id": "viewer",
+      "title": "The viewer: who is driving, what is happening, and the controls",
+      "spec": "9",
+      "source": [
+        "viewer/src/App.tsx",
+        "viewer/src/state/reducer.ts",
+        "viewer/src/state/view.ts",
+        "viewer/src/protocol.ts",
+        "viewer/src/components/StatusPanel.tsx",
+        "viewer/src/components/BrowserPane.tsx",
+        "viewer/src/components/Timeline.tsx",
+        "viewer/src/wording.ts",
+        "viewer/src/tokens.css",
+        "src/bap_browser/service/app.py",
+        "src/bap_browser/service/events.py"
+      ],
+      "tests": [
+        "tests/viewer/test_states.py",
+        "tests/viewer/test_live_session.py",
+        "tests/viewer/test_takeover.py",
+        "tests/viewer/test_walkthrough.py",
+        "tests/unit/test_viewer_commands.py",
+        "tests/unit/test_event_hub.py",
+        "tests/unit/test_service_session.py",
+        "tests/service/test_service.py"
+      ],
+      "reach": "`?state=<name>` for each state (`viewer/src/demo/sessions.ts`), `&theme=dark`, `&surface=mobile`. Controls by name: \"Pause\", \"Take over\", \"Stop session\", \"Hand back\".",
+      "addresses": [
+        "/",
+        "/healthz",
+        "/api/sessions",
+        "/api/sessions/{name}/ws"
+      ],
+      "tools": []
+    },
+    {
+      "id": "studio",
+      "title": "One window with three browsers, each a system",
+      "spec": "9.16, 9.17",
+      "source": [
+        "src/bap_browser/agent/studio.py",
+        "src/bap_browser/service/systems.py",
+        "viewer/src/Studio.tsx",
+        "viewer/src/studio/rooms.ts",
+        "viewer/src/systems/SystemsPage.tsx",
+        "viewer/src/systems/Access.tsx"
+      ],
+      "tests": [
+        "tests/viewer/test_studio.py",
+        "tests/service/test_systems_api.py",
+        "tests/unit/test_studio_parts.py"
+      ],
+      "reach": "`uv run bap-browser studio --open`. Tabs \"Cloud browser\", \"My Chrome\", \"Built-in browser\"; under each, \"Browser and chat\", \"Configuration\", \"Evaluations\". The button \"Systems\" opens what is not one browser's.",
+      "addresses": [
+        "/api/systems",
+        "/api/systems/{system}/{action}",
+        "/api/systems/{system}/log"
+      ],
+      "tools": []
+    },
+    {
+      "id": "signing-in",
+      "title": "The admin and the user, each with a sign-in page",
+      "spec": "4.11",
+      "source": [
+        "src/bap_browser/service/accounts.py",
+        "src/bap_browser/service/app.py",
+        "viewer/src/auth/SignIn.tsx",
+        "viewer/src/auth/api.ts",
+        "viewer/src/systems/UserSettings.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_accounts.py",
+        "tests/service/test_roles_api.py",
+        "tests/viewer/test_roles.py"
+      ],
+      "reach": "The admin at `<service>/admin`, a user at `<service>/`. The first time, the link the service prints makes the admin's password.",
+      "addresses": [
+        "/admin",
+        "/api/auth",
+        "/api/auth/sign-in",
+        "/api/auth/password",
+        "/api/auth/sign-out",
+        "/api/me",
+        "/api/admin/policy"
+      ],
+      "tools": []
+    },
+    {
+      "id": "settings",
+      "title": "Settings a person can change, drawn from one catalogue",
+      "spec": "10.2",
+      "source": [
+        "src/bap_browser/settings/catalogue.py",
+        "src/bap_browser/settings/store.py",
+        "src/bap_browser/config.py",
+        "src/bap_browser/service/browsing_data.py",
+        "viewer/src/systems/SettingsList.tsx",
+        "viewer/src/components/SettingsScreen.tsx",
+        "viewer/src/settings/api.ts"
+      ],
+      "tests": [
+        "tests/unit/test_settings_store.py",
+        "tests/unit/test_config.py",
+        "tests/service/test_settings_api.py",
+        "tests/service/test_browsing_data.py",
+        "tests/viewer/test_live_settings.py"
+      ],
+      "reach": "A browser's tab \"Configuration\". `uv run bap-browser config show --sources` prints the effective configuration.",
+      "addresses": [
+        "/api/settings",
+        "/api/config",
+        "/api/browsing-data/clear"
+      ],
+      "tools": []
+    },
+    {
+      "id": "evaluations",
+      "title": "What a browser's tasks took, and its checklist",
+      "spec": "12.6",
+      "source": [
+        "src/bap_browser/evals/record.py",
+        "src/bap_browser/evals/summary.py",
+        "src/bap_browser/evals/checks.py",
+        "viewer/src/systems/SystemsPage.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_evals.py",
+        "tests/viewer/test_studio.py"
+      ],
+      "reach": "A browser's tab \"Evaluations\": the facts, \"Run the checklist\", and the tasks with \"Good\", \"Bad\" and \"Show the trace\".",
+      "addresses": [
+        "/api/evals",
+        "/api/systems/{system}/evals",
+        "/api/systems/{system}/evals/{task}",
+        "/api/systems/{system}/evals/{task}/rating",
+        "/api/systems/{system}/checks"
+      ],
+      "tools": []
+    },
+    {
+      "id": "task-sets",
+      "title": "Task sets: tasks with a known right end, graded by code",
+      "spec": "12.7",
+      "source": [
+        "src/bap_browser/evals/suite.py",
+        "src/bap_browser/evals/sets/short.json",
+        "src/bap_browser/evals/sets/confirm.json",
+        "src/bap_browser/evals/sets/attack.json",
+        "src/bap_browser/evals/sets/long.json",
+        "src/bap_browser/demo_site/lab/lab.js",
+        "viewer/src/systems/Suite.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_task_grading.py",
+        "tests/e2e/test_task_sets.py",
+        "tests/viewer/test_studio.py"
+      ],
+      "reach": "A browser's tab \"Evaluations\", part \"Task sets\": \"Run with the agent\", \"Run the reference solutions\", \"Stop the run\", \"Show the tasks\". The practice site is at `<service>/demo-site/lab/`.",
+      "addresses": [
+        "/api/suite",
+        "/api/systems/{system}/suite",
+        "/api/systems/{system}/suite/stop"
+      ],
+      "tools": []
+    },
+    {
+      "id": "my-chrome",
+      "title": "The person's own Chrome, through the extension",
+      "spec": "4.9",
+      "source": [
+        "src/bap_browser/service/bridge.py",
+        "src/bap_browser/browser_extension.py",
+        "src/bap_browser/extension/manifest.json",
+        "src/bap_browser/keys.py"
+      ],
+      "tests": [
+        "tests/viewer/test_extension.py",
+        "tests/e2e/test_attach.py",
+        "tests/unit/test_browser_extension.py",
+        "tests/unit/test_keys.py"
+      ],
+      "reach": "Load `bap-browser-extension/` into Chrome (chrome://extensions, Developer mode, Load unpacked). The tab \"My Chrome\" goes from \"Not connected\" to \"Ready\".",
+      "addresses": [
+        "/bridge",
+        "/bridge/cdp"
+      ],
+      "tools": []
+    },
+    {
+      "id": "code-tool",
+      "title": "Several steps in one call: the code tool",
+      "spec": "7",
+      "source": [
+        "src/bap_browser/code/runner.py",
+        "src/bap_browser/code/worker.py"
+      ],
+      "tests": [
+        "tests/unit/test_code_tool.py",
+        "tests/unit/test_script_check.py",
+        "tests/e2e/test_code_tool.py"
+      ],
+      "reach": "Off by default. Turn on \"Let the agent run a script of several steps\" in a browser's Configuration, then call `browser_run`.",
+      "addresses": [],
+      "tools": [
+        "browser_run"
+      ]
+    },
+    {
+      "id": "mcp-server",
+      "title": "The tools over MCP, on stdio and on HTTP",
+      "spec": "16",
+      "source": [
+        "src/bap_browser/mcp/server.py",
+        "src/bap_browser/service/server.py"
+      ],
+      "tests": [
+        "tests/service/test_mcp.py",
+        "tests/service/test_serve.py"
+      ],
+      "reach": "`claude mcp add bap-browser -- uv run bap-browser mcp`, or the plugin in `plugin/`. Over HTTP: `uv run bap-browser serve`.",
+      "addresses": [
+        "/mcp"
+      ],
+      "tools": []
+    },
+    {
+      "id": "reference-agent",
+      "title": "The reference agent loop and its model",
+      "spec": "16.5",
+      "source": [
+        "src/bap_browser/agent/loop.py",
+        "src/bap_browser/agent/command.py",
+        "src/bap_browser/agent/models.py",
+        "src/bap_browser/agent/openai_model.py",
+        "src/bap_browser/agent/demo.py"
+      ],
+      "tests": [
+        "tests/unit/test_agent_loop.py",
+        "tests/unit/test_chat.py",
+        "tests/unit/test_openai_model.py",
+        "tests/e2e/test_agent_demo.py",
+        "tests/service/test_agent_command.py"
+      ],
+      "reach": "`uv run bap-browser agent --demo --open` with no key; a real task with `uv run bap-browser agent \"...\" --open`. In the window, the field \"Your task\".",
+      "addresses": [],
+      "tools": []
+    },
+    {
+      "id": "demo-site",
+      "title": "The demo site and the practice site",
+      "spec": "12.5, 12.7",
+      "source": [
+        "src/bap_browser/demo_site/start.html",
+        "src/bap_browser/demo_site/signup.html",
+        "src/bap_browser/demo_site/checkin.html",
+        "src/bap_browser/demo_site/lab/index.html"
+      ],
+      "tests": [
+        "tests/unit/test_site.py",
+        "tests/e2e/test_task_sets.py"
+      ],
+      "reach": "`<service>/demo-site/start.html` and `<service>/demo-site/lab/`.",
+      "addresses": [
+        "/demo-site"
+      ],
+      "tools": []
+    },
+    {
+      "id": "desktop-app",
+      "title": "The desktop app",
+      "spec": "14",
+      "source": [
+        "src/bap_browser/desktop_app.py",
+        "desktop/package.json"
+      ],
+      "tests": [
+        "tests/unit/test_desktop_app.py",
+        "tests/service/test_desktop_door.py"
+      ],
+      "reach": "The button \"Open desktop app\" in the window's bar.",
+      "addresses": [
+        "/api/desktop"
+      ],
+      "tools": []
+    },
+    {
+      "id": "doctor-and-bench",
+      "title": "Whether this machine can run it, and how fast it is",
+      "spec": "11, 12",
+      "source": [
+        "src/bap_browser/doctor.py",
+        "src/bap_browser/bench/runner.py",
+        "src/bap_browser/bench/scenarios.py",
+        "perf/budget.json"
+      ],
+      "tests": [
+        "tests/unit/test_doctor.py",
+        "tests/unit/test_bench.py"
+      ],
+      "reach": "`uv run bap-browser doctor` and `uv run bap-browser bench`.",
+      "addresses": [],
+      "tools": []
+    },
+    {
+      "id": "the-pathway",
+      "title": "How a change is made here, and the rules that hold it",
+      "spec": "20",
+      "source": [
+        "scripts/gate.py",
+        "scripts/patterns.py",
+        "scripts/patterns_baseline.json",
+        "docs/agent-pathway.md",
+        "docs/bad-patterns.md",
+        "docs/feature-map.json"
+      ],
+      "tests": [
+        "tests/unit/test_patterns.py",
+        "tests/unit/test_feature_map.py"
+      ],
+      "reach": "`uv run python scripts/gate.py`.",
+      "addresses": [],
+      "tools": []
+    }
+  ]
+}

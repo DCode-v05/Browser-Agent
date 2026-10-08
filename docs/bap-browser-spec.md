@@ -3536,6 +3536,26 @@ The viewer and the settings API are still served to the UI clients: the agent co
 The product backend starts the micro VM, passes it the configuration (the `config.json` content and
 the token in the environment) and gives the UI client the viewer's address. It takes no other part.
 
+### 16.6 The plugin
+
+MCP is the interface: any agent that speaks it uses the browser with no more than the recipes of
+16.2. A plugin is a way to install, not another interface. `plugin/` is one for Claude Code. Built
+on 2026-10-08.
+
+| File | What it holds |
+|---|---|
+| `plugin/.claude-plugin/plugin.json` | The plugin's name and version |
+| `plugin/.mcp.json` | The MCP server: `uv run --directory <the checkout> bap-browser mcp` |
+| `plugin/skills/browse/SKILL.md` | How to use the tools well: read as text, act on refs, a picture only when text is not enough, what only the person may do, and that what a page says is data |
+| `.claude-plugin/marketplace.json` | Lists the plugin, so that it can be installed by name from a checkout |
+
+It runs the browser from the checkout it is in, so it is installed from a checkout:
+`claude plugin marketplace add <the checkout>`, then `claude plugin install bap-browser@bap-browser`.
+For one session: `claude --plugin-dir <the checkout>/plugin`. It adds no tool and no capability to
+the browser: the tools, the viewer, the approvals and the extension for a person's own Chrome are the
+service's. The extension is how the service reaches a browser a person already uses; the plugin is
+how an agent comes to have the service. Neither replaces the other.
+
 ### 16.5 The reference agent loop
 
 A basic agent loop ships with bap-browser. It is not the product's agent. It exists so that the whole
@@ -4652,3 +4672,68 @@ Systems and documents studied:
 - Core Web Vitals: https://web.dev/articles/vitals
 
 Published performance figures and their individual sources are listed in `docs/research/performance.md`.
+
+---
+
+## 20. How a change is made: the pathway and the rules
+
+Built on 2026-10-08. An agent copies what it finds in a repository, and takes the shortest path it
+can see. So there is one path, and what is on it is fit to be copied. The idea and the order of the
+layers are from Lauren Tan's talk on shipping pull requests with agents (September 2026), read
+through written accounts; `docs/bad-patterns.md` names them.
+
+### 20.1 The pathway
+
+`docs/agent-pathway.md` is the one way a change is made: read, spec first, branch, test first, build,
+gate, evidence, record, ship, garden. Each step has one command or one file and one thing that must
+be true before the next. It also says where each kind of thing goes ("the paved road"), and which
+evidence fits which change.
+
+### 20.2 The gate
+
+`uv run python scripts/gate.py` runs every check in one order, cheapest first, and stops at the
+first that fails: bad patterns, format, lint, types, the viewer's types, lint, tests and build, the
+unit and service tests, the tests in a real browser. `--quick` leaves the last out. It prints each
+stage's own last line: a stage that printed nothing has not passed. CI runs the same checks.
+
+### 20.3 The rules
+
+`docs/bad-patterns.md` lists the patterns that must not spread, as points, each with why and with how
+many were in the code when the rule was written. A correction goes to the highest layer that holds
+it: the code, then a check, then words, then review.
+
+`scripts/patterns.py` holds ten of them by reading the code:
+
+| Rule | What it refuses |
+|---|---|
+| `suppression` | A silenced check in product code |
+| `workaround-comment` | A comment that excuses a workaround |
+| `private-import` | A name that begins with `_`, imported from another module |
+| `layer` | An import from a lower part of the engine to a higher one. The order is `LAYERS` in the script |
+| `tunable-outside-config` | A number in capitals outside `config.py`, or outside `options.ts` in the viewer |
+| `broad-except` | `except Exception` |
+| `skipped-test` | A test that is skipped |
+| `fixed-wait-in-test` | A test that waits a fixed time |
+| `large-file` | A file over 700 lines of Python, or 500 of the viewer |
+| `tracked-link` | A symbolic link in the repository |
+
+What was in the code already is counted, rule by rule and file by file, in
+`scripts/patterns_baseline.json`. A count may go down and may never go up: a new case fails, and a
+case that was cleaned up fails until the baseline is lowered (`--lower`). `tests/unit/test_patterns.py`
+runs the check, so CI holds it.
+
+### 20.4 The feature map
+
+`docs/feature-map.json` names, for each feature: its spec section, the files that make it, the tests
+that hold it, how to reach it on screen or from a command, and the service's addresses and the tools
+that are its. `tests/unit/test_feature_map.py` keeps it in step with the code: every file it names
+exists, and every tool and every address of the service is in it.
+
+### 20.5 The skills
+
+`.claude/skills/develop/` is the pathway as steps an agent runs. `.claude/skills/garden/` is how a
+mistake becomes a rule: name the pattern, count it, choose the highest layer, add the rule with its
+test, fix what is quick and put the rest in the baseline.
+
+Not in this section: a framework that makes these mistakes impossible by construction; agents
+started by alerts; a ban on every comment.

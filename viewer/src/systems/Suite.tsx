@@ -62,15 +62,16 @@ export function SuiteCard({ system, api }: { system: string; api: SystemsApi }) 
 
   // While a run is under way, where it is is asked again and again.
   const running = suite?.running ?? null;
+  const underWay = running !== null;
   useEffect(() => {
-    if (!running) return;
+    if (!underWay) return;
     let current = true;
     const timer = setInterval(() => void api.suite(system).then((told) => current && show(told)), RUNNING_POLL_MS);
     return () => {
       current = false;
       clearInterval(timer);
     };
-  }, [api, show, system, running !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [api, show, system, underWay]);
 
   async function run(set: SetName, mode: SuiteMode) {
     if (!suite) return;

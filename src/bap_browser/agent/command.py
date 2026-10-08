@@ -57,9 +57,9 @@ async def run_with_viewer(
             webbrowser.open(service.viewer_address)
         if open_viewer or wait_for_viewer:
             tell("Waiting for the viewer to connect.")
-            await _unless_stopped(session.hub.wait_for_viewer(), service)
+            await unless_stopped(session.hub.wait_for_viewer(), service)
         try:
-            answer = await _unless_stopped(
+            answer = await unless_stopped(
                 run_agent(
                     task,
                     session.toolkit,
@@ -147,10 +147,10 @@ async def _converse(
         session.give_task(first_task)
     history: list[Message] = []
     while True:
-        task = await _unless_stopped(_next_task(tasks, session), service)
+        task = await unless_stopped(next_task(tasks, session), service)
         if task is None:
             break
-        await _unless_stopped(_do(task, session, model, config, history), service)
+        await unless_stopped(do_task(task, session, model, config, history), service)
     tell(SESSION_OVER)
     await service.wait()
 
@@ -180,7 +180,7 @@ async def chat_in_own_chrome(
             f"mode, press Load unpacked and choose {extension}"
         )
         tell("Then open its side panel with the BAP icon in the toolbar.")
-        await _unless_stopped(_paired(bridge, extension, service, config.bridge.pairing_ttl_s), service)
+        await unless_stopped(paired(bridge, extension, service, config.bridge.pairing_ttl_s), service)
         tell("The extension has connected. Opening the agent's tab.")
         # The driver attaches to the tab through this process's own end of the bridge.
         browser = config.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
@@ -198,7 +198,7 @@ async def chat_in_own_chrome(
         # Which sites the agent may read and act on is decided on the person's machine.
         session.browser.ask_site = bridge.permit
         session.browser.site_done = bridge.permit_done
-        await _unless_stopped(session.start(), service)
+        await unless_stopped(session.start(), service)
         sessions[session.name] = session
         browser_extension.announce(extension, service.viewer_address, bridge=service.bridge_address)
         await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
@@ -211,7 +211,7 @@ async def chat_in_own_chrome(
         await service.stop()
 
 
-async def _paired(bridge: Bridge, extension: Path, service: Service, ttl_s: float) -> None:
+async def paired(bridge: Bridge, extension: Path, service: Service, ttl_s: float) -> None:
     """Waits for the extension to dial in. A pairing token is good for a short time only, so the
     extension is handed a new one before the last has run out."""
     waiting = asyncio.ensure_future(bridge.wait_connected())
@@ -223,7 +223,7 @@ async def _paired(bridge: Bridge, extension: Path, service: Service, ttl_s: floa
         waiting.cancel()
 
 
-async def _next_task(tasks: asyncio.Queue[str], session: ServiceSession) -> str | None:
+async def next_task(tasks: asyncio.Queue[str], session: ServiceSession) -> str | None:
     """The next task a person sent, or None once the session has ended."""
     waiting = asyncio.ensure_future(tasks.get())
     ended = asyncio.ensure_future(session.wait_until_ended())
@@ -245,7 +245,7 @@ class Did:
     record: TaskRecord | None
 
 
-async def _do(
+async def do_task(
     task: str,
     session: ServiceSession,
     model: Model,
@@ -278,7 +278,7 @@ async def _do(
     record: TaskRecord | None = None
     try:
         answer = await run_agent(
-            await _with_where_the_browser_is(task, session),
+            await with_where_the_browser_is(task, session),
             session.toolkit if trace is None else trace.tools(session.toolkit),
             model if trace is None else trace.model(model),
             config.agent,
@@ -310,7 +310,7 @@ async def _do(
 NOWHERE = ("", "about:blank")
 
 
-async def _with_where_the_browser_is(task: str, session: ServiceSession) -> str:
+async def with_where_the_browser_is(task: str, session: ServiceSession) -> str:
     """The task as the model is given it: with the page the browser is on now. A person who types a
     task looks at that page and means it; the model has not seen it yet."""
     here = next((tab for tab in await session.toolkit.tabs() if tab.active), None)
@@ -337,7 +337,7 @@ def _tidy(history: list[Message], begun: int) -> None:
             history[index] = ToolOutput(message.call, message.text.split("\n", 1)[0], message.is_error)
 
 
-async def _unless_stopped[T](work: Awaitable[T], service: Service) -> T:
+async def unless_stopped[T](work: Awaitable[T], service: Service) -> T:
     """The result of the work, unless the service stops first."""
     working, stopped = asyncio.ensure_future(work), asyncio.ensure_future(service.wait())
     try:

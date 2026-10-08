@@ -42,6 +42,16 @@ A real task needs a model key. Copy `.env.example` to `.env` and put your key on
 `OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
 `agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
 
+## Working on it
+
+There is one way to make a change here, for a person and for an agent: `docs/agent-pathway.md`.
+`uv run python scripts/gate.py` runs every check in one order and stops at the first that fails.
+The patterns that must not spread are in `docs/bad-patterns.md`, and `scripts/patterns.py` holds
+ten of them. `docs/feature-map.json` says where each feature is.
+
+For Claude Code there is a plugin: `claude --plugin-dir plugin` adds the browser's tools and a
+skill for using them.
+
 ## Evaluations
 
 In `bap-browser studio`, each browser's page has an Evaluations view: what its tasks took and cost,

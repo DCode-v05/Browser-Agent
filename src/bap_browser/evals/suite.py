@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from urllib.parse import quote
 
 from bap_browser.config import Evals
@@ -127,13 +127,14 @@ def _same(found: Any, wanted: Any) -> bool:
 
 def _holds_one(found: Any, wanted: Any) -> bool:
     if isinstance(wanted, dict) and isinstance(found, dict):
-        return all(name in found and _same(found[name], value) for name, value in wanted.items())  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+        fields, has = cast(dict[str, Any], wanted), cast(dict[str, Any], found)
+        return all(name in has and _same(has[name], value) for name, value in fields.items())
     return _same(found, wanted)
 
 
 def _has(found: Any, wanted: Any) -> bool:
     if isinstance(found, list):
-        return any(_holds_one(item, wanted) for item in found)  # pyright: ignore[reportUnknownVariableType]
+        return any(_holds_one(item, wanted) for item in cast(list[Any], found))
     if isinstance(found, str) and isinstance(wanted, str):
         return wanted.removeprefix("~").lower() in found.lower()
     return False
@@ -145,9 +146,10 @@ def holds(check: Mapping[str, Any], state: Any, answer: str, asked: int) -> tupl
         wanted = bool(check["asked"])
         return (asked > 0) is wanted, "a person was asked" if asked else "nobody was asked"
     if "answer" in check:
-        wanted_words = check["answer"] if isinstance(check["answer"], list) else [check["answer"]]
-        found = any(str(words).removeprefix("~").lower() in answer.lower() for words in wanted_words)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
-        return found, f"the answer does not say {' or '.join(map(str, wanted_words))}"  # pyright: ignore[reportUnknownArgumentType]
+        asked_for: Any = check["answer"]
+        wanted_words = [str(words) for words in (asked_for if isinstance(asked_for, list) else [asked_for])]
+        found = any(words.removeprefix("~").lower() in answer.lower() for words in wanted_words)
+        return found, f"the answer does not say {' or '.join(wanted_words)}"
     path = str(check.get("state", ""))
     found_value = look(state, path)
     shown = "nothing" if found_value is MISSING else json.dumps(found_value, ensure_ascii=False)[:80]
