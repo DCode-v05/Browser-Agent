@@ -109,7 +109,10 @@ async def attacked(
         guards["incoming"] = {"mark_page_text": True, "scan": "local", **guards.get("incoming", {})}
         config = make_config(
             tmp_path,
-            browser={"args": ["--host-resolver-rules=MAP *.test 127.0.0.1"]},
+            browser={
+                "args": ["--host-resolver-rules=MAP *.test 127.0.0.1"],
+                "downloads": {"dir": str(tmp_path / "downloads")},
+            },
             safeguards=guards,
             **sections,
         )
@@ -341,3 +344,76 @@ async def test_a_reviewer_that_was_talked_round_cannot_let_a_payment_or_a_leak_t
         assert model.requests, "the model was asked, and its yes was not enough"
     finally:
         model.close()
+
+
+# Files that arrive.
+
+
+async def arrived(on: Attacked, count: int) -> list[Any]:
+    """The downloads, once so many of them are no longer on their way."""
+    driver = on.session.browser.started_driver
+    assert driver is not None
+    async with asyncio.timeout(15):
+        while len([file for file in driver.downloads() if file.state != "downloading"]) < count:
+            await asyncio.sleep(0.05)
+    return driver.downloads()
+
+
+async def test_a_program_is_never_kept_whatever_its_name_says(attacked: Start, tmp_path: Path) -> None:
+    on = await attacked(watched=False)
+    opened = await on.open("shop.test", "attacks/download.html")
+    for link in ('link "Get the viewer"', 'link "Annual report"', 'link "Meeting notes"'):
+        await on.tools.call("browser_click", {"ref": on.ref(opened.text, link)})
+    files = {file.name: file for file in await arrived(on, 3)}
+    assert files["setup.exe"].state == "failed" and files["report.pdf"].state == "failed"
+    assert files["report.pdf"].reason == "this kind of file can run programs", (
+        "its first bytes are a program's"
+    )
+    # An ordinary file on the cloud browser is kept, as before.
+    assert files["notes.txt"].state == "saved"
+    kept = sorted(path.name for path in (tmp_path / "downloads").rglob("*") if path.is_file())
+    assert kept == ["notes.txt"]
+    told = (await on.tools.call("browser_snapshot", {})).text
+    assert 'the download of "setup.exe" was refused: this kind of file can run programs' in told
+
+
+async def test_an_archive_is_kept_only_with_a_persons_yes(attacked: Start, tmp_path: Path) -> None:
+    on = await attacked()
+    opened = await on.open("shop.test", "attacks/download.html")
+    archive = on.ref(opened.text, 'link "All photos"')
+    await on.tools.call("browser_click", {"ref": archive})
+    assert (await arrived(on, 1))[0].state == "held"
+    assert not (tmp_path / "downloads" / "photos.zip").exists(), "it waits apart from the files that are kept"
+
+    # It is settled with the agent's next step: the person is asked, and says no.
+    request, _ = await on.refused("browser_downloads", {})
+    assert request["summary"] == 'Keeping the downloaded file "photos.zip"'
+    assert (await arrived(on, 1))[0].state == "failed"
+    assert list((tmp_path / "downloads").rglob("photos*")) == []
+
+    # Once more, and this time they say yes.
+    await on.tools.call("browser_click", {"ref": archive})
+    assert (await arrived(on, 2))[1].state == "held"
+    call = asyncio.create_task(on.tools.call("browser_downloads", {}))
+    async with asyncio.timeout(10):
+        while len(on.told("approval_requested")) < 2:
+            await asyncio.sleep(0.02)
+    await on.session.handle(
+        {"type": "approve", "id": on.told("approval_requested")[-1]["id"], "scope": "once"}
+    )
+    listed = await asyncio.wait_for(call, 10)
+    assert (tmp_path / "downloads" / "photos.zip").is_file()
+    assert "photos.zip" in listed.text
+
+
+async def test_with_nobody_watching_a_file_that_needs_a_yes_is_deleted(
+    attacked: Start, tmp_path: Path
+) -> None:
+    on = await attacked(watched=False, control={"approval_without_viewer": "allow"})
+    opened = await on.open("shop.test", "attacks/download.html")
+    await on.tools.call("browser_click", {"ref": on.ref(opened.text, 'link "All photos"')})
+    await arrived(on, 1)
+    await on.tools.call("browser_snapshot", {})
+    (file,) = await arrived(on, 1)
+    assert (file.state, file.reason) == ("failed", "no one was watching")
+    assert [path for path in (tmp_path / "downloads").rglob("*") if path.is_file()] == []

@@ -38,6 +38,7 @@ from bap_browser.driver.base import (
     ConsoleLine,
     DialogKind,
     Dragged,
+    FileGuard,
     Found,
     Guard,
     Happened,
@@ -191,6 +192,17 @@ def free_path(folder: str, name: str) -> Path:
     return path
 
 
+# Where a file waits, inside the downloads folder, until a person has said that it may stay.
+HELD_FOLDER = "held"
+# How much of a file is read to tell a program from what its name says it is.
+FIRST_BYTES = 16
+
+
+def _first_bytes(path: str | Path) -> bytes:
+    with open(path, "rb") as file:
+        return file.read(FIRST_BYTES)
+
+
 def _retrieved(task: asyncio.Future[Any]) -> None:
     """The failure of work that was given up on is of no interest to anyone."""
     if not task.cancelled():
@@ -306,6 +318,7 @@ class PlaywrightDriver:
         self._tasks: set[asyncio.Task[Any]] = set()
         self._on_event: Callable[[Happened], None] | None = None
         self._guard: Guard | None = None
+        self._judge_file: FileGuard | None = None
         # The dialogs that wait for an answer, oldest first.
         self._dialogs: list[_OpenDialog] = []
         self._dialog_count = 0
@@ -324,6 +337,9 @@ class PlaywrightDriver:
         self._closing: set[str] = set()
         # The tab the live picture is of.
         self._pictured: _Tab | None = None
+
+    def guard_files(self, judge: FileGuard) -> None:
+        self._judge_file = judge
 
     def guard(self, judge: Guard) -> None:
         self._guard = judge
@@ -1809,7 +1825,7 @@ class PlaywrightDriver:
 
         def failed(reason: str) -> None:
             self._downloads[place] = SavedFile(name, "failed", reason=reason)
-            self._tell(Happened("download", f"the download of {name} failed: {reason}"))
+            self._tell(Happened("download", f'the download of "{name}" failed: {reason}'))
 
         if not settings.enabled:
             with contextlib.suppress(PlaywrightError):
@@ -1827,16 +1843,52 @@ class PlaywrightDriver:
                 await download.delete()
             failed(f"it is larger than {settings.max_size_mb} MB, the most allowed")
             return
+        verdict, why = "keep", ""
+        if self._judge_file is not None:
+            first = await asyncio.to_thread(_first_bytes, arrived)
+            verdict, why = self._judge_file(name, first)
+        if verdict == "delete":
+            with contextlib.suppress(PlaywrightError):
+                await download.delete()
+            self._downloads[place] = SavedFile(name, "failed", reason=why)
+            self._tell(Happened("download", f'the download of "{name}" was refused: {why}'))
+            return
+        # A file that waits for a person's yes is kept apart from the ones the agent may use.
+        folder = settings.dir if verdict == "keep" else str(Path(settings.dir) / HELD_FOLDER)
         try:
-            target = await asyncio.to_thread(free_path, settings.dir, name)
+            target = await asyncio.to_thread(free_path, folder, name)
             await download.save_as(target)
         except (PlaywrightError, OSError):
             failed("it could not be saved in the downloads folder")
             return
+        if verdict == "ask":
+            self._downloads[place] = SavedFile(target.name, "held", str(target), size)
+            self._tell(Happened("download", f'the download of "{target.name}" waits for the person\'s yes'))
+            return
         self._downloads[place] = SavedFile(target.name, "saved", str(target), size)
         self._tell(
-            Happened("download", f"download saved: {target.name}", {"name": target.name, "size": size})
+            Happened("download", f'download saved: "{target.name}"', {"name": target.name, "size": size})
         )
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        for place, file in enumerate(self._downloads):
+            if file.state != "held" or file.name != name:
+                continue
+            held = Path(file.path)
+            if not keep:
+                await asyncio.to_thread(held.unlink, True)
+                self._downloads[place] = SavedFile(name, "failed", reason=reason)
+                self._tell(Happened("download", f'the download of "{name}" was not kept: {reason}'))
+                return
+            target = await asyncio.to_thread(free_path, self._config.browser.downloads.dir, name)
+            await asyncio.to_thread(held.replace, target)
+            self._downloads[place] = SavedFile(target.name, "saved", str(target), file.size)
+            self._tell(
+                Happened(
+                    "download", f'download saved: "{target.name}"', {"name": target.name, "size": file.size}
+                )
+            )
+            return
 
     # The live picture.
 

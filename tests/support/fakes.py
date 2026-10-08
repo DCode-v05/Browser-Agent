@@ -196,6 +196,18 @@ class FakeDriver:
         self.calls.append(("upload", {"ref": ref, "paths": list(paths)}))
         return ActionOutcome('button "Attach files"')
 
+    def guard_files(self, judge: Any) -> None:
+        self.judge_file = judge
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        self.calls.append(("settle_download", (name, keep, reason)))
+        self.saved = [
+            SavedFile(file.name, "saved" if keep else "failed", file.path, file.size, "" if keep else reason)
+            if file.name == name and file.state == "held"
+            else file
+            for file in self.saved
+        ]
+
     def downloads(self) -> list[SavedFile]:
         return list(self.saved)
 

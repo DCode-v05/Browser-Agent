@@ -148,7 +148,7 @@ async def test_a_download_is_kept_in_the_downloads_folder_under_a_name_of_its_ow
         assert first == f"1 download:\nreport.txt (22 bytes) saved at {folder / 'report.txt'}", first
         assert (folder / "report.txt").read_text(encoding="utf-8") == "The quarterly report.\n"
         # The agent is told when the file is there, whichever call comes next.
-        assert "download saved: report.txt" in clicked.text + news
+        assert 'download saved: "report.txt"' in clicked.text + news
 
         # The same name again does not replace the first file.
         await tools.call("browser_click", {"ref": link})
@@ -176,7 +176,7 @@ async def test_a_download_that_is_too_large_is_not_kept(
         listed, news = await finished(tools, 1)
         assert listed == "1 download:\nreport.txt failed: it is larger than 0 MB, the most allowed", listed
         assert not folder.exists() or not list(folder.iterdir())
-        assert "the download of report.txt failed: it is larger than 0 MB" in clicked.text + news
+        assert 'the download of "report.txt" failed: it is larger than 0 MB' in clicked.text + news
 
 
 async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, site: str) -> None:

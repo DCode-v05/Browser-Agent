@@ -15,7 +15,9 @@ from bap_browser.errors import BrowserError
 from bap_browser.policy.address import without_credentials
 from bap_browser.policy.redaction import Redactor
 from bap_browser.policy.url_policy import UrlPolicy
+from bap_browser.safeguards.incoming import without_invisible
 from bap_browser.safeguards.model import Spend
+from bap_browser.safeguards.outgoing import judged_file
 
 SESSION_ENDED = "The session has ended."
 
@@ -92,8 +94,12 @@ class BrowserSession:
         self._closers: list[Callable[[], Awaitable[None]]] = []
         # The same, kept for the agent until its next result.
         self._news: deque[Happened] = deque(maxlen=config.browser.capture.max_state_events)
+        self.own_machine = False
+        """Whether the browser is on the person's own machine, where a file that arrives lands among
+        their own files. Set by whoever knows which backend this is."""
         self._driver.listen(self._happened)
         self._driver.guard(self._judge)
+        self._driver.guard_files(self._judge_file)
 
     def reconfigure(self, config: Config) -> None:
         """Takes a changed configuration for what is decided call by call: the address policy and
@@ -106,6 +112,16 @@ class BrowserSession:
         """The address policy, for what the browser sets out to load by itself (spec 8.1)."""
         decision = await self.policy.check(url)
         return decision.allowed, decision.reason
+
+    def _judge_file(self, name: str, first_bytes: bytes) -> tuple[Literal["keep", "ask", "delete"], str]:
+        """What is done with a file that arrived (spec 18.6): a file that can run programs is never
+        kept, whatever its name says; an archive, or any file on the person's own machine, waits
+        for their yes."""
+        shown, _ = without_invisible(name)
+        what = judged_file(shown, first_bytes, self.config.safeguards.downloads, own_machine=self.own_machine)
+        if what == "risky":
+            return "delete", "this kind of file can run programs"
+        return ("ask", "") if what == "ask" else ("keep", "")
 
     def _happened(self, event: Happened) -> None:
         if event.text:

@@ -710,6 +710,8 @@ async def downloads(session: BrowserSession, args: NoArgs) -> str:
             lines.append(f"{file.name} ({_size(file.size)}) saved at {file.path}")
         elif file.state == "downloading":
             lines.append(f"{file.name} is still downloading")
+        elif file.state == "held":
+            lines.append(f"{file.name} waits for the person's yes before it is kept")
         else:
             lines.append(f"{file.name} failed: {file.reason}")
     return f"{len(files)} download{'' if len(files) == 1 else 's'}:\n" + from_page("\n".join(lines))

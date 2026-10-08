@@ -43,6 +43,10 @@ _FROM_A_PAGE = re.compile(f"{PAGE_BEGINS}(.*?){PAGE_ENDS}", re.DOTALL)
 # A name a page wrote stands in the engine's own lines in double quotes.
 _A_NAME = re.compile(r'"([^"\n]+)"')
 NAME_WITHHELD = '"[withheld]"'
+# What a dialog said stands in the engine's own lines in single quotes: a confirm dialog
+# ('Proceed?'), and: the dialog 'Proceed?'. It is taken to the last quote of the line, so that a
+# page cannot end it early with a quote of its own.
+_A_DIALOGS_WORDS = re.compile(r"(?<=\(')(.+)(?='\))|(?<=the dialog ')(.+)(?='\.)")
 # What stands in a snapshot line for a control's name that was withheld, and two characters that
 # keep the engine's own insertions apart from the page's text while that text is marked.
 NAME_HELD = "[withheld]"
@@ -164,6 +168,11 @@ class Reader:
             return []
         return driver.unseen()
 
+    def own_words(self, words: str) -> str:
+        """One of the engine's own lines that no read of a page went through: the news of what
+        happened in the browser, and what is said of a dialog that blocks the page."""
+        return self._engines_own(words, self._session.config.safeguards.incoming.scan != "off")
+
     def _engines_own(self, words: str, scanning: bool) -> str:
         """The engine's own lines. A name a page wrote stands in them in double quotes: it is cut
         to its length, and withheld when it is addressed to an agent."""
@@ -176,6 +185,11 @@ class Reader:
                 return NAME_WITHHELD
             return match.group() if len(name) <= limit else f'"{name[: limit - 1]}{CUT}"'
 
+        def said(match: re.Match[str]) -> str:
+            return NAME_HELD if flagged_by(match.group(), names) else match.group()
+
+        if scanning and "'" in words:
+            words = _A_DIALOGS_WORDS.sub(said, words)
         return _A_NAME.sub(shown, words) if '"' in words else words
 
     async def _planted(self, found: Sequence[Passage]) -> list[Passage]:

@@ -33,6 +33,8 @@ HELD = {
 ENDED_BY_A_PERSON = "The session was ended by a person."
 TASK_STOPPED = "A person stopped the task, so nothing was done."
 ENDED = "The session has ended."
+# The backends whose browser is on the person's own machine (spec 4.3).
+OWN_MACHINE = ("takeover_chrome", "bundled_chromium")
 # Which button a pointer command names, as browsers number them.
 BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
 LONGEST_KEY_NAME = 32
@@ -70,6 +72,7 @@ class ServiceSession:
         self.browser.ask_person = self._ask_person_timed
         self.browser.ask_approval = self._ask_approval_timed
         self.browser.watched = lambda: self.hub.viewers > 0
+        self.browser.own_machine = backend in OWN_MACHINE
         # How long the agent's calls have waited for a person in all, in seconds (spec 12.6).
         self.waited_for_a_person_s = 0.0
         self.browser.on_event = self._happened

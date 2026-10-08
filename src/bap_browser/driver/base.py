@@ -185,7 +185,8 @@ class SavedFile:
     """A file the browser downloaded, or is downloading."""
 
     name: str
-    state: Literal["saved", "downloading", "failed"]
+    state: Literal["saved", "downloading", "failed", "held"]
+    """`held`: it has arrived and is kept aside until a person says whether it may stay (spec 18.6)."""
     path: str = ""
     size: int = 0
     reason: str = ""
@@ -216,6 +217,10 @@ class Happened:
 
 Guard = Callable[[str], Awaitable[tuple[bool, str]]]
 """Judges an address: whether it may be loaded, and when not, why in a few words."""
+
+FileGuard = Callable[[str, bytes], tuple[Literal["keep", "ask", "delete"], str]]
+"""Judges a file that arrived, by its name and its first bytes: kept, kept aside until a person
+has said yes, or deleted, and then why in a few words."""
 
 
 class Driver(Protocol):
@@ -400,3 +405,11 @@ class Driver(Protocol):
         ...
 
     def downloads(self) -> list[SavedFile]: ...
+
+    def guard_files(self, judge: FileGuard) -> None:
+        """Names who decides what is done with a file that arrives (spec 18.6)."""
+        ...
+
+    async def settle_download(self, name: str, keep: bool, reason: str = "") -> None:
+        """Keeps a file that was held, or deletes it and says why."""
+        ...
