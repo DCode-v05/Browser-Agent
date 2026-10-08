@@ -13,3 +13,5 @@ viewer/dist/
 src/bap_browser/viewer_dist/
 dist/
 .playwright-mcp/
+# What macOS leaves in a folder it has shown.
+.DS_Store

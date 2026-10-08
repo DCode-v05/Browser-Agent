@@ -1,0 +1,53 @@
+{
+  "broad-except": {
+    "src/bap_browser/code/worker.py": 1,
+    "src/bap_browser/doctor.py": 1,
+    "src/bap_browser/driver/playwright_driver.py": 1,
+    "src/bap_browser/tools/toolkit.py": 1
+  },
+  "fixed-wait-in-test": {
+    "tests/unit/test_desktop_app.py": 2,
+    "tests/viewer/test_live_session.py": 1
+  },
+  "large-file": {
+    "src/bap_browser/driver/playwright_driver.py": 1,
+    "src/bap_browser/service/app.py": 1,
+    "src/bap_browser/tools/browser_tools.py": 1,
+    "viewer/src/App.tsx": 1,
+    "viewer/src/systems/SystemsPage.tsx": 1
+  },
+  "layer": {
+    "src/bap_browser/config.py": 1,
+    "src/bap_browser/evals/record.py": 2
+  },
+  "private-import": {
+    "tests/unit/test_browser_extension.py": 1,
+    "tests/unit/test_cli.py": 3,
+    "tests/unit/test_viewer_commands.py": 1
+  },
+  "skipped-test": {
+    "tests/unit/test_remaining_tools.py": 1
+  },
+  "suppression": {
+    "src/bap_browser/bench/runner.py": 1,
+    "src/bap_browser/cli.py": 2,
+    "src/bap_browser/code/worker.py": 1,
+    "src/bap_browser/config.py": 1,
+    "src/bap_browser/evals/record.py": 2,
+    "src/bap_browser/policy/address.py": 1
+  },
+  "tunable-outside-config": {
+    "src/bap_browser/agent/openai_model.py": 1,
+    "src/bap_browser/bench/runner.py": 2,
+    "src/bap_browser/code/runner.py": 2,
+    "src/bap_browser/driver/playwright_driver.py": 2,
+    "src/bap_browser/service/app.py": 4,
+    "src/bap_browser/service/bridge.py": 1,
+    "src/bap_browser/service/session.py": 1,
+    "src/bap_browser/tools/sentences.py": 2,
+    "viewer/src/connection/socket.ts": 3,
+    "viewer/src/main.tsx": 2,
+    "viewer/src/systems/Suite.tsx": 1,
+    "viewer/src/systems/parts.tsx": 1
+  }
+}

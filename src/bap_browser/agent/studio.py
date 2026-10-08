@@ -25,11 +25,11 @@ from typing import Any
 from bap_browser import browser_extension
 from bap_browser.agent.command import (
     AGENT_NAME,
-    _do,  # pyright: ignore[reportPrivateUsage]
-    _next_task,  # pyright: ignore[reportPrivateUsage]
-    _paired,  # pyright: ignore[reportPrivateUsage]
-    _unless_stopped,  # pyright: ignore[reportPrivateUsage]
+    do_task,
+    next_task,
+    paired,
     tell,
+    unless_stopped,
 )
 from bap_browser.agent.models import Message, Model
 from bap_browser.config import Config
@@ -349,7 +349,7 @@ class Studio:
             session.said("person", words)
             # Each task starts with nothing remembered of the one before it: a conversation of its
             # own, and a model client of its own, which keeps the turns of one conversation.
-            return await _do(words, session, self._model_for(service), session.config, [], recorder)
+            return await do_task(words, session, self._model_for(service), session.config, [], recorder)
 
         try:
             async with room.turn:
@@ -391,7 +391,7 @@ class Studio:
             asyncio.create_task(self._own_browser(built_in)),
         ]
         try:
-            await _unless_stopped(asyncio.gather(*working), service)
+            await unless_stopped(asyncio.gather(*working), service)
         finally:
             for task in (*working, *self._running):
                 task.cancel()
@@ -433,11 +433,11 @@ class Studio:
         model = self._model_for(self.service)
         history: list[Message] = []
         while True:
-            task = await _next_task(tasks, session)
+            task = await next_task(tasks, session)
             if task is None:
                 return
             async with room.turn:
-                await _do(task, session, model, session.config, history, self._recorders[room.id])
+                await do_task(task, session, model, session.config, history, self._recorders[room.id])
 
     async def _own_browser(self, room: Room) -> None:
         """A page whose browser this process starts itself. Each time a person asks for a new
@@ -525,7 +525,7 @@ class Studio:
         """Waits for the extension to dial in. False when the browser was turned off meanwhile."""
         assert self.service is not None and self.service.bridge is not None
         pairing = asyncio.ensure_future(
-            _paired(self.service.bridge, self._extension, self.service, self._config.bridge.pairing_ttl_s)
+            paired(self.service.bridge, self._extension, self.service, self._config.bridge.pairing_ttl_s)
         )
         changed = asyncio.ensure_future(room.restart.wait())
         try:

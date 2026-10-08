@@ -9,7 +9,7 @@ import pytest
 from fakes import FakeDriver
 
 from bap_browser import browser_extension
-from bap_browser.agent.command import _with_where_the_browser_is  # pyright: ignore[reportPrivateUsage]
+from bap_browser.agent.command import with_where_the_browser_is  # pyright: ignore[reportPrivateUsage]
 from bap_browser.agent.studio import Room, said_of
 from bap_browser.errors import BrowserError
 from bap_browser.service.events import FellBehind
@@ -186,9 +186,9 @@ async def test_a_task_tells_the_model_where_the_browser_is(make_config, tmp_path
     await session.start()
     try:
         # A browser that is nowhere yet adds nothing.
-        assert await _with_where_the_browser_is("Find the price", session) == "Find the price"
+        assert await with_where_the_browser_is("Find the price", session) == "Find the price"
         driver.url = "https://example.com/shop"
-        assert await _with_where_the_browser_is("Find the price", session) == (
+        assert await with_where_the_browser_is("Find the price", session) == (
             "Find the price\n\n[The browser is on https://example.com/shop now. "
             "Read the page with browser_snapshot before you act.]"
         )

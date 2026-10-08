@@ -1,0 +1,9 @@
+{
+  "name": "bap-browser",
+  "description": "A browser an agent uses through MCP tools while a person watches, approves and takes over. Adds the browser's tools and a skill for using them well.",
+  "version": "0.1.0",
+  "author": {
+    "name": "DCode-v05"
+  },
+  "repository": "https://github.com/DCode-v05/Browser-Agent"
+}

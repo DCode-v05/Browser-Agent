@@ -1,0 +1,14 @@
+{
+  "name": "bap-browser",
+  "description": "The bap-browser plugin, from a checkout of its repository",
+  "owner": {
+    "name": "DCode-v05"
+  },
+  "plugins": [
+    {
+      "name": "bap-browser",
+      "source": "./plugin",
+      "description": "The browser's tools over MCP, and a skill for using them well"
+    }
+  ]
+}

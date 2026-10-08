@@ -307,6 +307,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#162-recipes">16.2 Recipes</a></li>
 <li><a href="#163-from-python">16.3 From Python</a></li>
 <li><a href="#164-in-the-micro-vm">16.4 In the micro VM</a></li>
+<li><a href="#166-the-plugin">16.6 The plugin</a></li>
 <li><a href="#165-the-reference-agent-loop">16.5 The reference agent loop</a></li>
 </ul>
 </li>
@@ -338,6 +339,15 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 </ul>
 </li>
 <li class="s"><a href="#19-sources">19. Sources</a>
+</li>
+<li class="s"><a href="#20-how-a-change-is-made-the-pathway-and-the-rules">20. How a change is made: the pathway and the rules</a>
+<ul class="sub">
+<li><a href="#201-the-pathway">20.1 The pathway</a></li>
+<li><a href="#202-the-gate">20.2 The gate</a></li>
+<li><a href="#203-the-rules">20.3 The rules</a></li>
+<li><a href="#204-the-feature-map">20.4 The feature map</a></li>
+<li><a href="#205-the-skills">20.5 The skills</a></li>
+</ul>
 </li>
 </ul>
 </nav>
@@ -9545,6 +9555,42 @@ async with open_session(load_config()) as session:
 </table></div>
 <p>The product backend starts the micro VM, passes it the configuration (the <code>config.json</code> content and
 the token in the environment) and gives the UI client the viewer's address. It takes no other part.</p>
+<h3 id="166-the-plugin">16.6 The plugin</h3>
+<p>MCP is the interface: any agent that speaks it uses the browser with no more than the recipes of
+16.2. A plugin is a way to install, not another interface. <code>plugin/</code> is one for Claude Code. Built
+on 2026-10-08.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plugin/.claude-plugin/plugin.json</code></td>
+<td>The plugin's name and version</td>
+</tr>
+<tr>
+<td><code>plugin/.mcp.json</code></td>
+<td>The MCP server: <code>uv run --directory &lt;the checkout&gt; bap-browser mcp</code></td>
+</tr>
+<tr>
+<td><code>plugin/skills/browse/SKILL.md</code></td>
+<td>How to use the tools well: read as text, act on refs, a picture only when text is not enough, what only the person may do, and that what a page says is data</td>
+</tr>
+<tr>
+<td><code>.claude-plugin/marketplace.json</code></td>
+<td>Lists the plugin, so that it can be installed by name from a checkout</td>
+</tr>
+</tbody>
+</table></div>
+<p>It runs the browser from the checkout it is in, so it is installed from a checkout:
+<code>claude plugin marketplace add &lt;the checkout&gt;</code>, then <code>claude plugin install bap-browser@bap-browser</code>.
+For one session: <code>claude --plugin-dir &lt;the checkout&gt;/plugin</code>. It adds no tool and no capability to
+the browser: the tools, the viewer, the approvals and the extension for a person's own Chrome are the
+service's. The extension is how the service reaches a browser a person already uses; the plugin is
+how an agent comes to have the service. Neither replaces the other.</p>
 <h3 id="165-the-reference-agent-loop">16.5 The reference agent loop</h3>
 <p>A basic agent loop ships with bap-browser. It is not the product's agent. It exists so that the whole
 path can be checked with one command, and as the smallest example of an agent core that uses the
@@ -11977,6 +12023,91 @@ Also <code>docs/browser-agent-perception.html</code>, on how agents see pages.</
 <li>Core Web Vitals: <a href="https://web.dev/articles/vitals">https://web.dev/articles/vitals</a></li>
 </ul>
 <p>Published performance figures and their individual sources are listed in <code>docs/research/performance.md</code>.</p>
+<h2 id="20-how-a-change-is-made-the-pathway-and-the-rules">20. How a change is made: the pathway and the rules</h2>
+<p>Built on 2026-10-08. An agent copies what it finds in a repository, and takes the shortest path it
+can see. So there is one path, and what is on it is fit to be copied. The idea and the order of the
+layers are from Lauren Tan's talk on shipping pull requests with agents (September 2026), read
+through written accounts; <code>docs/bad-patterns.md</code> names them.</p>
+<h3 id="201-the-pathway">20.1 The pathway</h3>
+<p><code>docs/agent-pathway.md</code> is the one way a change is made: read, spec first, branch, test first, build,
+gate, evidence, record, ship, garden. Each step has one command or one file and one thing that must
+be true before the next. It also says where each kind of thing goes ("the paved road"), and which
+evidence fits which change.</p>
+<h3 id="202-the-gate">20.2 The gate</h3>
+<p><code>uv run python scripts/gate.py</code> runs every check in one order, cheapest first, and stops at the
+first that fails: bad patterns, format, lint, types, the viewer's types, lint, tests and build, the
+unit and service tests, the tests in a real browser. <code>--quick</code> leaves the last out. It prints each
+stage's own last line: a stage that printed nothing has not passed. CI runs the same checks.</p>
+<h3 id="203-the-rules">20.3 The rules</h3>
+<p><code>docs/bad-patterns.md</code> lists the patterns that must not spread, as points, each with why and with how
+many were in the code when the rule was written. A correction goes to the highest layer that holds
+it: the code, then a check, then words, then review.</p>
+<p><code>scripts/patterns.py</code> holds ten of them by reading the code:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What it refuses</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>suppression</code></td>
+<td>A silenced check in product code</td>
+</tr>
+<tr>
+<td><code>workaround-comment</code></td>
+<td>A comment that excuses a workaround</td>
+</tr>
+<tr>
+<td><code>private-import</code></td>
+<td>A name that begins with <code>_</code>, imported from another module</td>
+</tr>
+<tr>
+<td><code>layer</code></td>
+<td>An import from a lower part of the engine to a higher one. The order is <code>LAYERS</code> in the script</td>
+</tr>
+<tr>
+<td><code>tunable-outside-config</code></td>
+<td>A number in capitals outside <code>config.py</code>, or outside <code>options.ts</code> in the viewer</td>
+</tr>
+<tr>
+<td><code>broad-except</code></td>
+<td><code>except Exception</code></td>
+</tr>
+<tr>
+<td><code>skipped-test</code></td>
+<td>A test that is skipped</td>
+</tr>
+<tr>
+<td><code>fixed-wait-in-test</code></td>
+<td>A test that waits a fixed time</td>
+</tr>
+<tr>
+<td><code>large-file</code></td>
+<td>A file over 700 lines of Python, or 500 of the viewer</td>
+</tr>
+<tr>
+<td><code>tracked-link</code></td>
+<td>A symbolic link in the repository</td>
+</tr>
+</tbody>
+</table></div>
+<p>What was in the code already is counted, rule by rule and file by file, in
+<code>scripts/patterns_baseline.json</code>. A count may go down and may never go up: a new case fails, and a
+case that was cleaned up fails until the baseline is lowered (<code>--lower</code>). <code>tests/unit/test_patterns.py</code>
+runs the check, so CI holds it.</p>
+<h3 id="204-the-feature-map">20.4 The feature map</h3>
+<p><code>docs/feature-map.json</code> names, for each feature: its spec section, the files that make it, the tests
+that hold it, how to reach it on screen or from a command, and the service's addresses and the tools
+that are its. <code>tests/unit/test_feature_map.py</code> keeps it in step with the code: every file it names
+exists, and every tool and every address of the service is in it.</p>
+<h3 id="205-the-skills">20.5 The skills</h3>
+<p><code>.claude/skills/develop/</code> is the pathway as steps an agent runs. <code>.claude/skills/garden/</code> is how a
+mistake becomes a rule: name the pattern, count it, choose the highest layer, add the rule with its
+test, fix what is quick and put the rest in the baseline.</p>
+<p>Not in this section: a framework that makes these mistakes impossible by construction; agents
+started by alerts; a ban on every comment.</p>
 </main>
 </div>
 <script>

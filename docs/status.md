@@ -423,6 +423,54 @@ Not built: a command that runs a set without the window; a run on a schedule; a 
 model; a public benchmark. The agent's runs of the confirmation set and the long tasks were not made,
 to spare tokens: press their buttons to make them.
 
+### 1p. Finished on 2026-10-08: one pathway for a change, the bad patterns as rules, and a plugin
+
+Two asks. The first: the page "MCP, extension or plugin" recommended keeping MCP as the interface
+and adding a plugin only as packaging; that plugin is built. The second, after Lauren Tan's talk on
+shipping pull requests with agents: one line for developing here, and the bad patterns of this
+codebase found and written as points and rules. Spec sections 16.6 and 20.
+
+| What | Where |
+|---|---|
+| The pathway: ten steps, each with one command and one condition | `docs/agent-pathway.md` |
+| The gate: every check in one order, stopping at the first that fails | `scripts/gate.py` |
+| The rules as points, with why and how many were found | `docs/bad-patterns.md` |
+| Ten of the rules held by a check, with a baseline that can only go down | `scripts/patterns.py`, `scripts/patterns_baseline.json` |
+| A map of every feature, kept in step with the code by a test | `docs/feature-map.json` |
+| Two skills for an agent working here | `.claude/skills/develop/`, `.claude/skills/garden/` |
+| The plugin for Claude Code: the MCP server and a skill for using the tools | `plugin/`, `.claude-plugin/marketplace.json` |
+
+What the audit of the code found, and what was done the same day:
+
+| Pattern | Found | Fixed | Left in the baseline |
+|---|---|---|---|
+| A silenced check | 17 | 9 | 8 |
+| A private name imported from another module | 11 | 6 | 5, in tests |
+| An import from a lower part to a higher one | 3 | 0 | 3 |
+| A tunable number outside `config.py` or `options.ts` | 22 | 0 | 22 |
+| `except Exception` | 4 | 0 | 4 |
+| A skipped test | 1 | 0 | 1 |
+| A fixed wait in a test | 3 | 0 | 3 |
+| A file too long to hold | 5 | 0 | 5 |
+| A comment that excuses a workaround | 0 | | held at zero |
+| A symbolic link in the repository | 0 | | held at zero |
+
+The fixes were made in the code, the strongest layer: five functions that another module used were
+given public names; the grading of the task sets says what it compares; an effect in the viewer
+names what it depends on.
+
+Proof: 39 tests of the checker (each rule finds its case and leaves a near one alone), 6 of the
+feature map. `claude plugin validate` passes for the plugin and for the marketplace file, and
+`claude --plugin-dir plugin mcp list` shows its MCP server connected.
+
+What rests on less than it should: the talk is a video and was not watched; the pathway and the
+rules rest on four written accounts of it, which differ on the order of the lower layers.
+
+Not built: the clean-up of the 51 cases in the baseline; rules 12 and 16 to 18 of
+`docs/bad-patterns.md`, which are words only; a plugin for agents other than Claude Code. Proposed
+and not made, because `CLAUDE.md` is yours to change: a line there pointing at the pathway and the
+gate.
+
 ### 2. Not started
 
 | What | Note |
