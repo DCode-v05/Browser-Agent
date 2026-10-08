@@ -70,15 +70,15 @@ only what local rules flag goes to a model.
 - [x] **1. Model client** `safeguards/model.py`: time limit, tries with uneven waits, a breaker for each use, counted cost. The reference loop (`agent/openai_model.py`) uses it.
 - [x] **2. Limits and loops** (the viewer's bar is with the viewer helper) `safeguards/limits.py`: steps and minutes of a task, calls a minute, spend, repeated acting calls, "Nothing on the page changed", unknown outcome, questions nobody answers. Viewer: the limit bar and "Allow more".
 - [x] **3. Site identity** `policy/sites.py`: the Public Suffix List, registrable name, same site; own pages by origin.
-- [ ] **4. The task** `safeguards/task.py`: `browser_begin_task`, the grades, domains in a message, events `task_set` and `sites_changed`. Viewer: the task line and site chips.
-- [ ] **5. The check** `safeguards/check.py` and `findings.py`: the stages in order; today's rules (tool policy, consequential words, site grants) moved in as the first findings; the action classifier (H1); x/y and key presses resolved to elements; findings refused with nobody watching (H8); one line per decision in the log. No reviewer yet: unsure goes to the person.
-- [ ] **6. What goes out** `safeguards/outgoing.py`: sensitive fields, the copy memory and short secrets, long addresses, files that arrive (after-step path), grant-access screens, money (amounts, caps).
-- [ ] **7. What comes in** `safeguards/incoming.py` and `scan.py`: unseen text, invisible characters, addresses, marks, quoted names in engine lines, the fixed rules, withholding, flagged pages; then the model's second opinion.
-- [ ] **8. Sites** `safeguards/sites.py`: look-alikes, confusable letters, `data:` addresses, bare addresses, sensitive sites, the active tab judged at every call; then the optional lists (abuse.ch, RDAP).
-- [ ] **9. The reviewer and Auto Mode** `safeguards/reviewer.py`: the value `auto` (offered: false), the input with marks, the table, the floor (H2), refuse / ask / run, "Allow once", the pause after refusals, sites added by the reviewer, frames outside the task. Viewer: the chip, the notice, marks on steps, the "Refused" list, the pause bar.
-- [ ] **10. The record and the service**: retention, control characters, tool hints, the tool list's hash and `GET /api/tools`, `Origin` on `/mcp`.
-- [ ] **11. The attack set** `tests/safety/` and `tests/site/attacks/`: the fooled agent, reached / tried / done, the report, the false-alarm pages; the group in each browser's checklist; the Systems page numbers.
-- [ ] **12. Finish**: settings in the catalogue and the settings screen; README, the connection guide, `docs/status.md`; `/verify`; a pull request.
+- [x] **4. The task** `safeguards/task.py`: `browser_begin_task`, the grades, domains in a message, events `task_set` and `sites_changed`. Viewer: the task line and site chips.
+- [x] **5. The check** `safeguards/check.py` and `findings.py`: the stages in order; today's rules (tool policy, consequential words, site grants) moved in as the first findings; the action classifier (H1); x/y and key presses resolved to elements; findings refused with nobody watching (H8); one line per decision in the log. No reviewer yet: unsure goes to the person.
+- [x] **6. What goes out** `safeguards/outgoing.py`: sensitive fields, the copy memory and short secrets, long addresses, files that arrive (after-step path), grant-access screens, money (amounts, caps).
+- [x] **7. What comes in** `safeguards/incoming.py` and `scan.py`: unseen text, invisible characters, addresses, marks, quoted names in engine lines, the fixed rules, withholding, flagged pages; then the model's second opinion.
+- [ ] **8. Sites** (built: everything on this machine. Not built: the optional lists, abuse.ch and RDAP) `safeguards/sites.py`: look-alikes, confusable letters, `data:` addresses, bare addresses, sensitive sites, the active tab judged at every call; then the optional lists (abuse.ch, RDAP).
+- [x] **9. The reviewer and Auto Mode** `safeguards/reviewer.py`: the value `auto` (offered: false), the input with marks, the table, the floor (H2), refuse / ask / run, "Allow once", the pause after refusals, sites added by the reviewer, frames outside the task. Viewer: the chip, the notice, marks on steps, the "Refused" list, the pause bar.
+- [x] **10. The record and the service**: retention, control characters, tool hints, the tool list's hash and `GET /api/tools`, `Origin` on `/mcp`.
+- [ ] **11. The attack set** (built: 17 attack pages and 4 harmless pages run in a real browser, `tests/e2e/test_attacks.py`. Not built: the fooled agent with its reached / tried / done report, the group in each browser's checklist, the Systems page numbers, the pages listed under "What is left" below) `tests/safety/` and `tests/site/attacks/`: the fooled agent, reached / tried / done, the report, the false-alarm pages; the group in each browser's checklist; the Systems page numbers.
+- [ ] **12. Finish** (done: the settings, the README with how an agent connects, the status page. Left: `/verify`, the pull request): settings in the catalogue and the settings screen; README, the connection guide, `docs/status.md`; `/verify`; a pull request.
 
 Attack pages of a slice are written with it, before its code.
 
@@ -89,46 +89,47 @@ Attack pages of a slice are written with it, before its code.
 | 2026-10-07 | Plan written. Nothing built yet. Next: slice 0, the spec |
 | 2026-10-07 | Slice 0 done: section 18 of the spec says every resolution above. Next: slice 1, the model client |
 | 2026-10-07 | Slices 1 and 2 done and committed. `safeguards/actions.py`, `task.py`, `reviewer.py` are written with unit tests and not yet wired in. Next: the check (`safeguards/check.py`) and its wiring into `tools/toolkit.py` |
+| 2026-10-08 | Slices 3 to 10 done, and the attack pages in a real browser. Next: `/verify` and the pull request; what is not built is listed under "Where the work stands" |
 
-## STOPPED HERE (2026-10-08, at the user's word): read this before anything else
+## Where the work stands (2026-10-08): read this before anything else
 
-Everything that is finished is committed and pushed. Nothing is left half-done in the working tree.
 The status for people is `docs/auto-mode-safeguards-status.md`: keep it up to date as parts land.
 
-Done: slices 0 to 6, 8 (the checks on this machine) and 9, and of slice 7 the marks, the invisible
-characters, the scan with its second opinion, flagged pages and the memory of what was read
-(`safeguards/reading.py`, called from `tools/toolkit.py` after a step ran).
+Built, tested and committed: slices 0 to 7, 9 and 10; of slice 8 everything that runs on this
+machine; of slice 11 the attack pages in a real browser. Since the stop of 2026-10-08 these landed:
+text a person cannot see (the page script), the attack set (`tests/e2e/test_attacks.py`), files that
+arrive (`PlaywrightDriver._save`, `Toolkit._settle_files`), the words of `[events]` and of a dialog
+through the fixed rules (`Reader.own_words`), and slice 10 (`Origin` on `/mcp`, `GET /api/tools`,
+`bap-browser config show --tools`, tool hints, `logging.retention_days`).
 
-Next, in order:
+What is left, in order:
 
-1. **Text a person cannot see** (18.5 rule 1): the tests in `driver/snapshot_page.js` (`visibility`,
-   `textOf`, the `text` operation, which uses `innerText` today), the `Unseen:` line, the
-   screen-reader exception. Pages for it are not written yet.
-2. **Files that arrive** (18.6 rule 4): `outgoing.judged_file` exists and is tested; nothing calls it.
-   The driver saves downloads in `_save` in `driver/playwright_driver.py`.
-3. **The words of `[events]`** through the fixed rules (`Reader._engines_own` does it for results).
-4. **Slice 10**: `logging.retention_days`, tool hints, the tool list's hash and `GET /api/tools`, the
-   `Origin` rule on `/mcp`.
-5. **The attack set**: no page is written but `tests/site/attacks/loop.html`. Hosts by
-   `--host-resolver-rules` (`MAP *.test 127.0.0.1`), a recording server for `/collect`.
-6. **The end**: the spec for what changed while building (the list below, and 18.5: a withheld
-   control name reads `- button [withheld] [ref=e4]`; the note after a picture's first line), the
-   settings reference in spec 10.3 (`uv run bap-browser config doc`), the README, the connection
-   guide, `/verify`, the pull request. Not built at all: abuse.ch, RDAP, the Systems page numbers,
-   the spending-cap setting in the settings screen.
+1. `/verify` over the whole build, then the pull request.
+2. **Telling a connected MCP client that the tools changed** (18.9). The tools over HTTP are served
+   one request at a time with no connection kept, so there is nobody to tell. Either the endpoint
+   keeps sessions, or the spec's line is changed to "a client compares the value of `/api/tools`".
+   The user is to decide.
+3. **The optional lists** (18.7): abuse.ch and the age of a domain (RDAP). The settings exist and
+   are off; nothing reads them.
+4. **The Systems page numbers**: checked, asked and refused steps for each browser.
+5. **The spending cap in the settings screen** (`safeguards.money.max_amount` is a setting of
+   `config.json` only) and the "Known-bad site list" setting.
+6. **More of the attack set** (18.13): the fooled agent and its report; the pages `spanish`,
+   `picture`, `late`, `shared_host`, `open_tab`, `redirect`, `frame`, `blob_login`, `decoys`,
+   `leak_address`, `leak_typing`, `leak_short` as pages in a real browser (their rules have unit
+   tests).
 
 Tests: `uv run pytest tests/unit tests/service -q`, then `tests/e2e`, then `tests/viewer` (build the
 viewer first). In the tests' own configuration the marks around page text are off
 (`tests/conftest.py`), so that the many tests that say exactly what a result holds stay as they are;
-`tests/unit/test_reading.py` turns them on.
+`tests/unit/test_reading.py` and `tests/e2e/test_attacks.py` turn them on. A test that downloads sets
+`browser.downloads.dir` to a folder of its own.
 
-Decided while building, and the spec says so already unless noted: `ip_host` and `young_domain` are
-for the reviewer in Auto Mode only; `step_on_sensitive_site` is raised in Auto Mode only, and refuses
-when nobody watches; site findings are settled once for a site and task; the confirming words are
-only "confirm"; `outgoing.decode_min_chars` is 8. Still to be written into the spec: the settings
-`money.around_chars`, `outgoing.consent_texts`, `limits.max_calls_choices`, `sites.sensitive.more`,
-`browser.timeouts.change_wait_ms` is in; the setting groups "Safety" and "Limits"; the setting
-"Copying between sites".
+Decided while building, and the spec says so: `ip_host` and `young_domain` are for the reviewer in
+Auto Mode only; `step_on_sensitive_site` is raised in Auto Mode only, and refuses when nobody watches;
+site findings are settled once for a site and task; the confirming words are only "confirm";
+`outgoing.decode_min_chars` is 8; a file that needs a yes lies in `downloads/held` and is settled at
+the end of the agent's next step; a dialog's words stay in single quotes and are withheld, not cut.
 
 Never again: Python or test text with a backslash through a shell heredoc. It broke a file three
 times in this work. Use the edit and write tools for such lines.
