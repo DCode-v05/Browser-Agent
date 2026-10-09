@@ -5059,7 +5059,7 @@ started by alerts; a ban on every comment.
 
 ## 21. Computer use
 
-Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 built and waiting for a key; 4 planned
+Date: 2026-10-09 · Status: arrangements 1, 2 and 4 built; 3 built and waiting for a key
 
 Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
@@ -5073,7 +5073,7 @@ browsers, with its own chat, settings, log and evaluations.
 | 1 | The person's own machine | A contained desktop in a container on that machine | Built |
 | 2 | A remote micro VM | The VM's own desktop, watched and driven over the network | Built: the micro VM's image with `DESKTOP=true`, and `bap-browser serve --desktop` (section 21.11) |
 | 3 | A remote micro VM | The VM's desktop, reaching the person's private services | Built, not yet joined to a real tailnet: the VM joins the person's Tailscale network when given a key (section 21.12). The tailnet's owner creates the key and the access policy |
-| 4 | A remote micro VM | The person's real machine | Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass |
+| 4 | An engine anywhere | The person's real Mac | Built (section 21.13): a helper the person runs on their Mac takes the engine's actions, with their permission. Over a tailnet once arrangement 3 has a key |
 
 ### 21.2 What a person sees
 
@@ -5195,7 +5195,7 @@ The desktop has three task sets of its own, run from its Evaluations like a brow
 
 ### 21.10 Not built yet
 
-Arrangement 4; reading apps through their accessibility tree; a desktop of macOS or
+A helper for Windows or Linux; reading apps through their accessibility tree; a desktop of macOS or
 Windows.
 
 ### 21.11 The micro VM
@@ -5239,3 +5239,30 @@ internet.
 - A key that is refused stops the VM with the reason. It does not go on without the tailnet.
 - The address rules of section 8.1 still hold: a tailnet address the person wants the agent to reach is
   theirs to allow.
+
+### 21.13 A person's real Mac
+
+Arrangement 4. The agent works on the person's own Mac, through a helper the person starts there:
+
+```bash
+uv run bap-browser helper --allow text_editor,calculator
+```
+
+- The helper prints a token, new each start. The engine is given it as `BAP_BROWSER_HELPER_TOKEN`
+  (in the environment or `.env`), with `computer.runs` set to `mac` and `computer.helper_url` to where
+  the helper answers. The helper answers on the Mac's own address unless told otherwise with `--host`.
+- It sees the screen with macOS's `screencapture` and moves the mouse and keyboard through CoreGraphics.
+  Nothing is installed. The Mac must allow the program that runs it under Screen Recording and
+  Accessibility, in System Settings, Privacy & Security; the engine says which is missing.
+- A picture is scaled to the screen's points, so x and y of a picture are x and y of the pointer.
+- **The person's stop.** Pushing the pointer into the top left corner of the screen
+  (`computer.helper_stop_corner`, 3 points) stops the helper for good: every later action is refused
+  until it is started again. Ctrl+C ends it.
+- **Apps.** The helper opens only the apps named with `--allow`, whatever the engine allows. On a Mac
+  they are TextEdit, Finder, Calculator and Terminal.
+- No folder is shared: the agent works among the person's own files, which is why the helper is
+  started by the person and stopped by them.
+- The helper keeps no record of what is typed.
+
+`tests/unit/test_mac_helper.py` runs the helper over real HTTP with a stand-in for the Mac's hands:
+the token, the missing permission, the stop in the corner, and the apps.

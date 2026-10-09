@@ -364,6 +364,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#2110-not-built-yet">21.10 Not built yet</a></li>
 <li><a href="#2111-the-micro-vm">21.11 The micro VM</a></li>
 <li><a href="#2112-the-micro-vm-on-a-persons-tailnet">21.12 The micro VM on a person&#x27;s tailnet</a></li>
+<li><a href="#2113-a-persons-real-mac">21.13 A person&#x27;s real Mac</a></li>
 </ul>
 </li>
 </ul>
@@ -12844,7 +12845,7 @@ looking. To wait for the thing it needs the extension to say that it has given u
 <p>Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.</p>
 <h2 id="21-computer-use">21. Computer use</h2>
-<p>Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 built and waiting for a key; 4 planned</p>
+<p>Date: 2026-10-09 · Status: arrangements 1, 2 and 4 built; 3 built and waiting for a key</p>
 <p>Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
 is for what a browser cannot reach. It is one more page of the window (section 9.16), beside the three
@@ -12880,9 +12881,9 @@ browsers, with its own chat, settings, log and evaluations.</p>
 </tr>
 <tr>
 <td>4</td>
-<td>A remote micro VM</td>
-<td>The person's real machine</td>
-<td>Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass</td>
+<td>An engine anywhere</td>
+<td>The person's real Mac</td>
+<td>Built (section 21.13): a helper the person runs on their Mac takes the engine's actions, with their permission. Over a tailnet once arrangement 3 has a key</td>
 </tr>
 </tbody>
 </table></div>
@@ -13076,7 +13077,7 @@ and <code>screen_height</code> (1280 by 800), <code>computer.folder</code>, and 
 <li>The desktop has no checklist; its task sets are its check.</li>
 </ul>
 <h3 id="2110-not-built-yet">21.10 Not built yet</h3>
-<p>Arrangement 4; reading apps through their accessibility tree; a desktop of macOS or
+<p>A helper for Windows or Linux; reading apps through their accessibility tree; a desktop of macOS or
 Windows.</p>
 <h3 id="2111-the-micro-vm">21.11 The micro VM</h3>
 <p>In the micro VM (section 17.2) there is no container to start a desktop in: the VM itself is the
@@ -13115,6 +13116,29 @@ internet.</p>
 <li>The address rules of section 8.1 still hold: a tailnet address the person wants the agent to reach is
   theirs to allow.</li>
 </ul>
+<h3 id="2113-a-persons-real-mac">21.13 A person's real Mac</h3>
+<p>Arrangement 4. The agent works on the person's own Mac, through a helper the person starts there:</p>
+<pre><code class="language-bash">uv run bap-browser helper --allow text_editor,calculator
+</code></pre>
+<ul>
+<li>The helper prints a token, new each start. The engine is given it as <code>BAP_BROWSER_HELPER_TOKEN</code>
+  (in the environment or <code>.env</code>), with <code>computer.runs</code> set to <code>mac</code> and <code>computer.helper_url</code> to where
+  the helper answers. The helper answers on the Mac's own address unless told otherwise with <code>--host</code>.</li>
+<li>It sees the screen with macOS's <code>screencapture</code> and moves the mouse and keyboard through CoreGraphics.
+  Nothing is installed. The Mac must allow the program that runs it under Screen Recording and
+  Accessibility, in System Settings, Privacy &amp; Security; the engine says which is missing.</li>
+<li>A picture is scaled to the screen's points, so x and y of a picture are x and y of the pointer.</li>
+<li><strong>The person's stop.</strong> Pushing the pointer into the top left corner of the screen
+  (<code>computer.helper_stop_corner</code>, 3 points) stops the helper for good: every later action is refused
+  until it is started again. Ctrl+C ends it.</li>
+<li><strong>Apps.</strong> The helper opens only the apps named with <code>--allow</code>, whatever the engine allows. On a Mac
+  they are TextEdit, Finder, Calculator and Terminal.</li>
+<li>No folder is shared: the agent works among the person's own files, which is why the helper is
+  started by the person and stopped by them.</li>
+<li>The helper keeps no record of what is typed.</li>
+</ul>
+<p><code>tests/unit/test_mac_helper.py</code> runs the helper over real HTTP with a stand-in for the Mac's hands:
+the token, the missing permission, the stop in the corner, and the apps.</p>
 </main>
 </div>
 <script>

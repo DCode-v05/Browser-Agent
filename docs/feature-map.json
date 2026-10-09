@@ -549,7 +549,10 @@
         "src/bap_browser/driver/screen_here.py",
         "deploy/Dockerfile",
         "deploy/config.vm.json",
-        "deploy/vm-start.sh"
+        "deploy/vm-start.sh",
+        "src/bap_browser/driver/mac_hands.py",
+        "src/bap_browser/driver/mac_driver.py",
+        "src/bap_browser/service/mac_helper.py"
       ],
       "tests": [
         "tests/unit/test_computer.py",
@@ -558,7 +561,8 @@
         "viewer/src/Studio.test.tsx",
         "tests/unit/test_desktop_tasks.py",
         "tests/e2e/test_computer_vm.py",
-        "tests/unit/test_deploy.py"
+        "tests/unit/test_deploy.py",
+        "tests/unit/test_mac_helper.py"
       ],
       "reach": "Build the desktop once (`docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy`), run `uv run bap-browser studio --open`, and press the tab Computer.",
       "addresses": [],

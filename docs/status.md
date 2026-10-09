@@ -621,6 +621,19 @@ and reaches the tailnet through Tailscale's local proxy.
 | A key Tailscale refuses | The VM stops with Tailscale's reason ("invalid key") and ours, exit 3, and the service never starts. The key is not written out |
 | A real key | **Not checked: there is none yet.** The tailnet's owner makes a reusable, ephemeral, tagged key; then the join, the HTTPS address and the proxy are proven |
 
+### 1w. Built on 2026-10-09: the agent on a person's real Mac (spec 21.13)
+
+Arrangement 4 of computer use. `bap-browser helper` on the person's Mac lets an engine drive it:
+pictures with macOS's `screencapture`, the mouse and keyboard through CoreGraphics, nothing installed.
+The person names the apps with `--allow`, gives the engine the token it printed, and stops it for good
+by pushing the pointer into the top left corner.
+
+Evidence: the helper and the engine's driver tested over real HTTP with a stand-in for the Mac's hands
+(5 tests). With the corner stop broken on purpose, its test fails. On this Mac, read only: the screen is
+1680 by 1050 points, Accessibility is allowed and Screen Recording is not yet.
+
+Not done yet: the live test on the person's Mac, with them watching.
+
 ### 2. Not started
 
 | What | Note |
