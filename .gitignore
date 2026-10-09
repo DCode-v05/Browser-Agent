@@ -6,7 +6,23 @@ __pycache__/
 .bap-browser/
 bap-browser-extension/
 config.json
+# Keys, tokens and passwords: never committed, wherever they are put. The template stays.
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+credentials.json
+# What a service writes about itself, with its token: the viewer's link, a helper's pairing.
+service.json
+serve.json
+remote-service.json
+helper.json
 # No trailing slash: a link named node_modules is kept out too, not only a folder.
 node_modules
 viewer/dist/
