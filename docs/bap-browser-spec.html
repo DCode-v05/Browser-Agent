@@ -363,6 +363,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#219-task-sets-of-the-desktop">21.9 Task sets of the desktop</a></li>
 <li><a href="#2110-not-built-yet">21.10 Not built yet</a></li>
 <li><a href="#2111-the-micro-vm">21.11 The micro VM</a></li>
+<li><a href="#2112-the-micro-vm-on-a-persons-tailnet">21.12 The micro VM on a person&#x27;s tailnet</a></li>
 </ul>
 </li>
 </ul>
@@ -12843,7 +12844,7 @@ looking. To wait for the thing it needs the extension to say that it has given u
 <p>Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.</p>
 <h2 id="21-computer-use">21. Computer use</h2>
-<p>Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 and 4 planned</p>
+<p>Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 built and waiting for a key; 4 planned</p>
 <p>Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
 is for what a browser cannot reach. It is one more page of the window (section 9.16), beside the three
@@ -12875,7 +12876,7 @@ browsers, with its own chat, settings, log and evaluations.</p>
 <td>3</td>
 <td>A remote micro VM</td>
 <td>The VM's desktop, reaching the person's private services</td>
-<td>Planned: the VM joins the person's Tailscale network as a tagged, ephemeral node. It needs a tailnet owner, an access policy and auth keys, which are the person's to create</td>
+<td>Built, not yet joined to a real tailnet: the VM joins the person's Tailscale network when given a key (section 21.12). The tailnet's owner creates the key and the access policy</td>
 </tr>
 <tr>
 <td>4</td>
@@ -13075,7 +13076,7 @@ and <code>screen_height</code> (1280 by 800), <code>computer.folder</code>, and 
 <li>The desktop has no checklist; its task sets are its check.</li>
 </ul>
 <h3 id="2110-not-built-yet">21.10 Not built yet</h3>
-<p>Arrangements 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+<p>Arrangement 4; reading apps through their accessibility tree; a desktop of macOS or
 Windows.</p>
 <h3 id="2111-the-micro-vm">21.11 The micro VM</h3>
 <p>In the micro VM (section 17.2) there is no container to start a desktop in: the VM itself is the
@@ -13095,6 +13096,25 @@ docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=&lt;a long random string&gt; b
 </code></pre>
 <p>The image installs uv from PyPI, so building it needs no registry but Docker Hub, Microsoft's and
 PyPI. <code>tests/e2e/test_computer_vm.py</code> starts the image and drives its desktop over MCP from outside.</p>
+<h3 id="2112-the-micro-vm-on-a-persons-tailnet">21.12 The micro VM on a person's tailnet</h3>
+<p>Arrangement 3. The VM joins the person's Tailscale network, so that its browser and its desktop can
+reach the person's private services, and the person reaches the VM's viewer, with nothing open to the
+internet.</p>
+<ul>
+<li>Build the image with <code>--build-arg TAILSCALE=true</code>, and give the container <code>TS_AUTHKEY</code>. With no key,
+  nothing of Tailscale runs.</li>
+<li>The key is made by the tailnet's owner: reusable, ephemeral, and tagged (for example
+  <code>tag:bap-browser</code>), so that the VM has what the access policy grants that tag and not a person's
+  rights. It is never in the image or <code>config.json</code>, never written out, and taken out of the
+  environment before the service starts.</li>
+<li>The VM's start step (<code>deploy/vm-start.sh</code>) runs Tailscale without root, keeps its state in memory
+  so the node leaves the tailnet when the VM ends, and joins with the key. Then it serves the viewer and
+  the tools to the tailnet over HTTPS (<code>tailscale serve</code>), with the service itself listening on the
+  VM's own address only, and sends the browser's and the apps' traffic through Tailscale's local proxy.</li>
+<li>A key that is refused stops the VM with the reason. It does not go on without the tailnet.</li>
+<li>The address rules of section 8.1 still hold: a tailnet address the person wants the agent to reach is
+  theirs to allow.</li>
+</ul>
 </main>
 </div>
 <script>

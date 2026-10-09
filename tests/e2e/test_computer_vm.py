@@ -104,3 +104,26 @@ async def test_an_agent_outside_the_vm_works_on_its_desktop(vm: tuple[str, str, 
         ["docker", "exec", name, "cat", "/home/pwuser/Files/vm.txt"], capture_output=True, check=False
     )
     assert saved.stdout.decode().strip() == "made in the VM", saved.stderr.decode()
+
+
+async def test_without_a_key_the_vm_runs_and_joins_no_tailnet(vm: tuple[str, str, str]) -> None:
+    _, _, name = vm
+    running = subprocess.run(
+        ["docker", "exec", name, "pgrep", "-x", "tailscaled"], capture_output=True, check=False
+    )
+    assert running.returncode == 1, "Tailscale runs with no key given"
+
+
+def test_a_key_that_is_refused_stops_the_vm_with_the_reason() -> None:
+    """Fails loudly: a VM that was meant to join a tailnet and could not does not serve anything."""
+    ended = subprocess.run(
+        ["docker", "run", "--rm", "-e", "TS_AUTHKEY=tskey-auth-k0000000000-notarealkey", IMAGE, *SERVE],
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    said = ended.stderr.decode()
+    assert ended.returncode == 3, said
+    assert "could not join the tailnet" in said
+    assert "notarealkey" not in said, "the key was written out"
+    assert "Viewer:" not in said, "the service started anyway"

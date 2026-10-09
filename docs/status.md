@@ -609,6 +609,18 @@ from. It now installs uv from PyPI. The image is 4.2 GB with the desktop.
 Not done: the image was run on this Mac, not on a remote machine. The team box has no Docker and no
 `sudo`, so it cannot run it.
 
+### 1v. Built on 2026-10-09, not yet joined to a real tailnet: the micro VM on a person's tailnet (spec 21.12)
+
+Arrangement 3 of computer use. Built with `TAILSCALE=true` and given `TS_AUTHKEY`, the micro VM
+joins the person's tailnet as an ephemeral node, serves its viewer and tools to the tailnet over HTTPS,
+and reaches the tailnet through Tailscale's local proxy.
+
+| Checked, on the image | Result |
+|---|---|
+| No key | The service runs; Tailscale does not |
+| A key Tailscale refuses | The VM stops with Tailscale's reason ("invalid key") and ours, exit 3, and the service never starts. The key is not written out |
+| A real key | **Not checked: there is none yet.** The tailnet's owner makes a reusable, ephemeral, tagged key; then the join, the HTTPS address and the proxy are proven |
+
 ### 2. Not started
 
 | What | Note |

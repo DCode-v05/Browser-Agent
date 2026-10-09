@@ -5059,7 +5059,7 @@ started by alerts; a ban on every comment.
 
 ## 21. Computer use
 
-Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 and 4 planned
+Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 built and waiting for a key; 4 planned
 
 Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
@@ -5072,7 +5072,7 @@ browsers, with its own chat, settings, log and evaluations.
 |---|---|---|---|
 | 1 | The person's own machine | A contained desktop in a container on that machine | Built |
 | 2 | A remote micro VM | The VM's own desktop, watched and driven over the network | Built: the micro VM's image with `DESKTOP=true`, and `bap-browser serve --desktop` (section 21.11) |
-| 3 | A remote micro VM | The VM's desktop, reaching the person's private services | Planned: the VM joins the person's Tailscale network as a tagged, ephemeral node. It needs a tailnet owner, an access policy and auth keys, which are the person's to create |
+| 3 | A remote micro VM | The VM's desktop, reaching the person's private services | Built, not yet joined to a real tailnet: the VM joins the person's Tailscale network when given a key (section 21.12). The tailnet's owner creates the key and the access policy |
 | 4 | A remote micro VM | The person's real machine | Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass |
 
 ### 21.2 What a person sees
@@ -5195,7 +5195,7 @@ The desktop has three task sets of its own, run from its Evaluations like a brow
 
 ### 21.10 Not built yet
 
-Arrangements 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+Arrangement 4; reading apps through their accessibility tree; a desktop of macOS or
 Windows.
 
 ### 21.11 The micro VM
@@ -5219,3 +5219,23 @@ docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-bro
 
 The image installs uv from PyPI, so building it needs no registry but Docker Hub, Microsoft's and
 PyPI. `tests/e2e/test_computer_vm.py` starts the image and drives its desktop over MCP from outside.
+
+### 21.12 The micro VM on a person's tailnet
+
+Arrangement 3. The VM joins the person's Tailscale network, so that its browser and its desktop can
+reach the person's private services, and the person reaches the VM's viewer, with nothing open to the
+internet.
+
+- Build the image with `--build-arg TAILSCALE=true`, and give the container `TS_AUTHKEY`. With no key,
+  nothing of Tailscale runs.
+- The key is made by the tailnet's owner: reusable, ephemeral, and tagged (for example
+  `tag:bap-browser`), so that the VM has what the access policy grants that tag and not a person's
+  rights. It is never in the image or `config.json`, never written out, and taken out of the
+  environment before the service starts.
+- The VM's start step (`deploy/vm-start.sh`) runs Tailscale without root, keeps its state in memory
+  so the node leaves the tailnet when the VM ends, and joins with the key. Then it serves the viewer and
+  the tools to the tailnet over HTTPS (`tailscale serve`), with the service itself listening on the
+  VM's own address only, and sends the browser's and the apps' traffic through Tailscale's local proxy.
+- A key that is refused stops the VM with the reason. It does not go on without the tailnet.
+- The address rules of section 8.1 still hold: a tailnet address the person wants the agent to reach is
+  theirs to allow.
