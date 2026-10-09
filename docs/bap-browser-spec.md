@@ -5296,6 +5296,12 @@ uv run bap-browser helper --allow text_editor,calculator
   that macOS shows its own prompts and lists Terminal in both panes. It watches for the person's yes,
   says in Terminal what is still missing, and pairs again once both are allowed: the page connects by
   itself.
+- **Held to the apps.** Unless the person allowed any app, the helper does an action of the agent
+  (a click, a key, typing, a scroll, a drag) only while an allowed app is in front, and refuses it
+  otherwise, saying which app is in front and how to bring an allowed one forward. An app that one of
+  the agent's actions starts, and that the person did not allow (as when it clicks an icon in the
+  Dock), is closed at once and the agent is told. What the person does through the viewer is never
+  held.
 - **Any app, on this Mac.** "On this Mac, let the agent open any app" (`computer.mac_any_app`, off) lets
   the agent open any app by its name, as GPT-6 Astra does; the helper is then started with `any`, and
   each opening asks the person first. A name that is not an app's name is refused.

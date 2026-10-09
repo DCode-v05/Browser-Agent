@@ -352,18 +352,20 @@ class MacDriver(DesktopDriver):
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
         with contextlib.suppress(BrowserError):
             if action == "move":
-                await self.link.act(do="move", x=x, y=y)
+                await self.link.act(do="move", x=x, y=y, by="person")
             else:
-                await self.link.act(do="press", x=x, y=y, button=button, down=action == "down")
+                await self.link.act(do="press", x=x, y=y, button=button, down=action == "down", by="person")
 
     async def key(self, action: KeyAction, key: str) -> None:
         with contextlib.suppress(BrowserError):
-            await self.link.act(do="key", keys=key, down=action == "down")
+            await self.link.act(do="key", keys=key, down=action == "down", by="person")
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
         with contextlib.suppress(BrowserError):
             line = self._settings.wheel_pixels_per_line
-            await self.link.act(do="scroll", x=x, y=y, lines_x=int(dx // line), lines_y=int(dy // line))
+            await self.link.act(
+                do="scroll", x=x, y=y, lines_x=int(dx // line), lines_y=int(dy // line), by="person"
+            )
 
 
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
