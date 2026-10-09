@@ -1,0 +1,162 @@
+{
+  "title": "Short tasks on the desktop",
+  "lead": "Whether a small task on the desktop is finished: an app opened, a file written or read.",
+  "tasks": [
+    {
+      "id": "write-a-note",
+      "title": "Write a note and save it",
+      "task": "Open the text editor, write the line Meeting at 10, and save it as meeting.txt in the folder Practice inside Files.",
+      "start": "desktop",
+      "pass": [
+        {
+          "state": "files.meeting_txt",
+          "has": "Meeting at 10"
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Text editor"
+        ],
+        [
+          "click",
+          640,
+          400
+        ],
+        [
+          "type",
+          "Meeting at 10"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "submit",
+          "/home/agent/Files/Practice/meeting.txt"
+        ],
+        [
+          "wait",
+          1
+        ]
+      ]
+    },
+    {
+      "id": "read-a-price",
+      "title": "Read a price from a file",
+      "task": "What does coffee cost, according to prices.txt in the folder Practice inside Files? Answer with the number.",
+      "start": "desktop",
+      "seed": {
+        "files": {
+          "prices.txt": "Tea 3\nCoffee 4\nCake 5\n"
+        }
+      },
+      "pass": [
+        {
+          "answer": "4"
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "Coffee costs 4."
+        ]
+      ]
+    },
+    {
+      "id": "use-the-calculator",
+      "title": "Work out a product with the calculator",
+      "task": "Use the calculator to work out 1234 times 5678, and tell me the result. The folder Practice inside Files is not needed.",
+      "start": "desktop",
+      "pass": [
+        {
+          "answer": [
+            "7006652",
+            "7,006,652"
+          ]
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Calculator"
+        ],
+        [
+          "answer",
+          "1234 times 5678 is 7006652."
+        ]
+      ]
+    },
+    {
+      "id": "add-a-line",
+      "title": "Add a line to a file",
+      "task": "Add the line call Ada at the end of todo.txt in the folder Practice inside Files, and save it.",
+      "start": "desktop",
+      "seed": {
+        "files": {
+          "todo.txt": "buy milk\n"
+        }
+      },
+      "pass": [
+        {
+          "state": "files.todo_txt",
+          "has": "call Ada"
+        },
+        {
+          "state": "files.todo_txt",
+          "has": "buy milk"
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Text editor"
+        ],
+        [
+          "key",
+          "Control+o"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "key",
+          "Control+l"
+        ],
+        [
+          "wait",
+          0.3
+        ],
+        [
+          "submit",
+          "/home/agent/Files/Practice/todo.txt"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "key",
+          "Control+End"
+        ],
+        [
+          "type",
+          "call Ada"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          0.5
+        ]
+      ]
+    }
+  ]
+}

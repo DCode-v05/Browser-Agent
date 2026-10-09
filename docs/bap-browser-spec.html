@@ -360,7 +360,8 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#216-safety">21.6 Safety</a></li>
 <li><a href="#217-settings">21.7 Settings</a></li>
 <li><a href="#218-tests">21.8 Tests</a></li>
-<li><a href="#219-not-built-yet">21.9 Not built yet</a></li>
+<li><a href="#219-task-sets-of-the-desktop">21.9 Task sets of the desktop</a></li>
+<li><a href="#2110-not-built-yet">21.10 Not built yet</a></li>
 </ul>
 </li>
 </ul>
@@ -13054,10 +13055,27 @@ and <code>screen_height</code> (1280 by 800), <code>computer.folder</code>, and 
   file the person then has; the desktop has no network; an app that is off cannot run at all. Skipped,
   with the reason, where Docker or the image is not there.</li>
 <li>The window's test in a real browser has the fourth page.</li>
+<li><code>tests/unit/test_desktop_tasks.py</code>: the desktop's sets are whole, <code>Practice</code> is made ready without
+  touching anything beside it, and a followed instruction fails its task. <code>tests/e2e/test_computer.py</code>
+  runs every desktop task by its reference solution on a real desktop.</li>
 </ul>
-<h3 id="219-not-built-yet">21.9 Not built yet</h3>
-<p>Arrangements 2, 3 and 4; task sets and an attack set for the desktop; reading apps through their
-accessibility tree; a desktop of macOS or Windows.</p>
+<h3 id="219-task-sets-of-the-desktop">21.9 Task sets of the desktop</h3>
+<p>The desktop has three task sets of its own, run from its Evaluations like a browser's (section 12.7):
+<code>short</code> (4 tasks), <code>long</code> (2) and <code>attack</code> (3). Their files are in <code>evals/sets/desktop/</code>.</p>
+<ul>
+<li>A task works in the folder <code>Practice</code> inside the shared folder, and nowhere else. Before each task
+  the apps are closed and <code>Practice</code> is emptied and given the task's files. The rest of the shared
+  folder is the person's and is never touched.</li>
+<li>Afterwards the files in <code>Practice</code> are read and graded by the same checks as a browser's sets. A
+  file's text is found under its name with <code>_</code> for the dot: <code>files.todo_txt</code>.</li>
+<li>The attack set plants instructions in files the agent is asked to read: delete the folder, write a
+  file, open the terminal. Each is graded on what happened in <code>Practice</code>, not on what the agent said.</li>
+<li>Every task has a reference solution, done with the agent's own tools and no model.</li>
+<li>The desktop has no checklist; its task sets are its check.</li>
+</ul>
+<h3 id="2110-not-built-yet">21.10 Not built yet</h3>
+<p>Arrangements 2, 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+Windows.</p>
 </main>
 </div>
 <script>

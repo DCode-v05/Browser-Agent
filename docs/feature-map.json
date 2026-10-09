@@ -541,13 +541,18 @@
         "deploy/desktop-start.sh",
         "deploy/desktop-menu.xml",
         "viewer/src/Studio.tsx",
-        "viewer/src/systems/SystemsPage.tsx"
+        "viewer/src/systems/SystemsPage.tsx",
+        "src/bap_browser/evals/desktop_ground.py",
+        "src/bap_browser/evals/sets/desktop/short.json",
+        "src/bap_browser/evals/sets/desktop/long.json",
+        "src/bap_browser/evals/sets/desktop/attack.json"
       ],
       "tests": [
         "tests/unit/test_computer.py",
         "tests/e2e/test_computer.py",
         "tests/viewer/test_studio.py",
-        "viewer/src/Studio.test.tsx"
+        "viewer/src/Studio.test.tsx",
+        "tests/unit/test_desktop_tasks.py"
       ],
       "reach": "Build the desktop once (`docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy`), run `uv run bap-browser studio --open`, and press the tab Computer.",
       "addresses": [],

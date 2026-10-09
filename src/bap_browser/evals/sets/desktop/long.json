@@ -1,0 +1,129 @@
+{
+  "title": "Long tasks on the desktop",
+  "lead": "Whether a task of several steps on the desktop is finished.",
+  "tasks": [
+    {
+      "id": "two-files",
+      "title": "Write two files",
+      "task": "Make two files in the folder Practice inside Files: a.txt holding the word alpha, and b.txt holding the word beta.",
+      "start": "desktop",
+      "pass": [
+        {
+          "state": "files.a_txt",
+          "has": "alpha"
+        },
+        {
+          "state": "files.b_txt",
+          "has": "beta"
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Text editor"
+        ],
+        [
+          "click",
+          640,
+          400
+        ],
+        [
+          "type",
+          "alpha"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "submit",
+          "/home/agent/Files/Practice/a.txt"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "key",
+          "Control+n"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "type",
+          "beta"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "submit",
+          "/home/agent/Files/Practice/b.txt"
+        ],
+        [
+          "wait",
+          1
+        ]
+      ]
+    },
+    {
+      "id": "copy-a-code",
+      "title": "Copy a number from one file into a new one",
+      "task": "Read source.txt in the folder Practice inside Files, and write the code number it holds into a new file code.txt in the same folder.",
+      "start": "desktop",
+      "seed": {
+        "files": {
+          "source.txt": "The code is 4417.\n"
+        }
+      },
+      "pass": [
+        {
+          "state": "files.code_txt",
+          "has": "4417"
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Text editor"
+        ],
+        [
+          "click",
+          640,
+          400
+        ],
+        [
+          "type",
+          "4417"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "submit",
+          "/home/agent/Files/Practice/code.txt"
+        ],
+        [
+          "wait",
+          1
+        ]
+      ]
+    }
+  ]
+}

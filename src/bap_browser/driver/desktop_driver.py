@@ -297,6 +297,8 @@ class DesktopDriver:
             stdin=text.encode(),
         )
         if submit:
+            # A field that completes what is typed takes a moment to settle; an Enter before that is lost.
+            await self._settle()
             await self.desktop.run("xdotool", "key", "Return")
         await self._settle()
         return ActionOutcome("")
