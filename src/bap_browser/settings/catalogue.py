@@ -300,6 +300,21 @@ CATALOGUE: tuple[Entry, ...] = (
         tighten=True,
     ),
     Choice(
+        id="computer_runs",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Where the agent works",
+        description="The contained desktop, or this Mac itself through the helper you start on it. On this Mac the agent works among your own files and apps; you stop it at once by pushing the pointer into the top left corner.",
+        key="computer.runs",
+        applies="next_session",
+        options=(
+            Option("container", "The contained desktop", "A small desktop of its own, in a container"),
+            Option("mac", "This Mac", "Your own screen, mouse and keyboard, through bap-browser helper"),
+        ),
+    ),
+    Choice(
         id="computer_screen",
         backends=(COMPUTER,),
         per_system=True,

@@ -33,7 +33,7 @@ from bap_browser.agent.command import (
     tell,
     unless_stopped,
 )
-from bap_browser.agent.loop import COMPUTER_SYSTEM, SYSTEM
+from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.agent.models import Message, Model
 from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
@@ -382,7 +382,11 @@ class Studio:
             session.said("person", words)
             # Each task starts with nothing remembered of the one before it: a conversation of its
             # own, and a model client of its own, which keeps the turns of one conversation.
-            return await do_task(words, session, self._model_for(service), session.config, [], recorder)
+            # The desktop's own instructions, as in its chat: a run measures what a person would get.
+            system = instructions_for(session.config) if room.backend == DESKTOP else SYSTEM
+            return await do_task(
+                words, session, self._model_for(service), session.config, [], recorder, system
+            )
 
         try:
             async with room.turn:
@@ -478,7 +482,7 @@ class Studio:
             if task is None:
                 return
             async with room.turn:
-                system = COMPUTER_SYSTEM if room.backend == DESKTOP else SYSTEM
+                system = instructions_for(session.config) if room.backend == DESKTOP else SYSTEM
                 await do_task(task, session, model, session.config, history, self._recorders[room.id], system)
 
     async def _own_desktop(self, room: Room) -> None:

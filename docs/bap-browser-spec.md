@@ -5279,6 +5279,12 @@ uv run bap-browser helper --allow text_editor,calculator
 - No folder is shared: the agent works among the person's own files, which is why the helper is
   started by the person and stopped by them.
 - The helper keeps no record of what is typed.
+- **In the window.** On the Computer tab's Configuration, "Where the agent works" chooses the contained
+  desktop or This Mac; it holds from the next session. A helper started on the same Mac pairs by
+  itself: it leaves its address and token in `.bap-browser/helper.json`, readable by this user alone,
+  and removes the file when it ends. The agent is then given the Mac's own instructions: it works only
+  on what the task names, uses Command for shortcuts, and never types a password, pays, sends,
+  deletes or shares unless the task says exactly that.
 
 `tests/unit/test_mac_helper.py` runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.

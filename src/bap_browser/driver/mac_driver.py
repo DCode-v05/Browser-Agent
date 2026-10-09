@@ -32,7 +32,11 @@ from bap_browser.driver.contained_desktop import App
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.mac_hands import MAC_APPS
 from bap_browser.errors import BadInput, BrowserError
+from bap_browser.private_file import write_json
 from bap_browser.results import Picture
+
+# The file, in the data folder, where a helper on this Mac says where it is.
+PAIRING = "helper.json"
 
 
 class MacLink:
@@ -97,7 +101,9 @@ class MacLink:
     async def start(self) -> None:
         if not self._token:
             raise BrowserError(
-                "No token for the helper. Put the token it printed in BAP_BROWSER_HELPER_TOKEN.",
+                "No helper is paired. Start the helper on this Mac with `uv run bap-browser helper "
+                "--allow text_editor,files,calculator`, or give the token of one elsewhere in "
+                "BAP_BROWSER_HELPER_TOKEN.",
                 reason="no token for the helper",
             )
         told = await self.status()
@@ -134,12 +140,40 @@ class MacLink:
         """A person's hand on a Mac goes through the driver's own pointer, key and wheel."""
 
 
+def pairing_file(config: Config) -> Path:
+    """Where the helper on this Mac leaves its address and token, for this user alone (spec 21.13)."""
+    return Path(config.data_dir).expanduser() / PAIRING
+
+
+def write_pairing(path: Path, url: str, token: str) -> None:
+    write_json(path, {"url": url, "token": token})
+
+
+def read_pairing(path: Path) -> tuple[str, str] | None:
+    """The address and the token the helper left. None when no helper is running here."""
+    try:
+        told = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if (
+        not isinstance(told, dict)
+        or not isinstance(told.get("url"), str)
+        or not isinstance(told.get("token"), str)
+    ):
+        return None
+    return told["url"], told["token"]
+
+
 class MacDriver(DesktopDriver):
     def __init__(self, config: Config, name: str = "computer") -> None:
         super().__init__(config, name)
         settings = config.computer
-        token = os.environ.get(settings.helper_token_env, "")
-        self.link = MacLink(settings.helper_url, token, settings.command_timeout_s)
+        url, token = settings.helper_url, os.environ.get(settings.helper_token_env, "")
+        # A helper on this same Mac pairs by itself: nothing is copied by hand.
+        paired = read_pairing(pairing_file(config)) if not token else None
+        if paired is not None:
+            url, token = paired
+        self.link = MacLink(url, token, settings.command_timeout_s)
         self.desktop = self.link
         self._screen = (settings.screen_width, settings.screen_height)
 

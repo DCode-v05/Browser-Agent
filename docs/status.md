@@ -671,6 +671,17 @@ the system's, so a user was not held to the admin's desktop settings; a question
 site offered "Allow on this site"; `studio.py` went over 700 lines and its configuration helpers moved
 to `agent/room_configs.py`.
 
+### 1z. Finished on 2026-10-09: the window's Computer tab can work on the person's own Mac
+
+"Where the agent works" on the Computer tab's Configuration chooses the contained desktop or This
+Mac. A helper started on the same Mac pairs by itself through `.bap-browser/helper.json` (this user
+alone), and the agent gets instructions for a person's own Mac.
+
+Found on the way: the desktop's task-set runs were given the browser's instructions, not the
+desktop's; only its chat had the right ones. Every desktop result with the model from earlier on
+2026-10-09 was measured that way, including the infeasible set's change from 0 to 1 of 3, which the
+added sentence did not reach. They are fixed now and must be run again.
+
 ### 2. Not started
 
 | What | Note |

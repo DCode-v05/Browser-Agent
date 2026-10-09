@@ -61,7 +61,8 @@ export function BrowserPane({ state, view, now, showPointer, options, onCommand,
 function AddressBar({ state, view, now }: { state: ViewerState; view: StateView; now: number }) {
   // A desktop has no address: the bar says what is shown instead.
   const desktop = state.session?.backend === 'contained_desktop';
-  const url = desktop ? W.parts.desktop : state.url || 'about:blank';
+  // A desktop has no address: the bar says which desktop it is, the contained one or the person's own Mac.
+  const url = desktop ? state.session?.browser || W.parts.desktop : state.url || 'about:blank';
   const blocked = view.key === 'blocked';
   return (
     <div className="address" data-blocked={blocked}>
