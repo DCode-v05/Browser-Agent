@@ -37,7 +37,7 @@ from bap_browser.agent.loop import COMPUTER_SYSTEM, SYSTEM
 from bap_browser.agent.models import Message, Model
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
-from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.mac_driver import desktop_driver_for
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
@@ -491,7 +491,7 @@ class Studio:
             tasks: asyncio.Queue[str] = asyncio.Queue()
             session = ServiceSession(
                 given,
-                DesktopDriver(as_set, room.id),
+                desktop_driver_for(as_set, room.id),
                 agent=AGENT_NAME,
                 name=room.id,
                 on_task=tasks.put_nowait,

@@ -21,10 +21,25 @@ class AllowedApps(Section):
 
 
 class Computer(Section):
-    runs: Literal["container", "here"] = setting(
+    runs: Literal["container", "here", "mac"] = setting(
         "container",
-        "Where the desktop runs: in a container of its own, or on this machine's own virtual screen. "
-        "`here` is for a machine that is itself the boundary, such as the micro VM",
+        "Where the desktop runs: in a container of its own, on this machine's own virtual screen "
+        "(`here`, for a machine that is itself the boundary, such as the micro VM), or on a person's "
+        "real Mac through the helper they run there (`mac`)",
+    )
+    helper_url: str = setting(
+        "http://127.0.0.1:8796", "Where the helper on the person's Mac answers, when the desktop is `mac`"
+    )
+    helper_token_env: str = setting(
+        "BAP_BROWSER_HELPER_TOKEN",
+        "The variable, in the environment or in `.env`, that holds the token the helper printed",
+    )
+    helper_port: int = setting(8796, "The port the helper listens on, on the person's Mac")
+    helper_stop_corner: float = setting(
+        3.0, "How close to the top left corner, in points, the pointer stops the helper for good"
+    )
+    wheel_pixels_per_line: int = setting(
+        40, "How many pixels of a person's wheel, in the viewer, make one line on the Mac"
     )
     display: str = setting(":1", "The virtual screen's display, when the desktop runs here")
     image: str = setting(

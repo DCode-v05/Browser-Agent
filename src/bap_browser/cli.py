@@ -8,6 +8,7 @@ import contextlib
 import json
 import logging
 import os
+import secrets
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -82,6 +83,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="serve the desktop of computer use instead of a browser: its computer_* tools and its picture",
     )
     serve.set_defaults(run=_serve)
+
+    helper = commands.add_parser(
+        "helper",
+        help="on your Mac: let an engine elsewhere drive this Mac, with your permission (spec 21.13)",
+    )
+    helper.add_argument("--config", help="path of config.json")
+    helper.add_argument(
+        "--allow",
+        default="",
+        help="the apps the engine may open here, by name: text_editor, files, calculator, terminal",
+    )
+    helper.add_argument(
+        "--host", default="127.0.0.1", help="the address to answer on; 127.0.0.1 is this Mac only"
+    )
+    helper.set_defaults(run=_helper)
 
     studio = commands.add_parser(
         "studio",
@@ -267,6 +283,48 @@ def _serve(args: argparse.Namespace) -> int:
         asyncio.run(run_http(config, open_viewer=args.open, desktop=args.desktop))
     # It runs until it is interrupted, so that is how it always ends.
     return 130
+
+
+def _helper(args: argparse.Namespace) -> int:
+    def say(text: str) -> None:
+        # The helper's words are for the person at this Mac, on the error stream.
+        print(text, file=sys.stderr)
+
+    if sys.platform != "darwin":
+        say("The helper runs on a Mac only.")
+        return 2
+    config = load_config(args.config)
+    # Imported here: the helper needs the web server and macOS's own libraries, nothing else.
+    import uvicorn
+
+    from bap_browser.driver.mac_hands import MAC_APPS, MacHands
+    from bap_browser.service.mac_helper import Helper, helper_app
+
+    apps = [name for name in args.allow.split(",") if name]
+    unknown = [name for name in apps if name not in MAC_APPS]
+    if unknown:
+        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(MAC_APPS)}.")
+        return 2
+    hands = MacHands()
+    recording, accessibility = hands.allowed()
+    token = secrets.token_urlsafe(32)
+    port = config.computer.helper_port
+    say(f"The helper answers on http://{args.host}:{port}, to this token only:")
+    say(token)
+    say("Give the token to the engine as BAP_BROWSER_HELPER_TOKEN. It is new each time the helper starts.")
+    say(f"Apps the engine may open: {', '.join(MAC_APPS[name] for name in apps) or 'none'}.")
+    if not (recording and accessibility):
+        say(
+            "Allow the program that runs this in System Settings, Privacy & Security: Screen Recording and Accessibility."
+        )
+    say("To stop it at once, push the pointer into the top left corner of the screen. Ctrl+C ends it.")
+    uvicorn.run(
+        helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
+        host=args.host,
+        port=port,
+        log_level="warning",
+    )
+    return 0
 
 
 def extension_folder(config: Config) -> Path:
