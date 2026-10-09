@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SetName, SuiteAnswer, SuiteOverall, SuiteRun, SuiteTotals, SystemsApi } from './api';
 import { headline, ParityCard, SuiteCard } from './Suite';
+import { W } from '../wording';
 
 const NONE: SuiteTotals = {
   tasks: 0,
@@ -229,5 +230,15 @@ describe('the task sets, browser by browser', () => {
     expect(screen.getByText('No task set has been run yet. Run one from the Evaluations view of a browser.')).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh' }));
     expect(onRefresh).toHaveBeenCalled();
+  });
+});
+
+describe('the task sets of the desktop of computer use (spec 21.9)', () => {
+  it('says that its tasks are done in the folder Practice, not on a practice site', async () => {
+    const api = { suite: vi.fn(async () => suiteOf({ system: 'computer' })) } as unknown as SystemsApi;
+    render(<SuiteCard system="computer" api={api} />);
+    await block('Short tasks');
+    expect(screen.getByText(W.systems.suite.leadDesktop)).toBeInTheDocument();
+    expect(screen.queryByText(W.systems.suite.lead)).not.toBeInTheDocument();
   });
 });

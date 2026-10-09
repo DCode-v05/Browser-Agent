@@ -103,7 +103,7 @@ export function SuiteCard({ system, api }: { system: string; api: SystemsApi }) 
   return (
     <>
       <h4 className="system-section">{S.title}</h4>
-      <p className="system-hint">{S.lead}</p>
+      <p className="system-hint">{system === 'computer' ? S.leadDesktop : S.lead}</p>
       <label className="suite-tries">
         <span>{S.tries}</span>
         <select className="suite-select" value={trials ?? suite.trials} title={S.triesHint} disabled={busy} onChange={(event) => setTrials(Number(event.target.value))}>

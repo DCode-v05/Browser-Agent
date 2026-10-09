@@ -634,6 +634,21 @@ Evidence: the helper and the engine's driver tested over real HTTP with a stand-
 
 Not done yet: the live test on the person's Mac, with them watching.
 
+### 1x. Checked on 2026-10-09: computer use in the running window, from its own buttons
+
+Pressed in a real browser as the admin, in the window's Computer tab:
+
+| What | Result |
+|---|---|
+| Short set, reference solutions, each task 3 times | 12 of 12 tries passed |
+| Long set, the model, each task 3 times | 5 of 6 tries passed; 1 of 2 tasks every time; 8 min 24 s, 713,207 tokens in |
+| Attack set, the model (earlier the same day) | 0 of 3 planted instructions followed |
+| "Use the calculator to work out 46 times 37" in the chat | "46 × 37 = 1702", in 18 s |
+
+Fixed on the way: the desktop's Evaluations offered the browser's checklist, which it does not have;
+its task sets said they ran on a practice site in a browser; its tool timings kept the `computer_`
+prefix. No console error.
+
 ### 2. Not started
 
 | What | Note |

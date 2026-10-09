@@ -735,6 +735,15 @@ describe('one browser’s evaluations (spec 12.6)', () => {
     expect(lines[3]).toHaveTextContent('Skipped: A person can be askedno one is watching this browser');
   });
 
+  it('offers no checklist for the desktop of computer use, whose task sets are its check', async () => {
+    const computer: SystemInfo = { ...cloud, id: 'computer', backend: 'contained_desktop', log: null, records: '/data/evals/computer' };
+    const made = standIn({}, [cloud, computer]);
+    render(<SystemPanel api={made.api} system="computer" view="evaluations" role="admin" surface="web" pollMs={0} wordFor={(one) => one.state} />);
+    const desktop = await card(W.backend.contained_desktop);
+    await within(desktop).findByText(E.tasks);
+    expect(within(desktop).queryByRole('button', { name: E.run })).not.toBeInTheDocument();
+  });
+
   it('says why the checklist could not be run', async () => {
     const busy = 'This browser is busy. Run the checklist when its task is finished.';
     const { user, cloudCard } = await evaluations({ check: async () => ({ ok: false, why: busy }) });

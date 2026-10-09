@@ -436,6 +436,7 @@ export const W = {
       triesHint: 'A task that passes once can fail the next time. Tried several times, a set shows how many tasks pass every time.',
       times: (n: number) => (n === 1 ? 'Once' : `${n} times`),
       tasks: (n: number) => (n === 1 ? '1 task' : `${n} tasks`),
+      leadDesktop: 'Tasks with a known right end, done on the desktop in the folder Practice inside its shared folder, and checked by code. A run closes the apps and empties Practice before each task; nothing else of the shared folder is touched. While it runs nobody is asked.',
       runAgent: 'Run with the agent',
       runAgentHint: 'The agent does every task of this set with its model. It takes minutes and uses tokens.',
       runReference: 'Run the reference solutions',
