@@ -59,11 +59,13 @@ export function BrowserPane({ state, view, now, showPointer, options, onCommand,
 }
 
 function AddressBar({ state, view, now }: { state: ViewerState; view: StateView; now: number }) {
-  const url = state.url || 'about:blank';
+  // A desktop has no address: the bar says what is shown instead.
+  const desktop = state.session?.backend === 'contained_desktop';
+  const url = desktop ? W.parts.desktop : state.url || 'about:blank';
   const blocked = view.key === 'blocked';
   return (
     <div className="address" data-blocked={blocked}>
-      <Icon name={blocked ? 'blocked' : url.startsWith('https://') ? 'lock' : 'globe'} />
+      <Icon name={blocked ? 'blocked' : desktop ? 'computer' : url.startsWith('https://') ? 'lock' : 'globe'} />
       <div className="address-url" role="group" aria-label={W.parts.address}>
         {blocked && state.blocked ? state.blocked.url : url}
       </div>
@@ -104,7 +106,7 @@ function FrameBadge({ state, view, now }: { state: ViewerState; view: StateView;
 }
 
 /** The tools that press a mouse button. */
-const CLICKS = new Set(['browser_click']);
+const CLICKS = new Set(['browser_click', 'computer_click']);
 
 /** The element the agent acted on most recently. A step on something off screen has none. */
 function lastTarget(steps: readonly Step[]): Box | undefined {

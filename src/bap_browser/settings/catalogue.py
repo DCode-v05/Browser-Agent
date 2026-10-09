@@ -10,7 +10,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from bap_browser.settings.kinds import (
+    BROWSERS,
     CLOUD,
+    COMPUTER,
     EVERYWHERE,
     NOT_ON_MOBILE,
     About,
@@ -119,6 +121,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Choice(
         id="scan_pages",
+        backends=BROWSERS,
         user=True,
         per_system=True,
         group="Safety",
@@ -139,6 +142,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Guard(
         id="cross_site_text",
+        backends=BROWSERS,
         user=True,
         per_system=True,
         group="Safety",
@@ -150,6 +154,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="sensitive_sites",
+        backends=BROWSERS,
         user=True,
         per_system=True,
         group="Safety",
@@ -174,6 +179,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="blocked_sites",
+        backends=BROWSERS,
         user=True,
         per_system=True,
         group="Sites",
@@ -185,6 +191,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     SiteList(
         id="allowed_sites",
+        backends=BROWSERS,
         user=True,
         per_system=True,
         group="Sites",
@@ -196,6 +203,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="allow_downloads",
+        backends=BROWSERS,
         per_system=True,
         group="Files",
         surfaces=EVERYWHERE,
@@ -206,6 +214,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="allow_uploads",
+        backends=BROWSERS,
         per_system=True,
         group="Files",
         surfaces=EVERYWHERE,
@@ -225,6 +234,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Action(
         id="clear_browsing_data",
+        backends=BROWSERS,
         group="Privacy",
         surfaces=EVERYWHERE,
         title="Clear browsing data",
@@ -269,6 +279,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="page_scripts",
+        backends=BROWSERS,
         per_system=True,
         group="Advanced",
         surfaces=NOT_ON_MOBILE,
@@ -279,6 +290,7 @@ CATALOGUE: tuple[Entry, ...] = (
     ),
     Switch(
         id="code_tool",
+        backends=BROWSERS,
         per_system=True,
         group="Advanced",
         surfaces=NOT_ON_MOBILE,
@@ -286,6 +298,72 @@ CATALOGUE: tuple[Entry, ...] = (
         description="Offers the agent a tool that does several steps in one call. Each step is still checked.",
         key="code.enabled",
         tighten=True,
+    ),
+    Switch(
+        id="computer_text_editor",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Text editor",
+        description="Lets the agent open the text editor on the desktop. Turning it on holds from the next session; turning it off holds at once.",
+        applies="next_session",
+        key="computer.apps.text_editor",
+    ),
+    Switch(
+        id="computer_files",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Files",
+        description="Lets the agent open the file manager on the desktop. Turning it on holds from the next session; turning it off holds at once.",
+        applies="next_session",
+        key="computer.apps.files",
+    ),
+    Switch(
+        id="computer_calculator",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Calculator",
+        description="Lets the agent open the calculator on the desktop. Turning it on holds from the next session; turning it off holds at once.",
+        applies="next_session",
+        key="computer.apps.calculator",
+    ),
+    Switch(
+        id="computer_terminal",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Terminal",
+        description="Lets the agent open a terminal. A terminal runs any command inside the desktop. Turning it on holds from the next session; turning it off holds at once.",
+        applies="next_session",
+        key="computer.apps.terminal",
+    ),
+    Switch(
+        id="computer_share_folder",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Share a folder with the desktop",
+        description="Shows one folder of this computer on the desktop, as Files. What the agent saves there, you have. Nothing else of this computer is seen from the desktop.",
+        key="computer.share_folder",
+        applies="next_session",
+    ),
+    Switch(
+        id="computer_network",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="Let the desktop reach the network",
+        description="Off: the desktop has no network at all. On: apps on it can reach the internet.",
+        key="computer.network",
+        applies="next_session",
     ),
     About(
         id="about",

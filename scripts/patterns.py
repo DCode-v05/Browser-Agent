@@ -95,7 +95,7 @@ A_VIEWER_NUMBER = re.compile(r"^(export )?const [A-Z][A-Z0-9_]* = -?[0-9][0-9_.]
 # import upward fails the check: the boundary is held by the import graph, not by a reader's care.
 LAYERS = (
     ("errors", "results", "env_file", "address", "private_file", "config_base"),
-    ("config_safeguards",),
+    ("config_safeguards", "config_computer"),
     ("config", "keys"),
     ("policy", "config_doc", "desktop_app", "browser_extension"),
     ("driver", "code", "settings"),

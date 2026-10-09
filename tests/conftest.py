@@ -43,6 +43,9 @@ def site() -> Iterator[str]:
     thread.join()
 
 
+NO_CONTAINER_PROGRAM = "no-container-program-in-tests"
+
+
 def write_config(folder: Path, **sections: Any) -> Path:
     """A config.json in `folder` that keeps every file the engine writes inside that folder."""
     data: dict[str, Any] = {"data_dir": str(folder), "logging": {"event_log": str(folder / "events.jsonl")}}
@@ -56,6 +59,13 @@ def write_config(folder: Path, **sections: Any) -> Path:
     # And who may sign in: a test never reads or changes the developer's own passwords.
     data["auth"] = {"file": str(folder / "accounts.json"), **data.get("auth", {})}
     data["logging"] = {"systems_dir": str(folder / "logs"), **data.get("logging", {})}
+    # The desktop of computer use is started only by the tests that are about it: elsewhere it has
+    # no container program, so its page is the same on every machine. Its shared folder stays here.
+    data["computer"] = {
+        "container_command": NO_CONTAINER_PROGRAM,
+        "folder": str(folder / "computer-files"),
+        **data.get("computer", {}),
+    }
     # Most tests say exactly what a result holds. The marks around what a page wrote (spec 18.5) are
     # left out of those, and tested where they are what the test is about.
     guards = dict(data.get("safeguards", {}))

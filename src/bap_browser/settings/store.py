@@ -31,7 +31,7 @@ from bap_browser.config import Config, deep_merge, defaults
 from bap_browser.errors import ConfigError
 from bap_browser.private_file import write_json
 from bap_browser.settings.catalogue import BY_ID, CATALOGUE, ENABLED, FREE
-from bap_browser.settings.kinds import GROUPS, SURFACES, Entry, Reason, Value
+from bap_browser.settings.kinds import COMPUTER, GROUPS, SURFACES, Entry, Reason, Value
 
 Role = Literal["admin", "user"]
 # Where a value comes from when nobody said: the configuration file or the environment.
@@ -119,6 +119,8 @@ class SettingsStore:
         self._admin, self._user, self._policy, self._preferred = _read(self._path)
         self.systems: tuple[str, ...] = ()
         """The browsers the service has, where it has several. Whoever runs them says so."""
+        self.backends: dict[str, str] = {}
+        """Where each of those systems is, for the settings that are one backend's alone."""
 
     # The two layers.
 
@@ -191,6 +193,8 @@ class SettingsStore:
                     continue
                 if entry.only_per_system and system is None:
                     continue
+                if not self._is_for(entry, system):
+                    continue
                 if role == "user" and not entry.user:
                     continue
                 if role == "admin":
@@ -220,6 +224,17 @@ class SettingsStore:
         if system is not None:
             answer["system"] = system
         return answer
+
+    def _is_for(self, entry: Entry, system: str | None) -> bool:
+        """Whether a setting is drawn for a system: one that is a desktop's alone is not drawn for
+        a browser, nor a browser's for the desktop (spec 21.8). Where it is not known what a system
+        is, every setting is drawn."""
+        backend = self.backends.get(system or "")
+        if backend is None:
+            return entry.backends is None or COMPUTER not in entry.backends
+        if COMPUTER in (entry.backends or ()):
+            return backend == COMPUTER
+        return backend != COMPUTER or entry.backends is None
 
     def change(
         self, surface: str, changes: Mapping[str, Any], system: str | None = None, role: Role = "admin"

@@ -123,6 +123,7 @@ async def test_the_window_has_a_page_for_each_browser(
             ("cloud", "remote_headless"),
             ("chrome", "takeover_chrome"),
             ("builtin", "bundled_chromium"),
+            ("computer", "contained_desktop"),
         ]
         # The person's own Chrome is not there until its extension dials in.
         assert rooms[1]["state"] == "waiting" and rooms[1]["extension"] == str(opened.folder)
@@ -133,6 +134,7 @@ async def test_the_window_has_a_page_for_each_browser(
             "Cloud browser Ready",
             "My Chrome Not connected",
             "Built-in browser Ready",
+            "Computer Could not start",
         ]
         # The cloud browser's page: its picture, and its own chat.
         await page.get_by_label("Your task").wait_for()
@@ -149,6 +151,11 @@ async def test_the_window_has_a_page_for_each_browser(
         await page.get_by_label("Your task").wait_for()
         assert await page.get_by_title("Session", exact=True).inner_text() == "Session\nbuiltin"
         assert (tmp_path / "built-in-browser").is_dir(), "the built-in browser keeps a profile of its own"
+
+        # Computer use: a desktop and no browser. Here there is no program to run it, and it says what to do.
+        await opened.open("Computer")
+        await page.get_by_role("heading", name="The desktop could not be started").wait_for()
+        assert "Install Docker" in await page.locator(".studio-wait-lead").inner_text()
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
 
 
@@ -269,7 +276,7 @@ async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
 
         status, told = await opened.ask("GET", "/api/systems")
         systems = {system["id"]: system for system in told["systems"]}
-        assert status == 200 and list(systems) == ["cloud", "chrome", "builtin"]
+        assert status == 200 and list(systems) == ["cloud", "chrome", "builtin", "computer"]
         assert all(system["enabled"] for system in systems.values())
         # A log for each browser, in the folder for them, and not one for all.
         assert systems["cloud"]["log"] == str((tmp_path / "logs" / "cloud.jsonl").resolve())
@@ -723,6 +730,8 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
             f"Cloud browser Ready On May use it {model} Configuration Evaluations",
             f"My Chrome Not connected On May use it {model} Configuration Evaluations",
             f"Built-in browser Ready On May use it {model} Configuration Evaluations",
+            # The desktop of computer use: no container program in a test, so it could not start.
+            f"Computer Could not start On May use it {model} Configuration Evaluations",
         ]
         assert await browsers.get_by_role("switch").count() == 0, "nothing is changed here"
         overall = systems.get_by_role("article", name="Evaluations of all systems")

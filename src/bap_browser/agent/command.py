@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from bap_browser import browser_extension
-from bap_browser.agent.loop import Unfinished, run_agent
+from bap_browser.agent.loop import SYSTEM, Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, Said, ToolOutput
 from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
@@ -255,6 +255,7 @@ async def do_task(
     config: Config,
     history: list[Message],
     recorder: Recorder | None = None,
+    system: str = SYSTEM,
 ) -> Did:
     """Runs one task and says how it went in the chat. With `recorder`, what the task took is
     kept: its time, its steps, its tokens and how it ended (spec 12.6)."""
@@ -289,6 +290,7 @@ async def do_task(
             ended=lambda: session.control == "ended",
             stopped=session.task_stopped,
             history=history,
+            system=system,
         )
         session.said("agent", answer)
         outcome = "answered"

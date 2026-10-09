@@ -18,7 +18,9 @@ from bap_browser.service.check_news import ASKED_OF_THE_CHECK, CheckNews
 from bap_browser.service.events import EventHub
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools.gate import Admission
-from bap_browser.tools.toolkit import DECLARES_A_TASK, Toolkit
+from bap_browser.tools.kinds import DECLARES_A_TASK
+from bap_browser.tools.registry import ToolDefinition
+from bap_browser.tools.toolkit import Toolkit
 
 ControlState = Literal["agent", "paused", "person_requested", "person", "ended"]
 HelpOutcome = Literal["done", "could_not", "timed_out"]
@@ -56,11 +58,13 @@ class ServiceSession(CheckNews):
         backend: str | None = None,
         on_restart: Callable[[], None] | None = None,
         settings: SettingsStore | None = None,
+        tools: Sequence[ToolDefinition] | None = None,
     ) -> None:
         """`backend` names where the browser is, when that is not what the configuration says: a
         person's own Chrome, or the browser built into the app (spec 4.3). `on_restart` is told when
         a person asks, after this session has ended, for a new one in its place. `settings` holds
-        what a person chose in the settings screen: it is laid over `config` (spec 10.1)."""
+        what a person chose in the settings screen: it is laid over `config` (spec 10.1). `tools` are the
+        tools on offer, when they are not a browser's: a desktop's (spec 21.5)."""
         # What the deployment and this session's own options give, before a person's settings.
         self._given = config
         self._settings = settings
@@ -91,7 +95,7 @@ class ServiceSession(CheckNews):
         self.stand_in: Callable[[str, str], ApprovalOutcome] | None = None
         """During a run of a task set (spec 12.7) there is no person to ask: this answers each
         approval at once, given the tool and what it would do. None at every other time."""
-        self.toolkit = Toolkit(self.browser, observer=self, gate=self._admit)
+        self.toolkit = Toolkit(self.browser, tools, observer=self, gate=self._admit)
         if on_task is not None:
             # In a chat the person's own messages are the task. An agent cannot put its own in their place.
             self.toolkit.leave_out(DECLARES_A_TASK)

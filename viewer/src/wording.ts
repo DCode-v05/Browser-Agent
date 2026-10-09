@@ -213,7 +213,7 @@ export const W = {
     signOut: 'Sign out',
     /** What each part of the window's bar is, shown when the pointer rests on it. */
     hint: {
-      systems: 'For the admin: what users are allowed, and the three browsers compared.',
+      systems: 'For the admin: what users are allowed, and the browsers and the desktop compared.',
       desktop: 'Opens the desktop app in a window of its own, with its own browser and its own chat.',
       signOut: 'Ends your visit on this page. You sign in again to come back.',
       view: {
@@ -226,12 +226,20 @@ export const W = {
         remote_headless: "A browser of the service's own. Nothing is kept from one session to the next.",
         takeover_chrome: 'A tab of your own Chrome, with your sign-ins. The extension connects it.',
         bundled_chromium: "The app's own browser. It keeps its sign-ins from one session to the next.",
+        contained_desktop: 'Computer use: a small desktop of its own, with its own apps. The agent works on it with the mouse and the keyboard.',
       },
     },
     noBrowser: 'No browser to use yet',
     noBrowserLead: "Your admin has not let users use any browser. Ask them to turn one on for users: it is in that browser's Configuration.",
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
+    /** The page of computer use, which is a desktop and no browser (spec 21). */
+    computer: {
+      starting: 'Starting the desktop…',
+      failed: 'The desktop could not be started',
+      turnedOff: 'The desktop is turned off',
+      view: 'Desktop and chat',
+    },
     desktop: {
       open: 'Open desktop app',
       opening: 'Opening…',
@@ -279,7 +287,7 @@ export const W = {
 
   systems: {
     title: 'Systems',
-    lead: "For the admin: what is not one browser's alone. What users are allowed, and the three browsers compared. Each browser's own configuration and evaluations are under its tab, at the top.",
+    lead: "For the admin: what is not one system's alone. What users are allowed, and the browsers and the desktop compared. Each one's own configuration and evaluations are under its tab, at the top.",
     views: 'What to show of the systems',
     view: { users: 'Users', overview: 'All systems' },
     viewHint: {
@@ -298,7 +306,7 @@ export const W = {
         configuration: "For the admin. How this one browser is set up: whether it runs, whether users may use it, and what the agent may do in it. A change is saved as you make it, and holds from the agent's next step.",
         settings: 'Your own settings for this browser, inside what your admin allows. A change is saved as you make it.',
         evaluations: {
-          admin: 'What the tasks done in this browser took: how they ended, how long they took and what they cost. The three browsers compared are under Systems, All systems.',
+          admin: 'What the tasks done in this browser took: how they ended, how long they took and what they cost. All of them compared are under Systems, All systems.',
           user: 'What the tasks done in this browser took. Your admin decides how much of it users see.',
         },
       },
@@ -306,6 +314,23 @@ export const W = {
     loading: 'Loading…',
     unreachable: 'The service did not answer. Try again.',
     thisBrowser: 'This browser',
+    /** The same parts of a system's page, for the desktop of computer use (spec 21), which is no browser. */
+    desktop: {
+      thisBrowser: 'This desktop',
+      use: 'Use this desktop',
+      useLead: 'On: the desktop runs and the agent can work on it. Off: its session ends and nobody can use it, until it is turned on again.',
+      startHint: 'Starts a new desktop and a new conversation.',
+      stopHint: 'Ends the session. The desktop stays turned on.',
+      restartHint: 'Ends the session and starts a new desktop and a new conversation. Nothing of the last desktop is kept, except the shared folder.',
+      manageLead: {
+        running: 'Restart ends the session and starts a new desktop and a new conversation. Stop ends the session and leaves the desktop turned on.',
+        stopped: 'Start gives this desktop a new session: a new desktop and a new conversation.',
+        off: 'Turn the desktop on to start it.',
+      },
+      users: 'Let users use this desktop',
+      usersLead: "On: users have the desktop's tab, with its chat, their settings and its evaluations. Off: for a user it is not there at all.",
+      configuration: 'For the admin. How the desktop of computer use is set up: whether it runs, whether users may use it, which apps the agent may open, and what of this computer it can reach. A change is saved as you make it.',
+    },
     use: 'Use this browser',
     useLead: 'On: the browser runs and the agent can work in it. Off: its session ends and nobody can use it, until it is turned on again.',
     chromeWaits: 'It connects by itself, a moment after its extension is loaded in your Chrome.',
@@ -324,7 +349,7 @@ export const W = {
     forUsersLead: "A setting below with a line about users is also on the user's page. Every other setting is yours alone: users never see it. Which ones users may change is under Systems, Users.",
     usersMay: "Also on the user's page. Users may set their own, never looser than yours.",
     usersHeld: "Also on the user's page, held at your value: users cannot change it.",
-    everyBrowser: 'One value for all three browsers.',
+    everyBrowser: 'One value for every browser and the desktop.',
     locked: 'Locked in config.json',
     sites: (count: number) => (count === 0 ? 'None' : count === 1 ? '1 site' : `${count} sites`),
     log: 'Log file',
@@ -394,7 +419,7 @@ export const W = {
     },
     overall: {
       title: 'Evaluations of all systems',
-      lead: 'The tasks of the three browsers added up, then a row for each, to compare them. Each browser has its own Evaluations under its tab.',
+      lead: 'The tasks of the browsers and the desktop added up, then a row for each, to compare them. Each has its own Evaluations under its tab.',
       none: 'No task has been done in any browser yet.',
       bySystem: 'By system',
       system: 'System',
@@ -599,6 +624,7 @@ export const W = {
     browser: 'Browser',
     tabs: 'Browser tabs',
     address: 'Address',
+    desktop: 'The desktop of computer use',
     steps: 'Steps',
     needsAttention: 'needs attention',
     elapsed: 'Elapsed',
@@ -618,6 +644,7 @@ export const W = {
     remote_headless: 'Cloud browser',
     takeover_chrome: 'My Chrome',
     bundled_chromium: 'Built-in browser',
+    contained_desktop: 'Computer',
   } satisfies Record<Backend, string>,
 
   settings: {

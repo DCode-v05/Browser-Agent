@@ -524,6 +524,47 @@
       "reach": "`uv run python scripts/gate.py`.",
       "addresses": [],
       "tools": []
+    },
+    {
+      "id": "computer-use",
+      "title": "Computer use: the agent on a contained desktop, the fourth page of the window",
+      "spec": "21",
+      "source": [
+        "src/bap_browser/config_computer.py",
+        "src/bap_browser/driver/contained_desktop.py",
+        "src/bap_browser/driver/desktop_driver.py",
+        "src/bap_browser/tools/computer_tools.py",
+        "src/bap_browser/tools/kinds.py",
+        "src/bap_browser/agent/studio.py",
+        "src/bap_browser/settings/catalogue.py",
+        "deploy/desktop.Dockerfile",
+        "deploy/desktop-start.sh",
+        "deploy/desktop-menu.xml",
+        "viewer/src/Studio.tsx",
+        "viewer/src/systems/SystemsPage.tsx"
+      ],
+      "tests": [
+        "tests/unit/test_computer.py",
+        "tests/e2e/test_computer.py",
+        "tests/viewer/test_studio.py",
+        "viewer/src/Studio.test.tsx"
+      ],
+      "reach": "Build the desktop once (`docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy`), run `uv run bap-browser studio --open`, and press the tab Computer.",
+      "addresses": [],
+      "tools": [
+        "computer_screenshot",
+        "computer_zoom",
+        "computer_click",
+        "computer_move",
+        "computer_drag",
+        "computer_type",
+        "computer_press_key",
+        "computer_scroll",
+        "computer_wait",
+        "computer_list_apps",
+        "computer_open_app",
+        "computer_request_human"
+      ]
     }
   ]
 }

@@ -27,7 +27,7 @@ from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools import Toolkit
-from bap_browser.tools.toolkit import READS
+from bap_browser.tools.kinds import READS
 
 INSTRUCTIONS = (
     "Browser tools. Read a page with browser_snapshot: an accessibility tree in which every element "

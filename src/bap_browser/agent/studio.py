@@ -1,11 +1,13 @@
-"""`bap-browser studio`: one window with the three browsers an agent can work in, each a page of it
-(spec 9.16), and each a system of its own to set up, to manage and to evaluate (spec 9.17).
+"""`bap-browser studio`: one window with the three browsers an agent can work in and the desktop of
+computer use (spec 21), each a page of it (spec 9.16), and each a system of its own to set up, to
+manage and to evaluate (spec 9.17).
 
 | Page | Where the browser is |
 |---|---|
 | Cloud browser | A headless browser of the service's own, with a fresh profile and a live picture |
 | My Chrome | A tab of the person's own Chrome, reached through the extension (spec 4.9) |
 | Built-in browser | A browser of the app's own that keeps its sign-ins, with a live picture |
+| Computer | A small Linux desktop in a container of its own, with a live picture (spec 21) |
 
 Each page is a session of its own, with its own chat, its own settings, its own log and its own
 record of what its tasks took. A session a person stopped can be started again from the page.
@@ -31,9 +33,11 @@ from bap_browser.agent.command import (
     tell,
     unless_stopped,
 )
+from bap_browser.agent.loop import COMPUTER_SYSTEM, SYSTEM
 from bap_browser.agent.models import Message, Model
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
+from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
@@ -44,10 +48,14 @@ from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
+from bap_browser.tools.computer_tools import COMPUTER_TOOLS
 
 logger = logging.getLogger(__name__)
 
-CLOUD, CHROME, BUILT_IN = "cloud", "chrome", "builtin"
+CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
+# The backend of the page that is no browser: the contained desktop of computer use (spec 21).
+DESKTOP = "contained_desktop"
+ONLY_A_BROWSER = "This is for a browser. The desktop of computer use has no checklist and no task sets yet."
 # The folder, inside the data folder, where the built-in browser keeps its sign-ins.
 BUILT_IN_PROFILE = "built-in-browser"
 # Where the core of the desktop app says where it is, beside this service's own such file.
@@ -130,10 +138,12 @@ class Studio:
             Room(CLOUD, "remote_headless"),
             Room(CHROME, "takeover_chrome"),
             Room(BUILT_IN, "bundled_chromium"),
+            Room(COMPUTER, DESKTOP),
         ]
         self._recorders = {room.id: Recorder(config.evals, room.id, room.backend) for room in self.rooms}
         # The settings know which browsers there are: a user's preferred one is among them.
         settings.systems = tuple(room.id for room in self.rooms)
+        settings.backends = {room.id: room.backend for room in self.rooms}
         # A checklist runs on one browser at a time, and not on one that is being checked already.
         self._checking: set[str] = set()
         # The task sets (spec 12.7): each browser's reports, and the run that is under way on it.
@@ -251,6 +261,8 @@ class Studio:
         """Runs the checklist on a browser. The result; or, as a sentence, why it could not run."""
         room, service = self._room(system), self.service
         assert room is not None and service is not None
+        if room.backend == DESKTOP:
+            return ONLY_A_BROWSER
         session = room.session
         if session is None or session.control == "ended":
             return "This browser has no session. Start it first."
@@ -310,6 +322,8 @@ class Studio:
         room, service = self._room(system), self.service
         assert room is not None and service is not None
         session = room.session
+        if room.backend == DESKTOP:
+            return ONLY_A_BROWSER
         if name not in SETS:
             return "There is no task set of that name."
         if not 1 <= trials <= self._config.evals.suite_max_trials:
@@ -379,16 +393,20 @@ class Studio:
             config = _cloud(config)
         elif room.id == BUILT_IN:
             config = _built_in(config)
+        elif room.id == COMPUTER:
+            # Its picture is sent to whoever watches, as a headless browser's is.
+            config = _cloud(config)
         return _with_its_own_log(config, room.id)
 
     async def run(self, service: Service) -> None:
-        """Runs the three browsers until the service stops."""
+        """Runs the three browsers and the desktop until the service stops."""
         self.service = service
-        cloud, chrome, built_in = self.rooms
+        cloud, chrome, built_in, computer = self.rooms
         working = [
             asyncio.create_task(self._own_browser(cloud)),
             asyncio.create_task(self._persons_chrome(chrome)),
             asyncio.create_task(self._own_browser(built_in)),
+            asyncio.create_task(self._own_desktop(computer)),
         ]
         try:
             await unless_stopped(asyncio.gather(*working), service)
@@ -439,7 +457,42 @@ class Studio:
             if task is None:
                 return
             async with room.turn:
-                await do_task(task, session, model, session.config, history, self._recorders[room.id])
+                system = COMPUTER_SYSTEM if room.backend == DESKTOP else SYSTEM
+                await do_task(task, session, model, session.config, history, self._recorders[room.id], system)
+
+    async def _own_desktop(self, room: Room) -> None:
+        """The page of computer use (spec 21): a contained desktop this process starts. Each time a
+        person asks for a new session, a new desktop is started for it, with nothing of the last."""
+        while True:
+            await self._wanted(room)
+            room.phase, room.note = "starting", ""
+            room.restart.clear()
+            given = self._given(room)
+            # The desktop is started as a person has set it up: its network and its shared folder.
+            as_set = self._settings.apply_to(given, room.backend, room.id)
+            tasks: asyncio.Queue[str] = asyncio.Queue()
+            session = ServiceSession(
+                given,
+                DesktopDriver(as_set, room.id),
+                agent=AGENT_NAME,
+                name=room.id,
+                on_task=tasks.put_nowait,
+                backend=room.backend,
+                on_restart=room.restart.set,
+                settings=self._settings,
+                tools=COMPUTER_TOOLS,
+            )
+            try:
+                await session.start()
+            except BapError as failed:
+                await session.close()
+                room.session, room.phase, room.note = None, "failed", str(failed)
+                # A person can try again from the Systems page.
+                await self._asked_again(room)
+                continue
+            self._take_place(room, session)
+            await self._talk(room, tasks, session)
+            await self._asked_again(room)
 
     async def _own_browser(self, room: Room) -> None:
         """A page whose browser this process starts itself. Each time a person asks for a new
