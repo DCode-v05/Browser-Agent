@@ -16,6 +16,7 @@ import { W } from './wording';
 const cloud: Room = { id: 'cloud', backend: 'remote_headless', state: 'agent', attention: false, working: false };
 const chrome: Room = { id: 'chrome', backend: 'takeover_chrome', state: 'waiting', attention: false, working: false, extension: '/home/ada/.bap-browser/extension' };
 const builtIn: Room = { id: 'builtin', backend: 'bundled_chromium', state: 'agent', attention: false, working: false };
+const computer: Room = { id: 'computer', backend: 'contained_desktop', state: 'agent', attention: false, working: false };
 const options = { ...DEFAULT_OPTIONS, tickMs: 0 };
 
 function open(rooms: Room[] = [cloud, chrome, builtIn], loadRooms = vi.fn(async () => null as Room[] | null), pollMs = 0) {
@@ -76,6 +77,23 @@ describe('the window of three pages (spec 9.16)', () => {
     await user.click(tab(/Built-in browser/));
     expect(screen.getByRole('heading', { name: W.studio.failed })).toBeInTheDocument();
     expect(screen.getByText(/it is not installed/)).toBeInTheDocument();
+  });
+
+  it('has a Computer page beside the browsers, with the desktop and its own chat (spec 21)', async () => {
+    const { asked, user } = open([cloud, chrome, builtIn, computer]);
+    expect(tab(/Computer/)).toHaveTextContent(`${W.backend.contained_desktop}${W.studio.mood.ready}`);
+    expect(tab(/Computer/)).toHaveAttribute('title', W.studio.hint.backend.contained_desktop);
+    await user.click(tab(/Computer/));
+    expect(tab(/Computer/)).toHaveAttribute('aria-selected', 'true');
+    expect(asked).toEqual(['cloud', 'computer']);
+  });
+
+  it('says why the desktop could not be started, in words of a desktop', async () => {
+    const failed: Room = { ...computer, state: 'failed', note: 'Install Docker and start it.' };
+    const { user } = open([cloud, chrome, builtIn, failed]);
+    await user.click(tab(/Computer/));
+    expect(screen.getByRole('heading', { name: W.studio.computer.failed })).toBeInTheDocument();
+    expect(screen.getByText('Install Docker and start it.')).toBeInTheDocument();
   });
 
   it('opens on the page the person was on', () => {

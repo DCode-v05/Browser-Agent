@@ -18,6 +18,7 @@ from bap_browser.address import presentable_address, without_credentials
 from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
+from bap_browser.driver.desktop_driver import SCREEN
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BadInput, BapError, PolicyBlocked
 from bap_browser.results import Picture, ToolResult
@@ -30,6 +31,20 @@ from bap_browser.tools.arguments import RunArgs
 from bap_browser.tools.browser_tools import RUN_A_SCRIPT
 from bap_browser.tools.event_log import EventLog, masked, names_only
 from bap_browser.tools.gate import Gate, always_open
+from bap_browser.tools.kinds import (
+    ANSWERS_A_DIALOG,
+    CHANGES_UNSEEN,
+    DECLARES_A_TASK,
+    GO_WHERE_THE_FOCUS_IS,
+    LISTS_THE_TABS,
+    NEED_NO_SITE,
+    NO_STEP_ON_A_PAGE,
+    POINTED,
+    PRESSES_KEYS,
+    READS,
+    RUN_BESIDE_A_DIALOG,
+    TOLD_BY_ITS_RESULT,
+)
 from bap_browser.tools.observer import StepObserver
 from bap_browser.tools.offered import TOOLS
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition, describe_problem
@@ -57,10 +72,6 @@ class Outcome:
     picture: Picture | None = None
 
 
-# The tools whose x and y are where the pointer goes. For browser_scroll they are only where the wheel turns.
-POINTED = frozenset({"browser_click", "browser_hover"})
-
-
 def _point(arguments: Mapping[str, Any], driver: Driver) -> Located | None:
     """The place a call names by x and y, so that the pointer a person sees goes there."""
     x, y = arguments.get("x"), arguments.get("y")
@@ -79,47 +90,6 @@ def _sentence(words: str) -> str:
     return words[:1].upper() + words[1:]
 
 
-# The tools that only read, or only wait. With "ask before every action" these are still not asked about.
-READS = frozenset(
-    {
-        "browser_snapshot",
-        "browser_get_text",
-        "browser_find",
-        "browser_screenshot",
-        "browser_zoom",
-        "browser_console",
-        "browser_network",
-        "browser_downloads",
-        "browser_wait",
-        "browser_request_human",
-        "browser_begin_task",
-    }
-)
-DECLARES_A_TASK = "browser_begin_task"
-# The one use of the tabs tool that changes nothing: it tells which tabs are open.
-LISTS_THE_TABS = ("browser_tabs", "list")
-# The tools whose keys go to the element that has the focus when they name no element.
-GO_WHERE_THE_FOCUS_IS = frozenset({"browser_type", "browser_press_key"})
-# The tools that touch no site: asking a person, waiting, and the list of saved files.
-NEED_NO_SITE = frozenset({"browser_request_human", "browser_wait", "browser_downloads", DECLARES_A_TASK})
-ANSWERS_A_DIALOG = "browser_handle_dialog"
-# While a page has a dialog open it answers nothing. Only these tools need nothing from it (spec 5.7).
-RUN_BESIDE_A_DIALOG = frozenset(
-    {
-        ANSWERS_A_DIALOG,
-        "browser_tabs",
-        "browser_console",
-        "browser_network",
-        "browser_downloads",
-        DECLARES_A_TASK,
-    }
-)
-# The tools that are no step on a page. They are not watched for going round in circles.
-NO_STEP_ON_A_PAGE = NEED_NO_SITE | {"browser_tabs", ANSWERS_A_DIALOG, RUN_A_SCRIPT}
-# What a hover brings up is often drawn by a style, which cannot be seen from here.
-CHANGES_UNSEEN = frozenset({"browser_hover"})
-# A script in the page is mostly a way to read it. Whether it repeats itself is told by what it gives.
-TOLD_BY_ITS_RESULT = READS | {"browser_evaluate"}
 # What an acting step is told when its answer was lost on the way (spec 18.8).
 OUTCOME_UNKNOWN = (
     "The connection to the browser was lost while this step ran. Whether it was done is not known. "
@@ -142,11 +112,13 @@ def _typed(name: str, arguments: Mapping[str, Any]) -> str | None:
         {
             "browser_type": "text",
             "browser_press_key": "keys",
+            "computer_type": "text",
+            "computer_press_key": "keys",
             ANSWERS_A_DIALOG: "prompt_text",
             "browser_evaluate": "expression",
         }.get(name, "")
     )
-    if not isinstance(put, str) or (name == "browser_press_key" and not keys.is_typed_text(put)):
+    if not isinstance(put, str) or (name in PRESSES_KEYS and not keys.is_typed_text(put)):
         return None
     return put
 
@@ -685,6 +657,8 @@ class Toolkit:
         """What ends every result: the open tabs, and what happened in the browser by itself since
         the last call."""
         block = ""
+        # A desktop has no tabs: its one screen is not listed (spec 21.5).
+        tabs = [tab for tab in tabs if tab.id != SCREEN]
         if tabs:
             block += "\n[tabs] " + " | ".join(
                 f"{tab.id}{'*' if tab.active else ''} {tab.url}" for tab in tabs

@@ -53,7 +53,7 @@ NAME_HELD = "[withheld]"
 HELD_LONG, HELD_SHORT = chr(0xFDD2), chr(0xFDD3)
 # A whole read of a page: when it finds nothing planted any more, the page is no longer flagged.
 WHOLE_READS = frozenset({"browser_snapshot", "browser_get_text"})
-TAKES_A_PICTURE = frozenset({"browser_screenshot", "browser_zoom"})
+TAKES_A_PICTURE = frozenset({"browser_screenshot", "browser_zoom", "computer_screenshot", "computer_zoom"})
 # The tools whose result is a new read of the page.
 READS_THE_PAGE = frozenset({"browser_snapshot", "browser_get_text", "browser_find", "browser_navigate"})
 INSTRUCTED = (

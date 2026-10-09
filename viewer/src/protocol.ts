@@ -1,7 +1,7 @@
 // The viewer protocol (spec 4.8): events from the service, commands to it.
 
 export type ControlState = 'agent' | 'waiting_approval' | 'person_requested' | 'person' | 'paused' | 'ended';
-export type Backend = 'remote_headless' | 'takeover_chrome' | 'bundled_chromium';
+export type Backend = 'remote_headless' | 'takeover_chrome' | 'bundled_chromium' | 'contained_desktop';
 export type Surface = 'web' | 'mobile' | 'desktop';
 
 /** A rectangle in page pixels. */

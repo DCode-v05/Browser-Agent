@@ -210,6 +210,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             assert await tabs(user, "Where the agent works") == [
                 "My Chrome Not connected",
                 "Built-in browser Ready",
+                "Computer Could not start",
             ]
             assert await user.get_by_role("button", name="Systems").count() == 0
             assert await running.status("GET", "/api/systems/cloud/evals", users_visit) == 404
@@ -224,7 +225,11 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await user.get_by_role("tab", name="Settings").click()
             preferred = user.get_by_role("combobox", name="Preferred browser")
             await preferred.wait_for()
-            assert await preferred.locator("option").all_text_contents() == ["My Chrome", "Built-in browser"]
+            assert await preferred.locator("option").all_text_contents() == [
+                "My Chrome",
+                "Built-in browser",
+                "Computer",
+            ]
             await preferred.select_option("builtin")
             task = user.get_by_label("Your task")
             await task.wait_for()

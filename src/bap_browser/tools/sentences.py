@@ -44,6 +44,9 @@ def label_for(
     tool: str, arguments: Mapping[str, Any], target: Located | None, room: Room = AS_SHIPPED
 ) -> str:
     """What the agent is doing: 'Clicking "Create account"'."""
+    on_a_desktop = _on_a_desktop(tool, arguments)
+    if on_a_desktop is not None:
+        return _fit(room, on_a_desktop[0])
     match tool:
         case "browser_navigate":
             return _row(room, "Opening ", _address(arguments), "")
@@ -119,6 +122,9 @@ def summary_for(
     """What happened: 'Clicked "Create account" (button)', or 'Could not click "Pay": it is covered'."""
     if failure is not None:
         return _fit(room, _row(room, "Could not ", _attempt(tool, arguments, target), "") + f": {failure}")
+    on_a_desktop = _on_a_desktop(tool, arguments)
+    if on_a_desktop is not None:
+        return _fit(room, on_a_desktop[1])
     match tool:
         case "browser_navigate":
             return _row(room, "Opened ", _address(arguments), "")
@@ -185,6 +191,9 @@ def summary_for(
 
 def _attempt(tool: str, arguments: Mapping[str, Any], target: Located | None) -> str:
     element = _element(arguments, target)
+    on_a_desktop = _on_a_desktop(tool, arguments)
+    if on_a_desktop is not None:
+        return on_a_desktop[2]
     match tool:
         case "browser_navigate":
             return f"open {_address(arguments)}"
@@ -256,6 +265,69 @@ _TABS_DOING = {
 }
 _TABS_DONE = {"list": "Listed the tabs", "new": "Opened a tab", "switch": "Switched to", "close": "Closed"}
 _TABS_TO_DO = {"list": "list the tabs", "new": "open a tab", "switch": "switch to", "close": "close"}
+
+
+def _on_a_desktop(tool: str, arguments: Mapping[str, Any]) -> tuple[str, str, str] | None:
+    """A step on the desktop of computer use (spec 21.7), three ways: what the agent is doing, what
+    happened, and what it could not do. None for a tool that is not a desktop's."""
+    at = _at(arguments)
+    typed = _count(arguments, None)
+    match tool:
+        case "computer_screenshot":
+            return "Looking at the screen", "Looked at the screen", "look at the screen"
+        case "computer_zoom":
+            return "Looking closer at the screen", "Looked closer at the screen", "look closer at the screen"
+        case "computer_click":
+            twice = arguments.get("click_count") == 2
+            doing, did, to = (
+                ("Double-clicking", "Double-clicked", "double-click")
+                if twice
+                else ("Clicking", "Clicked", "click")
+            )
+            return f"{doing}{at}", f"{did}{at}", f"{to}{at}"
+        case "computer_move":
+            return f"Moving the pointer{at}", f"Moved the pointer{at}", "move the pointer"
+        case "computer_drag":
+            return "Dragging on the screen", "Dragged on the screen", "drag on the screen"
+        case "computer_type":
+            return f"Typing {typed}".rstrip(), f"Typed {typed}".rstrip(), "type"
+        case "computer_press_key":
+            return f"Pressing {_key(arguments)}", f"Pressed {_key(arguments)}", f"press {_key(arguments)}"
+        case "computer_scroll":
+            way = _direction(arguments)
+            return f"Scrolling{way}", f"Scrolled{way}", f"scroll{way}"
+        case "computer_wait":
+            return "Waiting", "Waited", "finish waiting"
+        case "computer_list_apps":
+            return "Looking at the apps", "Looked at the apps", "look at the apps"
+        case "computer_open_app":
+            app = _app(arguments)
+            return f"Opening {app}", f"Opened {app}", f"open {app}"
+        case "computer_request_human":
+            reason = _reason(arguments)
+            return f"Asking for help: {reason}", f"Asked for help: {reason}", "get help"
+    return None
+
+
+def _at(arguments: Mapping[str, Any]) -> str:
+    x, y = arguments.get("x"), arguments.get("y")
+    if (
+        isinstance(x, bool)
+        or isinstance(y, bool)
+        or not isinstance(x, int | float)
+        or not isinstance(y, int | float)
+    ):
+        return ""
+    return f" at {x:g}, {y:g}"
+
+
+def _app(arguments: Mapping[str, Any]) -> str:
+    """The app by the name the agent gave, where that is a name: letters and spaces, and not long."""
+    name = arguments.get("app")
+    if not isinstance(name, str) or not name.replace(" ", "").replace("_", "").isalpha():
+        return "an app"
+    # A name longer than a row is cut where the row is fitted.
+    return name.strip()
 
 
 def _tab_action(arguments: Mapping[str, Any]) -> str:

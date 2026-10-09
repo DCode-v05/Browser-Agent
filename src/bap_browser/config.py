@@ -16,6 +16,7 @@ from pydantic import PrivateAttr, ValidationError, field_validator
 
 from bap_browser.address import site_pattern
 from bap_browser.config_base import Section, setting
+from bap_browser.config_computer import Computer
 from bap_browser.config_safeguards import (
     AutoMode,
     Limits,
@@ -542,6 +543,7 @@ class Config(Section):
     auth: Auth = Auth()
     evals: Evals = Evals()
     bench: Bench = Bench()
+    computer: Computer = Computer()
     # For each key a layer set, the layer: a file, the environment or the session. Not a setting.
     _sources: dict[str, str] = PrivateAttr(default_factory=dict[str, str])
 

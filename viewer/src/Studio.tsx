@@ -21,6 +21,7 @@ const BACKEND_ICON: Record<Backend, IconName> = {
   remote_headless: 'globe',
   takeover_chrome: 'person',
   bundled_chromium: 'monitor',
+  contained_desktop: 'computer',
 };
 
 /** What is shown under a browser's tab: the browser itself with its chat, how it is set up, or what its tasks took. */
@@ -264,7 +265,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
                   setView(name);
                 }}
               >
-                {W.studio.view[name]}
+                {name === 'agent' && room.backend === 'contained_desktop' ? W.studio.computer.view : W.studio.view[name]}
               </button>
             ))}
           </div>
@@ -384,7 +385,7 @@ function NoSession({ room, onTurnOn }: { room: Room; onTurnOn?(): void }) {
     return (
       <section className="studio-wait" aria-label={W.backend[room.backend]}>
         <Icon name="pause" size="large" />
-        <h2 className="studio-wait-title">{W.studio.turnedOff}</h2>
+        <h2 className="studio-wait-title">{room.backend === 'contained_desktop' ? W.studio.computer.turnedOff : W.studio.turnedOff}</h2>
         <p className="studio-wait-lead">{W.studio.turnedOffLead}</p>
         {onTurnOn && (
           <Button kind="primary" icon="play" onClick={onTurnOn}>
@@ -395,10 +396,11 @@ function NoSession({ room, onTurnOn }: { room: Room; onTurnOn?(): void }) {
     );
   }
   const failed = room.state === 'failed';
+  const words = room.backend === 'contained_desktop' ? W.studio.computer : W.studio;
   return (
     <section className="studio-wait" aria-label={W.backend[room.backend]}>
       <Icon name={failed ? 'alert' : BACKEND_ICON[room.backend]} size="large" />
-      <h2 className="studio-wait-title">{failed ? W.studio.failed : W.studio.starting}</h2>
+      <h2 className="studio-wait-title">{failed ? words.failed : words.starting}</h2>
       {room.note && <p className="studio-wait-lead">{room.note}</p>}
     </section>
   );

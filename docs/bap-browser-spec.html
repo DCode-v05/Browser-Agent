@@ -350,13 +350,26 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#206-the-first-clean-up">20.6 The first clean-up</a></li>
 </ul>
 </li>
+<li class="s"><a href="#21-computer-use">21. Computer use</a>
+<ul class="sub">
+<li><a href="#211-the-four-arrangements">21.1 The four arrangements</a></li>
+<li><a href="#212-what-a-person-sees">21.2 What a person sees</a></li>
+<li><a href="#213-the-contained-desktop">21.3 The contained desktop</a></li>
+<li><a href="#214-the-engine">21.4 The engine</a></li>
+<li><a href="#215-tools">21.5 Tools</a></li>
+<li><a href="#216-safety">21.6 Safety</a></li>
+<li><a href="#217-settings">21.7 Settings</a></li>
+<li><a href="#218-tests">21.8 Tests</a></li>
+<li><a href="#219-not-built-yet">21.9 Not built yet</a></li>
+</ul>
+</li>
 </ul>
 </nav>
 </details>
 <main>
 <header class="doc-head">
 <h1>bap-browser: Spec</h1>
-<div class="meta"><span>Date: 2026-10-03</span><span>Status: draft for review</span><span>Scope: browser use (computer use is a later spec)</span></div>
+<div class="meta"><span>Date: 2026-10-03</span><span>Status: draft for review</span><span>Scope: browser use, and computer use (section 21)</span></div>
 <p><code>bap-browser</code> is a browser that AI agents can use and that a person can watch and control.
 It is one library behind one contract; the browser itself can run in three places.
 This document describes everything it is, end to end: what it does, how it is built, how it looks,
@@ -12827,6 +12840,224 @@ that holds it, and the baseline holds one.</p>
 looking. To wait for the thing it needs the extension to say that it has given up, which it does not.</p>
 <p>Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.</p>
+<h2 id="21-computer-use">21. Computer use</h2>
+<p>Date: 2026-10-09 · Status: arrangement 1 built; arrangements 2 to 4 planned</p>
+<p>Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
+picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
+is for what a browser cannot reach. It is one more page of the window (section 9.16), beside the three
+browsers, with its own chat, settings, log and evaluations.</p>
+<h3 id="211-the-four-arrangements">21.1 The four arrangements</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Where the engine runs</th>
+<th>Which desktop it drives</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>The person's own machine</td>
+<td>A contained desktop in a container on that machine</td>
+<td>Built</td>
+</tr>
+<tr>
+<td>2</td>
+<td>A remote micro VM</td>
+<td>The VM's own contained desktop, watched over the network</td>
+<td>Planned: the micro VM image (section 17.2) gains the desktop</td>
+</tr>
+<tr>
+<td>3</td>
+<td>A remote micro VM</td>
+<td>The VM's desktop, reaching the person's private services</td>
+<td>Planned: the VM joins the person's Tailscale network as a tagged, ephemeral node. It needs a tailnet owner, an access policy and auth keys, which are the person's to create</td>
+</tr>
+<tr>
+<td>4</td>
+<td>A remote micro VM</td>
+<td>The person's real machine</td>
+<td>Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="212-what-a-person-sees">21.2 What a person sees</h3>
+<ul>
+<li>A fourth tab, <strong>Computer</strong>, on the window's home page, with the same marks of where it stands as
+  the browsers' tabs.</li>
+<li>Under it: <strong>Desktop and chat</strong>, <strong>Configuration</strong> and <strong>Evaluations</strong>, as for a browser. The live
+  picture is the desktop's screen. Its address bar says "The desktop of computer use".</li>
+<li>Pause, Take over, Hand back and Stop session work as for a browser. While a person has control,
+  their mouse and keys go to the desktop.</li>
+<li>When the desktop cannot start, the page says why and what to do: install or start Docker, build
+  the image, or allow Docker to reach the shared folder.</li>
+</ul>
+<h3 id="213-the-contained-desktop">21.3 The contained desktop</h3>
+<p>A small Linux desktop in a container, built from <code>deploy/desktop.Dockerfile</code>: a virtual screen
+(Xvfb), a window manager (Openbox) and four apps: a text editor, a file manager, a calculator and a
+terminal. It runs as a user without root rights.</p>
+<ul>
+<li>Build it once: <code>docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy</code>.</li>
+<li>It has <strong>no network</strong> unless a person allows it.</li>
+<li>One folder of the person's machine is shown in it as <code>Files</code> in its home folder, and nothing else of
+  that machine. By default the folder is <code>~/bap-browser-files</code>. On a Mac, Docker may not reach
+  Downloads, Documents or Desktop unless it is allowed to.</li>
+<li>Each session is a new desktop: nothing of the last is kept, except the shared folder.</li>
+<li>The desktop lasts only as long as the program that started it: the window holds its input open, and
+  it ends when that input closes, however the window ended.</li>
+</ul>
+<h3 id="214-the-engine">21.4 The engine</h3>
+<p><code>DesktopDriver</code> stands behind the same driver interface as a browser (section 4), so the session, the
+live picture, a person's hand, the log and the check on every step are those of a browser. What only a
+page has (refs, tabs, dialogs, an address) the desktop has not, and says so.</p>
+<p>Nothing an agent or a page wrote is put into a command line: positions are numbers, keys are names
+from a table, and typed text goes in on the standard input of the command that types it.</p>
+<h3 id="215-tools">21.5 Tools</h3>
+<p>Twelve tools, named <code>computer_*</code>. A desktop offers these and no <code>browser_*</code> tool.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>computer_screenshot</code></td>
+<td>A picture of the screen. x and y of every tool are pixels of it</td>
+</tr>
+<tr>
+<td><code>computer_zoom</code></td>
+<td>A part of the screen at twice its size, to read small print</td>
+</tr>
+<tr>
+<td><code>computer_click</code></td>
+<td>Click at x and y: button, count (2 is a double click), modifiers</td>
+</tr>
+<tr>
+<td><code>computer_move</code></td>
+<td>Move the pointer</td>
+</tr>
+<tr>
+<td><code>computer_drag</code></td>
+<td>Press at one point, move to another, let go</td>
+</tr>
+<tr>
+<td><code>computer_type</code></td>
+<td>Type text where the keyboard's focus is; <code>submit</code> presses Enter after it</td>
+</tr>
+<tr>
+<td><code>computer_press_key</code></td>
+<td>A key or a chord, such as Control+s</td>
+</tr>
+<tr>
+<td><code>computer_scroll</code></td>
+<td>Turn the wheel, at a point or where the pointer is</td>
+</tr>
+<tr>
+<td><code>computer_wait</code></td>
+<td>Wait some seconds</td>
+</tr>
+<tr>
+<td><code>computer_list_apps</code></td>
+<td>The apps the agent may open, whether a folder is shared, the open windows</td>
+</tr>
+<tr>
+<td><code>computer_open_app</code></td>
+<td>Open one of those apps</td>
+</tr>
+<tr>
+<td><code>computer_request_human</code></td>
+<td>Ask the person to do a step that is theirs: a password, a sign-in, a payment</td>
+</tr>
+</tbody>
+</table></div>
+<p>An action returns a sentence, never a picture: <code>computer_screenshot</code> shows the result. The titles of
+windows, and anything in a picture, are marked as written by what is on the screen: data, never
+instructions (section 18.5).</p>
+<h3 id="216-safety">21.6 Safety</h3>
+<ul>
+<li><strong>Apps.</strong> A person chooses which apps the agent may open. The terminal is off by default. An app
+  that is off is refused by the tool, and an empty file stands where its program is inside the
+  desktop, so no menu or other app can start it either. The desktop's own right-click menu is empty.</li>
+<li><strong>Folders and network.</strong> The desktop sees one folder of the person's machine and, unless allowed,
+  no network. The container is the boundary: an app inside it can do anything inside it, and nothing
+  outside it but that folder.</li>
+<li><strong>Passwords and sign-ins.</strong> The agent asks the person with <code>computer_request_human</code> and never does
+  such a step itself. What is typed while a person has control is not recorded.</li>
+<li><strong>What is typed</strong> is a character count in the log, the timeline and every event, never the text.</li>
+<li><strong>The check on every step</strong> (section 18) runs as for a browser. A desktop has no site, so the rules
+  about sites do not apply; approvals, Auto Mode, limits and the step counter do.</li>
+</ul>
+<h3 id="217-settings">21.7 Settings</h3>
+<p>A desktop has its own group of settings, <strong>Computer</strong>, on its Configuration. The settings that are a
+browser's alone (sites, downloads, uploads, page scripts, the page scan, cookies) are not drawn for the
+desktop, and the desktop's are not drawn for a browser.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Key</th>
+<th>Default</th>
+<th>Applies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text editor</td>
+<td><code>computer.apps.text_editor</code></td>
+<td>On</td>
+<td>Off at once; on from the next session</td>
+</tr>
+<tr>
+<td>Files</td>
+<td><code>computer.apps.files</code></td>
+<td>On</td>
+<td>The same</td>
+</tr>
+<tr>
+<td>Calculator</td>
+<td><code>computer.apps.calculator</code></td>
+<td>On</td>
+<td>The same</td>
+</tr>
+<tr>
+<td>Terminal</td>
+<td><code>computer.apps.terminal</code></td>
+<td>Off</td>
+<td>The same</td>
+</tr>
+<tr>
+<td>Share a folder with the desktop</td>
+<td><code>computer.share_folder</code></td>
+<td>On</td>
+<td><span class="ph ph-next">Next</span>session</td>
+</tr>
+<tr>
+<td>Let the desktop reach the network</td>
+<td><code>computer.network</code></td>
+<td>Off</td>
+<td><span class="ph ph-next">Next</span>session</td>
+</tr>
+</tbody>
+</table></div>
+<p>Other keys, for the deployment: <code>computer.image</code>, <code>computer.container_command</code>, <code>computer.screen_width</code>
+and <code>screen_height</code> (1280 by 800), <code>computer.folder</code>, and the waits and limits in
+<code>config_computer.py</code>, each with its meaning.</p>
+<h3 id="218-tests">21.8 Tests</h3>
+<ul>
+<li><code>tests/unit/test_computer.py</code>: key names, the sentences of the timeline, typed text kept out of
+  commands and logs, refused apps, points off the screen, and which settings each system has.</li>
+<li><code>tests/e2e/test_computer.py</code>, on a real desktop: the agent's tools open the editor, type and save a
+  file the person then has; the desktop has no network; an app that is off cannot run at all. Skipped,
+  with the reason, where Docker or the image is not there.</li>
+<li>The window's test in a real browser has the fourth page.</li>
+</ul>
+<h3 id="219-not-built-yet">21.9 Not built yet</h3>
+<p>Arrangements 2, 3 and 4; task sets and an attack set for the desktop; reading apps through their
+accessibility tree; a desktop of macOS or Windows.</p>
 </main>
 </div>
 <script>

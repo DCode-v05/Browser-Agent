@@ -13,6 +13,7 @@ export const BACKEND_ICON: Record<Backend, IconName> = {
   remote_headless: 'globe',
   takeover_chrome: 'person',
   bundled_chromium: 'monitor',
+  contained_desktop: 'computer',
 };
 /** The states in which a system has no session. */
 export const NOT_RUNNING = new Set(['starting', 'waiting', 'failed', 'off', 'ended']);

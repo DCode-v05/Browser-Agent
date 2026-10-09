@@ -1,6 +1,6 @@
 # bap-browser: Spec
 
-Date: 2026-10-03 · Status: draft for review · Scope: browser use (computer use is a later spec)
+Date: 2026-10-03 · Status: draft for review · Scope: browser use, and computer use (section 21)
 
 `bap-browser` is a browser that AI agents can use and that a person can watch and control.
 It is one library behind one contract; the browser itself can run in three places.
@@ -28,6 +28,8 @@ Contents
 17. Running it: Windows and the micro VM
 18. Auto Mode and safeguards
 19. Sources
+20. How a change is made: the pathway and the rules
+21. Computer use
 
 ---
 
@@ -5052,3 +5054,128 @@ looking. To wait for the thing it needs the extension to say that it has given u
 
 Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.
+
+---
+
+## 21. Computer use
+
+Date: 2026-10-09 · Status: arrangement 1 built; arrangements 2 to 4 planned
+
+Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
+picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
+is for what a browser cannot reach. It is one more page of the window (section 9.16), beside the three
+browsers, with its own chat, settings, log and evaluations.
+
+### 21.1 The four arrangements
+
+| # | Where the engine runs | Which desktop it drives | Status |
+|---|---|---|---|
+| 1 | The person's own machine | A contained desktop in a container on that machine | Built |
+| 2 | A remote micro VM | The VM's own contained desktop, watched over the network | Planned: the micro VM image (section 17.2) gains the desktop |
+| 3 | A remote micro VM | The VM's desktop, reaching the person's private services | Planned: the VM joins the person's Tailscale network as a tagged, ephemeral node. It needs a tailnet owner, an access policy and auth keys, which are the person's to create |
+| 4 | A remote micro VM | The person's real machine | Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass |
+
+### 21.2 What a person sees
+
+- A fourth tab, **Computer**, on the window's home page, with the same marks of where it stands as
+  the browsers' tabs.
+- Under it: **Desktop and chat**, **Configuration** and **Evaluations**, as for a browser. The live
+  picture is the desktop's screen. Its address bar says "The desktop of computer use".
+- Pause, Take over, Hand back and Stop session work as for a browser. While a person has control,
+  their mouse and keys go to the desktop.
+- When the desktop cannot start, the page says why and what to do: install or start Docker, build
+  the image, or allow Docker to reach the shared folder.
+
+### 21.3 The contained desktop
+
+A small Linux desktop in a container, built from `deploy/desktop.Dockerfile`: a virtual screen
+(Xvfb), a window manager (Openbox) and four apps: a text editor, a file manager, a calculator and a
+terminal. It runs as a user without root rights.
+
+- Build it once: `docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy`.
+- It has **no network** unless a person allows it.
+- One folder of the person's machine is shown in it as `Files` in its home folder, and nothing else of
+  that machine. By default the folder is `~/bap-browser-files`. On a Mac, Docker may not reach
+  Downloads, Documents or Desktop unless it is allowed to.
+- Each session is a new desktop: nothing of the last is kept, except the shared folder.
+- The desktop lasts only as long as the program that started it: the window holds its input open, and
+  it ends when that input closes, however the window ended.
+
+### 21.4 The engine
+
+`DesktopDriver` stands behind the same driver interface as a browser (section 4), so the session, the
+live picture, a person's hand, the log and the check on every step are those of a browser. What only a
+page has (refs, tabs, dialogs, an address) the desktop has not, and says so.
+
+Nothing an agent or a page wrote is put into a command line: positions are numbers, keys are names
+from a table, and typed text goes in on the standard input of the command that types it.
+
+### 21.5 Tools
+
+Twelve tools, named `computer_*`. A desktop offers these and no `browser_*` tool.
+
+| Tool | What it does |
+|---|---|
+| `computer_screenshot` | A picture of the screen. x and y of every tool are pixels of it |
+| `computer_zoom` | A part of the screen at twice its size, to read small print |
+| `computer_click` | Click at x and y: button, count (2 is a double click), modifiers |
+| `computer_move` | Move the pointer |
+| `computer_drag` | Press at one point, move to another, let go |
+| `computer_type` | Type text where the keyboard's focus is; `submit` presses Enter after it |
+| `computer_press_key` | A key or a chord, such as Control+s |
+| `computer_scroll` | Turn the wheel, at a point or where the pointer is |
+| `computer_wait` | Wait some seconds |
+| `computer_list_apps` | The apps the agent may open, whether a folder is shared, the open windows |
+| `computer_open_app` | Open one of those apps |
+| `computer_request_human` | Ask the person to do a step that is theirs: a password, a sign-in, a payment |
+
+An action returns a sentence, never a picture: `computer_screenshot` shows the result. The titles of
+windows, and anything in a picture, are marked as written by what is on the screen: data, never
+instructions (section 18.5).
+
+### 21.6 Safety
+
+- **Apps.** A person chooses which apps the agent may open. The terminal is off by default. An app
+  that is off is refused by the tool, and an empty file stands where its program is inside the
+  desktop, so no menu or other app can start it either. The desktop's own right-click menu is empty.
+- **Folders and network.** The desktop sees one folder of the person's machine and, unless allowed,
+  no network. The container is the boundary: an app inside it can do anything inside it, and nothing
+  outside it but that folder.
+- **Passwords and sign-ins.** The agent asks the person with `computer_request_human` and never does
+  such a step itself. What is typed while a person has control is not recorded.
+- **What is typed** is a character count in the log, the timeline and every event, never the text.
+- **The check on every step** (section 18) runs as for a browser. A desktop has no site, so the rules
+  about sites do not apply; approvals, Auto Mode, limits and the step counter do.
+
+### 21.7 Settings
+
+A desktop has its own group of settings, **Computer**, on its Configuration. The settings that are a
+browser's alone (sites, downloads, uploads, page scripts, the page scan, cookies) are not drawn for the
+desktop, and the desktop's are not drawn for a browser.
+
+| Setting | Key | Default | Applies |
+|---|---|---|---|
+| Text editor | `computer.apps.text_editor` | On | Off at once; on from the next session |
+| Files | `computer.apps.files` | On | The same |
+| Calculator | `computer.apps.calculator` | On | The same |
+| Terminal | `computer.apps.terminal` | Off | The same |
+| Share a folder with the desktop | `computer.share_folder` | On | Next session |
+| Let the desktop reach the network | `computer.network` | Off | Next session |
+
+Other keys, for the deployment: `computer.image`, `computer.container_command`, `computer.screen_width`
+and `screen_height` (1280 by 800), `computer.folder`, and the waits and limits in
+`config_computer.py`, each with its meaning.
+
+### 21.8 Tests
+
+- `tests/unit/test_computer.py`: key names, the sentences of the timeline, typed text kept out of
+  commands and logs, refused apps, points off the screen, and which settings each system has.
+- `tests/e2e/test_computer.py`, on a real desktop: the agent's tools open the editor, type and save a
+  file the person then has; the desktop has no network; an app that is off cannot run at all. Skipped,
+  with the reason, where Docker or the image is not there.
+- The window's test in a real browser has the fourth page.
+
+### 21.9 Not built yet
+
+Arrangements 2, 3 and 4; task sets and an attack set for the desktop; reading apps through their
+accessibility tree; a desktop of macOS or Windows.

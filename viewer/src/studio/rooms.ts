@@ -16,7 +16,7 @@ export interface Room {
   extension?: string;
 }
 
-const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium']);
+const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium', 'contained_desktop']);
 /** The states in which a page has no session to show yet. */
 const NO_SESSION = new Set(['starting', 'waiting', 'failed', 'off']);
 

@@ -534,6 +534,47 @@ What it found:
 Not checked there: the person's own Chrome, the three-browser window (it needs a model key on the
 machine), the task sets, and more than one session at a time.
 
+### 1s. Finished on 2026-10-09: computer use, the fourth page of the window (spec section 21)
+
+The window's home page has a fourth tab, **Computer**. Behind it is a small Linux desktop in a
+container on this machine, which the agent sees as a picture and works with the mouse and the
+keyboard. It has the same chat, live picture, Pause, Take over, Stop session, Configuration and
+Evaluations as a browser. This is arrangement 1 of the plan; 2 to 4 (a micro VM, Tailscale, the
+person's own machine) are not built.
+
+| What | Where |
+|---|---|
+| The desktop's image: Xvfb, Openbox, a text editor, a file manager, a calculator, a terminal | `deploy/desktop.Dockerfile` |
+| The engine, behind the same driver interface as a browser | `driver/desktop_driver.py`, `driver/contained_desktop.py` |
+| Twelve `computer_*` tools | `tools/computer_tools.py` |
+| The settings: which apps, a shared folder, the network | `config_computer.py`, group "Computer" of the catalogue |
+| The fourth page | `agent/studio.py`; `Studio.tsx` and the system panel in the viewer |
+
+Evidence, in the running window on this Mac:
+
+- The task "Open the text editor, write a shopping list with three lines: milk, eggs, bread. Save it
+  as shopping.txt in the Files folder" was done by the model in 55 seconds and 23 steps;
+  `~/bap-browser-files/shopping.txt` holds the three lines.
+- Every control of the page was pressed in a real browser as the admin: Take over (a right-click of
+  the person's opened the desktop's menu), Hand back, Pause, Resume, the Terminal switch (the agent
+  then named Terminal among its apps), Evaluations, Systems, Stop session and Start again. No error
+  in the console.
+- The desktop ends within a second when the window is killed with no clean shutdown.
+- Tests: 19 of computer use, of which 3 drive a real desktop; the window's test has the fourth page.
+
+What it found on the way:
+
+- The desktop's own right-click menu offered a terminal while Terminal was off. An app that is off is
+  now blocked inside the container (an empty file stands where its program is), and the menu is empty.
+- A container did not end with the window that started it. It now lasts only while the window holds
+  its input open.
+- Docker on a Mac may not reach folders under Downloads. The shared folder is `~/bap-browser-files`,
+  and the page says what to do when the folder cannot be reached.
+
+Not done: arrangements 2 to 4; task sets and an attack set for the desktop (its Evaluations has the
+tasks' records, but the checklist and the task sets say they are for a browser); the user's side of
+the page was not walked, because only the admin's sign-in was at hand.
+
 ### 2. Not started
 
 | What | Note |

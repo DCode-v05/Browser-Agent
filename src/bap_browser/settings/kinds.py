@@ -22,6 +22,7 @@ EVERYWHERE = SURFACES
 NOT_ON_MOBILE = ("web", "desktop")
 GROUPS = (
     "Browser",
+    "Computer",
     "Agent",
     "Approvals",
     "Safety",
@@ -34,6 +35,10 @@ GROUPS = (
     "Advanced",
 )
 CLOUD = "remote_headless"
+# The backends that are a browser, for the settings that are a browser's alone.
+BROWSERS = (CLOUD, "takeover_chrome", "bundled_chromium")
+# The desktop of computer use (spec 21), which is no browser.
+COMPUTER = "contained_desktop"
 # The name of the event log, in the data folder, for a person who turns it on where the deployment has none.
 EVENT_LOG_NAME = "events.jsonl"
 

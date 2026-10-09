@@ -363,7 +363,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
               {state.session.agent}
             </span>
             <span className="chip" data-kind="browser" title={state.session.browser}>
-              <Icon name="globe" />
+              <Icon name={state.session.backend === 'contained_desktop' ? 'computer' : 'globe'} />
               <span className="chip-name sr-only">{W.topBar.browser}</span>
               {W.backend[state.session.backend]}
             </span>

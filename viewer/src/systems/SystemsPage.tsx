@@ -121,7 +121,7 @@ export function SystemPanel({ api, system: id, view, role, me, onPrefer, surface
         <header className="systems-head">
           <div>
             <h2 className="systems-title">{P.title[view](W.backend[system.backend])}</h2>
-            <p className="systems-lead">{view === 'evaluations' ? P.lead.evaluations[role] : P.lead[view]}</p>
+            <p className="systems-lead">{view === 'evaluations' ? P.lead.evaluations[role] : view === 'configuration' && system.backend === 'contained_desktop' ? W.systems.desktop.configuration : P.lead[view]}</p>
           </div>
         </header>
       )}
@@ -291,32 +291,34 @@ function Configuration({ system, api, surface, word, version, onChanged, onSetti
   // A person's own Chrome is not started from here: its session begins when its extension dials in.
   const waitsForChrome = system.backend === 'takeover_chrome' && system.state === 'waiting';
   const name = W.backend[system.backend];
-  const A = W.systems.access;
+  // The desktop of computer use is set up with the same parts, in words of a desktop.
+  const S = system.backend === 'contained_desktop' ? { ...W.systems, ...W.systems.desktop } : W.systems;
+  const A = system.backend === 'contained_desktop' ? { ...W.systems.access, ...W.systems.desktop } : W.systems.access;
   return (
     <article className="system-card" aria-label={name} data-enabled={system.enabled}>
       <CardHead system={system} word={word} />
 
-      <h4 className="system-section">{W.systems.thisBrowser}</h4>
-      <SwitchRow title={W.systems.use} description={W.systems.useLead} label={`${W.systems.use}: ${name}`} on={system.enabled} onChange={(next) => void turn(next)} />
+      <h4 className="system-section">{S.thisBrowser}</h4>
+      <SwitchRow title={S.use} description={S.useLead} label={`${S.use}: ${name}`} on={system.enabled} onChange={(next) => void turn(next)} />
       <div className="system-actions">
         {running ? (
           <>
-            <Button icon="play" busy={busy === 'restart'} disabled={!system.enabled} hint={W.systems.restartHint} onClick={() => void manage('restart')}>
+            <Button icon="play" busy={busy === 'restart'} disabled={!system.enabled} hint={S.restartHint} onClick={() => void manage('restart')}>
               {W.systems.restart}
             </Button>
-            <Button icon="stop" busy={busy === 'stop'} disabled={!system.enabled} hint={W.systems.stopHint} onClick={() => void manage('stop')}>
+            <Button icon="stop" busy={busy === 'stop'} disabled={!system.enabled} hint={S.stopHint} onClick={() => void manage('stop')}>
               {W.systems.stop}
             </Button>
           </>
         ) : (
           !waitsForChrome && (
-            <Button icon="play" kind="primary" busy={busy === 'start'} disabled={!system.enabled} hint={W.systems.startHint} onClick={() => void manage('start')}>
+            <Button icon="play" kind="primary" busy={busy === 'start'} disabled={!system.enabled} hint={S.startHint} onClick={() => void manage('start')}>
               {W.systems.start}
             </Button>
           )
         )}
       </div>
-      {!waitsForChrome && <p className="system-hint">{W.systems.manageLead[!system.enabled ? 'off' : running ? 'running' : 'stopped']}</p>}
+      {!waitsForChrome && <p className="system-hint">{S.manageLead[!system.enabled ? 'off' : running ? 'running' : 'stopped']}</p>}
       {(note || system.note || waitsForChrome) && (
         <p className="system-note" role="status">
           {note || system.note || W.systems.chromeWaits}
