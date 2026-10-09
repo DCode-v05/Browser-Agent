@@ -89,3 +89,12 @@ read through four written accounts (named in `docs/bad-patterns.md`). What is ta
 
 What is not taken, because it is not built here: a framework that makes these impossible by
 construction, agents started by alerts, and a ban on every comment.
+
+## pstack on the pathway
+
+Since 2026-10-09 the pathway runs with SeptemberAI's pstack (`septemberai/pstack`), the packaged form
+of the same talk's skills. Eight of its skills apply to every change, as `CLAUDE.md` lists: `tdd` at
+step 4, `principle-laziness-protocol` and `principle-type-system-discipline` at step 5,
+`principle-test-behavior-not-implementation` to every test, `principle-sequence-verifiable-units` to
+the order of the work, `principle-prove-it-works` at step 7, and `unslop` with `technical-writing` to
+every word written.

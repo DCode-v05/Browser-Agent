@@ -29,6 +29,28 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - A change is made by the one pathway in `docs/agent-pathway.md`. The rules of the code are in `docs/bad-patterns.md`; a new case of one fails the gate.
 - `docs/feature-map.json` says where each feature is: its spec section, its files, its tests.
 
+## pstack
+This repository uses SeptemberAI's pstack (`septemberai/pstack`). `.claude/settings.json` offers it to
+every session here; install it once with `claude plugin marketplace add septemberai/pstack`, then
+`claude plugin install pstack@pstack`. Its rules (`SEPTEMBERAI.md` in that repository) load with it.
+
+Every session and every agent working here applies these eight, each read from the plugin's
+`skills/<name>/SKILL.md`:
+
+| Skill | Applied |
+|---|---|
+| `tdd` | To every change: the failing test first, watched failing for the right reason, then the code |
+| `principle-test-behavior-not-implementation` | To every test: call the code as its users do, assert what they observe |
+| `principle-type-system-discipline` | To every type and signature, in Python and TypeScript |
+| `principle-laziness-protocol` | To every diff: the smallest change, deletion before addition |
+| `principle-sequence-verifiable-units` | To every piece of work: small units, each ending in a check that passes, one commit each |
+| `principle-prove-it-works` | Before saying done: run the real thing and quote what it did |
+| `unslop` | To every piece of prose: docs, commit messages, replies |
+| `technical-writing` | To docs, the spec, status entries and reports |
+
+An agent that starts another agent names these eight in its brief. The rest of pstack
+(`/pstack:poteto-mode`, `/pstack:guide`) is there when asked for.
+
 ## Gotchas
 - Windows long paths are off and this workspace path is long. If `uv sync` fails with "os error 3",
   set `UV_PROJECT_ENVIRONMENT` to a short folder (for example `C:/venvs/bap-browser`) and run it again.
