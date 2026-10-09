@@ -37,7 +37,7 @@
         ],
         [
           "submit",
-          "/home/agent/Files/Practice/meeting.txt"
+          "~/Files/Practice/meeting.txt"
         ],
         [
           "wait",
@@ -134,7 +134,7 @@
         ],
         [
           "submit",
-          "/home/agent/Files/Practice/todo.txt"
+          "~/Files/Practice/todo.txt"
         ],
         [
           "wait",

@@ -7,12 +7,21 @@
   "browser": {
     "headless": true,
     "chromium_sandbox": false,
-    "args": ["--disable-dev-shm-usage"]
+    "args": [
+      "--disable-dev-shm-usage"
+    ]
   },
   "safety": {
     "block_private_networks": true
   },
   "logging": {
     "event_log": "/data/events.jsonl"
+  },
+  "computer": {
+    "runs": "here",
+    "folder": "~/Files",
+    "apps": {
+      "terminal": false
+    }
   }
 }

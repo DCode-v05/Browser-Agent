@@ -23,10 +23,13 @@ from mcp.types import (
 from bap_browser import __version__
 from bap_browser.config import Config
 from bap_browser.driver import open_session
+from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
+from bap_browser.settings.kinds import COMPUTER as DESKTOP
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools import Toolkit
+from bap_browser.tools.computer_tools import COMPUTER_TOOLS
 from bap_browser.tools.kinds import READS
 
 INSTRUCTIONS = (
@@ -83,11 +86,22 @@ async def run_stdio(config: Config) -> None:
 AGENT_OVER_HTTP = "Agent over MCP"
 
 
-async def run_http(config: Config, *, open_viewer: bool) -> None:
+async def run_http(config: Config, *, open_viewer: bool, desktop: bool = False) -> None:
     """Serves one session until the service is stopped: the tools over MCP on HTTP for an agent in
-    another process, and the viewer for a person to watch and control what it does."""
+    another process, and the viewer for a person to watch and control what it does. With `desktop`
+    the session is the desktop of computer use (spec 21), not a browser."""
     settings = SettingsStore(config)
-    session = ServiceSession(config, agent=AGENT_OVER_HTTP, settings=settings)
+    if desktop:
+        session = ServiceSession(
+            config,
+            DesktopDriver(config),
+            agent=AGENT_OVER_HTTP,
+            settings=settings,
+            backend=DESKTOP,
+            tools=COMPUTER_TOOLS,
+        )
+    else:
+        session = ServiceSession(config, agent=AGENT_OVER_HTTP, settings=settings)
     service = Service(
         config,
         {session.name: session},

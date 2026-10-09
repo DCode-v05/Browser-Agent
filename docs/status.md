@@ -591,6 +591,24 @@ ground (made ready, solved, read): the practice site for a browser, `Practice` f
 Found on the way: an Enter typed right after a path into a file box was lost while the box completed
 the path. `computer_type` with `submit` now lets the screen settle before Enter.
 
+### 1u. Finished on 2026-10-09: the desktop in the micro VM (spec 21.11)
+
+Arrangement 2 of computer use. The micro VM's image, built with `DESKTOP=true` and started with
+`bap-browser serve --desktop`, serves the desktop's tools over MCP on HTTP and its picture to the viewer.
+In the VM the desktop runs on the machine's own virtual screen (`computer.runs: here`), not in a
+container.
+
+Evidence: the image was started as a container standing in for the VM. An agent outside it listed
+only the `computer_*` tools, opened the editor, typed and saved `~/Files/vm.txt`, and the file was in
+the VM with that text. Its viewer, opened in a real browser, showed the desktop live with no console
+error.
+
+Found on the way: the image could not be built on a network that refuses ghcr.io, where it took uv
+from. It now installs uv from PyPI. The image is 4.2 GB with the desktop.
+
+Not done: the image was run on this Mac, not on a remote machine. The team box has no Docker and no
+`sudo`, so it cannot run it.
+
 ### 2. Not started
 
 | What | Note |

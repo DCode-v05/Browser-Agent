@@ -1,6 +1,8 @@
 # The browser service in a container (spec 17.2): one session, its tools over MCP on HTTP, the viewer.
 # Build from the repository's root:   docker build -f deploy/Dockerfile -t bap-browser .
 # Run:   docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-browser
+# With the desktop of computer use (spec 21.1, arrangement 2): build with --build-arg DESKTOP=true,
+# then run it with `uv run --project /app --no-sync bap-browser serve --desktop` as its command.
 
 # The viewer is built first: the Python package carries it.
 FROM node:22-slim AS viewer
@@ -14,7 +16,8 @@ RUN npm --prefix viewer run build
 # Playwright's own image: Chromium, and the libraries and fonts it needs, at the version in uv.lock.
 # A test keeps this tag and the lock file together.
 FROM mcr.microsoft.com/playwright/python:v1.63.0-noble
-COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
+# uv from PyPI: no other registry is needed to build this image.
+RUN pip install --no-cache-dir uv==0.12.5
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 WORKDIR /app
@@ -28,6 +31,19 @@ RUN uv sync --frozen --no-dev
 COPY deploy/config.vm.json /etc/bap-browser/config.json
 # What the service writes (where it is, its log) goes to a folder of its own, owned by the user it runs as.
 RUN mkdir -p /data && chown pwuser:pwuser /data
+
+# The desktop of computer use, on the machine's own virtual screen: no terminal is installed, and the
+# window manager's own menu is empty. The machine itself is the boundary.
+ARG DESKTOP=false
+COPY deploy/desktop-menu.xml /tmp/desktop-menu.xml
+RUN if [ "$DESKTOP" = true ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends \
+         xvfb openbox xdotool imagemagick x11-xserver-utils x11-utils dbus-x11 mousepad pcmanfm galculator \
+      && rm -rf /var/lib/apt/lists/* \
+      && install -d -o pwuser -g pwuser /home/pwuser/.config/openbox /home/pwuser/Files \
+      && install -o pwuser -g pwuser -m 644 /tmp/desktop-menu.xml /home/pwuser/.config/openbox/menu.xml; \
+    fi; rm /tmp/desktop-menu.xml
 
 # Not root: the service and the browser run as the image's unprivileged user.
 USER pwuser

@@ -76,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the browser in a window on this screen, so the agent is seen working in it",
     )
+    serve.add_argument(
+        "--desktop",
+        action="store_true",
+        help="serve the desktop of computer use instead of a browser: its computer_* tools and its picture",
+    )
     serve.set_defaults(run=_serve)
 
     studio = commands.add_parser(
@@ -259,7 +264,7 @@ def _serve(args: argparse.Namespace) -> int:
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(run_http(config, open_viewer=args.open))
+        asyncio.run(run_http(config, open_viewer=args.open, desktop=args.desktop))
     # It runs until it is interrupted, so that is how it always ends.
     return 130
 
