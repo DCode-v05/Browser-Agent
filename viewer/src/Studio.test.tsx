@@ -8,7 +8,7 @@ import { STATES } from './demo/sessions';
 import { createDemoSettings } from './demo/settings';
 import { DEFAULT_OPTIONS } from './options';
 import type { ClientCommand } from './protocol';
-import { moodOf, Studio } from './Studio';
+import { MacSetup, moodOf, Studio } from './Studio';
 import { desktopOpener, factsFrom, hasSession, NO_FACTS, roomsFrom, roomsIn, type Room } from './studio/rooms';
 import type { Me, SystemsApi } from './systems/api';
 import { W } from './wording';
@@ -576,5 +576,26 @@ describe('the pop-up that asks a person to do a step (spec 9.16)', () => {
     // The request is still there to answer, where it was before there were pop-ups.
     expect(screen.getByRole('button', { name: W.buttons.takeOver })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: W.buttons.couldNot })).toBeInTheDocument();
+  });
+});
+
+describe('the desktop on the person\'s own Mac (spec 21.13)', () => {
+  it('offers to start the helper in Terminal and links the two settings to allow, while none is paired', async () => {
+    const mac: Room = { ...computer, runs: 'mac', state: 'failed', note: 'No helper is paired.' };
+    const manage = vi.fn(async () => ({ ok: true }) as const);
+    const user = userEvent.setup();
+    render(<MacSetup note={mac.note} onStartHelper={() => manage()} />);
+    expect(screen.getByRole('heading', { name: W.studio.mac.title })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: W.studio.mac.screenRecording })).toHaveAttribute('href', expect.stringContaining('Privacy_ScreenCapture'));
+    expect(screen.getByRole('link', { name: W.studio.mac.accessibility })).toHaveAttribute('href', expect.stringContaining('Privacy_Accessibility'));
+    await user.click(screen.getByRole('button', { name: W.studio.mac.start }));
+    expect(manage).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('status')).toHaveTextContent(W.studio.mac.started);
+  });
+
+  it('tells a user that the admin starts the helper', () => {
+    render(<MacSetup />);
+    expect(screen.queryByRole('button', { name: W.studio.mac.start })).not.toBeInTheDocument();
+    expect(screen.getByText(W.studio.mac.adminOnly)).toBeInTheDocument();
   });
 });

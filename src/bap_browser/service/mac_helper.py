@@ -18,7 +18,10 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from bap_browser.driver.mac_driver import pairing_file, write_pairing
 from bap_browser.driver.mac_hands import MAC_APPS, Hands, chord, flags_of
+
+__all__ = ["Helper", "helper_app", "pairing_file", "write_pairing"]
 
 STOPPED = "The person stopped the helper by moving the pointer into the corner of the screen."
 BUTTONS = ("left", "right", "middle")

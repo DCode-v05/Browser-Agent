@@ -298,7 +298,7 @@ def _helper(args: argparse.Namespace) -> int:
     import uvicorn
 
     from bap_browser.driver.mac_hands import MAC_APPS, MacHands
-    from bap_browser.service.mac_helper import Helper, helper_app
+    from bap_browser.service.mac_helper import Helper, helper_app, pairing_file, write_pairing
 
     apps = [name for name in args.allow.split(",") if name]
     unknown = [name for name in apps if name not in MAC_APPS]
@@ -318,12 +318,20 @@ def _helper(args: argparse.Namespace) -> int:
             "Allow the program that runs this in System Settings, Privacy & Security: Screen Recording and Accessibility."
         )
     say("To stop it at once, push the pointer into the top left corner of the screen. Ctrl+C ends it.")
-    uvicorn.run(
-        helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
-        host=args.host,
-        port=port,
-        log_level="warning",
-    )
+    # A window on this same Mac finds the helper here: its address and token, for this user alone.
+    pairing = pairing_file(config)
+    write_pairing(pairing, f"http://{args.host}:{port}", token)
+    say(f"Paired with bap-browser on this Mac through {pairing}. Choose This Mac in Computer, Configuration.")
+    try:
+        uvicorn.run(
+            helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
+            host=args.host,
+            port=port,
+            log_level="warning",
+        )
+    finally:
+        pairing.unlink(missing_ok=True)
+
     return 0
 
 
@@ -354,7 +362,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser import browser_extension
     from bap_browser.agent.command import Interrupted
     from bap_browser.agent.openai_model import OpenAIModel
-    from bap_browser.agent.studio import run_studio
+    from bap_browser.agent.window import run_studio
     from bap_browser.safeguards.model import ModelClient
 
     extension = browser_extension.install(extension_folder(config))

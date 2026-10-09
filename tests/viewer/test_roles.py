@@ -16,7 +16,7 @@ from playwright.async_api import Browser, Locator, Page
 
 from bap_browser import browser_extension
 from bap_browser.agent.models import Reply, ScriptedModel, ToolCall
-from bap_browser.agent.studio import run_studio
+from bap_browser.agent.window import run_studio
 from bap_browser.config import Config
 
 ADMINS = "the admin's own words"

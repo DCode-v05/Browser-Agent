@@ -21,6 +21,8 @@ export interface SystemInfo {
   /** The folder that holds the record of this browser's tasks. The admin's to know. */
   records?: string;
   note?: string;
+  /** For the desktop of computer use: where it works, the contained desktop or the person's own Mac. */
+  runs?: string;
 }
 
 /** What of a system's evaluations a person may be shown (spec 12.6). The admin says so for users. */
@@ -284,7 +286,8 @@ export interface LogAnswer {
 /** What came of asking the service to do something: done, or why not, in words for the person. */
 export type Done<Result = undefined> = (Result extends undefined ? { ok: true } : { ok: true; result: Result }) | { ok: false; why: string };
 
-export type SystemAction = 'start' | 'stop' | 'restart';
+/** `helper`: start the helper of the person's own Mac in Terminal (spec 21.13). */
+export type SystemAction = 'start' | 'stop' | 'restart' | 'helper';
 
 export interface SystemsApi {
   list(): Promise<SystemInfo[] | null>;

@@ -12,7 +12,7 @@ from bap_browser.config import Computer
 from bap_browser.driver.mac_driver import MacDriver
 from bap_browser.driver.mac_hands import FLAGS, chord
 from bap_browser.errors import BrowserError
-from bap_browser.service.mac_helper import STOPPED, Helper, helper_app
+from bap_browser.service.mac_helper import STOPPED, Helper, helper_app, pairing_file, write_pairing
 
 TOKEN = "a-token-only-the-test-knows"
 PICTURE = b"\x89PNG\r\n\x1a\n" + bytes(24)
@@ -150,3 +150,110 @@ async def test_the_helper_opens_only_the_apps_the_person_named(mac: tuple[MacDri
     assert ("open", "Calculator") in hands.did and not [
         one for one in hands.did if one == ("open", "Terminal")
     ]
+
+
+def test_the_admin_chooses_this_mac_as_where_the_agent_works(make_config, tmp_path: Path) -> None:
+    from bap_browser.driver.mac_driver import desktop_driver_for
+    from bap_browser.settings.store import SettingsStore
+
+    store = SettingsStore(make_config(tmp_path))
+    store.systems, store.backends = ("computer",), {"computer": "contained_desktop"}
+    choice = next(
+        setting
+        for group in store.answer("web", "computer")["groups"]
+        for setting in group["settings"]
+        if setting["id"] == "computer_runs"
+    )
+    assert [one["value"] for one in choice["choices"]] == ["container", "mac"]
+    assert choice["value"] == "container" and choice["applies"] == "next_session"
+    store.change("web", {"computer_runs": "mac"}, "computer")
+    config = store.apply_to(make_config(tmp_path), "contained_desktop", "computer")
+    assert isinstance(desktop_driver_for(config), MacDriver)
+
+
+async def test_the_helper_pairs_through_a_private_file_and_nothing_is_copied(
+    mac: tuple[MacDriver, StandInHands], make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The helper on this Mac leaves its address and token where only this user can read them."""
+    driver, _ = mac
+    monkeypatch.delenv("BAP_BROWSER_HELPER_TOKEN")
+    config = make_config(tmp_path, computer={"runs": "mac"})
+    pairing = pairing_file(config)
+    write_pairing(pairing, driver.link.url, TOKEN)
+    assert pairing.stat().st_mode & 0o777 == 0o600
+    paired = MacDriver(config)
+    await paired.start()
+    assert paired.link.url == driver.link.url
+    pairing.unlink()
+    with pytest.raises(BrowserError, match="Start the helper"):
+        await MacDriver(config).start()
+
+
+def test_on_a_mac_the_agent_is_told_it_works_on_the_persons_own_mac(make_config, tmp_path: Path) -> None:
+    from bap_browser.agent.loop import instructions_for
+
+    mac = instructions_for(make_config(tmp_path, computer={"runs": "mac"}))
+    assert "person's own Mac" in mac and "Command" in mac and "Practice" not in mac
+    linux = instructions_for(make_config(tmp_path))
+    assert "small Linux desktop" in linux
+
+
+def test_the_window_starts_the_helper_in_terminal_with_the_apps_the_admin_allows(
+    make_config, tmp_path: Path
+) -> None:
+    from bap_browser.driver.mac_driver import start_helper_in_terminal
+
+    config = make_config(tmp_path, computer={"apps": {"files": False, "terminal": False}})
+    ran: list[list[str]] = []
+    script = start_helper_in_terminal(config, Path("/Users/ada/My Project"), ran.append)
+    assert ran == [["open", "-a", "Terminal", str(script)]]
+    assert script.stat().st_mode & 0o777 == 0o700
+    lines = script.read_text().splitlines()
+    assert lines[0] == "#!/bin/sh"
+    assert "cd '/Users/ada/My Project'" in lines[1]
+    assert lines[-1] == "exec uv run bap-browser helper --allow text_editor,calculator"
+
+
+def test_with_no_app_allowed_the_helper_is_not_started(make_config, tmp_path: Path) -> None:
+    from bap_browser.driver.mac_driver import start_helper_in_terminal
+
+    apps = {"text_editor": False, "files": False, "calculator": False, "terminal": False}
+    ran: list[list[str]] = []
+    with pytest.raises(BrowserError, match="Allow at least one app"):
+        start_helper_in_terminal(make_config(tmp_path, computer={"apps": apps}), tmp_path, ran.append)
+    assert ran == []
+
+
+async def test_the_page_connects_by_itself_once_the_helper_has_paired(make_config, tmp_path: Path) -> None:
+    import asyncio
+
+    from bap_browser.agent.studio import Room, paired_or_asked
+
+    config = make_config(tmp_path, computer={"runs": "mac", "helper_poll_s": 0.01})
+    room = Room("computer", "contained_desktop")
+    waiting = asyncio.create_task(paired_or_asked(room, config))
+    await asyncio.sleep(0.05)
+    assert not waiting.done(), "it went on with no helper"
+    write_pairing(pairing_file(config), "http://127.0.0.1:8796", TOKEN)
+    await asyncio.wait_for(waiting, 2)
+
+
+async def test_the_admin_starts_the_helper_from_the_window_only_for_this_mac(
+    make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+
+    from bap_browser.agent.studio import Studio
+    from bap_browser.settings.store import SettingsStore
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    config = make_config(tmp_path)
+    settings = SettingsStore(config)
+    studio = Studio(config, settings, lambda service: None, tmp_path)  # pyright: ignore[reportArgumentType]
+    opened: list[Path] = []
+    studio.open_helper = lambda given, folder, run=None: opened.append(folder) or folder  # pyright: ignore[reportAttributeAccessIssue]
+    assert await studio.manage("computer", "helper") == 'Choose "This Mac" under Where the agent works first.'
+    settings.change("web", {"computer_runs": "mac"}, "computer")
+    assert await studio.manage("computer", "helper") is None
+    assert opened == [Path.cwd()]
+    assert next(page for page in studio.pages() if page["id"] == "computer")["runs"] == "mac"
