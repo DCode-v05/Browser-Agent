@@ -8,8 +8,12 @@ scaled to points, so that x and y of a picture are x and y of the mouse.
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import ctypes.util
+import os
+import re
+import signal
 import subprocess
 import tempfile
 from collections.abc import Sequence
@@ -79,6 +83,10 @@ CHARACTER_CODES = {
     ",": 43, "/": 44, "n": 45, "m": 46, ".": 47, "`": 50,
 }  # fmt: skip
 MODIFIERS = {"Control": "ctrl", "Shift": "shift", "Alt": "alt", "Meta": "cmd", "ControlOrMeta": "cmd"}
+# Where each app begins in what `lsappinfo list` writes; its name is the first quoted word after.
+APP_START = re.compile(r"^\s*\d+\) ", re.MULTILINE)
+NAME = re.compile(r'^"([^"]+)"')
+PID = re.compile(r"pid = (\d+)")
 # The apps of computer use on a Mac, by their name in `computer.apps`.
 MAC_APPS = {"text_editor": "TextEdit", "files": "Finder", "calculator": "Calculator", "terminal": "Terminal"}
 
@@ -144,6 +152,14 @@ class Hands(Protocol):
 
     def front(self) -> str:
         """The name of the app in front."""
+        ...
+
+    def running(self) -> dict[str, int]:
+        """The apps a person can see running, by name, with their process ids."""
+        ...
+
+    def quit_app(self, pid: int) -> None:
+        """Ends an app."""
         ...
 
 
@@ -311,6 +327,19 @@ class MacHands:
 
     def open_app(self, name: str) -> None:
         subprocess.run(["open", "-a", name], check=True, capture_output=True)
+
+    def running(self) -> dict[str, int]:
+        listed = subprocess.run(["lsappinfo", "list"], capture_output=True, text=True, check=False).stdout
+        apps: dict[str, int] = {}
+        for block in APP_START.split(listed)[1:]:
+            name, pid = NAME.match(block), PID.search(block)
+            if name and pid and 'type="Foreground"' in block:
+                apps[name.group(1)] = int(pid.group(1))
+        return apps
+
+    def quit_app(self, pid: int) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGTERM)
 
     def front(self) -> str:
         front = subprocess.run(["lsappinfo", "front"], capture_output=True, text=True, check=False)

@@ -28,6 +28,10 @@ STOPPED = "The person stopped the helper by moving the pointer into the corner o
 BUTTONS = ("left", "right", "middle")
 # Started with `--allow any`, the helper opens any app by its name, as the person allows.
 ANY_APP = "any"
+# What the person does through the viewer is marked so: their own hand is never held to the apps.
+PERSON = "person"
+# The agent's actions that are done in the app in front.
+HELD_ACTIONS = frozenset({"click", "press", "drag", "type", "key", "scroll"})
 AN_APP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._&'()+-]{0,59}")
 
 
@@ -65,6 +69,28 @@ class Helper:
     def __init__(self, hands: Hands, token: str, apps: Sequence[str], corner: float) -> None:
         self.hands, self._token, self.apps, self._corner = hands, token, tuple(apps), corner
         self.stopped = False
+
+    @property
+    def held(self) -> bool:
+        """Whether the agent is held to the apps the person named: not when they allowed any app."""
+        return ANY_APP not in self.apps
+
+    @property
+    def app_names(self) -> set[str]:
+        return {MAC_APPS[app] for app in self.apps if app in MAC_APPS}
+
+    def outside_the_apps(self, asked: dict[str, Any]) -> str | None:
+        """Why an action of the agent may not be done in the app in front. None when it may."""
+        if not self.held or asked.get("by") == PERSON or asked.get("do") not in HELD_ACTIONS:
+            return None
+        front = self.hands.front()
+        if front in self.app_names:
+            return None
+        allowed = ", ".join(sorted(self.app_names)) or "none"
+        return (
+            f"The app in front is {front or 'none'}, which the person has not allowed on this Mac. Bring an "
+            f"allowed app ({allowed}) to the front with computer_open_app, and act there."
+        )
 
     def admits(self, request: Request) -> bool:
         scheme, _, given = request.headers.get("authorization", "").partition(" ")
@@ -185,9 +211,31 @@ def helper_app(helper: Helper) -> Starlette:
             asked = await request.json()
             if not isinstance(asked, dict):
                 raise ValueError("not an object")
+            outside = helper.outside_the_apps(asked)
+            if outside is not None:
+                return JSONResponse({"error": outside}, status_code=423)
+            # An app that the agent's action starts and that the person did not allow is closed at once,
+            # as when an icon in the Dock is clicked.
+            watching = helper.held and asked.get("by") != PERSON
+            before = await asyncio.to_thread(helper.hands.running) if watching else {}
             await asyncio.to_thread(act, helper, asked)
+            closed: list[str] = []
+            if watching:
+                after = await asyncio.to_thread(helper.hands.running)
+                for name, pid in after.items():
+                    if name not in before and name not in helper.app_names:
+                        await asyncio.to_thread(helper.hands.quit_app, pid)
+                        closed.append(name)
         except (ValueError, KeyError, IndexError, TypeError) as wrong:
             return JSONResponse({"error": f"The helper did not do it: {wrong}"}, status_code=400)
+        if closed:
+            return JSONResponse(
+                {
+                    "error": f"That started {', '.join(closed)}, which the person has not allowed on this Mac: "
+                    "it was closed. Do not try to open it another way."
+                },
+                status_code=423,
+            )
         return JSONResponse({"done": True})
 
     return Starlette(

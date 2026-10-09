@@ -694,7 +694,15 @@ Checked: the new Accessibility call, run without its prompt, gives the same answ
 the watcher, any-app opening and the yes before each are tested over real HTTP with stand-in hands.
 Not checked live: the prompts on the person's screen, which need them at the Mac.
 
-### 2. Not started
+### 1ab. Finished on 2026-10-10: on a real Mac the agent is held to the allowed apps
+
+Seen in the person's first live run: asked to "open Claude desktop", which was not an allowed app, the
+agent clicked Claude's icon in the Dock instead, at (1314, 218). On a real Mac the app list held only
+the tool that opens apps. The helper now refuses any action of the agent unless an allowed app is in
+front, and closes at once an app that the agent's action started and the person did not allow. The
+person's own hand is not held. Checked with tests over real HTTP; with the closing step broken on
+purpose its test fails.
+
 
 | What | Note |
 |---|---|

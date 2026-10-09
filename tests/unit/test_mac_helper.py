@@ -23,6 +23,10 @@ class StandInHands:
         self.did: list[tuple[str, Any]] = []
         self.at = (500.0, 400.0)
         self.permitted: tuple[bool, bool] = (True, True)
+        self.in_front = "TextEdit"
+        self.apps_running: dict[str, int] = {"TextEdit": 101}
+        # What a click starts, as a click on an icon in the Dock would.
+        self.click_starts: tuple[str, int] | None = None
 
     def screen(self) -> tuple[int, int]:
         return 1440, 900
@@ -39,6 +43,10 @@ class StandInHands:
 
     def click(self, x: float, y: float, button: str, count: int, flags: int) -> None:
         self.did.append(("click", (x, y, button, count, flags)))
+        if self.click_starts is not None:
+            name, pid = self.click_starts
+            self.apps_running[name] = pid
+            self.in_front = name
 
     def move(self, x: float, y: float) -> None:
         self.did.append(("move", (x, y)))
@@ -62,7 +70,14 @@ class StandInHands:
         self.did.append(("open", name))
 
     def front(self) -> str:
-        return "TextEdit"
+        return self.in_front
+
+    def running(self) -> dict[str, int]:
+        return dict(self.apps_running)
+
+    def quit_app(self, pid: int) -> None:
+        self.did.append(("quit", pid))
+        self.apps_running = {name: one for name, one in self.apps_running.items() if one != pid}
 
     def ask_for_access(self) -> None:
         self.did.append(("ask_for_access", None))
@@ -379,3 +394,44 @@ async def test_with_any_app_allowed_each_one_opens_only_after_a_persons_yes(
         await session.close()
         server.should_exit = True
         await serving
+
+
+async def test_the_agent_acts_only_in_an_app_the_person_allowed(mac: tuple[MacDriver, StandInHands]) -> None:
+    """Held to the apps on a real Mac: an app the person did not allow is not worked in."""
+    driver, hands = mac
+    await driver.start()
+    hands.in_front = "Claude"
+    with pytest.raises(BrowserError, match="Claude, which the person has not allowed"):
+        await driver.click_at(100, 100, button="left", click_count=1, modifiers=[])
+    with pytest.raises(BrowserError, match="computer_open_app"):
+        await driver.type_text(None, "hello", clear=False, submit=False, slowly=False)
+    assert not [one for one in hands.did if one[0] in ("click", "type")]
+    # Bringing an allowed app to the front is the way on.
+    hands.in_front = "TextEdit"
+    await driver.click_at(100, 100, button="left", click_count=1, modifiers=[])
+    assert ("click", (100.0, 100.0, "left", 1, 0)) in hands.did
+
+
+async def test_an_app_a_click_starts_that_the_person_did_not_allow_is_closed_at_once(
+    mac: tuple[MacDriver, StandInHands],
+) -> None:
+    """As when the agent clicks an icon in the Dock: the app it starts is closed, and it is told so."""
+    driver, hands = mac
+    await driver.start()
+    hands.click_starts = ("Claude", 777)
+    with pytest.raises(BrowserError, match="started Claude, which the person has not allowed"):
+        await driver.click_at(1314, 218, button="left", click_count=1, modifiers=[])
+    assert ("quit", 777) in hands.did and "Claude" not in hands.apps_running
+    # An allowed app that a click starts stays.
+    hands.in_front, hands.click_starts = "TextEdit", ("Calculator", 778)
+    await driver.click_at(10, 10, button="left", click_count=1, modifiers=[])
+    assert "Calculator" in hands.apps_running and ("quit", 778) not in hands.did
+
+
+async def test_the_persons_own_hand_is_not_held_to_the_apps(mac: tuple[MacDriver, StandInHands]) -> None:
+    driver, hands = mac
+    await driver.start()
+    hands.in_front = "Claude"
+    await driver.pointer("down", 50, 60, "left")
+    await driver.key("down", "a")
+    assert ("press", (50.0, 60.0, "left", True)) in hands.did
