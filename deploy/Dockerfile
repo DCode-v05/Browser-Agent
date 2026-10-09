@@ -45,6 +45,17 @@ RUN if [ "$DESKTOP" = true ]; then \
       && install -o pwuser -g pwuser -m 644 /tmp/desktop-menu.xml /home/pwuser/.config/openbox/menu.xml; \
     fi; rm /tmp/desktop-menu.xml
 
+# Tailscale, for a VM that joins a person's tailnet (spec 21.12, arrangement 3). It joins only when the
+# container is given TS_AUTHKEY; the key is never in the image.
+ARG TAILSCALE=false
+RUN if [ "$TAILSCALE" = true ]; then \
+      curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg \
+      && curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list \
+      && apt-get update && apt-get install -y --no-install-recommends tailscale \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
+COPY --chmod=755 deploy/vm-start.sh /usr/local/bin/vm-start
+
 # Not root: the service and the browser run as the image's unprivileged user.
 USER pwuser
 WORKDIR /data
@@ -53,4 +64,5 @@ EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
   CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=2)"
 # The token comes from the environment (BAP_BROWSER_TOKEN), never from the image.
+ENTRYPOINT ["/usr/local/bin/vm-start"]
 CMD ["uv", "run", "--project", "/app", "--no-sync", "bap-browser", "serve"]

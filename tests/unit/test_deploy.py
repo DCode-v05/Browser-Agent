@@ -38,3 +38,22 @@ def test_the_image_runs_as_an_unprivileged_user_and_carries_no_secret() -> None:
     ignored = (ROOT / ".dockerignore").read_text(encoding="utf-8").split()
     assert ".env" in ignored and "config.json" in ignored
     assert lines[-1] == 'CMD ["uv", "run", "--project", "/app", "--no-sync", "bap-browser", "serve"]'
+
+
+START = (ROOT / "deploy" / "vm-start.sh").read_text(encoding="utf-8")
+
+
+def test_the_vm_joins_a_tailnet_only_when_it_is_given_a_key_and_then_forgets_the_key() -> None:
+    """Spec 21.12: the key comes from the environment, never the image, and the service never has it."""
+    lines = [
+        line.strip() for line in DOCKERFILE.splitlines() if line.strip() and not line.strip().startswith("#")
+    ]
+    assert 'ENTRYPOINT ["/usr/local/bin/vm-start"]' in lines
+    assert lines.index('ENTRYPOINT ["/usr/local/bin/vm-start"]') < len(lines) - 1, (
+        "the service stays the command"
+    )
+    assert 'if [ -n "${TS_AUTHKEY:-}" ]' in START
+    assert "unset TS_AUTHKEY" in START and START.index("unset TS_AUTHKEY") < START.index('exec "$@"')
+    # The key's value is never written out: not echoed, not logged.
+    assert not [line for line in START.splitlines() if "echo" in line and "$TS_AUTHKEY" in line]
+    assert "--state=mem:" in START, "the VM's node is ephemeral: it leaves the tailnet when the VM ends"
