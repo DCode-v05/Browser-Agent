@@ -5059,7 +5059,7 @@ started by alerts; a ban on every comment.
 
 ## 21. Computer use
 
-Date: 2026-10-09 · Status: arrangement 1 built; arrangements 2 to 4 planned
+Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 and 4 planned
 
 Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
@@ -5071,7 +5071,7 @@ browsers, with its own chat, settings, log and evaluations.
 | # | Where the engine runs | Which desktop it drives | Status |
 |---|---|---|---|
 | 1 | The person's own machine | A contained desktop in a container on that machine | Built |
-| 2 | A remote micro VM | The VM's own contained desktop, watched over the network | Planned: the micro VM image (section 17.2) gains the desktop |
+| 2 | A remote micro VM | The VM's own desktop, watched and driven over the network | Built: the micro VM's image with `DESKTOP=true`, and `bap-browser serve --desktop` (section 21.11) |
 | 3 | A remote micro VM | The VM's desktop, reaching the person's private services | Planned: the VM joins the person's Tailscale network as a tagged, ephemeral node. It needs a tailnet owner, an access policy and auth keys, which are the person's to create |
 | 4 | A remote micro VM | The person's real machine | Planned, last: a small helper on that machine sends pictures and takes input, over the tailnet only, from the engine's tag only. Built after the attack tests of the desktop pass |
 
@@ -5195,5 +5195,27 @@ The desktop has three task sets of its own, run from its Evaluations like a brow
 
 ### 21.10 Not built yet
 
-Arrangements 2, 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+Arrangements 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
 Windows.
+
+### 21.11 The micro VM
+
+In the micro VM (section 17.2) there is no container to start a desktop in: the VM itself is the
+boundary. The desktop runs on the VM's own virtual screen, which the engine starts.
+
+- `computer.runs` says where the desktop runs: `container` (the default) or `here`.
+  `deploy/config.vm.json` sets `here`, with the shared folder at `~/Files` and no terminal.
+- The image gains the desktop's programs when built with `--build-arg DESKTOP=true`: the virtual
+  screen, the window manager with an empty menu, the text editor, the file manager and the
+  calculator. No terminal is installed.
+- `bap-browser serve --desktop` serves the desktop's tools over MCP on HTTP, and the viewer shows its
+  screen, as `serve` does for a browser.
+
+```bash
+docker build --build-arg DESKTOP=true -f deploy/Dockerfile -t bap-browser-computer .
+docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-browser-computer \
+  uv run --project /app --no-sync bap-browser serve --desktop
+```
+
+The image installs uv from PyPI, so building it needs no registry but Docker Hub, Microsoft's and
+PyPI. `tests/e2e/test_computer_vm.py` starts the image and drives its desktop over MCP from outside.

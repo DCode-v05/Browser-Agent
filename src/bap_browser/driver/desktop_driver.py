@@ -37,7 +37,8 @@ from bap_browser.driver.base import (
     Shot,
     TabInfo,
 )
-from bap_browser.driver.contained_desktop import App, ContainedDesktop
+from bap_browser.driver.contained_desktop import App, ContainedDesktop, Desktop
+from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BadInput, BapError, BrowserError
 from bap_browser.results import Picture
 
@@ -145,7 +146,12 @@ class DesktopDriver:
     def __init__(self, config: Config, name: str = "computer") -> None:
         self._config = config
         self._settings = config.computer
-        self.desktop = ContainedDesktop(config.computer, config.data_dir, name)
+        settings = config.computer
+        self.desktop: Desktop = (
+            ScreenHere(settings)
+            if settings.runs == "here"
+            else ContainedDesktop(settings, config.data_dir, name)
+        )
         self._frames: asyncio.Task[None] | None = None
         self._last_shot: tuple[int, int] | None = None
 

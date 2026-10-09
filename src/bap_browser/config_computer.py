@@ -6,6 +6,8 @@ their own because one file would be too long to read.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from bap_browser.config_base import Section, setting
 
 
@@ -19,6 +21,12 @@ class AllowedApps(Section):
 
 
 class Computer(Section):
+    runs: Literal["container", "here"] = setting(
+        "container",
+        "Where the desktop runs: in a container of its own, or on this machine's own virtual screen. "
+        "`here` is for a machine that is itself the boundary, such as the micro VM",
+    )
+    display: str = setting(":1", "The virtual screen's display, when the desktop runs here")
     image: str = setting(
         "bap-browser-desktop:latest",
         "The container image of the contained desktop. `deploy/desktop.Dockerfile` builds it",

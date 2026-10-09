@@ -362,6 +362,7 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#218-tests">21.8 Tests</a></li>
 <li><a href="#219-task-sets-of-the-desktop">21.9 Task sets of the desktop</a></li>
 <li><a href="#2110-not-built-yet">21.10 Not built yet</a></li>
+<li><a href="#2111-the-micro-vm">21.11 The micro VM</a></li>
 </ul>
 </li>
 </ul>
@@ -12842,7 +12843,7 @@ looking. To wait for the thing it needs the extension to say that it has given u
 <p>Not in this section: a framework that makes these mistakes impossible by construction; agents
 started by alerts; a ban on every comment.</p>
 <h2 id="21-computer-use">21. Computer use</h2>
-<p>Date: 2026-10-09 · Status: arrangement 1 built; arrangements 2 to 4 planned</p>
+<p>Date: 2026-10-09 · Status: arrangements 1 and 2 built; 3 and 4 planned</p>
 <p>Computer use lets the agent work on a whole desktop, not only in a browser: it sees the screen as a
 picture and acts with the mouse and the keyboard. It is slower and less exact than browser use, so it
 is for what a browser cannot reach. It is one more page of the window (section 9.16), beside the three
@@ -12867,8 +12868,8 @@ browsers, with its own chat, settings, log and evaluations.</p>
 <tr>
 <td>2</td>
 <td>A remote micro VM</td>
-<td>The VM's own contained desktop, watched over the network</td>
-<td>Planned: the micro VM image (section 17.2) gains the desktop</td>
+<td>The VM's own desktop, watched and driven over the network</td>
+<td>Built: the micro VM's image with <code>DESKTOP=true</code>, and <code>bap-browser serve --desktop</code> (section 21.11)</td>
 </tr>
 <tr>
 <td>3</td>
@@ -13074,8 +13075,26 @@ and <code>screen_height</code> (1280 by 800), <code>computer.folder</code>, and 
 <li>The desktop has no checklist; its task sets are its check.</li>
 </ul>
 <h3 id="2110-not-built-yet">21.10 Not built yet</h3>
-<p>Arrangements 2, 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+<p>Arrangements 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
 Windows.</p>
+<h3 id="2111-the-micro-vm">21.11 The micro VM</h3>
+<p>In the micro VM (section 17.2) there is no container to start a desktop in: the VM itself is the
+boundary. The desktop runs on the VM's own virtual screen, which the engine starts.</p>
+<ul>
+<li><code>computer.runs</code> says where the desktop runs: <code>container</code> (the default) or <code>here</code>.
+  <code>deploy/config.vm.json</code> sets <code>here</code>, with the shared folder at <code>~/Files</code> and no terminal.</li>
+<li>The image gains the desktop's programs when built with <code>--build-arg DESKTOP=true</code>: the virtual
+  screen, the window manager with an empty menu, the text editor, the file manager and the
+  calculator. No terminal is installed.</li>
+<li><code>bap-browser serve --desktop</code> serves the desktop's tools over MCP on HTTP, and the viewer shows its
+  screen, as <code>serve</code> does for a browser.</li>
+</ul>
+<pre><code class="language-bash">docker build --build-arg DESKTOP=true -f deploy/Dockerfile -t bap-browser-computer .
+docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=&lt;a long random string&gt; bap-browser-computer \
+  uv run --project /app --no-sync bap-browser serve --desktop
+</code></pre>
+<p>The image installs uv from PyPI, so building it needs no registry but Docker Hub, Microsoft's and
+PyPI. <code>tests/e2e/test_computer_vm.py</code> starts the image and drives its desktop over MCP from outside.</p>
 </main>
 </div>
 <script>

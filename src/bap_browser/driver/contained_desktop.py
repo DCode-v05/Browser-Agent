@@ -13,6 +13,7 @@ import hashlib
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from bap_browser.config_computer import Computer
 from bap_browser.errors import BrowserError
@@ -44,6 +45,26 @@ APPS = (
     App("calculator", "Calculator", "galculator"),
     App("terminal", "Terminal", "xterm"),
 )
+
+
+class Desktop(Protocol):
+    """A desktop the driver works on: in a container, or on this machine's own virtual screen."""
+
+    @property
+    def alive(self) -> bool: ...
+
+    @property
+    def folder(self) -> Path | None: ...
+
+    async def start(self) -> None: ...
+
+    async def close(self) -> None: ...
+
+    async def run(self, *command: str, stdin: bytes | None = None) -> bytes: ...
+
+    async def start_app(self, app: App) -> None: ...
+
+    async def send(self, line: str) -> None: ...
 
 
 def allowed_apps(settings: Computer) -> list[App]:
