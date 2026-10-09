@@ -701,7 +701,10 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         assert await systems.get_by_role("switch", name="Use this browser").count() == 0
         # Every switch says what it lets a user do, and works.
         switches = await users.get_by_role("switch").all()
-        assert len(switches) == 17
+        # 17 of the browsers and the window, and two of the desktop of computer use (spec 21.7).
+        assert len(switches) == 19
+        for name in ("A picture after each action", "Ask me before an app opens"):
+            assert await users.get_by_role("switch", name=f"What users may change: {name}").count() == 1
         assert await users.locator(".system-row-hint:empty").count() == 0
         cost = users.get_by_role("switch", name="What users may see: What the tasks cost")
         await turned(cost, False)
@@ -710,7 +713,8 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         colour = users.get_by_role("switch", name="What users may change: Colour mode")
         await turned(colour, False)
         policy = (await opened.ask("GET", "/api/admin/policy"))[1]
-        assert {"id": "colour_mode", "allowed": False}.items() <= policy["may_change"][-1].items()
+        colour_line = next(line for line in policy["may_change"] if line["id"] == "colour_mode")
+        assert colour_line["allowed"] is False
         await turned(colour, True)
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         SHOTS.mkdir(parents=True, exist_ok=True)

@@ -38,11 +38,11 @@ from bap_browser.service.session import ServiceSession
 
 Mode = Literal["agent", "reference"]
 """Who does the tasks: the agent with its model, or the reference solutions, which need no model."""
-SetName = Literal["short", "confirm", "attack", "long"]
+SetName = Literal["short", "confirm", "attack", "long", "infeasible"]
 SETS: tuple[SetName, ...] = ("short", "confirm", "attack", "long")
 Kind = Literal["browser", "desktop"]
 """What a system is: a browser, or the desktop of computer use (spec 21). Each has sets of its own."""
-DESKTOP_SETS: tuple[SetName, ...] = ("short", "long", "attack")
+DESKTOP_SETS: tuple[SetName, ...] = ("short", "long", "attack", "infeasible")
 LAB = "demo-site/lab"
 RUNS = "runs.jsonl"
 STATE = re.compile(r"LABSTATE(\{.*\})ENDSTATE", re.DOTALL)

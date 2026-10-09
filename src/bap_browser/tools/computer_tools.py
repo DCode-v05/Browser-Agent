@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from bap_browser import keys
+from bap_browser.config import Config
 from bap_browser.driver.contained_desktop import APPS, allowed_apps
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.session import BrowserSession
@@ -22,6 +23,16 @@ from bap_browser.tools.browser_tools import request_human
 from bap_browser.tools.registry import Args, Shown, ToolDefinition
 
 LOOK = " Take a screenshot to see the result."
+AFTER = " This is a picture of the screen after it."
+
+
+async def after(session: BrowserSession, driver: DesktopDriver, said: str) -> str | Shown:
+    """What an action returns: a sentence, or with `computer.picture_after_action` the sentence and a
+    picture of the screen after it, as the vendors' loops return one after every action."""
+    if not session.config.computer.picture_after_action:
+        return said
+    shot = await driver.screenshot(full_page=False, annotate=False)
+    return Shown(said.replace(LOOK, AFTER), shot.picture)
 
 
 class PointArgs(Args):
@@ -112,52 +123,54 @@ async def zoom(session: BrowserSession, args: ZoomArgs) -> Shown:
     )
 
 
-async def click(session: BrowserSession, args: ClickArgs) -> str:
+async def click(session: BrowserSession, args: ClickArgs) -> str | Shown:
     driver = await _desktop(session)
     done = await driver.click_at(
         args.x, args.y, button=args.button, click_count=args.click_count, modifiers=args.modifiers
     )
     how = {1: "Clicked", 2: "Double-clicked", 3: "Triple-clicked"}[args.click_count]
     button = "" if args.button == "left" else f" with the {args.button} button"
-    return f"{how} {done.target}{button}.{LOOK}"
+    return await after(session, driver, f"{how} {done.target}{button}.{LOOK}")
 
 
-async def move(session: BrowserSession, args: PointArgs) -> str:
+async def move(session: BrowserSession, args: PointArgs) -> str | Shown:
     driver = await _desktop(session)
     done = await driver.hover_at(args.x, args.y)
-    return f"Moved the pointer to {done.target}.{LOOK}"
+    return await after(session, driver, f"Moved the pointer to {done.target}.{LOOK}")
 
 
-async def drag(session: BrowserSession, args: DragArgs) -> str:
+async def drag(session: BrowserSession, args: DragArgs) -> str | Shown:
     driver = await _desktop(session)
     start, end = (args.from_xy[0], args.from_xy[1]), (args.to_xy[0], args.to_xy[1])
     done = await driver.drag(start, end)
-    return f"Dragged from {done.source} to {done.target}.{LOOK}"
+    return await after(session, driver, f"Dragged from {done.source} to {done.target}.{LOOK}")
 
 
-async def type_text(session: BrowserSession, args: TypeArgs) -> str:
+async def type_text(session: BrowserSession, args: TypeArgs) -> str | Shown:
     driver = await _desktop(session)
     await driver.type_text(None, args.text, clear=False, submit=args.submit, slowly=False)
     then = " and pressed Enter" if args.submit else ""
-    return f"Typed {len(args.text)} characters where the keyboard's focus is{then}.{LOOK}"
+    return await after(
+        session, driver, f"Typed {len(args.text)} characters where the keyboard's focus is{then}.{LOOK}"
+    )
 
 
-async def press_key(session: BrowserSession, args: PressKeyArgs) -> str:
+async def press_key(session: BrowserSession, args: PressKeyArgs) -> str | Shown:
     driver = await _desktop(session)
     named = keys.normalise(args.keys)
     await driver.press_key(named, repeat=args.repeat, ref=None)
     times = "" if args.repeat == 1 else f" {args.repeat} times"
     # A key that types a character is typed text: it is shown to nobody.
     shown = "a key" if keys.is_typed_text(args.keys) else named
-    return f"Pressed {shown}{times}.{LOOK}"
+    return await after(session, driver, f"Pressed {shown}{times}.{LOOK}")
 
 
-async def scroll(session: BrowserSession, args: ScrollArgs) -> str:
+async def scroll(session: BrowserSession, args: ScrollArgs) -> str | Shown:
     driver = await _desktop(session)
     at = (args.x, args.y) if args.x is not None and args.y is not None else None
     await driver.turn_wheel(args.direction, args.amount, at)
     where = f" at ({at[0]:g}, {at[1]:g})" if at else " where the pointer is"
-    return f"Turned the wheel {args.direction} by {args.amount}{where}.{LOOK}"
+    return await after(session, driver, f"Turned the wheel {args.direction} by {args.amount}{where}.{LOOK}")
 
 
 async def wait(session: BrowserSession, args: WaitArgs) -> str:
@@ -281,3 +294,8 @@ COMPUTER_KEYS = frozenset({"computer_type", "computer_press_key"})
 COMPUTER_NAMES = frozenset(tool.name for tool in COMPUTER_TOOLS)
 # The tools that are no step on the screen. They are not watched for going round in circles.
 COMPUTER_NO_STEP = frozenset({"computer_wait", "computer_list_apps", "computer_request_human"})
+
+
+def computer_tools_for(config: Config) -> tuple[ToolDefinition, ...]:
+    """The desktop's tools as the configuration offers them: zoom only where it is turned on."""
+    return tuple(tool for tool in COMPUTER_TOOLS if tool.name != "computer_zoom" or config.computer.zoom)

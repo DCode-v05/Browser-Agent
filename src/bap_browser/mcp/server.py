@@ -29,7 +29,7 @@ from bap_browser.service.session import ServiceSession
 from bap_browser.settings.kinds import COMPUTER as DESKTOP
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools import Toolkit
-from bap_browser.tools.computer_tools import COMPUTER_TOOLS
+from bap_browser.tools.computer_tools import computer_tools_for
 from bap_browser.tools.kinds import READS
 
 INSTRUCTIONS = (
@@ -98,7 +98,7 @@ async def run_http(config: Config, *, open_viewer: bool, desktop: bool = False) 
             agent=AGENT_OVER_HTTP,
             settings=settings,
             backend=DESKTOP,
-            tools=COMPUTER_TOOLS,
+            tools=computer_tools_for,
         )
     else:
         session = ServiceSession(config, agent=AGENT_OVER_HTTP, settings=settings)

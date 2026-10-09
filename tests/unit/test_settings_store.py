@@ -641,6 +641,8 @@ def test_the_admin_says_which_settings_users_may_change(make_config: MakeConfig,
         "picture_quality",
         "show_agent_pointer",
         "colour_mode",
+        "computer_picture_after_action",
+        "computer_ask_before_apps",
     ]
     # Each line says what it is, so that the admin knows what they are deciding.
     assert told["may_change"][0] == {
