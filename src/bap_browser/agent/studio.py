@@ -16,9 +16,10 @@ record of what its tasks took. A session a person stopped can be started again f
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
-import webbrowser
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,15 +31,13 @@ from bap_browser.agent.command import (
     do_task,
     next_task,
     paired,
-    tell,
     unless_stopped,
 )
 from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.agent.models import Message, Model
 from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
-from bap_browser.desktop_app import DesktopApp
-from bap_browser.driver.mac_driver import desktop_driver_for
+from bap_browser.driver.mac_driver import desktop_driver_for, pairing_file, start_helper_in_terminal
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
@@ -58,7 +57,6 @@ from bap_browser.evals.suite import (
     suite_recorder,
 )
 from bap_browser.evals.suite import described as set_described
-from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
@@ -70,12 +68,32 @@ CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
 # The backend of the page that is no browser: the contained desktop of computer use (spec 21).
 DESKTOP = "contained_desktop"
 ONLY_A_BROWSER = "The checklist is for a browser. The desktop of computer use is checked with its task sets."
-# Where the core of the desktop app says where it is, beside this service's own such file.
-DESKTOP_STATE_FILE = "desktop-service.json"
 # What a person needs the agent's attention for.
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
 # What the page of the person's own Chrome says when that Chrome has no window to work in.
 NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
+
+
+async def paired_or_asked(room: Room, config: Config) -> None:
+    """Waits until a person asks for a new session, or, for the desktop on This Mac, until a helper
+    pairs anew (spec 21.13)."""
+    if config.computer.runs != "mac":
+        await room.restart.wait()
+        room.restart.clear()
+        return
+    pairing = pairing_file(config)
+
+    def stamp() -> float | None:
+        return pairing.stat().st_mtime if pairing.exists() else None
+
+    seen = stamp()
+    while not room.restart.is_set():
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(room.restart.wait(), config.computer.helper_poll_s)
+        now = stamp()
+        if now is not None and now != seen:
+            return
+    room.restart.clear()
 
 
 def kind_of(room: Room) -> Kind:
@@ -91,7 +109,8 @@ def said_of(failed: BaseException) -> str:
 
 
 # What a person may do with a browser of the window, besides setting it up.
-ACTIONS = ("start", "stop", "restart")
+# `helper`: start the helper of the person's own Mac in Terminal, for the desktop on This Mac.
+ACTIONS = ("start", "stop", "restart", "helper")
 # What the summary of an ended session says, in place of "You stopped it."
 STOPPED = "You stopped this browser from the Systems page."
 TURNED_OFF = "This browser was turned off."
@@ -150,6 +169,8 @@ class Studio:
         self._settings = settings
         self._model_for = model_for
         self._extension = extension
+        # Opens the helper of this Mac in Terminal. A test gives one that only notes it.
+        self.open_helper = start_helper_in_terminal
         self.sessions: dict[str, ServiceSession] = {}
         self.rooms = [
             Room(CLOUD, "remote_headless"),
@@ -172,8 +193,12 @@ class Studio:
     # What the window asks (the HTTP surface).
 
     def pages(self) -> list[dict[str, Any]]:
-        """The pages of the window, for its tabs (spec 9.16)."""
-        return [room.described(self._extension) for room in self.rooms]
+        """The pages of the window, for its tabs (spec 9.16). The desktop's says where it works."""
+        told = [room.described(self._extension) for room in self.rooms]
+        for page, room in zip(told, self.rooms, strict=True):
+            if room.backend == DESKTOP:
+                page["runs"] = self._configured(room).computer.runs
+        return told
 
     def described(self) -> list[dict[str, Any]]:
         """The systems, for the page that sets them up and manages them (spec 9.17)."""
@@ -189,6 +214,7 @@ class Studio:
                     # Where this browser's log is written. None when a person turned it off.
                     "log": str(Path(log).resolve()) if log else None,
                     "records": str(self._recorders[room.id].folder.resolve()),
+                    **({"runs": config.computer.runs} if room.backend == DESKTOP else {}),
                 }
             )
         return told
@@ -223,6 +249,8 @@ class Studio:
             return "There is no such browser, or nothing of that name to do with it."
         if not self._settings.enabled(system):
             return "This browser is turned off. Turn it on first."
+        if action == "helper":
+            return self._start_helper(room)
         running = room.session is not None and room.session.control != "ended"
         if action == "stop":
             if not running:
@@ -233,6 +261,19 @@ class Studio:
             return "This browser is running already."
         await self._end(room, RESTARTED)
         room.restart.set()
+        return None
+
+    def _start_helper(self, room: Room) -> str | None:
+        """Starts the helper of this Mac in Terminal (spec 21.13). None when it was started."""
+        config = self._configured(room)
+        if room.backend != DESKTOP or config.computer.runs != "mac":
+            return 'Choose "This Mac" under Where the agent works first.'
+        if sys.platform != "darwin":
+            return "The helper runs on a Mac only."
+        try:
+            self.open_helper(config, Path.cwd())
+        except BapError as failed:
+            return str(failed)
         return None
 
     async def _end(self, room: Room, why: str) -> None:
@@ -512,8 +553,9 @@ class Studio:
             except BapError as failed:
                 await session.close()
                 room.session, room.phase, room.note = None, "failed", str(failed)
-                # A person can try again from the Systems page.
-                await self._asked_again(room)
+                # A person can try again from the Systems page. On This Mac it goes on by itself as
+                # soon as a helper pairs.
+                await paired_or_asked(room, as_set)
                 continue
             self._take_place(room, session)
             await self._talk(room, tasks, session)
@@ -615,67 +657,3 @@ class Studio:
             for waiting in (pairing, changed):
                 waiting.cancel()
             await asyncio.gather(pairing, changed, return_exceptions=True)
-
-
-async def run_studio(
-    config: Config, model_for: Callable[[Service], Model], *, open_viewer: bool, extension: Path
-) -> None:
-    """Serves the window and its three pages until the service is stopped (Ctrl+C), which raises
-    Interrupted. `extension` is the folder the extension was put in, for the person's own Chrome."""
-    config = browser_extension.may_show_viewer(config)
-    desktop = _desktop_app(config)
-    settings = SettingsStore(config)
-    accounts = Accounts(config.auth)
-    studio = Studio(config, settings, model_for, extension)
-
-    def serving(port: int | None) -> Service:
-        return Service(
-            config,
-            studio.sessions,
-            port=port,
-            bridge=True,
-            rooms=studio.pages,
-            desktop=desktop,
-            settings=settings,
-            systems=studio,
-            accounts=accounts,
-        )
-
-    # The configured port, so that the two sign-in pages keep their addresses from one start to
-    # the next. Where it is taken, any free port.
-    service = serving(None)
-    try:
-        await service.start()
-    except OSError:
-        service = serving(0)
-        await service.start()
-    try:
-        tell(f"Viewer: {service.viewer_address}")
-        tell(f"Sign in as a user: {service.address}/")
-        tell(f"Sign in as the admin: {service.address}/admin")
-        tell(f"Demo site: {service.address}/demo-site/start.html")
-        tell(
-            'For the page "My Chrome", load the extension into your Chrome, once: open chrome://extensions, '
-            f"switch on Developer mode, press Load unpacked and choose {extension}"
-        )
-        tell("Press Ctrl+C to end.")
-        if open_viewer:
-            # The first time, the admin's page with this start's own link, which creates the
-            # admin's password. After that, the page where people sign in.
-            first_time = f"{service.address}/admin#token={service.token}"
-            webbrowser.open(f"{service.address}/" if accounts.has("admin") else first_time)
-        await studio.run(service)
-    finally:
-        browser_extension.forget(extension)
-        await asyncio.to_thread(desktop.close)
-        await service.stop()
-
-
-def _desktop_app(config: Config) -> DesktopApp:
-    """The desktop app, a program of its own. Its core says where it is in a file beside this
-    service's own."""
-    return DesktopApp(
-        Path(config.server.desktop_dir).expanduser().resolve(),
-        Path(config.server.state_file).resolve().with_name(DESKTOP_STATE_FILE),
-        close_wait_s=config.server.desktop_close_wait_s,
-    )

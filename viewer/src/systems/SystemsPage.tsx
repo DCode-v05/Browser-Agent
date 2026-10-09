@@ -270,6 +270,15 @@ function Configuration({ system, api, surface, word, version, onChanged, onSetti
     await onChanged();
   }
 
+  /** Starts the helper of this Mac in Terminal, and says that it did. */
+  async function startHelper() {
+    setNote('');
+    setBusy('helper');
+    const done = await api.manage(system.id, 'helper');
+    setBusy(null);
+    setNote(done.ok ? W.studio.mac.started : done.why);
+  }
+
   async function manage(action: SystemAction) {
     setNote('');
     setBusy(action);
@@ -318,6 +327,13 @@ function Configuration({ system, api, surface, word, version, onChanged, onSetti
           )
         )}
       </div>
+      {system.runs === 'mac' && (
+        <div className="system-actions">
+          <Button icon="play" busy={busy === 'helper'} disabled={!system.enabled} hint={W.studio.mac.startHint} onClick={() => void startHelper()}>
+            {W.studio.mac.start}
+          </Button>
+        </div>
+      )}
       {!waitsForChrome && <p className="system-hint">{S.manageLead[!system.enabled ? 'off' : running ? 'running' : 'stopped']}</p>}
       {(note || system.note || waitsForChrome) && (
         <p className="system-note" role="status">

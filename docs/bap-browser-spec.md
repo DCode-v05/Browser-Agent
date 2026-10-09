@@ -5285,6 +5285,12 @@ uv run bap-browser helper --allow text_editor,calculator
   and removes the file when it ends. The agent is then given the Mac's own instructions: it works only
   on what the task names, uses Command for shortcuts, and never types a password, pays, sends,
   deletes or shares unless the task says exactly that.
+- **Started from the window.** While the Computer tab waits for a helper, it shows "Let the agent use
+  this Mac": the admin's button "Start the helper in Terminal" writes `.bap-browser/start-helper.command`
+  (this user alone) with the apps the admin allows, and opens it in Terminal, so Terminal is the
+  program macOS asks to allow and the person sees the helper there. Two links open the panes of
+  System Settings to allow it: Screen Recording and Accessibility. The page connects by itself when the
+  helper pairs. The same button is on the Configuration card when This Mac is chosen.
 
 `tests/unit/test_mac_helper.py` runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.

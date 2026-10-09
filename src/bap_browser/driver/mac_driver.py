@@ -12,6 +12,8 @@ import contextlib
 import hashlib
 import json
 import os
+import shlex
+import subprocess
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Sequence
@@ -28,7 +30,7 @@ from bap_browser.driver.base import (
     PointerAction,
     Shot,
 )
-from bap_browser.driver.contained_desktop import App
+from bap_browser.driver.contained_desktop import App, allowed_apps
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.mac_hands import MAC_APPS
 from bap_browser.errors import BadInput, BrowserError
@@ -37,6 +39,8 @@ from bap_browser.results import Picture
 
 # The file, in the data folder, where a helper on this Mac says where it is.
 PAIRING = "helper.json"
+# The script, in the data folder, that Terminal runs to start the helper.
+START_SCRIPT = "start-helper.command"
 
 
 class MacLink:
@@ -162,6 +166,32 @@ def read_pairing(path: Path) -> tuple[str, str] | None:
     ):
         return None
     return told["url"], told["token"]
+
+
+def start_helper_in_terminal(
+    config: Config, folder: Path, run: Callable[[list[str]], Any] = subprocess.run
+) -> Path:
+    """Starts the helper on this Mac in a Terminal window of its own, from the project's `folder`,
+    with the apps the admin allows. Terminal is then the program macOS asks the person to allow, and
+    the person sees the helper and ends it there with Ctrl+C."""
+    apps = [app.id for app in allowed_apps(config.computer)]
+    if not apps:
+        raise BrowserError(
+            "Allow at least one app on the Computer tab's Configuration first.", reason="no app is allowed"
+        )
+    script = Path(config.data_dir).expanduser().resolve() / START_SCRIPT
+    script.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "#!/bin/sh",
+        f"cd {shlex.quote(str(folder))} || exit 1",
+        f"exec uv run bap-browser helper --allow {','.join(apps)}",
+    ]
+    handle = os.open(script, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o700)
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        file.write("\n".join(lines) + "\n")
+    os.chmod(script, 0o700)
+    run(["open", "-a", "Terminal", str(script)])
+    return script
 
 
 class MacDriver(DesktopDriver):

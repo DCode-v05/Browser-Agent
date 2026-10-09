@@ -16,7 +16,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright
 
 from bap_browser import browser_extension
 from bap_browser.agent.models import Reply, ScriptedModel, ToolCall
-from bap_browser.agent.studio import run_studio
+from bap_browser.agent.window import run_studio
 from bap_browser.config import Config
 
 ASK = ToolCall("a", "browser_request_human", {"reason": "Sign in to Northfield for me", "kind": "login"})

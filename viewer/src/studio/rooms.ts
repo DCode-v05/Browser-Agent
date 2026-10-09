@@ -14,6 +14,8 @@ export interface Room {
   note?: string;
   /** For the person's own Chrome: the folder the extension is in, to load it from. */
   extension?: string;
+  /** For the desktop of computer use: where it works, the contained desktop or the person's own Mac. */
+  runs?: string;
 }
 
 const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium', 'contained_desktop']);
@@ -24,7 +26,7 @@ export const hasSession = (room: Pick<Room, 'state'>): boolean => !NO_SESSION.ha
 
 function roomOf(given: unknown): Room | null {
   if (typeof given !== 'object' || given === null) return null;
-  const { id, backend, state, attention, working, note, extension } = given as Record<string, unknown>;
+  const { id, backend, state, attention, working, note, extension, runs } = given as Record<string, unknown>;
   if (typeof id !== 'string' || typeof backend !== 'string' || !BACKENDS.has(backend) || typeof state !== 'string') return null;
   return {
     id,
@@ -34,6 +36,7 @@ function roomOf(given: unknown): Room | null {
     working: working === true,
     note: typeof note === 'string' ? note : undefined,
     extension: typeof extension === 'string' ? extension : undefined,
+    runs: typeof runs === 'string' ? runs : undefined,
   };
 }
 

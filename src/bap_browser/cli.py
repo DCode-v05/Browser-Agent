@@ -362,7 +362,7 @@ def _studio(args: argparse.Namespace) -> int:
     from bap_browser import browser_extension
     from bap_browser.agent.command import Interrupted
     from bap_browser.agent.openai_model import OpenAIModel
-    from bap_browser.agent.studio import run_studio
+    from bap_browser.agent.window import run_studio
     from bap_browser.safeguards.model import ModelClient
 
     extension = browser_extension.install(extension_folder(config))

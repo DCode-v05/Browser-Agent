@@ -35,6 +35,9 @@ class Computer(Section):
         "The variable, in the environment or in `.env`, that holds the token the helper printed",
     )
     helper_port: int = setting(8796, "The port the helper listens on, on the person's Mac")
+    helper_poll_s: float = setting(
+        1.0, "How often the window looks whether a helper on this Mac has paired, while it waits for one"
+    )
     helper_stop_corner: float = setting(
         3.0, "How close to the top left corner, in points, the pointer stops the helper for good"
     )
