@@ -26,7 +26,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, Protocol, cast
 from urllib.parse import quote
 
 from bap_browser.config import Evals
@@ -40,6 +40,9 @@ Mode = Literal["agent", "reference"]
 """Who does the tasks: the agent with its model, or the reference solutions, which need no model."""
 SetName = Literal["short", "confirm", "attack", "long"]
 SETS: tuple[SetName, ...] = ("short", "confirm", "attack", "long")
+Kind = Literal["browser", "desktop"]
+"""What a system is: a browser, or the desktop of computer use (spec 21). Each has sets of its own."""
+DESKTOP_SETS: tuple[SetName, ...] = ("short", "long", "attack")
 LAB = "demo-site/lab"
 RUNS = "runs.jsonl"
 STATE = re.compile(r"LABSTATE(\{.*\})ENDSTATE", re.DOTALL)
@@ -71,9 +74,21 @@ class EvalTask:
     """For the `attack` set: the planted instruction was followed when any one of these holds."""
 
 
-def load_set(name: str) -> list[EvalTask]:
+def sets_of(kind: Kind) -> tuple[SetName, ...]:
+    """The sets a system of this kind is run with."""
+    return DESKTOP_SETS if kind == "desktop" else SETS
+
+
+def _read_set(name: str, kind: Kind) -> dict[str, Any]:
+    folder = resources.files("bap_browser.evals") / "sets"
+    if kind == "desktop":
+        folder = folder / "desktop"
+    return json.loads((folder / f"{name}.json").read_text("utf-8"))
+
+
+def load_set(name: str, kind: Kind = "browser") -> list[EvalTask]:
     """The tasks of one set, from its file in this package."""
-    raw = json.loads((resources.files("bap_browser.evals") / "sets" / f"{name}.json").read_text("utf-8"))
+    raw = _read_set(name, kind)
     return [
         EvalTask(
             id=one["id"],
@@ -91,9 +106,9 @@ def load_set(name: str) -> list[EvalTask]:
     ]
 
 
-def described(name: str) -> dict[str, Any]:
+def described(name: str, kind: Kind = "browser") -> dict[str, Any]:
     """A set as the window lists it: its title, what it measures, and how many tasks it has."""
-    raw = json.loads((resources.files("bap_browser.evals") / "sets" / f"{name}.json").read_text("utf-8"))
+    raw = _read_set(name, kind)
     return {"id": name, "title": raw["title"], "lead": raw["lead"], "tasks": len(raw["tasks"])}
 
 
@@ -187,11 +202,11 @@ def grade(task: EvalTask, state: Any, answer: str, asked: int) -> tuple[bool, st
 A_LINE = r'^\s*- {role} "{name}"[^\n]*?\[ref=((?:f\d+)?e\d+)\]'
 
 
-class _Lost(Exception):
+class LostStep(Exception):
     """A step of a reference solution could not be done."""
 
 
-async def _own(session: ServiceSession, name: str, arguments: Mapping[str, Any]) -> ToolResult:
+async def own_call(session: ServiceSession, name: str, arguments: Mapping[str, Any]) -> ToolResult:
     """One call of the runner's own: making the site ready, a step of a reference solution, the
     reading of what was done. It is no step of an agent's, so the limits of a task do not count it."""
     with session.toolkit.limits.own_work():
@@ -199,10 +214,10 @@ async def _own(session: ServiceSession, name: str, arguments: Mapping[str, Any])
 
 
 async def _ref(session: ServiceSession, role: str, name: str) -> str:
-    page = await _own(session, "browser_snapshot", {})
+    page = await own_call(session, "browser_snapshot", {})
     found = re.search(A_LINE.format(role=re.escape(role), name=re.escape(name)), page.text, re.MULTILINE)
     if found is None:
-        raise _Lost(f'there is no {role} "{name}" on the page')
+        raise LostStep(f'there is no {role} "{name}" on the page')
     return found.group(1)
 
 
@@ -228,10 +243,10 @@ async def solve(session: ServiceSession, site: str, steps: Sequence[Sequence[Any
             ref = await _ref(session, "checkbox", rest[0])
             call = ("browser_set_checked", {"ref": ref, "checked": bool(rest[1])})
         else:
-            raise _Lost(f"a reference solution has no step named {kind}")
-        result = await _own(session, *call)
+            raise LostStep(f"a reference solution has no step named {kind}")
+        result = await own_call(session, *call)
         if result.is_error:
-            raise _Lost(result.text.split("\n", 1)[0][:160])
+            raise LostStep(result.text.split("\n", 1)[0][:160])
     return answer, done
 
 
@@ -272,8 +287,8 @@ Doing = Callable[[str], Any]
 
 async def _state_of(session: ServiceSession, site: str) -> Any:
     """What was done on the practice site, read from its own page with the agent's own tools."""
-    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/state.html"})
-    page = await _own(session, "browser_get_text", {})
+    await own_call(session, "browser_navigate", {"url": f"{site}/{LAB}/state.html"})
+    page = await own_call(session, "browser_get_text", {})
     found = STATE.search(page.text)
     if found is None:
         return None
@@ -283,15 +298,63 @@ async def _state_of(session: ServiceSession, site: str) -> Any:
         return None
 
 
+class Ground(Protocol):
+    """Where a set's tasks are done: made ready before each, solved without a model, and read
+    afterwards. The practice site for a browser; the Practice folder for the desktop."""
+
+    async def ready(self, task: EvalTask) -> None: ...
+
+    async def solve(self, steps: Sequence[Sequence[Any]]) -> tuple[str, int]: ...
+
+    async def state(self) -> Any:
+        """What was done, for the checks. None when it could not be read."""
+        ...
+
+    async def keep_place(self) -> None:
+        """Notes where the system is before a run, to go back there afterwards."""
+        ...
+
+    async def back(self) -> None: ...
+
+
+class Lab:
+    """The practice site, in a browser (spec 12.7)."""
+
+    def __init__(self, session: ServiceSession, site: str) -> None:
+        self._session, self._site, self._before = session, site, ""
+
+    async def ready(self, task: EvalTask) -> None:
+        seed = quote(json.dumps(task.seed, separators=(",", ":")))
+        await own_call(
+            self._session, "browser_navigate", {"url": f"{self._site}/{LAB}/reset.html?seed={seed}"}
+        )
+        await own_call(self._session, "browser_navigate", {"url": f"{self._site}/{LAB}/{task.start}"})
+
+    async def solve(self, steps: Sequence[Sequence[Any]]) -> tuple[str, int]:
+        return await solve(self._session, self._site, steps)
+
+    async def state(self) -> Any:
+        return await _state_of(self._session, self._site)
+
+    async def keep_place(self) -> None:
+        tabs = await self._session.toolkit.tabs()
+        self._before = next((tab.url for tab in tabs if tab.active), "")
+
+    async def back(self) -> None:
+        if self._before:
+            # The browser goes back to where it was, for whatever the agent does next.
+            await own_call(self._session, "browser_navigate", {"url": self._before})
+
+
 async def run_trial(
     session: ServiceSession,
-    site: str,
+    ground: Ground,
     task: EvalTask,
     mode: Mode,
     do: Doing | None,
     settings: Evals,
 ) -> dict[str, Any]:
-    """One task, once: the site made ready, the task done, and what was done graded."""
+    """One task, once: its ground made ready, the task done, and what was done graded."""
     began = time.perf_counter()
     asked = 0
 
@@ -300,9 +363,7 @@ async def run_trial(
         asked += 1
         return task.answer
 
-    seed = quote(json.dumps(task.seed, separators=(",", ":")))
-    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/reset.html?seed={seed}"})
-    await _own(session, "browser_navigate", {"url": f"{site}/{LAB}/{task.start}"})
+    await ground.ready(task)
     told: dict[str, Any] = {"outcome": "answered", "steps": 0, "input_tokens": 0, "output_tokens": 0}
     answer, lost = "", ""
     session.stand_in = stand_in
@@ -310,8 +371,8 @@ async def run_trial(
         if mode == "reference" or do is None:
             session.working(True)
             try:
-                answer, told["steps"] = await solve(session, site, task.solution)
-            except _Lost as failed:
+                answer, told["steps"] = await ground.solve(task.solution)
+            except LostStep as failed:
                 lost, told["outcome"] = str(failed), "failed"
             finally:
                 session.working(False)
@@ -336,9 +397,9 @@ async def run_trial(
                     }
     finally:
         session.stand_in = None
-    state = None if session.control == "ended" else await _state_of(session, site)
+    state = None if session.control == "ended" else await ground.state()
     if state is None:
-        passed, why, attacked = False, lost or "the practice site could not be read afterwards", None
+        passed, why, attacked = False, lost or "what was done could not be read afterwards", None
     else:
         passed, why, attacked = grade(task, state, answer, asked)
         if lost and not passed:
@@ -355,7 +416,7 @@ async def run_trial(
 
 async def run_set(
     session: ServiceSession,
-    site: str,
+    ground: Ground,
     name: str,
     *,
     trials: int,
@@ -365,11 +426,12 @@ async def run_set(
     model: str,
     progress: Progress,
     tasks: Sequence[EvalTask] | None = None,
+    kind: Kind = "browser",
 ) -> dict[str, Any]:
     """Every task of a set, each `trials` times. The report of the run."""
-    tasks = load_set(name) if tasks is None else tasks
+    tasks = load_set(name, kind) if tasks is None else tasks
     began = time.time()
-    before = next((tab.url for tab in await session.toolkit.tabs() if tab.active), "")
+    await ground.keep_place()
     rows: list[dict[str, Any]] = []
     for number, task in enumerate(tasks, 1):
         row: dict[str, Any] = {"id": task.id, "title": task.title, "risky": task.risky, "trials": []}
@@ -377,15 +439,14 @@ async def run_set(
             if progress.stop.is_set() or session.control == "ended":
                 break
             progress.task, progress.trial, progress.title = number, trial, task.title
-            row["trials"].append(await run_trial(session, site, task, mode, do, settings))
+            row["trials"].append(await run_trial(session, ground, task, mode, do, settings))
         if row["trials"]:
             row["passed"] = sum(one["passed"] for one in row["trials"])
             rows.append(row)
         if progress.stop.is_set() or session.control == "ended":
             break
-    if before and session.control != "ended":
-        # The browser goes back to where it was, for whatever the agent does next.
-        await _own(session, "browser_navigate", {"url": before})
+    if session.control != "ended":
+        await ground.back()
     return {
         "id": secrets.token_hex(5),
         "set": name,

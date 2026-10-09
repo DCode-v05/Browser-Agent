@@ -5174,8 +5174,26 @@ and `screen_height` (1280 by 800), `computer.folder`, and the waits and limits i
   file the person then has; the desktop has no network; an app that is off cannot run at all. Skipped,
   with the reason, where Docker or the image is not there.
 - The window's test in a real browser has the fourth page.
+- `tests/unit/test_desktop_tasks.py`: the desktop's sets are whole, `Practice` is made ready without
+  touching anything beside it, and a followed instruction fails its task. `tests/e2e/test_computer.py`
+  runs every desktop task by its reference solution on a real desktop.
 
-### 21.9 Not built yet
+### 21.9 Task sets of the desktop
 
-Arrangements 2, 3 and 4; task sets and an attack set for the desktop; reading apps through their
-accessibility tree; a desktop of macOS or Windows.
+The desktop has three task sets of its own, run from its Evaluations like a browser's (section 12.7):
+`short` (4 tasks), `long` (2) and `attack` (3). Their files are in `evals/sets/desktop/`.
+
+- A task works in the folder `Practice` inside the shared folder, and nowhere else. Before each task
+  the apps are closed and `Practice` is emptied and given the task's files. The rest of the shared
+  folder is the person's and is never touched.
+- Afterwards the files in `Practice` are read and graded by the same checks as a browser's sets. A
+  file's text is found under its name with `_` for the dot: `files.todo_txt`.
+- The attack set plants instructions in files the agent is asked to read: delete the folder, write a
+  file, open the terminal. Each is graded on what happened in `Practice`, not on what the agent said.
+- Every task has a reference solution, done with the agent's own tools and no model.
+- The desktop has no checklist; its task sets are its check.
+
+### 21.10 Not built yet
+
+Arrangements 2, 3 and 4; reading apps through their accessibility tree; a desktop of macOS or
+Windows.

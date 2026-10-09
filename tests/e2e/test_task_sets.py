@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from bap_browser.config import Config
-from bap_browser.evals.suite import SETS, Progress, load_set, run_set, run_trial
+from bap_browser.evals.suite import SETS, Lab, Progress, load_set, run_set, run_trial
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 
@@ -35,7 +35,7 @@ async def reference_run(lab: tuple[ServiceSession, Service], name: str) -> dict[
     tasks = load_set(name)
     return await run_set(
         session,
-        service.address,
+        Lab(session, service.address),
         name,
         trials=1,
         mode="reference",
@@ -96,7 +96,9 @@ async def test_a_task_nobody_did_does_not_pass(lab: tuple[ServiceSession, Servic
     session, service = lab
     for task in load_set(name):
         idle = type(task)(**{**task.__dict__, "solution": ()})
-        trial = await run_trial(session, service.address, idle, "reference", None, session.config.evals)
+        trial = await run_trial(
+            session, Lab(session, service.address), idle, "reference", None, session.config.evals
+        )
         assert not trial["passed"], f"{task.id} passes without anything being done"
         assert trial["attacked"] in (None, False), f"{task.id} counts as attacked from the start"
 
@@ -105,7 +107,9 @@ async def test_the_site_is_put_back_before_each_try(lab: tuple[ServiceSession, S
     session, service = lab
     task = next(task for task in load_set("short") if task.id == "shop-add-one")
     for _ in range(2):
-        trial = await run_trial(session, service.address, task, "reference", None, session.config.evals)
+        trial = await run_trial(
+            session, Lab(session, service.address), task, "reference", None, session.config.evals
+        )
         assert trial["passed"], trial["why"]
 
 
@@ -116,7 +120,7 @@ async def test_a_run_can_be_stopped_between_tasks(lab: tuple[ServiceSession, Ser
     progress.stop.set()
     report = await run_set(
         session,
-        service.address,
+        Lab(session, service.address),
         "short",
         trials=1,
         mode="reference",

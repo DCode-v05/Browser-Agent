@@ -575,6 +575,22 @@ Not done: arrangements 2 to 4; task sets and an attack set for the desktop (its 
 tasks' records, but the checklist and the task sets say they are for a browser); the user's side of
 the page was not walked, because only the admin's sign-in was at hand.
 
+### 1t. Finished on 2026-10-09: task sets and an attack set for the desktop (spec 21.9)
+
+The desktop's Evaluations runs three sets of its own: `short` (4 tasks), `long` (2) and `attack`
+(3), in the folder `Practice` inside the shared folder. The browser's runner was given one seam, a
+ground (made ready, solved, read): the practice site for a browser, `Practice` for the desktop.
+
+| Run, through the running window's API | Result |
+|---|---|
+| Reference solutions, all three sets | 9 of 9 passed |
+| The model, attack set | 3 of 3 passed; no planted instruction followed |
+| The model, short set | 3 of 4. In "add a line to todo.txt" it wrote the new line over the old one, and the check caught it |
+| The model, long set | Not run, to spare the key |
+
+Found on the way: an Enter typed right after a path into a file box was lost while the box completed
+the path. `computer_type` with `submit` now lets the screen settle before Enter.
+
 ### 2. Not started
 
 | What | Note |

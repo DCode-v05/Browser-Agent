@@ -42,7 +42,19 @@ from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
 from bap_browser.evals.checks import run_checklist
-from bap_browser.evals.suite import SETS, Mode, Progress, Reports, run_set, suite_recorder
+from bap_browser.evals.desktop_ground import Desk
+from bap_browser.evals.suite import (
+    SETS,
+    Ground,
+    Kind,
+    Lab,
+    Mode,
+    Progress,
+    Reports,
+    run_set,
+    sets_of,
+    suite_recorder,
+)
 from bap_browser.evals.suite import described as set_described
 from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
@@ -55,7 +67,7 @@ logger = logging.getLogger(__name__)
 CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
 # The backend of the page that is no browser: the contained desktop of computer use (spec 21).
 DESKTOP = "contained_desktop"
-ONLY_A_BROWSER = "This is for a browser. The desktop of computer use has no checklist and no task sets yet."
+ONLY_A_BROWSER = "The checklist is for a browser. The desktop of computer use is checked with its task sets."
 # The folder, inside the data folder, where the built-in browser keeps its sign-ins.
 BUILT_IN_PROFILE = "built-in-browser"
 # Where the core of the desktop app says where it is, beside this service's own such file.
@@ -64,6 +76,11 @@ DESKTOP_STATE_FILE = "desktop-service.json"
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
 # What the page of the person's own Chrome says when that Chrome has no window to work in.
 NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
+
+
+def kind_of(room: Room) -> Kind:
+    """Whether a page of the window is a browser or the desktop, for its task sets."""
+    return "desktop" if room.backend == DESKTOP else "browser"
 
 
 def said_of(failed: BaseException) -> str:
@@ -291,7 +308,8 @@ class Studio:
             "system": system,
             "model": self._configured(room).agent.model,
             "sets": [
-                {**set_described(name), **latest.get(name, {"last": None, "earlier": []})} for name in SETS
+                {**set_described(name, kind_of(room)), **latest.get(name, {"last": None, "earlier": []})}
+                for name in sets_of(kind_of(room))
             ],
             "running": running.told() if running is not None else None,
             "trials": settings.suite_trials,
@@ -322,9 +340,7 @@ class Studio:
         room, service = self._room(system), self.service
         assert room is not None and service is not None
         session = room.session
-        if room.backend == DESKTOP:
-            return ONLY_A_BROWSER
-        if name not in SETS:
+        if name not in sets_of(kind_of(room)):
             return "There is no task set of that name."
         if not 1 <= trials <= self._config.evals.suite_max_trials:
             return f"A task is tried between 1 and {self._config.evals.suite_max_trials} times."
@@ -334,7 +350,7 @@ class Studio:
             return "The agent is not driving this browser now. Hand it back, or resume it, first."
         if session.busy or system in self._checking or system in self._runs:
             return "This browser is busy. Run the task set when its task is finished."
-        progress = Progress(name, mode, trials, set_described(name)["tasks"])
+        progress = Progress(name, mode, trials, set_described(name, kind_of(room))["tasks"])
         self._runs[system] = progress
         running = asyncio.create_task(self._run_suite(room, session, service, progress))
         self._running.add(running)
@@ -367,9 +383,10 @@ class Studio:
 
         try:
             async with room.turn:
+                ground: Ground = Desk(session) if room.backend == DESKTOP else Lab(session, service.address)
                 report = await run_set(
                     session,
-                    service.address,
+                    ground,
                     progress.set,
                     trials=progress.trials,
                     mode=progress.mode,
@@ -377,6 +394,7 @@ class Studio:
                     settings=self._config.evals,
                     model=session.config.agent.model,
                     progress=progress,
+                    kind=kind_of(room),
                 )
             await asyncio.to_thread(self._reports[room.id].keep, report)
         except BapError as failed:

@@ -496,6 +496,9 @@ class Auth(Section):
 
 
 class Evals(Section):
+    desktop_file_chars: int = setting(
+        2000, "How much of each file in Practice the checks of the desktop's task sets are given"
+    )
     enabled: bool = setting(
         True, "Keep a record of each task a browser of the window does: its time, its steps, its tokens"
     )

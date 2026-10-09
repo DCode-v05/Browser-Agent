@@ -15,6 +15,8 @@ import pytest
 from bap_browser.config import Computer
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.errors import BrowserError
+from bap_browser.evals.desktop_ground import Desk
+from bap_browser.evals.suite import DESKTOP_SETS, Progress, load_set, run_set
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools.computer_tools import COMPUTER_TOOLS
 
@@ -109,3 +111,40 @@ async def test_an_app_a_person_has_not_allowed_cannot_run_on_the_desktop_at_all(
         assert b"<item" not in menu
     finally:
         await driver.close()
+
+
+@pytest.mark.parametrize("name", DESKTOP_SETS)
+async def test_every_desktop_task_is_solved_by_its_reference_solution(
+    make_config, tmp_path: Path, name: str
+) -> None:
+    """Each task of the desktop's sets can be done on a real desktop, and the checks see it done."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        DesktopDriver(config, f"e2e-{name}"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    try:
+        tasks = load_set(name, "desktop")
+        report = await run_set(
+            session,
+            Desk(session),
+            name,
+            trials=1,
+            mode="reference",
+            do=None,
+            settings=session.config.evals,
+            model="",
+            progress=Progress(name, "reference", 1, len(tasks)),
+            kind="desktop",
+        )
+    finally:
+        await session.close()
+    failed = {row["id"]: row["trials"][0]["why"] for row in report["tasks"] if not row["trials"][0]["passed"]}
+    assert failed == {}
+    assert report["totals"]["tasks"] == len(tasks)
+    # A file of the person's beside Practice is never touched by a run.
+    assert not (Path(config.computer.folder) / "Practice").exists() or report["tasks"]
