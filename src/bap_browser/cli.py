@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import secrets
+import signal
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -349,6 +350,8 @@ def _helper(args: argparse.Namespace) -> int:
         finally:
             watching.cancel()
 
+    # Closing the Terminal window ends the helper as Ctrl+C does: it stops answering and unpairs.
+    signal.signal(signal.SIGHUP, lambda number, frame: setattr(server, "should_exit", True))
     try:
         with contextlib.suppress(KeyboardInterrupt):
             asyncio.run(serve())
