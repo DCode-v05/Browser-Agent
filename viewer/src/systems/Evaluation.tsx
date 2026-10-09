@@ -160,7 +160,8 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
             </>
           )}
 
-          {may.checklist && (
+          {/* The desktop of computer use has no checklist: its task sets are its check (spec 21.9). */}
+          {may.checklist && system.backend !== 'contained_desktop' && (
             <>
               <h4 className="system-section">{E.checklist}</h4>
               <p className="system-hint">{E.checklistLead}</p>
@@ -252,7 +253,7 @@ function Trace({ trace }: { trace: TaskTrace }) {
     <ol className="system-trace" aria-label={E.trace}>
       {trace.spans.map((span, index) => (
         <li key={index} className="system-span" data-kind={span.kind} data-ok={span.ok}>
-          <span className="system-span-name">{span.kind === 'model' ? E.theModel : span.name.replace('browser_', '')}</span>
+          <span className="system-span-name">{span.kind === 'model' ? E.theModel : span.name.replace(/^(browser|computer)_/, '')}</span>
           <span className="system-span-track" aria-hidden="true">
             <span className="system-span-bar" style={{ marginInlineStart: `${Math.min((span.at_ms / whole) * 100, 99)}%`, width: `${Math.max((span.ms / whole) * 100, 1)}%` }} />
           </span>
