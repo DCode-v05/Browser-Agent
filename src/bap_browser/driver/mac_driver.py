@@ -121,8 +121,9 @@ class MacLink:
         ]
         if missing:
             raise BrowserError(
-                f"The Mac has not allowed the helper {' and '.join(missing)}. The person allows it in System "
-                "Settings, Privacy & Security, for the program that runs the helper.",
+                f"The Mac has not allowed the helper {' and '.join(missing)} yet. macOS has asked: switch "
+                "Terminal on under each in System Settings, Privacy & Security. This page connects by itself "
+                "once both are allowed.",
                 reason="the Mac has not allowed it",
             )
         if told["stopped"]:
@@ -175,6 +176,8 @@ def start_helper_in_terminal(
     with the apps the admin allows. Terminal is then the program macOS asks the person to allow, and
     the person sees the helper and ends it there with Ctrl+C."""
     apps = [app.id for app in allowed_apps(config.computer)]
+    if config.computer.mac_any_app:
+        apps.append("any")
     if not apps:
         raise BrowserError(
             "Allow at least one app on the Computer tab's Configuration first.", reason="no app is allowed"
@@ -233,9 +236,17 @@ class MacDriver(DesktopDriver):
 
     async def open_app(self, app: App) -> bool:
         await self.link.start_app(app)
+        return await self._in_front(MAC_APPS[app.id])
+
+    async def open_named_app(self, name: str) -> bool:
+        await self.link.act(do="open", name=name)
+        return await self._in_front(name)
+
+    async def _in_front(self, name: str) -> bool:
+        """Whether the app comes to the front within the wait for an app."""
         waited, pause = 0.0, self._settings.app_poll_ms / 1000
         while waited < self._settings.app_open_wait_s:
-            if (await self.link.status()).get("front") == MAC_APPS[app.id]:
+            if (await self.link.status()).get("front") == name:
                 return True
             await asyncio.sleep(pause)
             waited += pause

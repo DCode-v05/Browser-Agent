@@ -682,6 +682,18 @@ desktop's; only its chat had the right ones. Every desktop result with the model
 2026-10-09 was measured that way, including the infeasible set's change from 0 to 1 of 3, which the
 added sentence did not reach. They are fixed now and must be run again.
 
+### 1aa. Finished on 2026-10-10: macOS asks for the helper's permissions, and any app on this Mac
+
+The person's error "The Mac has not allowed the helper Screen Recording and Accessibility" had one
+cause: the helper only checked the two permissions and never asked for them, so macOS neither
+prompted nor listed Terminal in either pane. The helper now asks, as GPT-6 Astra's app does, watches
+for the yes, and pairs again so the window connects by itself. "On this Mac, let the agent open any
+app" lets the agent open any app by its name, each after the person's yes.
+
+Checked: the new Accessibility call, run without its prompt, gives the same answer as the plain check;
+the watcher, any-app opening and the yes before each are tested over real HTTP with stand-in hands.
+Not checked live: the prompts on the person's screen, which need them at the Mac.
+
 ### 2. Not started
 
 | What | Note |

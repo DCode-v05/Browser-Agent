@@ -206,6 +206,10 @@ class DesktopDriver:
         titles = [line.strip()[:longest] for line in out.decode(errors="replace").splitlines()]
         return [title for title in titles if title and title != "Openbox"][:most]
 
+    async def open_named_app(self, name: str) -> bool:
+        """Opens an app by its name. Only the person's own Mac does that; a desktop opens its own apps."""
+        raise BadInput("This desktop opens only the apps computer_list_apps names.", reason="no such app")
+
     async def open_app(self, app: App) -> bool:
         """Opens an app. True when a window of it came up in time."""
         before = len(await self.windows())

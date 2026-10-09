@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import secrets
+import signal
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -298,37 +299,62 @@ def _helper(args: argparse.Namespace) -> int:
     import uvicorn
 
     from bap_browser.driver.mac_hands import MAC_APPS, MacHands
-    from bap_browser.service.mac_helper import Helper, helper_app, pairing_file, write_pairing
+    from bap_browser.service.mac_helper import (
+        ANY_APP,
+        Helper,
+        helper_app,
+        pairing_file,
+        watch_permissions,
+        write_pairing,
+    )
 
     apps = [name for name in args.allow.split(",") if name]
-    unknown = [name for name in apps if name not in MAC_APPS]
+    unknown = [name for name in apps if name not in MAC_APPS and name != ANY_APP]
     if unknown:
-        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(MAC_APPS)}.")
+        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(MAC_APPS)}, or any.")
         return 2
     hands = MacHands()
-    recording, accessibility = hands.allowed()
     token = secrets.token_urlsafe(32)
     port = config.computer.helper_port
-    say(f"The helper answers on http://{args.host}:{port}, to this token only:")
+    address = f"http://{args.host}:{port}"
+    say(f"The helper answers on {address}, to this token only:")
     say(token)
     say("Give the token to the engine as BAP_BROWSER_HELPER_TOKEN. It is new each time the helper starts.")
-    say(f"Apps the engine may open: {', '.join(MAC_APPS[name] for name in apps) or 'none'}.")
-    if not (recording and accessibility):
-        say(
-            "Allow the program that runs this in System Settings, Privacy & Security: Screen Recording and Accessibility."
-        )
+    named = [MAC_APPS[name] for name in apps if name in MAC_APPS]
+    if ANY_APP in apps:
+        named.append("any app by its name, each after your yes")
+    say(f"Apps the engine may open: {', '.join(named) or 'none'}.")
     say("To stop it at once, push the pointer into the top left corner of the screen. Ctrl+C ends it.")
     # A window on this same Mac finds the helper here: its address and token, for this user alone.
     pairing = pairing_file(config)
-    write_pairing(pairing, f"http://{args.host}:{port}", token)
+
+    def pair() -> None:
+        write_pairing(pairing, address, token)
+
+    pair()
     say(f"Paired with bap-browser on this Mac through {pairing}. Choose This Mac in Computer, Configuration.")
-    try:
-        uvicorn.run(
+    server = uvicorn.Server(
+        uvicorn.Config(
             helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
             host=args.host,
             port=port,
             log_level="warning",
         )
+    )
+
+    async def serve() -> None:
+        # macOS is asked for what is missing; once both are allowed the window is told, and connects.
+        watching = asyncio.create_task(watch_permissions(hands, pair, say, config.computer.helper_poll_s))
+        try:
+            await server.serve()
+        finally:
+            watching.cancel()
+
+    # Closing the Terminal window ends the helper as Ctrl+C does: it stops answering and unpairs.
+    signal.signal(signal.SIGHUP, lambda number, frame: setattr(server, "should_exit", True))
+    try:
+        with contextlib.suppress(KeyboardInterrupt):
+            asyncio.run(serve())
     finally:
         pairing.unlink(missing_ok=True)
 

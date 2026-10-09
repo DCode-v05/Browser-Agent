@@ -13205,6 +13205,14 @@ internet.</p>
   program macOS asks to allow and the person sees the helper there. Two links open the panes of
   System Settings to allow it: Screen Recording and Accessibility. The page connects by itself when the
   helper pairs. The same button is on the Configuration card when This Mac is chosen.</li>
+<li><strong>macOS asks, as for GPT-6 Astra's app.</strong> The helper asks macOS for Screen Recording and Accessibility
+  when it starts (<code>CGRequestScreenCaptureAccess</code>, <code>AXIsProcessTrustedWithOptions</code> with the prompt), so
+  that macOS shows its own prompts and lists Terminal in both panes. It watches for the person's yes,
+  says in Terminal what is still missing, and pairs again once both are allowed: the page connects by
+  itself.</li>
+<li><strong>Any app, on this Mac.</strong> "On this Mac, let the agent open any app" (<code>computer.mac_any_app</code>, off) lets
+  the agent open any app by its name, as GPT-6 Astra does; the helper is then started with <code>any</code>, and
+  each opening asks the person first. A name that is not an app's name is refused.</li>
 </ul>
 <p><code>tests/unit/test_mac_helper.py</code> runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.</p>

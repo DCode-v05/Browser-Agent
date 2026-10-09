@@ -111,6 +111,11 @@ class Hands(Protocol):
         """Whether Screen Recording and Accessibility are allowed for this program."""
         ...
 
+    def ask_for_access(self) -> None:
+        """Has macOS ask the person for what is not allowed yet. It also lists this program under
+        Screen Recording and Accessibility, so that the person finds it there to switch on."""
+        ...
+
     def pointer_at(self) -> tuple[float, float]: ...
 
     def picture(
@@ -169,6 +174,18 @@ class MacHands:
         cg.CGDisplayBounds.restype = Rect
         cg.CGDisplayBounds.argtypes = [ctypes.c_uint32]
         cg.CGPreflightScreenCaptureAccess.restype = ctypes.c_bool
+        cg.CGRequestScreenCaptureAccess.restype = ctypes.c_bool
+        self._ax.AXIsProcessTrustedWithOptions.restype = ctypes.c_bool
+        self._ax.AXIsProcessTrustedWithOptions.argtypes = [ctypes.c_void_p]
+        self._cf.CFDictionaryCreate.restype = ctypes.c_void_p
+        self._cf.CFDictionaryCreate.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.c_long,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+        ]
         self._ax.AXIsProcessTrusted.restype = ctypes.c_bool
         cg.CGEventCreate.restype = event
         cg.CGEventCreate.argtypes = [pointer]
@@ -203,6 +220,27 @@ class MacHands:
 
     def allowed(self) -> tuple[bool, bool]:
         return bool(self._cg.CGPreflightScreenCaptureAccess()), bool(self._ax.AXIsProcessTrusted())
+
+    def ask_for_access(self) -> None:
+        recording, accessibility = self.allowed()
+        if not recording:
+            self._cg.CGRequestScreenCaptureAccess()
+        if not accessibility:
+            self.trusted(prompt=True)
+
+    def trusted(self, *, prompt: bool) -> bool:
+        """Whether Accessibility is allowed. With `prompt`, macOS asks the person when it is not."""
+        cf, ax = self._cf, self._ax
+        key = ctypes.c_void_p.in_dll(ax, "kAXTrustedCheckOptionPrompt")
+        value = ctypes.c_void_p.in_dll(cf, "kCFBooleanTrue" if prompt else "kCFBooleanFalse")
+        keys, values = (ctypes.c_void_p * 1)(key.value), (ctypes.c_void_p * 1)(value.value)
+        key_calls = ctypes.addressof(ctypes.c_char.in_dll(cf, "kCFTypeDictionaryKeyCallBacks"))
+        value_calls = ctypes.addressof(ctypes.c_char.in_dll(cf, "kCFTypeDictionaryValueCallBacks"))
+        options = cf.CFDictionaryCreate(None, keys, values, 1, key_calls, value_calls)
+        try:
+            return bool(ax.AXIsProcessTrustedWithOptions(options))
+        finally:
+            cf.CFRelease(options)
 
     def pointer_at(self) -> tuple[float, float]:
         event = self._cg.CGEventCreate(None)

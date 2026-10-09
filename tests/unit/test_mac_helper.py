@@ -64,6 +64,9 @@ class StandInHands:
     def front(self) -> str:
         return "TextEdit"
 
+    def ask_for_access(self) -> None:
+        self.did.append(("ask_for_access", None))
+
 
 @pytest.fixture
 async def mac(
@@ -257,3 +260,122 @@ async def test_the_admin_starts_the_helper_from_the_window_only_for_this_mac(
     assert await studio.manage("computer", "helper") is None
     assert opened == [Path.cwd()]
     assert next(page for page in studio.pages() if page["id"] == "computer")["runs"] == "mac"
+
+
+async def test_the_helper_asks_macos_for_what_is_missing_and_pairs_again_when_it_is_allowed(
+    make_config, tmp_path: Path
+) -> None:
+    """As GPT-6 Astra's app does: macOS asks the person, and lists the program to allow."""
+    import asyncio
+
+    from bap_browser.service.mac_helper import watch_permissions
+
+    hands = StandInHands()
+    hands.permitted = (False, False)
+    config = make_config(tmp_path)
+    pairing = pairing_file(config)
+    said: list[str] = []
+    watching = asyncio.create_task(
+        watch_permissions(
+            hands, lambda: write_pairing(pairing, "http://127.0.0.1:8796", TOKEN), said.append, 0.01
+        )
+    )
+    await asyncio.sleep(0.05)
+    assert ("ask_for_access", None) in hands.did
+    assert any("Screen Recording" in line and "Accessibility" in line for line in said)
+    assert not pairing.exists()
+    hands.permitted = (True, True)
+    await asyncio.sleep(0.05)
+    watching.cancel()
+    assert pairing.exists(), "the window is not told that the Mac now allows it"
+    assert any("allowed" in line.lower() for line in said[1:])
+
+
+async def test_on_this_mac_any_app_opens_by_its_name_only_where_the_person_allows_any(
+    mac: tuple[MacDriver, StandInHands],
+) -> None:
+    driver, hands = mac
+    await driver.start()
+    with pytest.raises(BrowserError, match="did not allow that app"):
+        await driver.link.act(do="open", name="Notes")
+    assert not [one for one in hands.did if one[0] == "open"]
+
+
+async def test_a_helper_started_with_any_app_opens_one_by_its_name_and_refuses_a_name_that_is_no_name(
+    make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    hands = StandInHands()
+    helper = Helper(hands, TOKEN, ["any"], 3.0)
+    server = uvicorn.Server(uvicorn.Config(helper_app(helper), host="127.0.0.1", port=0, log_level="warning"))
+    serving = asyncio.create_task(server.serve())
+    while not server.started:
+        await asyncio.sleep(0.01)
+    port = server.servers[0].sockets[0].getsockname()[1]
+    monkeypatch.setenv("BAP_BROWSER_HELPER_TOKEN", TOKEN)
+    driver = MacDriver(
+        make_config(tmp_path, computer={"runs": "mac", "helper_url": f"http://127.0.0.1:{port}"})
+    )
+    try:
+        await driver.start()
+        await driver.link.act(do="open", name="Notes")
+        with pytest.raises(BrowserError, match="not the name of an app"):
+            await driver.link.act(do="open", name="-a Terminal; rm -rf ~")
+        assert [one for one in hands.did if one[0] == "open"] == [("open", "Notes")]
+    finally:
+        server.should_exit = True
+        await serving
+
+
+async def test_with_any_app_allowed_each_one_opens_only_after_a_persons_yes(
+    make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from bap_browser.driver.session import Question
+    from bap_browser.service.session import ServiceSession
+    from bap_browser.tools.computer_tools import computer_tools_for
+
+    hands = StandInHands()
+    server = uvicorn.Server(
+        uvicorn.Config(
+            helper_app(Helper(hands, TOKEN, ["any"], 3.0)), host="127.0.0.1", port=0, log_level="warning"
+        )
+    )
+    serving = asyncio.create_task(server.serve())
+    while not server.started:
+        await asyncio.sleep(0.01)
+    port = server.servers[0].sockets[0].getsockname()[1]
+    monkeypatch.setenv("BAP_BROWSER_HELPER_TOKEN", TOKEN)
+    computer = {
+        "runs": "mac",
+        "mac_any_app": True,
+        "helper_url": f"http://127.0.0.1:{port}",
+        "app_open_wait_s": 0.05,
+    }
+    config = make_config(tmp_path, computer=computer)
+    session = ServiceSession(
+        config, MacDriver(config), name="computer", backend="contained_desktop", tools=computer_tools_for
+    )
+    answers = iter(["denied", "allowed"])
+    asked: list[Question] = []
+
+    async def person(question: Question) -> Any:
+        asked.append(question)
+        return next(answers)
+
+    await session.start()
+    session.browser.ask_approval = person
+    try:
+        listed = await session.toolkit.call("computer_list_apps", {})
+        assert "any app on this Mac" in listed.text
+        refused = await session.toolkit.call("computer_open_app", {"app": "Notes"})
+        assert refused.is_error and not [one for one in hands.did if one[0] == "open"]
+        await session.toolkit.call("computer_open_app", {"app": "Notes"})
+        assert [one for one in hands.did if one[0] == "open"] == [("open", "Notes")]
+        assert [question.summary for question in asked] == ["Opening Notes", "Opening Notes"]
+    finally:
+        await session.close()
+        server.should_exit = True
+        await serving

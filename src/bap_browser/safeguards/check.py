@@ -188,7 +188,8 @@ class Check(Findings):
         began = self._clock()
         config = self._session.config
         policy = config.safety.action_policies.get(step.tool, config.safety.default_action_policy)
-        if step.tool == OPENS_AN_APP and config.computer.ask_before_apps and policy != "deny":
+        any_app = config.computer.runs == "mac" and config.computer.mac_any_app
+        if step.tool == OPENS_AN_APP and (config.computer.ask_before_apps or any_app) and policy != "deny":
             # A person's yes before the agent opens an app on the desktop (spec 21.7).
             policy = "confirm"
         if policy == "deny":

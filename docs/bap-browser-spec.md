@@ -5291,6 +5291,14 @@ uv run bap-browser helper --allow text_editor,calculator
   program macOS asks to allow and the person sees the helper there. Two links open the panes of
   System Settings to allow it: Screen Recording and Accessibility. The page connects by itself when the
   helper pairs. The same button is on the Configuration card when This Mac is chosen.
+- **macOS asks, as for GPT-6 Astra's app.** The helper asks macOS for Screen Recording and Accessibility
+  when it starts (`CGRequestScreenCaptureAccess`, `AXIsProcessTrustedWithOptions` with the prompt), so
+  that macOS shows its own prompts and lists Terminal in both panes. It watches for the person's yes,
+  says in Terminal what is still missing, and pairs again once both are allowed: the page connects by
+  itself.
+- **Any app, on this Mac.** "On this Mac, let the agent open any app" (`computer.mac_any_app`, off) lets
+  the agent open any app by its name, as GPT-6 Astra does; the helper is then started with `any`, and
+  each opening asks the person first. A name that is not an app's name is refused.
 
 `tests/unit/test_mac_helper.py` runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.
