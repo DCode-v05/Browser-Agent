@@ -35,6 +35,7 @@ from bap_browser.agent.command import (
 )
 from bap_browser.agent.loop import COMPUTER_SYSTEM, SYSTEM
 from bap_browser.agent.models import Message, Model
+from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.driver.mac_driver import desktop_driver_for
@@ -44,6 +45,7 @@ from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
 from bap_browser.evals.checks import run_checklist
 from bap_browser.evals.desktop_ground import Desk
 from bap_browser.evals.suite import (
+    DESKTOP_SETS,
     SETS,
     Ground,
     Kind,
@@ -60,7 +62,7 @@ from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.store import SettingsStore
-from bap_browser.tools.computer_tools import COMPUTER_TOOLS
+from bap_browser.tools.computer_tools import computer_tools_for
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +70,6 @@ CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
 # The backend of the page that is no browser: the contained desktop of computer use (spec 21).
 DESKTOP = "contained_desktop"
 ONLY_A_BROWSER = "The checklist is for a browser. The desktop of computer use is checked with its task sets."
-# The folder, inside the data folder, where the built-in browser keeps its sign-ins.
-BUILT_IN_PROFILE = "built-in-browser"
 # Where the core of the desktop app says where it is, beside this service's own such file.
 DESKTOP_STATE_FILE = "desktop-service.json"
 # What a person needs the agent's attention for.
@@ -333,7 +333,10 @@ class Studio:
                 for name, told in latest.items()
             }
             lines.append({"system": room.id, "runs": runs})
-        return {"sets": [set_described(name) for name in SETS], "systems": lines}
+        # Every set of every system: the desktop has one the browsers do not (spec 21.9).
+        listed = [set_described(name) for name in SETS]
+        listed += [set_described(name, "desktop") for name in DESKTOP_SETS if name not in SETS]
+        return {"sets": listed, "systems": lines}
 
     def start_suite(self, system: str, name: str, trials: int, mode: Mode) -> str | None:
         """Begins a run of a task set on a browser. None when it began; otherwise why not."""
@@ -408,13 +411,13 @@ class Studio:
         """What the deployment gives this browser, before a person's settings."""
         config = self._config
         if room.id == CLOUD:
-            config = _cloud(config)
+            config = cloud_config(config)
         elif room.id == BUILT_IN:
-            config = _built_in(config)
+            config = built_in_config(config)
         elif room.id == COMPUTER:
             # Its picture is sent to whoever watches, as a headless browser's is.
-            config = _cloud(config)
-        return _with_its_own_log(config, room.id)
+            config = cloud_config(config)
+        return with_its_own_log(config, room.id)
 
     async def run(self, service: Service) -> None:
         """Runs the three browsers and the desktop until the service stops."""
@@ -498,7 +501,7 @@ class Studio:
                 backend=room.backend,
                 on_restart=room.restart.set,
                 settings=self._settings,
-                tools=COMPUTER_TOOLS,
+                tools=computer_tools_for,
             )
             try:
                 await session.start()
@@ -672,28 +675,3 @@ def _desktop_app(config: Config) -> DesktopApp:
         Path(config.server.state_file).resolve().with_name(DESKTOP_STATE_FILE),
         close_wait_s=config.server.desktop_close_wait_s,
     )
-
-
-def _cloud(config: Config) -> Config:
-    """A headless browser that starts with nothing: no profile is kept from one session to the next."""
-    browser = config.browser.model_copy(update={"headless": True, "user_data_dir": None, "cdp_url": None})
-    return config.model_copy(update={"browser": browser})
-
-
-def _built_in(config: Config) -> Config:
-    """The app's own browser: it keeps its sign-ins, apart from the person's own browser and from
-    the cloud browser."""
-    profile = Path(config.data_dir).expanduser() / BUILT_IN_PROFILE
-    browser = config.browser.model_copy(
-        update={"headless": True, "user_data_dir": str(profile), "cdp_url": None}
-    )
-    return config.model_copy(update={"browser": browser})
-
-
-def _with_its_own_log(config: Config, system: str) -> Config:
-    """Each browser of the window writes a log of its own (spec 9.17), where the deployment keeps a
-    log at all."""
-    if config.logging.event_log is None:
-        return config
-    own = Path(config.logging.systems_dir) / f"{system}.jsonl"
-    return config.model_copy(update={"logging": config.logging.model_copy(update={"event_log": str(own)})})

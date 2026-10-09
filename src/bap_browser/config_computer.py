@@ -47,8 +47,14 @@ class Computer(Section):
         "The container image of the contained desktop. `deploy/desktop.Dockerfile` builds it",
     )
     container_command: str = setting("docker", "The program that runs containers")
-    screen_width: int = setting(1280, "Width of the desktop's screen, in pixels")
-    screen_height: int = setting(800, "Height of the desktop's screen, in pixels")
+    screen: Literal["1024x768", "1280x800", "1366x768"] = setting(
+        "1280x800", "The desktop's screen, width by height in pixels. Sizes the vendors recommend for a model"
+    )
+    zoom: bool = setting(True, "Whether the agent is offered `computer_zoom`, to read small print")
+    picture_after_action: bool = setting(
+        False, "Whether each action's result holds a picture of the screen after it: fewer calls, more tokens"
+    )
+    ask_before_apps: bool = setting(False, "Whether a person is asked before the agent opens an app")
     apps: AllowedApps = AllowedApps()
     network: bool = setting(False, "Whether the desktop may reach the network. Off: it has none at all")
     share_folder: bool = setting(
@@ -74,3 +80,11 @@ class Computer(Section):
     )
     window_title_chars: int = setting(80, "How much of a window's title a result holds")
     windows_listed: int = setting(12, "How many open windows a result names at most")
+
+    @property
+    def screen_width(self) -> int:
+        return int(self.screen.split("x")[0])
+
+    @property
+    def screen_height(self) -> int:
+        return int(self.screen.split("x")[1])

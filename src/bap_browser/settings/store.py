@@ -176,7 +176,9 @@ class SettingsStore:
 
     def _above_users(self, system: str | None) -> Config:
         """The configuration as the admin has it, which a user's settings are held against."""
-        return self._laid(self._config, self._config.backend.kind, system, "admin")
+        # The system's own backend: a setting of the desktop alone is laid for the desktop.
+        backend = self.backends.get(system or "", self._config.backend.kind)
+        return self._laid(self._config, backend, system, "admin")
 
     # The settings screen.
 

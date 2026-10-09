@@ -19,8 +19,7 @@ from bap_browser.service.events import EventHub
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools.gate import Admission
 from bap_browser.tools.kinds import DECLARES_A_TASK
-from bap_browser.tools.registry import ToolDefinition
-from bap_browser.tools.toolkit import Toolkit
+from bap_browser.tools.toolkit import Offer, Toolkit
 
 ControlState = Literal["agent", "paused", "person_requested", "person", "ended"]
 HelpOutcome = Literal["done", "could_not", "timed_out"]
@@ -58,7 +57,7 @@ class ServiceSession(CheckNews):
         backend: str | None = None,
         on_restart: Callable[[], None] | None = None,
         settings: SettingsStore | None = None,
-        tools: Sequence[ToolDefinition] | None = None,
+        tools: Offer | None = None,
     ) -> None:
         """`backend` names where the browser is, when that is not what the configuration says: a
         person's own Chrome, or the browser built into the app (spec 4.3). `on_restart` is told when

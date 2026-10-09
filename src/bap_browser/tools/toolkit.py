@@ -7,7 +7,7 @@ import contextlib
 import logging
 import re
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -123,6 +123,10 @@ def _typed(name: str, arguments: Mapping[str, Any]) -> str | None:
     return put
 
 
+Offer = Sequence[ToolDefinition] | Callable[[Config], Sequence[ToolDefinition]]
+"""The tools a session offers: always the same ones, or chosen from its configuration as it is now."""
+
+
 def tools_for(config: Config) -> tuple[ToolDefinition, ...]:
     """The tools a deployment offers. Four of them exist only when their feature is turned on."""
     browser = config.browser
@@ -140,14 +144,17 @@ class Toolkit:
     def __init__(
         self,
         session: BrowserSession,
-        tools: Sequence[ToolDefinition] | None = None,
+        tools: Offer | None = None,
         observer: StepObserver | None = None,
         gate: Gate = always_open,
     ) -> None:
         self._session = session
         # None when the tools are those the configuration offers, which a person's settings can change.
-        self._chosen = tools
-        offered = tools_for(session.config) if tools is None else tools
+        # What is on offer, for the configuration as it is: the browser's tools by default.
+        self._offer: Callable[[Config], Sequence[ToolDefinition]] = (
+            tools_for if tools is None else tools if callable(tools) else lambda config: tools
+        )
+        offered = self._offer(session.config)
         self._tools = {tool.name: tool for tool in offered}
         self._observer = observer
         self._gate = gate
@@ -175,10 +182,9 @@ class Toolkit:
 
     def reconfigure(self) -> None:
         """Takes up a change in the session's configuration: the tools on offer, and the log."""
-        if self._chosen is None:
-            offered = tools_for(self._session.config)
-            self._tools = {tool.name: tool for tool in offered if tool.name not in self._left_out}
-            self._session.tool_names = tuple(self._tools)
+        offered = self._offer(self._session.config)
+        self._tools = {tool.name: tool for tool in offered if tool.name not in self._left_out}
+        self._session.tool_names = tuple(self._tools)
         self._log = EventLog(self._session.config.logging)
 
     def definitions(self) -> list[ToolDefinition]:

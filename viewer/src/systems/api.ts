@@ -181,7 +181,7 @@ export interface Overall {
 }
 
 /** The task sets of a system (spec 12.7). */
-export type SetName = 'short' | 'confirm' | 'attack' | 'long';
+export type SetName = 'short' | 'confirm' | 'attack' | 'long' | 'infeasible';
 /** Who does the tasks: the agent with its model, or the reference solutions, which need no model. */
 export type SuiteMode = 'agent' | 'reference';
 

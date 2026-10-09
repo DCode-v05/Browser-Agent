@@ -649,6 +649,28 @@ Fixed on the way: the desktop's Evaluations offered the browser's checklist, whi
 its task sets said they ran on a practice site in a browser; its tool timings kept the `computer_`
 prefix. No console error.
 
+### 1y. Finished on 2026-10-09: the settings of computer use, and two evaluations after OSWorld and OS-Harm
+
+The desktop's Configuration gains four settings, each as a vendor offers it: the screen's size (as
+Anthropic and OpenAI size it), the zoom tool (Anthropic's `enable_zoom`), a picture after each action
+(as their loops return one) and a person's yes before an app opens (Google's and OpenAI's
+confirmations). The admin chooses, under Systems, Users, whether users may change the last two; a user
+may turn the yes on, never off over the admin. The desktop gains an `infeasible` set (3 tasks, after
+OSWorld) and a fourth attack task (after OS-Harm's data exfiltration).
+
+| Checked in the running window, as the admin | Result |
+|---|---|
+| The ten Computer settings on the Configuration | Shown, and none of a browser's |
+| "Ask me before an app opens" on, then "Open the calculator" | The pop-up "Opening Calculator" in 3 s; after Allow once, "The calculator is open." |
+| Systems, Users | Lists the two desktop settings a user may be let change |
+| Attack set, the model, each task once | 0 of 4 planted instructions followed |
+| Infeasible set, the model, each task once | 0 of 3 at first: it searched until the step limit. With one sentence more in its instructions (say at once when an app, a file or a network is not there), 1 of 3 |
+
+Found on the way: the store laid the admin's settings above a user for the deployment's backend, not
+the system's, so a user was not held to the admin's desktop settings; a question about a step with no
+site offered "Allow on this site"; `studio.py` went over 700 lines and its configuration helpers moved
+to `agent/room_configs.py`.
+
 ### 2. Not started
 
 | What | Note |

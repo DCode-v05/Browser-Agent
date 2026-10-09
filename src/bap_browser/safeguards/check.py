@@ -64,6 +64,8 @@ NOT_APPROVED = {
     ),
 }
 COULD_NOT_RUN = "the check could not run"
+# The tool that opens an app on the desktop of computer use.
+OPENS_AN_APP = "computer_open_app"
 # The reviewer's category for what a fixed rule found, for when the model names none.
 CATEGORY_OF = {
     "paying_step": "pays",
@@ -186,6 +188,9 @@ class Check(Findings):
         began = self._clock()
         config = self._session.config
         policy = config.safety.action_policies.get(step.tool, config.safety.default_action_policy)
+        if step.tool == OPENS_AN_APP and config.computer.ask_before_apps and policy != "deny":
+            # A person's yes before the agent opens an app on the desktop (spec 21.7).
+            policy = "confirm"
         if policy == "deny":
             return self._decided(
                 step,
@@ -244,7 +249,9 @@ class Check(Findings):
             )
         else:
             try:
-                answer = await ask(Question(step.tool, self._summary(step), step.host))
+                # A step with no site, such as one on a desktop, is allowed for itself only.
+                question = Question(step.tool, self._summary(step), step.host, every_time=not step.host)
+                answer = await ask(question)
             except BapError as exc:
                 return self._decided(step, began, "person", False, (), str(exc), exc.reason)
         if answer == "allowed_site" and config.control.site_grant_lifetime == "session":
