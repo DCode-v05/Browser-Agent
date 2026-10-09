@@ -33,6 +33,13 @@ because the change looks small; say so in your report if a step did not apply, a
    then `git switch main && git pull --ff-only`.
 10. **Garden.** For each thing that went wrong on the way, use the skill `garden`.
 
+## pstack on the way
+
+Apply the eight pstack skills that `CLAUDE.md` lists: `tdd` at step 4, `principle-laziness-protocol`
+and `principle-type-system-discipline` at step 5, `principle-test-behavior-not-implementation` to every
+test, `principle-sequence-verifiable-units` to the order of the work, `principle-prove-it-works` at
+step 7, and `unslop` with `technical-writing` to every word written at step 8 and in the report.
+
 ## What to report
 
 - The gate's last line.
