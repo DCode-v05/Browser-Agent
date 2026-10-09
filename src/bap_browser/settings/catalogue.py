@@ -314,6 +314,17 @@ CATALOGUE: tuple[Entry, ...] = (
             Option("mac", "This Mac", "Your own screen, mouse and keyboard, through bap-browser helper"),
         ),
     ),
+    Switch(
+        id="computer_mac_any_app",
+        backends=(COMPUTER,),
+        per_system=True,
+        group="Computer",
+        surfaces=NOT_ON_MOBILE,
+        title="On this Mac, let the agent open any app",
+        description="As GPT-6 Astra does: the agent may open any app on your Mac by its name. Each opening asks you first. Holds from the next start of the helper.",
+        key="computer.mac_any_app",
+        applies="next_session",
+    ),
     Choice(
         id="computer_screen",
         backends=(COMPUTER,),

@@ -87,6 +87,11 @@ class OpenAppArgs(Args):
     app: str = Field(min_length=1, max_length=40)
 
 
+def any_app(config: Config) -> bool:
+    """Whether the agent may open any app by its name: on the person's own Mac, where they allow it."""
+    return config.computer.runs == "mac" and config.computer.mac_any_app
+
+
 async def _desktop(session: BrowserSession) -> DesktopDriver:
     driver = await session.driver(may_restart=True)
     if not isinstance(driver, DesktopDriver):
@@ -184,6 +189,8 @@ async def list_apps(session: BrowserSession, args: NoArgs) -> str:
     # What a person allows now: a change in the settings holds from the next call.
     allowed = allowed_apps(session.config.computer)
     names = ", ".join(app.name for app in allowed) or "none"
+    if any_app(session.config):
+        names += "; and any app on this Mac, by its name: each opening asks the person first"
     shared = (
         " The folder Files in the home folder is shared with the person: what is saved there, they have."
         if driver.desktop.folder is not None
@@ -197,6 +204,15 @@ async def open_app(session: BrowserSession, args: OpenAppArgs) -> str:
     wanted = args.app.strip().lower()
     known = next((app for app in APPS if wanted in (app.name.lower(), app.id, app.command)), None)
     allowed = allowed_apps(session.config.computer)
+    if known is None and any_app(session.config):
+        # On the person's own Mac, where they allow any app: it is opened by its name, after their yes.
+        name = args.app.strip()
+        if not await driver.open_named_app(name):
+            raise BrowserError(
+                f"{name} was asked to open, but it did not come to the front in time. Take a screenshot.",
+                reason="no window came up",
+            )
+        return f"Opened {name}.{LOOK}\n{await _windows(driver)}"
     if known is None or known not in allowed:
         names = ", ".join(app.name for app in allowed) or "none"
         if known is None:

@@ -58,6 +58,10 @@ class Computer(Section):
         False, "Whether each action's result holds a picture of the screen after it: fewer calls, more tokens"
     )
     ask_before_apps: bool = setting(False, "Whether a person is asked before the agent opens an app")
+    mac_any_app: bool = setting(
+        False,
+        "On the person's own Mac: whether the agent may open any app by its name. Each opening asks them first",
+    )
     apps: AllowedApps = AllowedApps()
     network: bool = setting(False, "Whether the desktop may reach the network. Off: it has none at all")
     share_folder: bool = setting(

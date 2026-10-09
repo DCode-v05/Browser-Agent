@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import re
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -25,6 +26,37 @@ __all__ = ["Helper", "helper_app", "pairing_file", "write_pairing"]
 
 STOPPED = "The person stopped the helper by moving the pointer into the corner of the screen."
 BUTTONS = ("left", "right", "middle")
+# Started with `--allow any`, the helper opens any app by its name, as the person allows.
+ANY_APP = "any"
+AN_APP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._&'()+-]{0,59}")
+
+
+async def watch_permissions(
+    hands: Hands, on_allowed: Callable[[], None], say: Callable[[str], None], every_s: float
+) -> None:
+    """Has macOS ask for what is missing, says in Terminal what is allowed, and when both are,
+    tells the window: `on_allowed` pairs the helper again, and the window connects by itself."""
+    told: tuple[bool, bool] | None = None
+    while True:
+        now = await asyncio.to_thread(hands.allowed)
+        if now != told:
+            if told is None and not all(now):
+                await asyncio.to_thread(hands.ask_for_access)
+            missing = [
+                name
+                for name, given in zip(("Screen Recording", "Accessibility"), now, strict=True)
+                if not given
+            ]
+            if missing:
+                say(
+                    f"macOS is asking: allow Terminal under {' and '.join(missing)} in System Settings, "
+                    "Privacy & Security. After Screen Recording, quit Terminal and start the helper again."
+                )
+            else:
+                say("Screen Recording and Accessibility are allowed. The window connects by itself.")
+                on_allowed()
+            told = now
+        await asyncio.sleep(every_s)
 
 
 class Helper:
@@ -97,10 +129,15 @@ def act(helper: Helper, asked: dict[str, Any]) -> None:
                 hands.move(_number(asked["x"]), _number(asked["y"]))
             hands.scroll(int(_number(asked.get("lines_x", 0))), int(_number(asked.get("lines_y", 0))))
         case "open":
-            app = asked.get("app")
-            if app not in helper.apps or app not in MAC_APPS:
+            app, name = asked.get("app"), asked.get("name")
+            if isinstance(app, str) and app in helper.apps and app in MAC_APPS:
+                hands.open_app(MAC_APPS[app])
+            elif isinstance(name, str) and ANY_APP in helper.apps:
+                if not AN_APP_NAME.fullmatch(name):
+                    raise ValueError("that is not the name of an app")
+                hands.open_app(name)
+            else:
                 raise ValueError("the person did not allow that app on this Mac")
-            hands.open_app(MAC_APPS[app])
         case _:
             raise ValueError("no such action")
 

@@ -240,7 +240,7 @@ export const W = {
       start: 'Start the helper in Terminal',
       startHint: 'Opens Terminal and starts the helper there. You see it, and Ctrl+C in Terminal ends it.',
       started: 'Terminal is starting the helper. This page connects by itself when it is ready.',
-      allow: 'If macOS asks, allow Terminal under both of these. After allowing Screen Recording, quit Terminal (Command+Q) and start the helper again.',
+      allow: 'macOS asks you to allow Terminal for Screen Recording and for Accessibility: switch Terminal on in both. After Screen Recording, macOS asks to quit Terminal; quit it, then press Start the helper again. This page connects by itself once both are allowed.',
       screenRecording: 'Open Screen Recording settings',
       accessibility: 'Open Accessibility settings',
       stop: 'To stop the agent at once, push the pointer into the top left corner of the screen.',
