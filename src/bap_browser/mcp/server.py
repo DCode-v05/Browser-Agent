@@ -23,7 +23,7 @@ from mcp.types import (
 from bap_browser import __version__
 from bap_browser.config import Config
 from bap_browser.driver import open_session
-from bap_browser.driver.mac_driver import desktop_driver_for
+from bap_browser.driver.helper_driver import desktop_driver_for
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
 from bap_browser.settings.kinds import COMPUTER as DESKTOP

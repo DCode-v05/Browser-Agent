@@ -21,22 +21,23 @@ class AllowedApps(Section):
 
 
 class Computer(Section):
-    runs: Literal["container", "here", "mac"] = setting(
+    runs: Literal["container", "here", "mac", "windows"] = setting(
         "container",
         "Where the desktop runs: in a container of its own, on this machine's own virtual screen "
         "(`here`, for a machine that is itself the boundary, such as the micro VM), or on a person's "
-        "real Mac through the helper they run there (`mac`)",
+        "real Mac (`mac`) or Windows PC (`windows`) through the helper they run there",
     )
     helper_url: str = setting(
-        "http://127.0.0.1:8796", "Where the helper on the person's Mac answers, when the desktop is `mac`"
+        "http://127.0.0.1:8796",
+        "Where the helper on the person's machine answers, when the desktop is `mac` or `windows`",
     )
     helper_token_env: str = setting(
         "BAP_BROWSER_HELPER_TOKEN",
         "The variable, in the environment or in `.env`, that holds the token the helper printed",
     )
-    helper_port: int = setting(8796, "The port the helper listens on, on the person's Mac")
+    helper_port: int = setting(8796, "The port the helper listens on, on the person's machine")
     helper_poll_s: float = setting(
-        1.0, "How often the window looks whether a helper on this Mac has paired, while it waits for one"
+        1.0, "How often the window looks whether a helper on this machine has paired, while it waits for one"
     )
     helper_stop_corner: float = setting(
         3.0, "How close to the top left corner, in points, the pointer stops the helper for good"
@@ -58,9 +59,10 @@ class Computer(Section):
         False, "Whether each action's result holds a picture of the screen after it: fewer calls, more tokens"
     )
     ask_before_apps: bool = setting(False, "Whether a person is asked before the agent opens an app")
-    mac_any_app: bool = setting(
+    helper_any_app: bool = setting(
         False,
-        "On the person's own Mac: whether the agent may open any app by its name. Each opening asks them first",
+        "On the person's own Mac or PC: whether the agent may open any app by its name. Each opening "
+        "asks them first",
     )
     apps: AllowedApps = AllowedApps()
     network: bool = setting(False, "Whether the desktop may reach the network. Off: it has none at all")

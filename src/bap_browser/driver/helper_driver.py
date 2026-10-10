@@ -1,4 +1,5 @@
-"""The driver of computer use on a person's real Mac (spec 21.13), through the helper they run there.
+"""The driver of computer use on a person's real machine (spec 21.13, 21.14: a Mac or a PC), through
+the helper they run there.
 
 Each action is asked of the helper over HTTP with its token. The helper decides what it allows: it
 refuses everything once the person has pushed the pointer into the corner of the screen, and it opens
@@ -10,12 +11,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
-import json
 import os
 import shlex
 import subprocess
-import urllib.error
-import urllib.request
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
@@ -32,141 +30,24 @@ from bap_browser.driver.base import (
 )
 from bap_browser.driver.contained_desktop import App, allowed_apps
 from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.helper_link import HelperLink, pairing_file, read_pairing, write_pairing
 from bap_browser.driver.mac_hands import MAC_APPS
+from bap_browser.driver.windows_hands import WINDOWS_APPS
 from bap_browser.errors import BadInput, BrowserError
-from bap_browser.private_file import write_json
 from bap_browser.results import Picture
 
-# The file, in the data folder, where a helper on this Mac says where it is.
-PAIRING = "helper.json"
+__all__ = [
+    "MacDriver",
+    "WindowsDriver",
+    "desktop_driver_for",
+    "pairing_file",
+    "read_pairing",
+    "start_helper_in_terminal",
+    "write_pairing",
+]
+
 # The script, in the data folder, that Terminal runs to start the helper.
 START_SCRIPT = "start-helper.command"
-
-
-class MacLink:
-    """The way to the helper on the person's Mac. It stands where the desktop of a container would."""
-
-    def __init__(self, url: str, token: str, timeout_s: float) -> None:
-        self._url, self._token, self._timeout_s = url.rstrip("/"), token, timeout_s
-        self._running = False
-
-    @property
-    def url(self) -> str:
-        """Where the helper answers."""
-        return self._url
-
-    @property
-    def alive(self) -> bool:
-        return self._running
-
-    @property
-    def folder(self) -> Path | None:
-        """No folder is shared: the agent works among the person's own files."""
-        return None
-
-    async def ask(self, method: str, path: str, body: dict[str, Any] | None = None) -> tuple[bytes, str]:
-        """What the helper answered, and its kind. A refusal or a failure is a BrowserError."""
-
-        def call() -> tuple[bytes, str]:
-            request = urllib.request.Request(
-                self._url + path,
-                data=json.dumps(body).encode() if body is not None else None,
-                headers={"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"},
-                method=method,
-            )
-            with urllib.request.urlopen(request, timeout=self._timeout_s) as answer:
-                return answer.read(), answer.headers.get("Content-Type", "")
-
-        try:
-            return await asyncio.to_thread(call)
-        except urllib.error.HTTPError as refused:
-            said = refused.read().decode(errors="replace")
-            with contextlib.suppress(ValueError):
-                said = json.loads(said).get("error", said)
-            if refused.code == 401:
-                said = "The helper did not take the token. Copy the token it printed into BAP_BROWSER_HELPER_TOKEN."
-            raise BrowserError(
-                said or f"The helper answered {refused.code}.", reason="the helper refused"
-            ) from None
-        except OSError as lost:
-            self._running = False
-            raise BrowserError(
-                f"The helper on the Mac does not answer at {self._url}: {lost}. Start it there with "
-                "`bap-browser helper`.",
-                reason="the helper does not answer",
-            ) from None
-
-    async def status(self) -> dict[str, Any]:
-        return json.loads((await self.ask("GET", "/status"))[0])
-
-    async def act(self, **asked: Any) -> None:
-        await self.ask("POST", "/act", asked)
-
-    async def start(self) -> None:
-        if not self._token:
-            raise BrowserError(
-                "No helper is paired. Start the helper on this Mac with `uv run bap-browser helper "
-                "--allow text_editor,files,calculator`, or give the token of one elsewhere in "
-                "BAP_BROWSER_HELPER_TOKEN.",
-                reason="no token for the helper",
-            )
-        told = await self.status()
-        missing = [
-            name
-            for name, given in (
-                ("Screen Recording", told["screen_recording"]),
-                ("Accessibility", told["accessibility"]),
-            )
-            if not given
-        ]
-        if missing:
-            raise BrowserError(
-                f"The Mac has not allowed the helper {' and '.join(missing)} yet. macOS has asked: switch "
-                "Terminal on under each in System Settings, Privacy & Security. This page connects by itself "
-                "once both are allowed.",
-                reason="the Mac has not allowed it",
-            )
-        if told["stopped"]:
-            raise BrowserError(
-                "The person stopped the helper. Start it again on the Mac.", reason="the helper is stopped"
-            )
-        self._running = True
-
-    async def close(self) -> None:
-        self._running = False
-
-    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
-        raise BrowserError("Commands are not run on a person's Mac.", reason="not on a Mac")
-
-    async def start_app(self, app: App) -> None:
-        await self.act(do="open", app=app.id)
-
-    async def send(self, line: str) -> None:
-        """A person's hand on a Mac goes through the driver's own pointer, key and wheel."""
-
-
-def pairing_file(config: Config) -> Path:
-    """Where the helper on this Mac leaves its address and token, for this user alone (spec 21.13)."""
-    return Path(config.data_dir).expanduser() / PAIRING
-
-
-def write_pairing(path: Path, url: str, token: str) -> None:
-    write_json(path, {"url": url, "token": token})
-
-
-def read_pairing(path: Path) -> tuple[str, str] | None:
-    """The address and the token the helper left. None when no helper is running here."""
-    try:
-        told = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if (
-        not isinstance(told, dict)
-        or not isinstance(told.get("url"), str)
-        or not isinstance(told.get("token"), str)
-    ):
-        return None
-    return told["url"], told["token"]
 
 
 def start_helper_in_terminal(
@@ -176,7 +57,7 @@ def start_helper_in_terminal(
     with the apps the admin allows. Terminal is then the program macOS asks the person to allow, and
     the person sees the helper and ends it there with Ctrl+C."""
     apps = [app.id for app in allowed_apps(config.computer)]
-    if config.computer.mac_any_app:
+    if config.computer.helper_any_app:
         apps.append("any")
     if not apps:
         raise BrowserError(
@@ -197,16 +78,22 @@ def start_helper_in_terminal(
     return script
 
 
-class MacDriver(DesktopDriver):
+class HelperDriver(DesktopDriver):
+    """A real machine reached through its own helper (spec 21.13, 21.14): `MacDriver` and
+    `WindowsDriver` are this with that machine's own apps and the name it is called by."""
+
+    apps_by_name: dict[str, str]
+    machine: str
+
     def __init__(self, config: Config, name: str = "computer") -> None:
         super().__init__(config, name)
         settings = config.computer
         url, token = settings.helper_url, os.environ.get(settings.helper_token_env, "")
-        # A helper on this same Mac pairs by itself: nothing is copied by hand.
+        # A helper on this same machine pairs by itself: nothing is copied by hand.
         paired = read_pairing(pairing_file(config)) if not token else None
         if paired is not None:
             url, token = paired
-        self.link = MacLink(url, token, settings.command_timeout_s)
+        self.link = HelperLink(url, token, settings.command_timeout_s, machine=self.machine)
         self.desktop = self.link
         self._screen = (settings.screen_width, settings.screen_height)
 
@@ -216,7 +103,7 @@ class MacDriver(DesktopDriver):
         self._screen = (int(width), int(height))
 
     def description(self) -> str:
-        return f"The person's Mac, {self._screen[0]} by {self._screen[1]}"
+        return f"The person's {self.machine}, {self._screen[0]} by {self._screen[1]}"
 
     async def viewport(self) -> tuple[int, int]:
         return self._screen
@@ -236,7 +123,7 @@ class MacDriver(DesktopDriver):
 
     async def open_app(self, app: App) -> bool:
         await self.link.start_app(app)
-        return await self._in_front(MAC_APPS[app.id])
+        return await self._in_front(self.apps_by_name[app.id])
 
     async def open_named_app(self, name: str) -> bool:
         await self.link.act(do="open", name=name)
@@ -299,7 +186,7 @@ class MacDriver(DesktopDriver):
         if ref is not None:
             self._no_page()
         if clear:
-            await self.link.act(do="key", keys="Meta+a")
+            await self.link.act(do="key", keys="ControlOrMeta+a")
             await self.link.act(do="key", keys="Backspace")
         await self.link.act(do="type", text=text)
         if submit:
@@ -368,6 +255,21 @@ class MacDriver(DesktopDriver):
             )
 
 
+class MacDriver(HelperDriver):
+    apps_by_name = MAC_APPS
+    machine = "Mac"
+
+
+class WindowsDriver(HelperDriver):
+    apps_by_name = WINDOWS_APPS
+    machine = "PC"
+
+
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
-    """The driver of the desktop the configuration names: a container's, this machine's, or a Mac's."""
-    return MacDriver(config, name) if config.computer.runs == "mac" else DesktopDriver(config, name)
+    """The driver of the desktop the configuration names: a container's, this machine's, a Mac's or
+    a PC's."""
+    if config.computer.runs == "mac":
+        return MacDriver(config, name)
+    if config.computer.runs == "windows":
+        return WindowsDriver(config, name)
+    return DesktopDriver(config, name)

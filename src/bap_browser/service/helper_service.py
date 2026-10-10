@@ -1,4 +1,5 @@
-"""The helper a person runs on their own Mac, so that an engine elsewhere can drive it (spec 21.13).
+"""The helper a person runs on their own machine, so that an engine elsewhere can drive it through it
+(spec 21.13 to 21.15: a Mac, a PC or a Linux machine).
 
 It answers only to the token it printed when it started, and only on the address it was given. It
 opens only the apps the person named when they started it. When the person pushes the pointer into
@@ -19,8 +20,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from bap_browser.driver.mac_driver import pairing_file, write_pairing
-from bap_browser.driver.mac_hands import MAC_APPS, Hands, chord, flags_of
+from bap_browser.driver.helper_link import pairing_file, write_pairing
+from bap_browser.driver.mac_hands import Hands
 
 __all__ = ["Helper", "helper_app", "pairing_file", "write_pairing"]
 
@@ -36,10 +37,17 @@ AN_APP_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._&'()+-]{0,59}")
 
 
 async def watch_permissions(
-    hands: Hands, on_allowed: Callable[[], None], say: Callable[[str], None], every_s: float
+    hands: Hands,
+    on_allowed: Callable[[], None],
+    say: Callable[[str], None],
+    every_s: float,
+    *,
+    ready: str = "Screen Recording and Accessibility are allowed. The window connects by itself.",
 ) -> None:
     """Has macOS ask for what is missing, says in Terminal what is allowed, and when both are,
-    tells the window: `on_allowed` pairs the helper again, and the window connects by itself."""
+    tells the window: `on_allowed` pairs the helper again, and the window connects by itself. Only
+    the Mac helper has a permission to watch for (spec 21.14, 21.15): a machine whose
+    `Hands.allowed()` is always `(True, True)` is told `ready`, once, and paired at once."""
     told: tuple[bool, bool] | None = None
     while True:
         now = await asyncio.to_thread(hands.allowed)
@@ -57,17 +65,32 @@ async def watch_permissions(
                     "Privacy & Security. After Screen Recording, quit Terminal and start the helper again."
                 )
             else:
-                say("Screen Recording and Accessibility are allowed. The window connects by itself.")
+                say(ready)
                 on_allowed()
             told = now
         await asyncio.sleep(every_s)
 
 
 class Helper:
-    """What the helper allows and whether it has been stopped."""
+    """What the helper allows and whether it has been stopped. `apps_by_name` maps an id of
+    `computer.apps` to that machine's name for the app (`MAC_APPS`, `WINDOWS_APPS`, ...); `chord` and
+    `flags_of` are that machine's own key-code table, matching what `hands.key` and `hands.click`
+    expect; `machine` names it in the sentences a person reads ("Mac", "PC", "Linux machine")."""
 
-    def __init__(self, hands: Hands, token: str, apps: Sequence[str], corner: float) -> None:
+    def __init__(
+        self,
+        hands: Hands,
+        token: str,
+        apps: Sequence[str],
+        corner: float,
+        *,
+        apps_by_name: dict[str, str],
+        chord: Callable[[str], tuple[int, int]],
+        flags_of: Callable[[Sequence[str]], int],
+        machine: str,
+    ) -> None:
         self.hands, self._token, self.apps, self._corner = hands, token, tuple(apps), corner
+        self.apps_by_name, self.chord, self.flags_of, self.machine = apps_by_name, chord, flags_of, machine
         self.stopped = False
 
     @property
@@ -77,7 +100,7 @@ class Helper:
 
     @property
     def app_names(self) -> set[str]:
-        return {MAC_APPS[app] for app in self.apps if app in MAC_APPS}
+        return {self.apps_by_name[app] for app in self.apps if app in self.apps_by_name}
 
     def outside_the_apps(self, asked: dict[str, Any]) -> str | None:
         """Why an action of the agent may not be done in the app in front. None when it may."""
@@ -88,8 +111,9 @@ class Helper:
             return None
         allowed = ", ".join(sorted(self.app_names)) or "none"
         return (
-            f"The app in front is {front or 'none'}, which the person has not allowed on this Mac. Bring an "
-            f"allowed app ({allowed}) to the front with computer_open_app, and act there."
+            f"The app in front is {front or 'none'}, which the person has not allowed on this "
+            f"{self.machine}. Bring an allowed app ({allowed}) to the front with computer_open_app, "
+            "and act there."
         )
 
     def admits(self, request: Request) -> bool:
@@ -132,7 +156,7 @@ def act(helper: Helper, asked: dict[str, Any]) -> None:
             held = asked.get("held", [])
             if not isinstance(held, list):
                 raise ValueError("held is a list of modifiers")
-            flags = flags_of([str(name) for name in held])
+            flags = helper.flags_of([str(name) for name in held])
             hands.click(_number(asked["x"]), _number(asked["y"]), button, count, flags)
         case "move":
             hands.move(_number(asked["x"]), _number(asked["y"]))
@@ -149,21 +173,21 @@ def act(helper: Helper, asked: dict[str, Any]) -> None:
         case "key":
             down = asked.get("down")
             for _ in range(int(_number(asked.get("repeat", 1)))):
-                hands.key(*chord(str(asked["keys"])), down if isinstance(down, bool) else None)
+                hands.key(*helper.chord(str(asked["keys"])), down if isinstance(down, bool) else None)
         case "scroll":
             if "x" in asked and "y" in asked:
                 hands.move(_number(asked["x"]), _number(asked["y"]))
             hands.scroll(int(_number(asked.get("lines_x", 0))), int(_number(asked.get("lines_y", 0))))
         case "open":
             app, name = asked.get("app"), asked.get("name")
-            if isinstance(app, str) and app in helper.apps and app in MAC_APPS:
-                hands.open_app(MAC_APPS[app])
+            if isinstance(app, str) and app in helper.apps and app in helper.apps_by_name:
+                hands.open_app(helper.apps_by_name[app])
             elif isinstance(name, str) and ANY_APP in helper.apps:
                 if not AN_APP_NAME.fullmatch(name):
                     raise ValueError("that is not the name of an app")
                 hands.open_app(name)
             else:
-                raise ValueError("the person did not allow that app on this Mac")
+                raise ValueError(f"the person did not allow that app on this {helper.machine}")
         case _:
             raise ValueError("no such action")
 
@@ -231,8 +255,8 @@ def helper_app(helper: Helper) -> Starlette:
         if closed:
             return JSONResponse(
                 {
-                    "error": f"That started {', '.join(closed)}, which the person has not allowed on this Mac: "
-                    "it was closed. Do not try to open it another way."
+                    "error": f"That started {', '.join(closed)}, which the person has not allowed on "
+                    f"this {helper.machine}: it was closed. Do not try to open it another way."
                 },
                 status_code=423,
             )

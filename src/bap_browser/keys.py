@@ -6,6 +6,8 @@ them become one form: modifiers first, joined with `+`, such as `Control+Shift+t
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from bap_browser.errors import BadInput
 
 MODIFIERS = {
@@ -124,3 +126,26 @@ def _key(name: str, *, with_modifiers: bool) -> str:
         "character. To type text, use browser_type.",
         reason="the key name is not known",
     )
+
+
+def resolve_chord(keys: str, named: dict[str, int], single: dict[str, int]) -> tuple[list[str], int]:
+    """The modifiers held, by the names this module gives them (`Control`, `Shift`, `Alt`, `Meta`,
+    `ControlOrMeta`), and the key's own code: from `named` by its name, or from `single` by the one
+    character it types. Raises `KeyError` with the key's own text for a key neither table has. A
+    machine's own `chord` calls this with its own code tables, since the codes are the machine's."""
+    *held, key = ["+"] if keys == "+" else keys.replace("++", "+plus").split("+")
+    key = "=" if key == "plus" else key
+    code = named.get(key, single.get(key.lower()) if len(key) == 1 else None)
+    if code is None:
+        raise KeyError(key)
+    return held, code
+
+
+def resolve_flags(held: Sequence[str], bits: dict[str, int], names: dict[str, str]) -> int:
+    """The flags of the modifiers held, by the names this module gives them. `bits` and `names` are a
+    machine's own: which bit stands for which of its own modifier names, and which of this module's
+    modifier names is which of the machine's. Raises `KeyError` for a modifier `names` does not hold."""
+    flags = 0
+    for name in held:
+        flags |= bits[names[name]]
+    return flags

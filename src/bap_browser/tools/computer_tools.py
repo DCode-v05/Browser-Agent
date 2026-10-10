@@ -88,8 +88,8 @@ class OpenAppArgs(Args):
 
 
 def any_app(config: Config) -> bool:
-    """Whether the agent may open any app by its name: on the person's own Mac, where they allow it."""
-    return config.computer.runs == "mac" and config.computer.mac_any_app
+    """Whether the agent may open any app by its name: on the person's own Mac or PC, where they allow it."""
+    return config.computer.runs in ("mac", "windows") and config.computer.helper_any_app
 
 
 async def _desktop(session: BrowserSession) -> DesktopDriver:

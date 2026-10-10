@@ -21,6 +21,8 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Literal, Protocol
 
+from bap_browser.keys import resolve_chord, resolve_flags
+
 Button = Literal["left", "right", "middle"]
 
 # Event types, buttons and fields of CoreGraphics.
@@ -93,20 +95,13 @@ MAC_APPS = {"text_editor": "TextEdit", "files": "Finder", "calculator": "Calcula
 
 def flags_of(held: Sequence[str]) -> int:
     """The flags of the modifiers held, by their names in `bap_browser.keys`. KeyError for another."""
-    flags = 0
-    for name in held:
-        flags |= FLAGS[MODIFIERS[name]]
-    return flags
+    return resolve_flags(held, FLAGS, MODIFIERS)
 
 
 def chord(keys: str) -> tuple[int, int]:
     """`Meta+s`, as `bap_browser.keys.normalise` gives it, as a key code and the flags held with it.
     Raises KeyError for a key this keyboard has no code for."""
-    *held, key = ["+"] if keys == "+" else keys.replace("++", "+plus").split("+")
-    key = "=" if key == "plus" else key
-    code = NAMED_CODES.get(key, CHARACTER_CODES.get(key.lower()) if len(key) == 1 else None)
-    if code is None:
-        raise KeyError(key)
+    held, code = resolve_chord(keys, NAMED_CODES, CHARACTER_CODES)
     return code, flags_of(held)
 
 

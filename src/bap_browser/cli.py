@@ -288,70 +288,90 @@ def _serve(args: argparse.Namespace) -> int:
 
 def _helper(args: argparse.Namespace) -> int:
     def say(text: str) -> None:
-        # The helper's words are for the person at this Mac, on the error stream.
+        # The helper's words are for the person at this machine, on the error stream.
         print(text, file=sys.stderr)
 
-    if sys.platform != "darwin":
-        say("The helper runs on a Mac only.")
-        return 2
-    config = load_config(args.config)
-    # Imported here: the helper needs the web server and macOS's own libraries, nothing else.
+    # Imported here: the helper needs the web server and this machine's own libraries, nothing else.
     import uvicorn
 
-    from bap_browser.driver.mac_hands import MAC_APPS, MacHands
-    from bap_browser.service.mac_helper import (
-        ANY_APP,
-        Helper,
-        helper_app,
-        pairing_file,
-        watch_permissions,
-        write_pairing,
-    )
+    from bap_browser.driver.helper_link import pairing_file, write_pairing
+    from bap_browser.service.helper_service import ANY_APP, Helper, helper_app, watch_permissions
 
-    apps = [name for name in args.allow.split(",") if name]
-    unknown = [name for name in apps if name not in MAC_APPS and name != ANY_APP]
-    if unknown:
-        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(MAC_APPS)}, or any.")
+    if sys.platform == "darwin":
+        from bap_browser.driver.mac_hands import MAC_APPS, MacHands, chord, flags_of
+
+        hands, apps_by_name, machine = MacHands(), MAC_APPS, "Mac"
+    elif sys.platform == "win32":
+        from bap_browser.driver.windows_hands import WINDOWS_APPS, WindowsHands, chord, flags_of
+
+        hands, apps_by_name, machine = WindowsHands(), WINDOWS_APPS, "PC"
+    else:
+        say("The helper runs on a Mac or a Windows PC only.")
         return 2
-    hands = MacHands()
+
+    config = load_config(args.config)
+    apps = [name for name in args.allow.split(",") if name]
+    unknown = [name for name in apps if name not in apps_by_name and name != ANY_APP]
+    if unknown:
+        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(apps_by_name)}, or any.")
+        return 2
     token = secrets.token_urlsafe(32)
     port = config.computer.helper_port
     address = f"http://{args.host}:{port}"
     say(f"The helper answers on {address}, to this token only:")
     say(token)
     say("Give the token to the engine as BAP_BROWSER_HELPER_TOKEN. It is new each time the helper starts.")
-    named = [MAC_APPS[name] for name in apps if name in MAC_APPS]
+    named = [apps_by_name[name] for name in apps if name in apps_by_name]
     if ANY_APP in apps:
         named.append("any app by its name, each after your yes")
     say(f"Apps the engine may open: {', '.join(named) or 'none'}.")
     say("To stop it at once, push the pointer into the top left corner of the screen. Ctrl+C ends it.")
-    # A window on this same Mac finds the helper here: its address and token, for this user alone.
+    # A window on this same machine finds the helper here: its address and token, for this user alone.
     pairing = pairing_file(config)
 
     def pair() -> None:
         write_pairing(pairing, address, token)
 
     pair()
-    say(f"Paired with bap-browser on this Mac through {pairing}. Choose This Mac in Computer, Configuration.")
+    say(
+        f"Paired with bap-browser on this {machine} through {pairing}. Choose This {machine} in "
+        "Computer, Configuration."
+    )
+    helper = Helper(
+        hands,
+        token,
+        apps,
+        config.computer.helper_stop_corner,
+        apps_by_name=apps_by_name,
+        chord=chord,
+        flags_of=flags_of,
+        machine=machine,
+    )
     server = uvicorn.Server(
-        uvicorn.Config(
-            helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
-            host=args.host,
-            port=port,
-            log_level="warning",
-        )
+        uvicorn.Config(helper_app(helper), host=args.host, port=port, log_level="warning")
     )
 
     async def serve() -> None:
-        # macOS is asked for what is missing; once both are allowed the window is told, and connects.
-        watching = asyncio.create_task(watch_permissions(hands, pair, say, config.computer.helper_poll_s))
+        # On a Mac, macOS is asked for what is missing; once both are allowed the window is told, and
+        # connects. On a machine with nothing to ask for, this says so once and connects at once.
+        poll = config.computer.helper_poll_s
+        watching = (
+            asyncio.create_task(watch_permissions(hands, pair, say, poll))
+            if machine == "Mac"
+            else asyncio.create_task(
+                watch_permissions(hands, pair, say, poll, ready="Ready. The window connects by itself.")
+            )
+        )
         try:
             await server.serve()
         finally:
             watching.cancel()
 
     # Closing the Terminal window ends the helper as Ctrl+C does: it stops answering and unpairs.
-    signal.signal(signal.SIGHUP, lambda number, frame: setattr(server, "should_exit", True))
+    # Windows has no SIGHUP; there, only Ctrl+C (SIGINT, caught below) stops it this way.
+    sighup = getattr(signal, "SIGHUP", None)
+    if sighup is not None:
+        signal.signal(sighup, lambda number, frame: setattr(server, "should_exit", True))
     try:
         with contextlib.suppress(KeyboardInterrupt):
             asyncio.run(serve())

@@ -37,7 +37,7 @@ from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.agent.models import Message, Model
 from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
-from bap_browser.driver.mac_driver import desktop_driver_for, pairing_file, start_helper_in_terminal
+from bap_browser.driver.helper_driver import desktop_driver_for, pairing_file, start_helper_in_terminal
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of

@@ -365,6 +365,9 @@ li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: rela
 <li><a href="#2111-the-micro-vm">21.11 The micro VM</a></li>
 <li><a href="#2112-the-micro-vm-on-a-persons-tailnet">21.12 The micro VM on a person&#x27;s tailnet</a></li>
 <li><a href="#2113-a-persons-real-mac">21.13 A person&#x27;s real Mac</a></li>
+<li><a href="#2114-a-persons-real-windows-machine">21.14 A person&#x27;s real Windows machine</a></li>
+<li><a href="#2115-a-persons-real-linux-machine-x11">21.15 A person&#x27;s real Linux machine (X11)</a></li>
+<li><a href="#2116-a-helper-reached-over-the-tailnet">21.16 A helper reached over the tailnet</a></li>
 </ul>
 </li>
 </ul>
@@ -12882,8 +12885,8 @@ browsers, with its own chat, settings, log and evaluations.</p>
 <tr>
 <td>4</td>
 <td>An engine anywhere</td>
-<td>The person's real Mac</td>
-<td>Built (section 21.13): a helper the person runs on their Mac takes the engine's actions, with their permission. Over a tailnet once arrangement 3 has a key</td>
+<td>The person's real Mac, Windows or Linux (X11) machine</td>
+<td>Mac built (section 21.13). Windows and Linux designed, not yet built (sections 21.14, 21.15): a helper the person runs takes the engine's actions, with their permission. Reached over a tailnet once arrangement 3 has a key (section 21.16)</td>
 </tr>
 </tbody>
 </table></div>
@@ -13134,8 +13137,9 @@ user may change is the admin's choice, under Systems, Users. Other keys, for the
 <li>The desktop has no checklist; its task sets are its check.</li>
 </ul>
 <h3 id="2110-not-built-yet">21.10 Not built yet</h3>
-<p>A helper for Windows or Linux; reading apps through their accessibility tree; a desktop of macOS or
-Windows.</p>
+<p>Reading apps through their accessibility tree; a desktop of macOS or Windows; a helper for Linux on
+Wayland (section 21.15 covers X11 only). A helper for Windows and for Linux on X11 are designed, in
+sections 21.14 and 21.15, and not yet built.</p>
 <h3 id="2111-the-micro-vm">21.11 The micro VM</h3>
 <p>In the micro VM (section 17.2) there is no container to start a desktop in: the VM itself is the
 boundary. The desktop runs on the VM's own virtual screen, which the engine starts.</p>
@@ -13172,6 +13176,9 @@ internet.</p>
 <li>A key that is refused stops the VM with the reason. It does not go on without the tailnet.</li>
 <li>The address rules of section 8.1 still hold: a tailnet address the person wants the agent to reach is
   theirs to allow.</li>
+<li>Once the engine is itself on a tailnet, it can also reach a helper of arrangement 4 (sections 21.13
+  to 21.15) by the helper's Tailscale address instead of <code>127.0.0.1</code>, so that a person's own machine
+  need not be on the same network as the engine. Section 21.16 says how.</li>
 </ul>
 <h3 id="2113-a-persons-real-mac">21.13 A person's real Mac</h3>
 <p>Arrangement 4. The agent works on the person's own Mac, through a helper the person starts there:</p>
@@ -13216,12 +13223,71 @@ internet.</p>
   the agent's actions starts, and that the person did not allow (as when it clicks an icon in the
   Dock), is closed at once and the agent is told. What the person does through the viewer is never
   held.</li>
-<li><strong>Any app, on this Mac.</strong> "On this Mac, let the agent open any app" (<code>computer.mac_any_app</code>, off) lets
-  the agent open any app by its name, as GPT-6 Astra does; the helper is then started with <code>any</code>, and
-  each opening asks the person first. A name that is not an app's name is refused.</li>
+<li><strong>Any app, on this Mac.</strong> "On this Mac, let the agent open any app" (<code>computer.helper_any_app</code>, off,
+  shared with the Windows and Linux helpers of sections 21.14 and 21.15) lets the agent open any app
+  by its name, as GPT-6 Astra does; the helper is then started with <code>any</code>, and each opening asks the
+  person first. A name that is not an app's name is refused.</li>
 </ul>
 <p><code>tests/unit/test_mac_helper.py</code> runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.</p>
+<h3 id="2114-a-persons-real-windows-machine">21.14 A person's real Windows machine</h3>
+<p>Arrangement 4, extended to a second platform. Designed; not yet built. As section 21.13, except:</p>
+<ul>
+<li>The helper sees the screen through Windows's own <code>user32.dll</code> and <code>gdi32.dll</code> (reached through
+  <code>ctypes</code>, nothing installed for that) and moves the mouse and keyboard the same way. Resizing a
+  picture to a width and encoding it as JPEG, which macOS's <code>sips</code> already does for the Mac helper,
+  has no built-in equivalent on Windows: this adds Pillow as a dependency of the whole package, used
+  by the Windows and Linux helpers only.</li>
+<li>The apps named with <code>--allow</code> are, on Windows: Notepad, File Explorer, Calculator and a terminal.
+  Which program answers to "Calculator" and to a terminal depends on the Windows build (the Store's
+  Calculator app replaces the classic one on current Windows); this is confirmed when it is built.</li>
+<li>There is no Mac-like Screen Recording or Accessibility gate to ask for: a program already sees the
+  screen and sends input to windows of its own user. The known limit this leaves: a window running as
+  an administrator refuses input from a program that is not, by Windows's own rule (UIPI); the helper
+  is not run as an administrator, so such a window is out of its reach, the same way a locked screen
+  is out of a Mac helper's reach.</li>
+<li>The person's stop is the same gesture and the same setting (<code>computer.helper_stop_corner</code>): the top
+  left corner of the screen.</li>
+<li><code>tests/unit/test_windows_helper.py</code> is to run the helper over real HTTP with a stand-in for
+  Windows's hands, as <code>tests/unit/test_mac_helper.py</code> does for the Mac's.</li>
+</ul>
+<h3 id="2115-a-persons-real-linux-machine-x11">21.15 A person's real Linux machine (X11)</h3>
+<p>Arrangement 4, extended to a third platform. Designed; not yet built, and for X11 only: a desktop on
+Wayland is not reached by it (section 21.10). As section 21.13, except:</p>
+<ul>
+<li>The helper sees the screen and moves the mouse and keyboard by running <code>scrot</code> (or <code>maim</code>) and
+  <code>xdotool</code>, which must already be on the person's machine: unlike the Mac and Windows helpers,
+  nothing of this is built into Linux itself, and the person installs them once, by hand, before the
+  helper's first start. Resizing and encoding each picture uses Pillow, as section 21.14 adds it;
+  <code>scrot</code> or <code>maim</code> gives it the raw picture first.</li>
+<li>Which program answers to each app a person allows is not one name, as on a Mac: a text editor, a
+  file manager, a calculator and a terminal differ by desktop environment. The helper tries an
+  ordered list of common names for each (a text editor: <code>gedit</code>, then <code>kate</code>, then <code>mousepad</code>; and so
+  on for the rest) and opens the first one found on the machine's own path.</li>
+<li>There is no permission to ask for, as on a Mac: <code>xdotool</code> and <code>scrot</code> work on the person's own
+  session without asking.</li>
+<li>The person's stop is the same gesture and setting.</li>
+<li><code>tests/unit/test_linux_helper.py</code> is to run the helper over real HTTP with a stand-in for its hands.</li>
+</ul>
+<h3 id="2116-a-helper-reached-over-the-tailnet">21.16 A helper reached over the tailnet</h3>
+<p>Designed; not yet built. Arrangement 4 joins arrangement 3: the engine, wherever it runs (including a
+micro VM that has joined the person's tailnet, section 21.12), reaches a helper of sections 21.13 to
+21.15 by the helper's Tailscale address, so that the person's own machine need not share a network
+with the engine, and nothing of the helper is open to the internet.</p>
+<ul>
+<li>The helper is started with <code>--host</code> set to the machine's own Tailscale address (<code>tailscale ip -4</code>),
+  not <code>0.0.0.0</code>: it answers on the tailnet and nowhere else on the person's network. <code>127.0.0.1</code> stays
+  the default for a helper and an engine on the same machine, as today.</li>
+<li><code>computer.helper_url</code> is set to that address, and <code>BAP_BROWSER_HELPER_TOKEN</code> is given to the engine
+  by hand: the pairing file of section 21.13 is read only when the helper and the window share a
+  machine, which does not hold once the engine is elsewhere.</li>
+<li>The helper's own token is still what admits a request; Tailscale's own encryption is what keeps it
+  from being read on the way, the same way the micro VM's viewer is reached in section 21.12. Nothing
+  about the token or the check on every request (section 21.6) changes.</li>
+<li>Proof of this section is a live one: the person's machine and the micro VM of section 21.12 on the
+  same tailnet, the engine given the helper's Tailscale address, a task done on the person's machine,
+  and the live picture watched through the VM's own viewer.</li>
+</ul>
 </main>
 </div>
 <script>

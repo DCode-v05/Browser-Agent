@@ -9,13 +9,20 @@ import pytest
 import uvicorn
 
 from bap_browser.config import Computer
-from bap_browser.driver.mac_driver import MacDriver
-from bap_browser.driver.mac_hands import FLAGS, chord
+from bap_browser.driver.helper_driver import MacDriver
+from bap_browser.driver.mac_hands import FLAGS, MAC_APPS, chord, flags_of
 from bap_browser.errors import BrowserError
-from bap_browser.service.mac_helper import STOPPED, Helper, helper_app, pairing_file, write_pairing
+from bap_browser.service.helper_service import STOPPED, Helper, helper_app, pairing_file, write_pairing
 
 TOKEN = "a-token-only-the-test-knows"
 PICTURE = b"\x89PNG\r\n\x1a\n" + bytes(24)
+
+
+def mac_helper(hands: "StandInHands", token: str, apps: list[str], corner: float = 3.0) -> Helper:
+    """A `Helper` for the Mac's own hands, apps and key table: what every test here drives."""
+    return Helper(
+        hands, token, apps, corner, apps_by_name=MAC_APPS, chord=chord, flags_of=flags_of, machine="Mac"
+    )
 
 
 class StandInHands:
@@ -88,7 +95,7 @@ async def mac(
     make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> AsyncIterator[tuple[MacDriver, StandInHands]]:
     hands = StandInHands()
-    helper = Helper(hands, TOKEN, ["text_editor", "calculator"], 3.0)
+    helper = mac_helper(hands, TOKEN, ["text_editor", "calculator"])
     server = uvicorn.Server(uvicorn.Config(helper_app(helper), host="127.0.0.1", port=0, log_level="warning"))
     import asyncio
 
@@ -171,7 +178,7 @@ async def test_the_helper_opens_only_the_apps_the_person_named(mac: tuple[MacDri
 
 
 def test_the_admin_chooses_this_mac_as_where_the_agent_works(make_config, tmp_path: Path) -> None:
-    from bap_browser.driver.mac_driver import desktop_driver_for
+    from bap_browser.driver.helper_driver import desktop_driver_for
     from bap_browser.settings.store import SettingsStore
 
     store = SettingsStore(make_config(tmp_path))
@@ -182,7 +189,7 @@ def test_the_admin_chooses_this_mac_as_where_the_agent_works(make_config, tmp_pa
         for setting in group["settings"]
         if setting["id"] == "computer_runs"
     )
-    assert [one["value"] for one in choice["choices"]] == ["container", "mac"]
+    assert [one["value"] for one in choice["choices"]] == ["container", "mac", "windows"]
     assert choice["value"] == "container" and choice["applies"] == "next_session"
     store.change("web", {"computer_runs": "mac"}, "computer")
     config = store.apply_to(make_config(tmp_path), "contained_desktop", "computer")
@@ -219,7 +226,7 @@ def test_on_a_mac_the_agent_is_told_it_works_on_the_persons_own_mac(make_config,
 def test_the_window_starts_the_helper_in_terminal_with_the_apps_the_admin_allows(
     make_config, tmp_path: Path
 ) -> None:
-    from bap_browser.driver.mac_driver import start_helper_in_terminal
+    from bap_browser.driver.helper_driver import start_helper_in_terminal
 
     config = make_config(tmp_path, computer={"apps": {"files": False, "terminal": False}})
     ran: list[list[str]] = []
@@ -233,7 +240,7 @@ def test_the_window_starts_the_helper_in_terminal_with_the_apps_the_admin_allows
 
 
 def test_with_no_app_allowed_the_helper_is_not_started(make_config, tmp_path: Path) -> None:
-    from bap_browser.driver.mac_driver import start_helper_in_terminal
+    from bap_browser.driver.helper_driver import start_helper_in_terminal
 
     apps = {"text_editor": False, "files": False, "calculator": False, "terminal": False}
     ran: list[list[str]] = []
@@ -283,7 +290,7 @@ async def test_the_helper_asks_macos_for_what_is_missing_and_pairs_again_when_it
     """As GPT-6 Astra's app does: macOS asks the person, and lists the program to allow."""
     import asyncio
 
-    from bap_browser.service.mac_helper import watch_permissions
+    from bap_browser.service.helper_service import watch_permissions
 
     hands = StandInHands()
     hands.permitted = (False, False)
@@ -322,7 +329,7 @@ async def test_a_helper_started_with_any_app_opens_one_by_its_name_and_refuses_a
     import asyncio
 
     hands = StandInHands()
-    helper = Helper(hands, TOKEN, ["any"], 3.0)
+    helper = mac_helper(hands, TOKEN, ["any"])
     server = uvicorn.Server(uvicorn.Config(helper_app(helper), host="127.0.0.1", port=0, log_level="warning"))
     serving = asyncio.create_task(server.serve())
     while not server.started:
@@ -355,7 +362,7 @@ async def test_with_any_app_allowed_each_one_opens_only_after_a_persons_yes(
     hands = StandInHands()
     server = uvicorn.Server(
         uvicorn.Config(
-            helper_app(Helper(hands, TOKEN, ["any"], 3.0)), host="127.0.0.1", port=0, log_level="warning"
+            helper_app(mac_helper(hands, TOKEN, ["any"])), host="127.0.0.1", port=0, log_level="warning"
         )
     )
     serving = asyncio.create_task(server.serve())
@@ -365,7 +372,7 @@ async def test_with_any_app_allowed_each_one_opens_only_after_a_persons_yes(
     monkeypatch.setenv("BAP_BROWSER_HELPER_TOKEN", TOKEN)
     computer = {
         "runs": "mac",
-        "mac_any_app": True,
+        "helper_any_app": True,
         "helper_url": f"http://127.0.0.1:{port}",
         "app_open_wait_s": 0.05,
     }
