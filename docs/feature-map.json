@@ -600,15 +600,20 @@
         "src/bap_browser/computer/seams/driver_package.py",
         "src/bap_browser/computer/hermes_tests.txt",
         "src/bap_browser/config_computer.py",
-        "scripts/take_hermes.py"
+        "scripts/take_hermes.py",
+        "src/bap_browser/computer/driver.py",
+        "src/bap_browser/computer/driver.lock.json",
+        "src/bap_browser/computer/commands.py",
+        "scripts/ladder.py"
       ],
       "tests": [
         "tests/unit/test_hermes_base.py",
         "tests/hermes/conftest.py",
         "tests/hermes/not_here.json",
-        "tests/hermes/test_computer_use.py"
+        "tests/hermes/test_computer_use.py",
+        "tests/unit/test_driver_install.py"
       ],
-      "reach": "Not on a screen yet: the tool is put behind the session in a later unit (spec 22.11). Run `uv run pytest tests/unit/test_hermes_base.py tests/hermes`.",
+      "reach": "Not on a screen yet: the tool is put behind the session in a later unit (spec 22.11). Install the driver with `uv run bap-browser computer install`, see what is ready with `uv run bap-browser computer doctor`, and run `uv run python scripts/ladder.py`.",
       "addresses": [],
       "tools": []
     }

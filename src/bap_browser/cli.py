@@ -109,6 +109,24 @@ def build_parser() -> argparse.ArgumentParser:
     studio.add_argument("--open", action="store_true", help="open the window in your browser")
     studio.set_defaults(run=_studio)
 
+    computer = commands.add_parser(
+        "computer", help="the driver of computer use: install it, see what is missing, allow it on macOS"
+    )
+    computer_commands = computer.add_subparsers(dest="computer_command", required=True)
+    install = computer_commands.add_parser("install", help="install the pinned driver for this system")
+    install.add_argument("--config", help="path of config.json")
+    install.set_defaults(run=_computer)
+    its_doctor = computer_commands.add_parser("doctor", help="what the driver says is ready, check by check")
+    its_doctor.add_argument("--config", help="path of config.json")
+    its_doctor.add_argument("--json", action="store_true", help="print the report as JSON")
+    its_doctor.set_defaults(run=_computer)
+    permissions = computer_commands.add_parser(
+        "permissions", help="whether the driver is ready; `grant` has macOS ask for what is missing"
+    )
+    permissions.add_argument("what", nargs="?", choices=["status", "grant"], default="status")
+    permissions.add_argument("--config", help="path of config.json")
+    permissions.set_defaults(run=_computer)
+
     doctor = commands.add_parser(
         "doctor", help="check that this machine has what bap-browser needs, and which browsers launch here"
     )
@@ -226,6 +244,18 @@ def _config_init(args: argparse.Namespace) -> int:
 def _config_doc(args: argparse.Namespace) -> int:
     print(reference_markdown(), end="")
     return 0
+
+
+def _computer(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    # Imported here so that the other commands start without loading computer use.
+    from bap_browser.computer import commands
+
+    if args.computer_command == "install":
+        return commands.install(config)
+    if args.computer_command == "doctor":
+        return commands.doctor(config, as_json=args.json)
+    return commands.permissions(config, grant=args.what == "grant")
 
 
 def _doctor(args: argparse.Namespace) -> int:

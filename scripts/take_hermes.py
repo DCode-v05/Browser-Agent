@@ -73,6 +73,9 @@ PUBLIC = (
     "_native_tool_result_images",
     "_run_async",
     "_needs_chromium_sandbox_bypass",
+    # Used by our installer, which does on macOS what Hermes' installer does (spec 22.2.2).
+    "_resolve_cua_driver_app_path",
+    "_validate_cua_driver_app_signature",
 )
 # What a message tells a person to run, and the variable that names another driver.
 WORDS = (
