@@ -6,6 +6,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from bap_browser.computer import driver
 from bap_browser.computer.seams.state import current
 
 NOT_INSTALLED = "The driver of computer use is not installed. Run `bap-browser computer install`."
@@ -17,10 +18,14 @@ class Installed:
 
 
 def installed_package(name: str) -> Installed | None:
-    """The driver that is installed, or None. It installs nothing."""
+    """The driver that is installed, or None. It installs nothing. Another driver named in the
+    settings, for development, comes before the pinned one."""
     command = current().computer.base.driver_command
-    found = shutil.which(command) if command else None
-    return Installed(Path(found)) if found else None
+    if command:
+        found = shutil.which(command)
+        return Installed(Path(found)) if found else None
+    binary = driver.installed(current().home)
+    return Installed(binary) if binary else None
 
 
 def ensure(name: str) -> None:

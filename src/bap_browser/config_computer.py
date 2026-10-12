@@ -73,6 +73,14 @@ class Base(Section):
     driver_command: str = setting(
         "", "Another driver to start in place of the pinned one, by its path or its name. For development"
     )
+    home: str = setting(
+        "~/.bap-browser/computer",
+        "Where computer use keeps the driver it installed, its captures and who holds the screen",
+    )
+    install_timeout_s: float = setting(120.0, "Longest wait for the driver's download, when it is installed")
+    register_timeout_s: float = setting(
+        15.0, "On macOS: longest wait for the system to take note of the driver's app after it is installed"
+    )
     desktop: DesktopOfTheBase = DesktopOfTheBase()
 
 

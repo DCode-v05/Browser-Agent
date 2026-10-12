@@ -48,8 +48,8 @@ def test_resolve_app_path_follows_real_symlink_and_is_idempotent(tmp_path):
     except (OSError, NotImplementedError):
         pytest.skip("symlinks are unavailable on this host")
 
-    assert cua_backend_daemon._resolve_cua_driver_app_path(str(shim)) == str(app)
-    assert cua_backend_daemon._resolve_cua_driver_app_path(str(executable)) == str(app)
+    assert cua_backend_daemon.resolve_cua_driver_app_path(str(shim)) == str(app)
+    assert cua_backend_daemon.resolve_cua_driver_app_path(str(executable)) == str(app)
 
 
 def test_resolve_app_path_follows_standard_driver_symlink(monkeypatch):
@@ -60,7 +60,7 @@ def test_resolve_app_path_follows_standard_driver_symlink(monkeypatch):
     monkeypatch.setattr(cua_backend.os.path, "isfile", lambda path: True)
     monkeypatch.setattr(cua_backend.os, "access", lambda path, mode: True)
 
-    assert cua_backend_daemon._resolve_cua_driver_app_path(symlink) == "/Applications/CuaDriver.app"
+    assert cua_backend_daemon.resolve_cua_driver_app_path(symlink) == "/Applications/CuaDriver.app"
 
 
 def test_resolve_app_path_does_not_fall_back_to_an_unrelated_bundle(monkeypatch):
@@ -70,21 +70,21 @@ def test_resolve_app_path_does_not_fall_back_to_an_unrelated_bundle(monkeypatch)
         lambda path: "/usr/local/bin/cua-driver",
     )
 
-    assert cua_backend_daemon._resolve_cua_driver_app_path("cua-driver") is None
+    assert cua_backend_daemon.resolve_cua_driver_app_path("cua-driver") is None
 
 
 @pytest.mark.parametrize("team_id", ["4YEC26S9KF", "YCK386LBJ7"])
 def test_driver_signature_accepts_official_team_ids(monkeypatch, team_id):
     _patch_codesign(monkeypatch, _codesign_proc(team_id=team_id))
 
-    cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+    cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_still_rejects_unrecognised_team(monkeypatch):
     _patch_codesign(monkeypatch, _codesign_proc(team_id="EVIL000000"))
 
     with pytest.raises(RuntimeError, match="signed by team"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_still_requires_exact_bundle_identifier(monkeypatch):
@@ -97,7 +97,7 @@ def test_driver_signature_still_requires_exact_bundle_identifier(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="has identifier"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_rejects_unsigned_by_default(monkeypatch):
@@ -105,7 +105,7 @@ def test_driver_signature_rejects_unsigned_by_default(monkeypatch):
     monkeypatch.setattr(cua_backend, "_computer_use_cfg", dict)
 
     with pytest.raises(RuntimeError, match="signed by team"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_allows_unsigned_only_with_opt_in(monkeypatch):
@@ -116,7 +116,7 @@ def test_driver_signature_allows_unsigned_only_with_opt_in(monkeypatch):
         lambda: {"allow_unsigned_driver": True},
     )
 
-    cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+    cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_unsigned_opt_in_still_requires_exact_bundle_identifier(monkeypatch):
@@ -134,14 +134,14 @@ def test_unsigned_opt_in_still_requires_exact_bundle_identifier(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="has identifier"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_requires_codesign(monkeypatch):
     monkeypatch.setattr(cua_backend_daemon.shutil, "which", lambda name: None)
 
     with pytest.raises(RuntimeError, match="codesign is required"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_driver_signature_rejects_codesign_failure(monkeypatch):
@@ -151,7 +151,7 @@ def test_driver_signature_rejects_codesign_failure(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="not code-signed"):
-        cua_backend_daemon._validate_cua_driver_app_signature("/Applications/CuaDriver.app")
+        cua_backend_daemon.validate_cua_driver_app_signature("/Applications/CuaDriver.app")
 
 
 def test_embedded_spawn_resolves_shim_and_accepts_current_team(monkeypatch):

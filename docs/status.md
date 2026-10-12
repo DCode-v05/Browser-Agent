@@ -762,6 +762,52 @@ Not built, and not checked:
 | 2 | The font is two files in the repository. Say if you prefer the npm package `@fontsource-variable/hanken-grotesk` |
 | 3 | `CLAUDE.md` says form values never reach a result; the spec shows the model what a field holds in a snapshot (never a password). I kept the spec. The wording in `CLAUDE.md` is yours to change |
 
+
+### 1ad. Built on 2026-10-12: the driver is installed by its checksum, and asked what is ready (spec 22, unit 2 of 8)
+
+| | |
+|---|---|
+| One pin | `src/bap_browser/computer/driver.lock.json`: `cua-driver` 0.21.0, with the address and SHA-256 of its six builds, as Hermes records them. A test fails if a driver version is written anywhere else |
+| Install | `bap-browser computer install`: downloads this system's build, refuses it unless the checksum matches, unpacks it into `~/.bap-browser/computer/driver/0.21.0/`, asks the driver what it can do, and switches its telemetry off for good |
+| Doctor | `bap-browser computer doctor`: the driver's own report, check by check |
+| Permissions | `bap-browser computer permissions`: on macOS, which of the two it has; `grant` has macOS ask. Elsewhere, that there is nothing to allow |
+| The ladder | `scripts/ladder.py`: rungs 1 and 2 of spec 22.10.1, on the machine it is run on |
+| CI | The job for each system now covers Linux too, installs the real driver on all three, and prints the doctor and the ladder |
+
+Run on this Mac (macOS 26.6, arm64), and read:
+
+- `bap-browser computer install` printed "Installed cua-driver 0.21.0". `codesign` gave
+  `Identifier=com.trycua.driver`, `TeamIdentifier=YCK386LBJ7`, one of the two teams Hermes accepts.
+  The install is 177 MB.
+- `bap-browser computer doctor` printed "binary_version: cua-driver 0.21.0", "platform_supported:
+  macOS 26.6 (arm64)", "bundle_identity: Bundle is com.trycua.driver", and failed the two rows that
+  are a person's to give: Accessibility and Screen Recording.
+- `scripts/ladder.py`: rung 1 passed. Rung 2 did not run: macOS has not allowed the driver.
+
+Running it found three things that reading Hermes' code had not:
+
+1. **macOS must be told where the driver's app is.** The driver starts its own background process
+   through macOS by the app's name. Unpacked in our folder, macOS did not know it, and the doctor
+   failed with "Check that /Applications/CuaDriver.app is installed". Hermes' installer registers the
+   app; ours now does the same, after checking its signature.
+2. **Telemetry was on by default in that background process.** Our setting in the driver's
+   environment does not reach a process macOS starts. Without it the driver said "Telemetry: enabled
+   (source: default)". The installer now runs the driver's own `telemetry disable`, and it says
+   "disabled (source: persisted)". No installation id was ever created.
+3. **The driver asks GitHub which version is newest.** It wrote `~/.cua-driver/version_check.json`
+   ("latest_version": "0.34.1") on its first start. It installs nothing by itself. Whether this can be
+   switched off is not yet known.
+
+Not built, and not checked:
+
+- Rung 2 on this Mac waits for you: run `uv run bap-browser computer permissions grant`, allow
+  CuaDriver under Accessibility and Screen Recording, then `uv run python scripts/ladder.py`. The first
+  try of rung 2 made macOS show its Accessibility question; it is yours to answer.
+- The driver's background process keeps running after a command. It was stopped by hand with
+  `cua-driver stop`. Stopping it when the engine ends is part of unit 3.
+- The desktop's image and the micro VM do not read the lock file yet: unit 6.
+- Windows and Linux: see CI's output for this pull request, recorded below when it has run.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

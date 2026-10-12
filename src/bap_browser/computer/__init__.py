@@ -16,14 +16,23 @@ from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
 
-__all__ = ["ask_with", "base", "computer_use", "driver_environment", "settings_seen"]
+__all__ = ["ask_with", "base", "computer_use", "driver_environment", "home_of", "settings_seen"]
+
+
+def home_of(config: Config) -> Path:
+    """The folder computer use keeps its files in."""
+    return Path(config.computer.base.home).expanduser()
 
 
 @contextmanager
-def base(config: Config, home: Path, backend: Callable[[], Any] | None = None) -> Iterator[None]:
-    """Computer use for one configuration, with its files in `home`. On the way out every driver it
-    started is stopped. `backend` names a backend to use in place of the driver."""
-    before = work_for(Working(computer=config.computer, home=home, backend=backend))
+def base(
+    config: Config, home: Path | None = None, backend: Callable[[], Any] | None = None
+) -> Iterator[None]:
+    """Computer use for one configuration, with its files in `home` (the configuration's, unless
+    another is given). On the way out every driver it started is stopped. `backend` names a backend
+    to use in place of the driver."""
+    working = Working(computer=config.computer, home=home or home_of(config), backend=backend)
+    before = work_for(working)
     try:
         yield
     finally:

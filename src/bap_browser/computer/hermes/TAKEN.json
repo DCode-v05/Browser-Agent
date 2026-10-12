@@ -25,7 +25,7 @@
     "computer_use/cua_backend_daemon.py": {
       "from": "tools/computer_use/cua_backend_daemon.py",
       "theirs": "523e9b93c6f71f4a3925a808ed3b0dbeea70fdb054a6f0994dd380f9c4c52d7e",
-      "sha256": "af2653605f42f3acfba43b83a0d1aefed53951c48434a8a9ebe5d8ae0781cfe3"
+      "sha256": "a6a90d6dda60b3c9817187f3045cde2460973c931b5b865164dab4015d969486"
     },
     "computer_use/cua_backend_driver.py": {
       "from": "tools/computer_use/cua_backend_driver.py",

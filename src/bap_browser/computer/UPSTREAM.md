@@ -24,7 +24,7 @@ Only three kinds of text, listed in full in `scripts/take_hermes.py`:
 | Change | Why | Example |
 |---|---|---|
 | The names of Hermes' modules | The copied code asks Hermes for settings, a home folder, approval, the driver and a clean environment. Our seams answer | `hermes_cli.config` becomes `bap_browser.computer.seams.settings` |
-| Nine names that begin with `_` | Our rule: no private name is imported across modules | `_sanitize_subprocess_env` becomes `sanitize_subprocess_env` |
+| Eleven names that begin with `_` | Our rule: no private name is imported across modules. Nine are asked of our seams; two are Hermes' checks of the macOS app, which our installer uses | `_sanitize_subprocess_env` becomes `sanitize_subprocess_env` |
 | Two words a person reads | The command and the variable are ours | `hermes computer-use` becomes `bap-browser computer` |
 
 ## The seams
@@ -37,7 +37,7 @@ Each module of `seams/` stands where a part of Hermes stood.
 | `home` | `hermes_constants`, `hermes_cli.profiles` | One folder for computer use, given by the engine. One profile |
 | `process` | `tools.environments.local`, `hermes_cli._subprocess_compat`, `agent.async_utils` | An environment with every key and token taken out; no console window on Windows |
 | `approval` | `tools.approval` | Asks whoever the engine named. With nobody to ask, refuses. Never told to ask nobody |
-| `driver_package` | `pm` | Finds the installed driver. Installs nothing |
+| `driver_package` | `pm` | Finds the driver that `computer/driver.py` installed. Installs nothing itself |
 | `provider` | `plugins.computer_use`, `agent.provider_base` | One driver: `cua-driver`, or a stand-in a test names |
 | `vision` | `agent.auxiliary_client`, `tools.vision_tools` | A screenshot goes to the model as it is |
 | `sandbox` | `tools.terminal_tool`, `tools.environments` | No terminal sandbox: the desktop is on the engine's own machine |

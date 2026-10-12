@@ -34,7 +34,7 @@ def _cb():
     from bap_browser.computer.hermes.computer_use import cua_backend
     return cua_backend
 
-def _resolve_cua_driver_app_path(driver_cmd: str) -> Optional[str]:
+def resolve_cua_driver_app_path(driver_cmd: str) -> Optional[str]:
     """Return the CuaDriver.app bundle that CARRIES *driver_cmd*, if any. Derived from the resolved binary path
     only — no /Applications fallback, which could be a DIFFERENT install than the one the manifest resolved,
     running code the resolution chain never validated."""
@@ -42,7 +42,7 @@ def _resolve_cua_driver_app_path(driver_cmd: str) -> Optional[str]:
     executable = os.path.join(head + ".app", "Contents", "MacOS", "cua-driver")
     return head + ".app" if marker and os.path.isfile(executable) and os.access(executable, os.X_OK) else None
 
-def _validate_cua_driver_app_signature(app_path: str) -> None:
+def validate_cua_driver_app_signature(app_path: str) -> None:
     """Fail closed unless *app_path* is the genuinely-signed CuaDriver.app. ``/usr/bin/open`` hands LaunchServices
     whatever bundle sits at the path, so ``codesign -dv`` must report EXACTLY ``Identifier=com.trycua.driver`` and
     an expected TeamIdentifier. ``TeamIdentifier=not set`` (ad-hoc dev builds) is allowed only with
@@ -74,10 +74,10 @@ def _embedded_daemon_spawn_command(driver_cmd: str, serve_args: list[str], *, pl
     """Build the private-daemon launch while preserving macOS TCC identity."""
     if platform != "darwin":
         return [driver_cmd, *serve_args]
-    resolved_app = app_path or _resolve_cua_driver_app_path(driver_cmd)
+    resolved_app = app_path or resolve_cua_driver_app_path(driver_cmd)
     if not resolved_app:
         raise RuntimeError("CuaDriver.app is required for private computer-use sessions on macOS. Run `bap-browser computer install` to restore it.")
-    _validate_cua_driver_app_signature(resolved_app)
+    validate_cua_driver_app_signature(resolved_app)
     return ["/usr/bin/open", "-n", "-g", "-a", resolved_app, "--args", *serve_args]
 
 def _wait_or_kill(process: Any) -> None:
