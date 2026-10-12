@@ -15,7 +15,11 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import subprocess
 import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from bap_browser import computer
@@ -24,6 +28,15 @@ from bap_browser.computer.hermes.computer_use import permissions
 from bap_browser.config import load_config
 
 MODES = ("som", "vision", "ax")
+# An app each system has: how it is started, the name a capture finds it by, and how it is closed
+# when ending its process is not enough.
+KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
+    "win32": (["notepad.exe"], "Notepad", []),
+    "linux": (["zenity", "--entry", "--title=Ladder", "--text=A window the ladder knows"], "zenity", []),
+    "darwin": (["open", "-a", "TextEdit"], "TextEdit", ["osascript", "-e", 'quit app "TextEdit"']),
+}
+WAIT_FOR_THE_APP_S = 20.0
+LOOK_AGAIN_S = 0.5
 
 
 def said(result: Any) -> dict[str, Any]:
@@ -40,8 +53,29 @@ def said(result: Any) -> dict[str, Any]:
     return {**(answer if isinstance(answer, dict) else {}), "picture": picture}
 
 
-def capture(mode: str) -> tuple[bool, str]:
-    answer = said(computer.computer_use({"action": "capture", "mode": mode}, session="ladder"))
+@contextmanager
+def a_known_app() -> Iterator[str]:
+    """Opens an app every such system has, for the captures to look at, and closes it after."""
+    system = next(name for name in KNOWN if sys.platform.startswith(name))
+    command, name, closing = KNOWN[system]
+    started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        yield name
+    finally:
+        started.terminate()
+        if closing:
+            subprocess.run(closing, capture_output=True, check=False)
+
+
+def capture(mode: str, app: str) -> tuple[bool, str]:
+    """A capture of the known app. Its window takes a moment to come up, so it is asked for until it
+    is there or the wait is over."""
+    asked = {"action": "capture", "mode": mode, "app": app}
+    ends = time.monotonic() + WAIT_FOR_THE_APP_S
+    answer = said(computer.computer_use(asked, session="ladder"))
+    while ("error" in answer or not answer.get("width")) and time.monotonic() < ends:
+        time.sleep(LOOK_AGAIN_S)
+        answer = said(computer.computer_use(asked, session="ladder"))
     if "error" in answer:
         return False, str(answer["error"])
     width, height = answer.get("width", 0), answer.get("height", 0)
@@ -79,9 +113,11 @@ def main(arguments: list[str] | None = None) -> int:
                 modes: tuple[str, ...] = ()
             else:
                 modes = MODES
-            for mode in modes:
-                passed, seen = capture(mode)
-                rungs.append((f"2, a capture in the mode {mode}", passed, seen))
+            if modes:
+                with a_known_app() as app:
+                    for mode in modes:
+                        passed, seen = capture(mode, app)
+                        rungs.append((f"2, a capture of {app} in the mode {mode}", passed, seen))
 
     for name, passed, seen in rungs:
         print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")

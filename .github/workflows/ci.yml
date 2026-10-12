@@ -56,5 +56,13 @@ jobs:
         shell: bash
       - run: uv run bap-browser computer doctor || echo "The doctor found something on this runner."
         shell: bash
-      - run: uv run python scripts/ladder.py || echo "The ladder did not pass on this runner."
+      # Linux has no screen on a runner: a virtual one, the accessibility bus and one small app.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity
+      - run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
+          else
+            uv run python scripts/ladder.py
+          fi || echo "The ladder did not pass on this runner."
         shell: bash
