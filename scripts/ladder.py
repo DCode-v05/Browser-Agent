@@ -43,6 +43,7 @@ KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
 }
 # A line of a capture that names a field text goes into: its number and its role.
 A_FIELD = re.compile(r"#(\d+) (\S*(?:[Tt]ext|[Ee]dit|[Ee]ntry|[Dd]ocument)\S*) ")
+OK_BUTTON = re.compile(r"#(\d+) \S*button\S* 'OK'")
 TYPED = "ladder 4711"
 WAIT_FOR_THE_APP_S = 20.0
 LOOK_AGAIN_S = 0.5
@@ -68,15 +69,17 @@ def said(result: Any) -> dict[str, Any]:
 
 
 @contextmanager
-def a_known_app() -> Iterator[str]:
-    """Opens an app every such system has, for the captures to look at, and closes it after."""
+def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
+    """Opens an app every such system has, for the ladder to work in, and closes it after. The app
+    and its process come out: on Linux the app prints what was typed into it when it is closed."""
     system = next(name for name in KNOWN if sys.platform.startswith(name))
     command, name, closing = KNOWN[system]
-    started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    started = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     try:
-        yield name
+        yield name, started
     finally:
-        started.terminate()
+        if started.poll() is None:
+            started.terminate()
         if closing:
             subprocess.run(closing, capture_output=True, check=False)
 
@@ -114,7 +117,7 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
     rungs: list[tuple[str, bool, str]] = []
     await session.start()
     try:
-        with a_known_app() as app:
+        with a_known_app() as (app, process):
             ends = time.monotonic() + WAIT_FOR_THE_APP_S
             seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax", "app": app})
             while not A_FIELD.search(seen.text) and time.monotonic() < ends:
@@ -141,16 +144,43 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             after = await session.toolkit.call(
                 "computer_use", {"action": "capture", "mode": "ax", "app": app}
             )
-            rungs.append(
-                (
-                    "3, what was typed is read back from the screen",
-                    TYPED in after.text,
-                    "it is there" if TYPED in after.text else " | ".join(after.text.splitlines())[:900],
-                )
-            )
+            rungs.append(await read_back(session, after.text, process))
     finally:
         await session.close()
     return rungs
+
+
+async def read_back(
+    session: ServiceSession, after: str, process: subprocess.Popen[bytes]
+) -> tuple[str, bool, str]:
+    """Whether what was typed is in the app, told by the app and not by the driver. A capture names
+    a field and not what it holds, so each known app is asked in its own way."""
+    name = "3, the app itself holds what was typed"
+    told = " | ".join(after.splitlines())[:600]
+    if sys.platform == "win32":
+        # Notepad marks a document that was changed with a star before its name.
+        return (
+            name,
+            "*Untitled" in after,
+            "its title bar says the document was changed" if "*Untitled" in after else told,
+        )
+    if sys.platform.startswith("linux"):
+        # The dialog prints its field when OK is pressed: a click by number, and the text comes out.
+        button = OK_BUTTON.search(after)
+        if button is None:
+            return name, False, told
+        await session.toolkit.call("computer_use", {"action": "click", "element": int(button.group(1))})
+        try:
+            printed = (await asyncio.to_thread(process.communicate, None, WAIT_FOR_THE_APP_S))[0]
+        except subprocess.TimeoutExpired:
+            return name, False, "OK was clicked by its number, and the dialog did not close"
+        said_back = printed.decode("utf-8", errors="replace").strip()
+        return (
+            name,
+            said_back == TYPED,
+            f"the dialog printed {said_back!r} after OK was clicked by its number",
+        )
+    return name, TYPED in after, "it is in the capture" if TYPED in after else told
 
 
 def main(arguments: list[str] | None = None) -> int:
@@ -182,7 +212,7 @@ def main(arguments: list[str] | None = None) -> int:
             else:
                 modes = MODES
             if modes:
-                with a_known_app() as app:
+                with a_known_app() as (app, _):
                     for mode in modes:
                         passed, seen = capture(mode, app)
                         rungs.append((f"2, a capture of {app} in the mode {mode}", passed, seen))
