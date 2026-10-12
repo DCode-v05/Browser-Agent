@@ -246,6 +246,19 @@ export const W = {
       stop: 'To stop the agent at once, push the pointer into the top left corner of the screen.',
       adminOnly: 'Your admin starts the helper on this Mac.',
     },
+    /** A real machine as the desktop of computer use, through the installed driver (spec 22). */
+    machine: {
+      title: 'Let the agent use this machine',
+      lead: 'The agent works on this machine\'s own screen, in the background: your pointer and the window in front of you stay yours. It opens only the apps allowed in Configuration.',
+      install: 'Install the driver',
+      installHint: 'Downloads the driver of computer use for this system and checks it against its pinned checksum.',
+      installed: 'The driver is installed. This page goes on by itself when the machine is ready.',
+      allow: 'Allow it on this Mac',
+      allowHint: 'On macOS: has the system ask you to allow the driver, CuaDriver, under Accessibility and Screen Recording. Windows and Linux ask nothing.',
+      asked: 'macOS is asking you to allow CuaDriver. Switch it on under Accessibility and under Screen Recording. This page goes on by itself once both are allowed.',
+      tip: 'To take the screen yourself, press Take over. Stop ends the agent\'s work at once.',
+      adminOnly: 'Your admin sets this machine up for the agent.',
+    },
     /** The page of computer use, which is a desktop and no browser (spec 21). */
     computer: {
       starting: 'Starting the desktop…',

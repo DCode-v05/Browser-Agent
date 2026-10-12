@@ -312,6 +312,16 @@ CATALOGUE: tuple[Entry, ...] = (
         options=(
             Option("container", "The contained desktop", "A small desktop of its own, in a container"),
             Option("mac", "This Mac", "Your own screen, mouse and keyboard, through bap-browser helper"),
+            Option(
+                "machine",
+                "This machine",
+                "Its own screen on Windows, macOS or Linux, in the background, through the installed driver",
+            ),
+            Option(
+                "remote",
+                "A machine elsewhere",
+                "Someone's own machine, through bap-browser computer helper there. Its address is in config.json",
+            ),
         ),
     ),
     Switch(

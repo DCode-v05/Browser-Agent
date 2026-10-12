@@ -6,17 +6,25 @@ answers what that code asks of Hermes. This module is how the rest of the engine
 
 from __future__ import annotations
 
+import os
+import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from bap_browser.computer import remote
-from bap_browser.computer.hermes.computer_use import cua_backend, tool
+from bap_browser.computer import driver, remote
+from bap_browser.computer.hermes.bot_desktop import lease
+from bap_browser.computer.hermes.computer_use import cua_backend, permissions, tool
+from bap_browser.computer.hermes.computer_use.backend import CaptureResult
 from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
 
+# The whole screen, as Hermes' tool names it, and who holds it when a person takes over in the viewer.
+THE_SCREEN = "screen"
+THE_VIEWER = "viewer"
 __all__ = [
     "ask_with",
     "base",
@@ -45,6 +53,8 @@ def base(
     elsewhere = config.computer.runs == "remote"
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
     before = work_for(Working(computer=settings, home=home, backend=backend))
+    # A session that ended while a person held the screen must not hold the next one.
+    lease.release()
     try:
         yield
     finally:
@@ -81,6 +91,61 @@ def manual() -> str:
     text = (Path(__file__).parent / "hermes" / "skill" / "SKILL.md").read_text(encoding="utf-8")
     _, _, body = text.removeprefix("---").partition("\n---\n")
     return body.strip() if text.startswith("---") and body else text.strip()
+
+
+@dataclass(frozen=True)
+class Lacks:
+    """What a machine still lacks before an agent can work on it, and how a person is told."""
+
+    what: Literal["driver", "permission", "code"]
+    said: str
+
+
+def lacks(config: Config) -> Lacks | None:
+    """What stands between this configuration and a session on the machine. None when nothing does.
+    It is asked before a session begins, never during one."""
+    settings = config.computer
+    if settings.runs == "remote":
+        if os.environ.get(settings.helper_token_env):
+            return None
+        return Lacks(
+            "code",
+            f"The pairing code of the helper on the other machine is not set in {settings.helper_token_env}.",
+        )
+    if not settings.base.driver_command and driver.installed(home_of(config)) is None:
+        return Lacks("driver", "The driver of computer use is not installed on this machine.")
+    if sys.platform != "darwin":
+        return None
+    with base(config):
+        status = permissions.computer_use_status()
+    # Only a plain no counts. With the driver not yet running macOS gives no answer, and the first
+    # capture will tell.
+    missing = [
+        name
+        for field, name in (("accessibility", "Accessibility"), ("screen_recording", "Screen Recording"))
+        if status.get(field) is False
+    ]
+    if missing:
+        return Lacks(
+            "permission", f"macOS has not allowed the driver, CuaDriver, under {' and '.join(missing)}."
+        )
+    return None
+
+
+def person_holds(holds: bool) -> None:
+    """A person has taken the screen, or given it back. While they hold it, Hermes' tool does
+    nothing for the agent, not even a capture (spec 22.2.1)."""
+    if holds:
+        lease.acquire(THE_VIEWER, reason="A person has taken over in the viewer.")
+    else:
+        lease.release(THE_VIEWER)
+
+
+def screen(session: str) -> CaptureResult:
+    """The whole screen, for the person who watches. It is theirs to see whoever holds the screen,
+    so it does not pass the gate the agent's own captures pass."""
+    with tool._backend_for_call(session) as backend:
+        return backend.capture(mode="vision", app=THE_SCREEN)
 
 
 def settings_seen() -> dict[str, Any]:

@@ -182,7 +182,7 @@ def test_the_admin_chooses_this_mac_as_where_the_agent_works(make_config, tmp_pa
         for setting in group["settings"]
         if setting["id"] == "computer_runs"
     )
-    assert [one["value"] for one in choice["choices"]] == ["container", "mac"]
+    assert [one["value"] for one in choice["choices"]] == ["container", "mac", "machine", "remote"]
     assert choice["value"] == "container" and choice["applies"] == "next_session"
     store.change("web", {"computer_runs": "mac"}, "computer")
     config = store.apply_to(make_config(tmp_path), "contained_desktop", "computer")

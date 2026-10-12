@@ -612,7 +612,9 @@
         "src/bap_browser/computer/remote.py",
         "src/bap_browser/computer/hermes/skill/SKILL.md",
         "deploy/Dockerfile",
-        "deploy/vm-start.sh"
+        "deploy/vm-start.sh",
+        "src/bap_browser/agent/machine_setup.py",
+        "viewer/src/MachineSetup.tsx"
       ],
       "tests": [
         "tests/unit/test_hermes_base.py",
@@ -623,9 +625,12 @@
         "tests/unit/test_computer_use_tool.py",
         "tests/unit/test_machine_helper.py",
         "tests/unit/test_remote_machine.py",
-        "tests/unit/test_deploy.py"
+        "tests/unit/test_deploy.py",
+        "tests/unit/test_machine_in_the_window.py",
+        "viewer/src/MachineSetup.test.tsx",
+        "tests/viewer/test_studio.py"
       ],
-      "reach": "Set `computer.runs` to `machine` (this machine) or `remote` (a machine elsewhere, through `bap-browser computer helper` there). Install the driver with `uv run bap-browser computer install`. Prove it with `uv run python scripts/ladder.py`, with `--through-helper`, or on Linux with `--virtual-screen`. The Computer tab has no choice for these yet.",
+      "reach": "Run `uv run bap-browser studio --open`, open Systems, and under Computer set Where the agent works to This machine. The Computer tab then says what the machine lacks and offers Install the driver and Allow it on this Mac; when it lacks nothing, the desktop and its chat appear. A machine elsewhere is set the same way, with its helper's address in `config.json`. Prove it with `uv run python scripts/ladder.py`.",
       "addresses": [],
       "tools": [
         "computer_use"
