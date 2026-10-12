@@ -822,6 +822,49 @@ On CI's own machines, with the real driver (run of 2026-10-12, pull request #48)
   app in front (on Windows the front window was the driver's own, which it refuses to read), and it
   misread a result that holds a picture.
 
+
+### 1ae. Built on 2026-10-12: Hermes' tool behind the session, and proven on Windows and Linux (spec 22, unit 3, first part)
+
+An agent can now work on a real machine through the engine. With `computer.runs` set to `machine`
+the session offers Hermes' one tool, `computer_use`, with `computer_open_app` and
+`computer_request_human` of ours, and every call still passes the check, the limits and the log.
+
+| | |
+|---|---|
+| The driver of a machine | `driver/hermes_driver.py`: starts Hermes' base for the session and stops the driver when it ends |
+| The tool | `tools/computer_use_tool.py`: takes what Hermes' tool takes (a test holds the two in step) and returns plain text, with a picture only for a capture that has one |
+| Judged by its action | `tools/kinds.py`: `capture`, `wait` and the two lists only look; `type`, `key` and `set_value` put text in. The check, "ask before every action", the limits and the masking of the log decide by that |
+| Never what was typed | The timeline says "Typed 9 characters" and "Pressed cmd+s"; the log keeps a length; no result holds the text |
+| The model is told the system | The instructions name Windows, macOS or Linux, and that system's keys |
+
+Proven with the real driver on CI's own machines, by `scripts/ladder.py`, now three rungs:
+
+| System | Rung 3: through the session, find a field by its number, type into it, and have the app say what it holds |
+|---|---|
+| Linux (Ubuntu 24.04, X11) | Passed. The field was element 1. The driver: "Typed 11 character(s) (via AT-SPI)". OK was then clicked by its number and the dialog printed `ladder 4711` |
+| Windows (Server 2025) | Passed. The field was element 0. The driver: "the field changed and now contains the requested text". Notepad's title bar then showed the document as changed |
+| macOS | Not run: the driver is not allowed yet on this Mac, and cannot be on a hosted runner |
+
+The three rungs must now pass on Linux and Windows for every pull request.
+
+Found on the way, and what was done:
+
+- A capture names a field, not what it holds. My first check of "read it back" looked for the typed
+  text in a capture and failed on both systems although the typing had worked. The ladder now asks the
+  app itself.
+- The ladder printed a character a Windows console could not encode, and stopped. It now prints on
+  any console.
+
+Not built, and not checked:
+
+- The Computer tab has no choice named "This machine" yet, and the viewer's live picture of a real
+  machine has not been looked at: the next part.
+- Take over and Stop are not yet joined to Hermes' lease. Rungs 4 and 5 wait for that.
+- The agent is not yet held to the allowed apps on a machine. `computer_open_app` opens only allowed
+  apps, but a click can still reach any window. Hermes' `bounded` mode does the holding, and is next.
+- The marks around text from the screen still say "written by the site". On a desktop it is the screen.
+- macOS, on this Mac: waiting for you to allow the driver.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

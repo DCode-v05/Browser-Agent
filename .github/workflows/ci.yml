@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
-      - run: uv run pytest tests/unit/test_hermes_base.py tests/unit/test_driver_install.py tests/hermes -q
+      - run: uv run pytest tests/unit/test_hermes_base.py tests/unit/test_driver_install.py tests/unit/test_computer_use_tool.py tests/hermes -q
       - run: uv run bap-browser computer install
       - run: uv run bap-browser computer doctor || echo "The doctor found something on this runner."
         shell: bash
@@ -59,13 +59,9 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity
-          dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --rungs 2
-          dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py || echo "Rung 3 did not pass on this runner."
+          dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
       - if: runner.os == 'Windows'
-        run: uv run python scripts/ladder.py --rungs 2
-      - if: runner.os == 'Windows'
-        run: uv run python scripts/ladder.py || echo "Rung 3 did not pass on this runner."
-        shell: bash
+        run: uv run python scripts/ladder.py
       - if: runner.os == 'macOS'
         run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."
         shell: bash
