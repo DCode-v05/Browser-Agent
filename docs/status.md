@@ -945,7 +945,12 @@ Found on the way:
   the page went on to the chat by itself, with the room's state `agent`.
 - The take-over test was forced to fail once, by leaving the lease untaken: it answered
   `(None, None)` where `human_has_control` was expected. It was put back.
-- The ladder has a fifth rung for this, climbed with the real driver on CI: see the pull request.
+- The ladder has a fifth rung for this, climbed with the real driver on CI's Linux and Windows
+  machines, directly, through the helper, and on Linux on the engine's own screen. Each time: "the tool
+  itself answered 'human_has_control'; after the hand back a capture worked".
+- That rung was missing from the first push of this work. My edit of the ladder had not applied, its
+  error was hidden, and CI passed without the rung. I saw it because the rung's line was not in CI's
+  output, added it, and CI ran it.
 
 Not built, and not checked:
 
