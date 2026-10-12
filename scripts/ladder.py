@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import io
 import json
 import platform
 import re
@@ -52,7 +53,10 @@ def said(result: Any) -> dict[str, Any]:
     dictionary whose `meta` says what the picture is of."""
     if isinstance(result, str):
         answer = json.loads(result)
-        return answer if isinstance(answer, dict) else {"error": result}
+        if not isinstance(answer, dict):
+            return {"error": result}
+        # A screen that has not changed is not sent twice: the picture is the one before.
+        return {**answer, "picture": bool(answer.get("screen_unchanged"))}
     meta = result.get("meta", {})
     picture = any(part.get("type") == "image_url" for part in result.get("content", []))
     return {
@@ -154,6 +158,10 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path of config.json")
     parser.add_argument("--rungs", type=int, default=3, help="the highest rung to climb: 2 or 3")
     asked = parser.parse_args(arguments)
+    # What a screen holds is printed as it is, on a console of any encoding.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     config = load_config(asked.config)
     print(
         f"The ladder on {platform.system()} {platform.release()} ({platform.machine()}), Python {platform.python_version()}"
