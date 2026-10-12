@@ -47,7 +47,9 @@ STAGES = (
     Stage("viewer lint", _npm("viewer", "lint")),
     Stage("viewer tests", _npm("viewer", "test")),
     Stage("viewer build", _npm("viewer", "build")),
-    Stage("unit and service tests", ("uv", "run", "pytest", "-q", "tests/unit", "tests/service")),
+    Stage(
+        "unit and service tests", ("uv", "run", "pytest", "-q", "tests/unit", "tests/service", "tests/hermes")
+    ),
     Stage("tests in a real browser", ("uv", "run", "pytest", "-q", "tests/e2e", "tests/viewer"), True),
 )
 

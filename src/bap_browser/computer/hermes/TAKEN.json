@@ -1,0 +1,176 @@
+{
+  "source": "NousResearch/hermes-agent",
+  "commit": "3569e846",
+  "files": {
+    "computer_use/__init__.py": {
+      "from": "tools/computer_use/__init__.py",
+      "theirs": "e4e4491b5234d8a7d84b32e302b4d5f303c08cd00fb1a542b5141c18512c9d13",
+      "sha256": "f3936af0507b6147bd530a5ac360df0da3369ebd56d0531860a3ba064cbaa55e"
+    },
+    "computer_use/backend.py": {
+      "from": "tools/computer_use/backend.py",
+      "theirs": "73e0c56db5b71eb0e4963589157e85c62c4f3e5d175f39c1fc3e6039fa4918b6",
+      "sha256": "69e5c12a1e6f7a3cfcfa27a109b5376abd74873d1de24cb3f191ae9974b475bf"
+    },
+    "computer_use/cua_backend.py": {
+      "from": "tools/computer_use/cua_backend.py",
+      "theirs": "6c0287de53eb3fbfd3307d961898554343271e406c4e6bd31ba4a43194ab5821",
+      "sha256": "a70c3c4f5a4fca268bb33795a4a4fb41ef2fbc456f4fd7cce374c55acc97c3e4"
+    },
+    "computer_use/cua_backend_capture.py": {
+      "from": "tools/computer_use/cua_backend_capture.py",
+      "theirs": "3409d16b40415f611e8b9c8ff0d99167e6247692d440e1aa8b02a823ff6cb204",
+      "sha256": "9ce8827c7c382ef45fbb7c6e7d8362eaaead047505baa67a4cfab84f1fd954ab"
+    },
+    "computer_use/cua_backend_daemon.py": {
+      "from": "tools/computer_use/cua_backend_daemon.py",
+      "theirs": "523e9b93c6f71f4a3925a808ed3b0dbeea70fdb054a6f0994dd380f9c4c52d7e",
+      "sha256": "af2653605f42f3acfba43b83a0d1aefed53951c48434a8a9ebe5d8ae0781cfe3"
+    },
+    "computer_use/cua_backend_driver.py": {
+      "from": "tools/computer_use/cua_backend_driver.py",
+      "theirs": "8031564bf9e19111b295496a4312ce96087163ba6b9f9ff6e0b1da6796159d67",
+      "sha256": "594b37d3d7976b593b0c59e917ffd7804ccd52c6fc5c08b258afd92904a7feae"
+    },
+    "computer_use/cua_backend_input.py": {
+      "from": "tools/computer_use/cua_backend_input.py",
+      "theirs": "a34c327a5526f2250d2c9a520b999a75f693d42b10fced4ef5270911044d1004",
+      "sha256": "8bca87a1ddeff78e55533307dacf24bb8aa1f9136df2c13fdd496cf0cb7f53c0"
+    },
+    "computer_use/cua_backend_parse.py": {
+      "from": "tools/computer_use/cua_backend_parse.py",
+      "theirs": "01262bc4d889f1f49eb654eb81cf222428833458ed146a951de38a9c6865a5fb",
+      "sha256": "3c8428d7cb692daab4842d676ece7ce628ce36d34371bb7b80c5a7740d0fb622"
+    },
+    "computer_use/cua_backend_session.py": {
+      "from": "tools/computer_use/cua_backend_session.py",
+      "theirs": "cee46b2396b9050dff420d6e8d0e46d6363e14dfc702f8c0a609797aceacbfa1",
+      "sha256": "88430c3adc511a4124767d3cca7a11911a48abee7405d721bee3ebebf05db9a0"
+    },
+    "computer_use/doctor.py": {
+      "from": "tools/computer_use/doctor.py",
+      "theirs": "351bec9623a083791edd1fa184ff597833f1cc594bbbabf10ec3117ad2ccc9b6",
+      "sha256": "89a32fe9c571588fdca08fe9bce89bbd590e5cfd83af67435b5bba6e09bea228"
+    },
+    "computer_use/permissions.py": {
+      "from": "tools/computer_use/permissions.py",
+      "theirs": "1723fcfb656581149daeb8bc6f4a59f35048ba1772e828832835fb5b9abae729",
+      "sha256": "de8187d30caceecd05e0181c9a76a06f60d9ac2ae3ecb38063d2a006645b5748"
+    },
+    "computer_use/schema.py": {
+      "from": "tools/computer_use/schema.py",
+      "theirs": "b3a476af8599f7936e8eebd0f552e5eaf82c4261199f9bf07aa3837a67ade726",
+      "sha256": "96b0178dc72ea586f16b419931db92674707e02df0d1ab7bb66861d029ad78f9"
+    },
+    "computer_use/tool.py": {
+      "from": "tools/computer_use/tool.py",
+      "theirs": "0f61a487c96ef94fde4e1ecfb52df6efafbd37c055433618a6d6f8aebb2d28fc",
+      "sha256": "6f4c850b1ba38e91fd29c690d838fb114366edf225fac8ad4926d8e6456d0d64"
+    },
+    "bot_desktop/__init__.py": {
+      "from": "tools/bot_desktop/__init__.py",
+      "theirs": "550cd5ecdf8d4966c8e5e9087fd2655509c8022b5ed2d4e4315280015a7b9af8",
+      "sha256": "36e8a7686faee9a11992c58bb2f4dd6b0bd5ff4ac835884bf7e179cb7d89a492"
+    },
+    "bot_desktop/browser.py": {
+      "from": "tools/bot_desktop/browser.py",
+      "theirs": "3aeea2f1d06bbcd2c963a83962fdc56a75b900c1c2cab4628292e064114fe78e",
+      "sha256": "0d9187fc0f341c0f9bc05dba38ca9f52415a32e92258a9e64d469cdd93f3d954"
+    },
+    "bot_desktop/install.py": {
+      "from": "tools/bot_desktop/install.py",
+      "theirs": "371adeb7db0dc2d8d10637c4debc2022cbb2bcc7315a776199b862905dd6ed38",
+      "sha256": "eb9e513f3876eade710062f475a8efe73e2e929548724c18052db7e1f38bf474"
+    },
+    "bot_desktop/launcher.sh": {
+      "from": "tools/bot_desktop/launcher.sh",
+      "theirs": "09fdb8052012ea589da940e3201c8025c1de199c17df6c22af42bf18e5272216",
+      "sha256": "09fdb8052012ea589da940e3201c8025c1de199c17df6c22af42bf18e5272216"
+    },
+    "bot_desktop/lease.py": {
+      "from": "tools/bot_desktop/lease.py",
+      "theirs": "6c49998bed955a236ca90bef1975352a09ae38acb7cb18115fed81c2129a21b9",
+      "sha256": "3ced67d14e4a804c740427bb98455853c25e8c899a55798d1c98cf90734b6d9e"
+    },
+    "bot_desktop/placement.py": {
+      "from": "tools/bot_desktop/placement.py",
+      "theirs": "93a2d0af0e8c9406cb132defb4c621867c8401bffaf1b6ab925bc2ebd2f6aef2",
+      "sha256": "8072d5d37664118a679449841043f1cf32f4be85761e32dc6d63608e22bdb546"
+    },
+    "bot_desktop/resources.py": {
+      "from": "tools/bot_desktop/resources.py",
+      "theirs": "5192588306765143fb9037f18ccad3da4c435b17cd07ccb74bdaf2079910e398",
+      "sha256": "8505a2261f26f380b6adb38aa202d66d61564a107da40121b5f4f9d4eb84e88a"
+    },
+    "bot_desktop/rfb_filter.py": {
+      "from": "tools/bot_desktop/rfb_filter.py",
+      "theirs": "3e7b31584072f82b0a003f7bcc50b30f42cfab3080301e2c4766de384753f1da",
+      "sha256": "ed6ea3645a8ea39e661952f077ba3d1ab5906a8a7e4d96164480a5a250c2fb1e"
+    },
+    "bot_desktop/runtime.py": {
+      "from": "tools/bot_desktop/runtime.py",
+      "theirs": "3bb92ff82a31367dec03426b7ed2215c8f34fa8dbcaa9b84ac091ac8276c2884",
+      "sha256": "c916d87d4b78e6ec5440959e750478f2646b978f5b1a446cb1ffa8c7fee4d0b7"
+    },
+    "bot_desktop/sandbox_host.py": {
+      "from": "tools/bot_desktop/sandbox_host.py",
+      "theirs": "31784751d011b4bc7df64a8a65e08e1d7f3983368b9e38140b89752da1469737",
+      "sha256": "2f5d8730427c96d54d03bc1285c3b20c14b2d1636881c9c1cfc5d454febb7d3a"
+    },
+    "bot_desktop/thumbnail.py": {
+      "from": "tools/bot_desktop/thumbnail.py",
+      "theirs": "61cc3fd7863739d881f3fd0aeca18640cd178e044c8e1fc2e20551a3910af135",
+      "sha256": "44deca81e4458b37e4e7c0d96d0b10a53c486d0e8cedee191999c91d367f73da"
+    },
+    "bot_desktop/wallpaper.png": {
+      "from": "tools/bot_desktop/wallpaper.png",
+      "theirs": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2",
+      "sha256": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2"
+    }
+  },
+  "tests": {
+    "test_cua_atexit_teardown.py": "tests/computer_use/test_cua_atexit_teardown.py",
+    "test_cua_no_overlay.py": "tests/computer_use/test_cua_no_overlay.py",
+    "test_cua_perf_knobs.py": "tests/computer_use/test_cua_perf_knobs.py",
+    "test_cua_spawn_env_sanitization.py": "tests/computer_use/test_cua_spawn_env_sanitization.py",
+    "test_cua_telemetry.py": "tests/computer_use/test_cua_telemetry.py",
+    "test_cua_wayland_env.py": "tests/computer_use/test_cua_wayland_env.py",
+    "test_cua_wsl_manifest_path.py": "tests/computer_use/test_cua_wsl_manifest_path.py",
+    "test_doctor.py": "tests/computer_use/test_doctor.py",
+    "test_permissions_resolution.py": "tests/computer_use/test_permissions_resolution.py",
+    "test_bot_desktop_browser.py": "tests/tools/test_bot_desktop_browser.py",
+    "test_bot_desktop_browser_fence.py": "tests/tools/test_bot_desktop_browser_fence.py",
+    "test_bot_desktop_idle.py": "tests/tools/test_bot_desktop_idle.py",
+    "test_bot_desktop_install.py": "tests/tools/test_bot_desktop_install.py",
+    "test_bot_desktop_launcher_seed.py": "tests/tools/test_bot_desktop_launcher_seed.py",
+    "test_bot_desktop_launcher_xvnc.py": "tests/tools/test_bot_desktop_launcher_xvnc.py",
+    "test_bot_desktop_lease.py": "tests/tools/test_bot_desktop_lease.py",
+    "test_bot_desktop_placement.py": "tests/tools/test_bot_desktop_placement.py",
+    "test_bot_desktop_resources.py": "tests/tools/test_bot_desktop_resources.py",
+    "test_bot_desktop_rfb_filter_limits.py": "tests/tools/test_bot_desktop_rfb_filter_limits.py",
+    "test_bot_desktop_runtime.py": "tests/tools/test_bot_desktop_runtime.py",
+    "test_computer_use.py": "tests/tools/test_computer_use.py",
+    "test_computer_use_approval_isolation.py": "tests/tools/test_computer_use_approval_isolation.py",
+    "test_computer_use_ax_walk_bound.py": "tests/tools/test_computer_use_ax_walk_bound.py",
+    "test_computer_use_backend_rebind.py": "tests/tools/test_computer_use_backend_rebind.py",
+    "test_computer_use_capture_fence.py": "tests/tools/test_computer_use_capture_fence.py",
+    "test_computer_use_capture_routing.py": "tests/tools/test_computer_use_capture_routing.py",
+    "test_computer_use_capture_self_window.py": "tests/tools/test_computer_use_capture_self_window.py",
+    "test_computer_use_cua_0_10_permissions.py": "tests/tools/test_computer_use_cua_0_10_permissions.py",
+    "test_computer_use_cua_0_9.py": "tests/tools/test_computer_use_cua_0_9.py",
+    "test_computer_use_cua_backend_linux.py": "tests/tools/test_computer_use_cua_backend_linux.py",
+    "test_computer_use_cua_macos_identity.py": "tests/tools/test_computer_use_cua_macos_identity.py",
+    "test_computer_use_delivery_ladder.py": "tests/tools/test_computer_use_delivery_ladder.py",
+    "test_computer_use_display_count_guard.py": "tests/tools/test_computer_use_display_count_guard.py",
+    "test_computer_use_empty_discovery_diagnosis.py": "tests/tools/test_computer_use_empty_discovery_diagnosis.py",
+    "test_computer_use_fullscreen_capture.py": "tests/tools/test_computer_use_fullscreen_capture.py",
+    "test_computer_use_input_target_guard.py": "tests/tools/test_computer_use_input_target_guard.py",
+    "test_computer_use_native_platform.py": "tests/tools/test_computer_use_native_platform.py",
+    "test_computer_use_null_pid_windows.py": "tests/tools/test_computer_use_null_pid_windows.py",
+    "test_computer_use_placeholder_ids.py": "tests/tools/test_computer_use_placeholder_ids.py",
+    "test_computer_use_screenshot_dedup.py": "tests/tools/test_computer_use_screenshot_dedup.py",
+    "test_computer_use_zero_bounds.py": "tests/tools/test_computer_use_zero_bounds.py",
+    "test_computer_use_zero_delivery_verdict.py": "tests/tools/test_computer_use_zero_delivery_verdict.py",
+    "cua_driver_0_9_tools_list.json": "tests/fixtures/cua_driver_0_9_tools_list.json"
+  }
+}

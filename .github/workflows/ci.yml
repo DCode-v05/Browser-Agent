@@ -36,3 +36,17 @@ jobs:
         env:
           # Hosted runners do not allow the user namespaces Chromium's sandbox needs.
           BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"
+
+  # Computer use is the same on Windows, macOS and Linux (spec 22.10.1). Linux is in the job above;
+  # here the tests of the base run on the other two.
+  computer-on-each-system:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run pytest tests/unit/test_hermes_base.py tests/hermes -q

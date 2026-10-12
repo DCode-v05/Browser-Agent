@@ -580,6 +580,37 @@
         "computer_open_app",
         "computer_request_human"
       ]
+    },
+    {
+      "id": "computer-on-hermes",
+      "title": "Computer use on Hermes' base: Hermes' tool and desktop code, taken whole, behind our seams",
+      "spec": "22",
+      "source": [
+        "src/bap_browser/computer/__init__.py",
+        "src/bap_browser/computer/UPSTREAM.md",
+        "src/bap_browser/computer/hermes/TAKEN.json",
+        "src/bap_browser/computer/hermes/computer_use/tool.py",
+        "src/bap_browser/computer/hermes/computer_use/cua_backend.py",
+        "src/bap_browser/computer/hermes/bot_desktop/lease.py",
+        "src/bap_browser/computer/seams/settings.py",
+        "src/bap_browser/computer/seams/approval.py",
+        "src/bap_browser/computer/seams/process.py",
+        "src/bap_browser/computer/seams/home.py",
+        "src/bap_browser/computer/seams/provider.py",
+        "src/bap_browser/computer/seams/driver_package.py",
+        "src/bap_browser/computer/hermes_tests.txt",
+        "src/bap_browser/config_computer.py",
+        "scripts/take_hermes.py"
+      ],
+      "tests": [
+        "tests/unit/test_hermes_base.py",
+        "tests/hermes/conftest.py",
+        "tests/hermes/not_here.json",
+        "tests/hermes/test_computer_use.py"
+      ],
+      "reach": "Not on a screen yet: the tool is put behind the session in a later unit (spec 22.11). Run `uv run pytest tests/unit/test_hermes_base.py tests/hermes`.",
+      "addresses": [],
+      "tools": []
     }
   ]
 }

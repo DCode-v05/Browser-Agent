@@ -20,6 +20,62 @@ class AllowedApps(Section):
     )
 
 
+class DesktopOfTheBase(Section):
+    geometry: str = setting("1440x900", "The contained desktop's screen, width by height in pixels")
+    auto_start: bool = setting(
+        False, "Whether a Linux machine with no screen starts the contained desktop on the first action"
+    )
+    min_free_memory_mb: int = setting(
+        1536, "The free memory, in megabytes, below which the contained desktop refuses to start"
+    )
+    idle_stop_minutes: int = setting(
+        30, "How long the contained desktop may stand unused before it is stopped. 0 never stops it"
+    )
+    placement: Literal["auto", "terminal", "gateway"] = setting(
+        "auto", "Where the contained desktop lives: with the sandbox when there is one, or on this machine"
+    )
+
+
+class Base(Section):
+    """What Hermes' computer use is set to (spec 22.8). The names on the right of each are Hermes' own."""
+
+    capture_after_mode: Literal["som", "vision", "ax"] = setting(
+        "som",
+        "What a capture that follows an action holds: numbered picture, picture alone, or elements alone",
+    )
+    max_image_dimension: int = setting(
+        1456, "The longest edge of a picture the driver returns, in pixels. 0 leaves it as it is"
+    )
+    ax_max_elements: int = setting(
+        200, "How many elements the driver reads of one window at most. 0 sets no bound"
+    )
+    permission_mode: Literal["standard", "bounded"] = setting(
+        "bounded", "Whether the driver itself holds the agent to the allowed apps (`bounded`) or not"
+    )
+    capability_manifest: str = setting(
+        "",
+        "The file that says what the driver may touch, when the mode is `bounded`. Written from the allowed apps",
+    )
+    no_overlay: Literal["auto", "on", "off"] = setting(
+        "auto",
+        "Whether the driver's pointer overlay is left out. `auto` decides by the system, as Hermes does",
+    )
+    native_wayland: bool = setting(False, "On Linux: whether the driver uses a Wayland session directly")
+    driver_telemetry: bool = setting(False, "Whether the driver may send its makers anonymous usage figures")
+    allow_unsigned_driver: bool = setting(
+        False,
+        "On macOS: whether a driver that is not signed by its makers may be started. For their developers",
+    )
+    autostart: bool = setting(
+        False,
+        "On Windows: whether the driver's logon task is registered, for a machine driven with nobody signed in",
+    )
+    driver_command: str = setting(
+        "", "Another driver to start in place of the pinned one, by its path or its name. For development"
+    )
+    desktop: DesktopOfTheBase = DesktopOfTheBase()
+
+
 class Computer(Section):
     runs: Literal["container", "here", "mac"] = setting(
         "container",
@@ -63,6 +119,7 @@ class Computer(Section):
         "On the person's own Mac: whether the agent may open any app by its name. Each opening asks them first",
     )
     apps: AllowedApps = AllowedApps()
+    base: Base = Base()
     network: bool = setting(False, "Whether the desktop may reach the network. Off: it has none at all")
     share_folder: bool = setting(
         True, "Whether a folder of this machine is shown in the desktop, as `Files` in its home folder"

@@ -715,6 +715,40 @@ purpose its test fails.
 | Viewer states the spec lists | Session picker, the takeover bar's "failed", address "loading", "limit reached". ("Saving", "working" and "handing back" are there since 2026-10-06) |
 | The deferred minor findings of the two reviews | Listed further down, unchanged |
 
+
+### 1ac. Built on 2026-10-12: Hermes' computer use taken in as the base (spec 22, unit 1 of 8)
+
+Computer use is being rebuilt on Hermes' (NousResearch/hermes-agent, MIT), so that one tool works the
+same on Windows, macOS and Linux. Section 22 of the spec is the whole design and its ten decisions.
+This is the first of its eight units. Today's computer use (section 21) is unchanged and still the
+one that runs.
+
+| | |
+|---|---|
+| Taken | Hermes' `tools/computer_use/` and `tools/bot_desktop/` at commit `3569e846`: 25 files, into `src/bap_browser/computer/hermes/` |
+| How | `scripts/take_hermes.py`. It changes module names, nine private names and two words a person reads; nothing else. `computer/UPSTREAM.md` says how to take a later Hermes |
+| Seams | Nine modules in `computer/seams/` answer what Hermes' code asks of Hermes: settings (from `Config.computer.base`), home folder, approval, a clean environment, the driver |
+| Held | A test fails when a taken file differs from the SHA-256 in `hermes/TAKEN.json` |
+| CI | A new job runs the base's tests on Windows and macOS runners. Linux is in the main job |
+
+- Measured on macOS, Python 3.12: `uv run pytest tests/unit/test_hermes_base.py tests/hermes` gave
+  282 passed, 31 skipped, 94 deselected. The 31 are Hermes' tests for Linux or Windows and run there.
+- Of Hermes' own tests, 273 pass against our seams. 94 are left out, each named with its reason in
+  `tests/hermes/not_here.json`: they test Hermes' package manager, settings file, second model for
+  pictures and terminal sandbox, none of which was taken.
+- Seen by hand, with a stand-in backend: `cmd+shift+q` answered "blocked key combo"; a click with
+  nobody to ask answered "requires approval but no interactive user"; with no driver installed a
+  capture answered "The driver of computer use is not installed. Run `bap-browser computer install`."
+- Forced to fail twice, to see the tests guard: a line added to a taken file, and the filter of
+  secrets switched off. Each failed one test, and both were put back.
+
+Not built, and not checked:
+
+- The driver itself is not installed or run. `bap-browser computer install` does not exist yet: unit 2.
+- Nothing of the base is behind the session, the viewer or a tool an agent can call: units 3 and 4.
+- No Windows or Linux machine has run any of this. CI's Windows and macOS jobs are the first run there.
+- Some of Hermes' results still say "Hermes" to the model. They are reworded in unit 3.
+
 ### 3. Waiting for your word
 
 | # | Question |

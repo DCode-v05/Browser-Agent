@@ -62,6 +62,7 @@ Rules that other checks already hold:
 | 15 | **Typed text, passwords and tokens never reach a log, an event or a result** | Tests of the event log and of each tool |
 | 16 | **No tool returns raw HTML, and every observation is capped** | Tests of each tool |
 | 17 | **A second working folder installs its own packages.** No link to another checkout's `node_modules` | Rule 10, and `.gitignore`, which keeps a link of that name out |
+| 20 | **Code taken from another project is taken whole, by a script.** Nothing under `src/bap_browser/computer/hermes/` or `tests/hermes/test_*.py` is edited by hand; the other checks leave those folders to their own project's rules | `tests/unit/test_hermes_base.py`, which holds each file to the SHA-256 in `TAKEN.json` |
 
 A rule that is words only, because no check can hold it:
 
