@@ -135,7 +135,7 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 (
                     "3, typing into it is done and does not come back in the result",
                     not typed.is_error and TYPED not in typed.text,
-                    typed.text.splitlines()[0][:200],
+                    " | ".join(typed.text.splitlines())[:300],
                 )
             )
             after = await session.toolkit.call(
@@ -145,7 +145,7 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 (
                     "3, what was typed is read back from the screen",
                     TYPED in after.text,
-                    "it is there" if TYPED in after.text else after.text[:400],
+                    "it is there" if TYPED in after.text else " | ".join(after.text.splitlines())[:900],
                 )
             )
     finally:
