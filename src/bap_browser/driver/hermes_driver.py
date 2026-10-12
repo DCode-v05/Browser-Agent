@@ -44,8 +44,9 @@ NAMED = {
     },
 }
 A_PICTURE = "data:"
-# The whole screen, as Hermes' tool names it: a picture, and no elements.
-THE_SCREEN = "screen"
+PNG = b"\x89PNG"
+# The states of a session in which a person is at the screen.
+A_PERSON_IS_AT_THE_SCREEN = ("person", "person_requested")
 
 
 def as_shot(result: Any) -> Shot | None:
@@ -86,6 +87,10 @@ class HermesDriver(DesktopDriver):
     # The session.
 
     async def start(self) -> None:
+        # With a backend named in the driver's place there is no driver to lack.
+        lacking = None if self._stand_in else await asyncio.to_thread(computer.lacks, self._config)
+        if lacking is not None:
+            raise BrowserError(lacking.said, reason=f"the machine lacks: {lacking.what}")
         if self._settings.base.virtual_screen:
             self._screen = await own_screen(self._settings)
         self._base = computer.base(self._config, backend=self._stand_in)
@@ -150,15 +155,24 @@ class HermesDriver(DesktopDriver):
     # that its looking never moves the window the agent is working in.
 
     async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
-        seen = await self.use(
-            {"action": "capture", "mode": "vision", "app": THE_SCREEN}, f"{self._name}:viewer"
-        )
-        shot = as_shot(seen)
-        if shot is not None:
-            self._last = shot
+        if self._base is None:
+            raise BrowserError(
+                "The machine's screen is not being driven any more.", reason="the session ended"
+            )
+        seen = await asyncio.to_thread(computer.screen, f"{self._name}:viewer")
+        if seen.png_b64:
+            data = base64.b64decode(seen.png_b64)
+            kind = seen.image_mime_type or ("image/png" if data.startswith(PNG) else "image/jpeg")
+            self._last = Shot(Picture(data, kind), seen.width, seen.height)
         if self._last is None:
             raise BrowserError("The machine gave no picture of its screen.", reason="no picture")
         return self._last
+
+    async def control_is(self, state: str) -> None:
+        """Who has the session now. While a person is at the screen, Hermes' own gate keeps the agent
+        from it: on a real machine that gate follows the person's hand (spec 22.3.1)."""
+        if self._base is not None:
+            await asyncio.to_thread(computer.person_holds, state in A_PERSON_IS_AT_THE_SCREEN)
 
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         pause = max(self._settings.frame_ms / 1000, 1 / level.max_fps)

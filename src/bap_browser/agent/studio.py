@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from bap_browser import browser_extension
+from bap_browser.agent import machine_setup
 from bap_browser.agent.command import (
     AGENT_NAME,
     do_task,
@@ -77,6 +78,11 @@ NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent 
 async def paired_or_asked(room: Room, config: Config) -> None:
     """Waits until a person asks for a new session, or, for the desktop on This Mac, until a helper
     pairs anew (spec 21.13)."""
+    if config.computer.runs == "machine":
+        # It goes on by itself once the driver is installed and, on macOS, allowed.
+        await machine_setup.until_ready(config, room.restart)
+        room.restart.clear()
+        return
     if config.computer.runs != "mac":
         await room.restart.wait()
         room.restart.clear()
@@ -110,7 +116,7 @@ def said_of(failed: BaseException) -> str:
 
 # What a person may do with a browser of the window, besides setting it up.
 # `helper`: start the helper of the person's own Mac in Terminal, for the desktop on This Mac.
-ACTIONS = ("start", "stop", "restart", "helper")
+ACTIONS = ("start", "stop", "restart", "helper", "install", "allow")
 # What the summary of an ended session says, in place of "You stopped it."
 STOPPED = "You stopped this browser from the Systems page."
 TURNED_OFF = "This browser was turned off."
@@ -251,6 +257,11 @@ class Studio:
             return "This browser is turned off. Turn it on first."
         if action == "helper":
             return self._start_helper(room)
+        if action in ("install", "allow"):
+            if room.backend != DESKTOP or (room.session is not None and room.session.control != "ended"):
+                return "This is for a machine that is not being worked on yet."
+            # A download, or macOS's question: neither is waited for on the loop.
+            return await asyncio.to_thread(machine_setup.make_ready, self._configured(room), action)
         running = room.session is not None and room.session.control != "ended"
         if action == "stop":
             if not running:

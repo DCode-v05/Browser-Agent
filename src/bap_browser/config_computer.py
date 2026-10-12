@@ -95,6 +95,9 @@ class Base(Section):
     )
     pairing_bytes: int = setting(18, "How many random bytes the helper's pairing code is made of")
     whois_timeout_s: float = setting(5.0, "Longest wait for Tailscale to say who a caller is")
+    ready_poll_s: float = setting(
+        5.0, "How often the window looks whether a machine that lacked something is ready now"
+    )
     virtual_screen: bool = setting(
         False,
         "Whether the engine starts this machine's own virtual screen before it drives it. For a machine "

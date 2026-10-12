@@ -16,6 +16,7 @@ import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studi
 import type { Passwords } from './systems/Access';
 import type { Me, SystemsApi } from './systems/api';
 import { SystemPanel, SystemsPage } from './systems/SystemsPage';
+import { MachineSetup } from './MachineSetup';
 import { W } from './wording';
 
 const BACKEND_ICON: Record<Backend, IconName> = {
@@ -319,6 +320,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             room={room}
             onTurnOn={systems && role === 'admin' ? () => systems.settings(room.id).change(surface, { system_enabled: true }).then(refresh, refresh) : undefined}
             onStartHelper={systems && role === 'admin' ? () => systems.manage(room.id, 'helper') : undefined}
+            onManage={systems && role === 'admin' ? (step) => systems.manage(room.id, step) : undefined}
           />
         )}
        </div>
@@ -392,8 +394,11 @@ export function MacSetup({ note, onStartHelper }: { note?: string; onStartHelper
   );
 }
 
-function NoSession({ room, onTurnOn, onStartHelper }: { room: Room; onTurnOn?(): void; onStartHelper?(): Promise<{ ok: true } | { ok: false; why: string }> }) {
+function NoSession({ room, onTurnOn, onStartHelper, onManage }: { room: Room; onTurnOn?(): void; onStartHelper?(): Promise<{ ok: true } | { ok: false; why: string }>; onManage?(step: 'install' | 'allow'): Promise<{ ok: true } | { ok: false; why: string }> }) {
   const [copied, setCopied] = useState(false);
+  if (room.backend === 'contained_desktop' && room.runs === 'machine' && room.state !== 'off') {
+    return <MachineSetup note={room.note} onManage={onManage} />;
+  }
   if (room.backend === 'contained_desktop' && room.runs === 'mac' && room.state !== 'off') {
     return <MacSetup note={room.note} onStartHelper={onStartHelper} />;
   }

@@ -928,6 +928,41 @@ Found on the way:
   differ from the last one sent, and a test holds it to that. My check of the stream also depended on
   timing; it now waits for the first picture before anything on the screen is changed.
 
+
+### 1ag. Built on 2026-10-12: a real machine in the window, and Take over joined to Hermes' gate (spec 22.3.1, 22.10.1)
+
+| | |
+|---|---|
+| The setting | "Where the agent works" now offers "This machine" and "A machine elsewhere" beside the contained desktop and This Mac |
+| The Computer tab | Set to This machine, it says what the machine lacks (no driver, or on macOS the driver not allowed) and offers two buttons to the admin: "Install the driver" and "Allow it on this Mac". When the machine lacks nothing, the desktop and its chat appear by themselves |
+| Take over | A person taking the screen in the viewer now takes Hermes' own lease. While they hold it the tool does nothing for the agent, not even a capture, including a call that was already on its way past our own gate |
+| The person still sees | The viewer's live picture is the person's to see whoever holds the screen, so it does not pass that gate |
+| Stop | Ends the session and the driver; nothing more reaches the machine. A take over left behind by a session that ended does not hold the next one |
+
+- Measured: 11 new unit tests and 3 of the viewer's. In a real browser (`tests/viewer/test_studio.py`):
+  the page showed "Let the agent use this machine" and "The driver of computer use is not installed on
+  this machine."; Allow was pressed and said that there was nothing to ask yet; Install was pressed, and
+  the page went on to the chat by itself, with the room's state `agent`.
+- The take-over test was forced to fail once, by leaving the lease untaken: it answered
+  `(None, None)` where `human_has_control` was expected. It was put back.
+- The ladder has a fifth rung for this, climbed with the real driver on CI's Linux and Windows
+  machines, directly, through the helper, and on Linux on the engine's own screen. Each time: "the tool
+  itself answered 'human_has_control'; after the hand back a capture worked".
+- That rung was missing from the first push of this work. My edit of the ladder had not applied, its
+  error was hidden, and CI passed without the rung. I saw it because the rung's line was not in CI's
+  output, added it, and CI ran it.
+
+Not built, and not checked:
+
+- **macOS, still.** The driver is not allowed on this Mac, so nothing past its install has run here,
+  and "Allow it on this Mac" was pressed only where there was no driver to ask for. Pressing it on this
+  Mac shows macOS's own question, which is yours to answer.
+- **A real tailnet, still.** No Tailscale here and no key. Nothing in this entry changes that.
+- "A machine elsewhere" has no field for the helper's address in the settings screen: it is in
+  `config.json`. The base's other settings are not in the settings screen either.
+- A user (not the admin) sees "Your admin sets this machine up for the agent." That is tested in the
+  viewer's own tests, not walked in a real browser.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

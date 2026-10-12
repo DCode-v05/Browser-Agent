@@ -12,11 +12,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pytest
 from playwright.async_api import Browser, Locator, Page, async_playwright
 
 from bap_browser import browser_extension
 from bap_browser.agent.models import Reply, ScriptedModel, ToolCall
 from bap_browser.agent.window import run_studio
+from bap_browser.computer import commands, driver
 from bap_browser.config import Config
 
 ASK = ToolCall("a", "browser_request_human", {"reason": "Sign in to Northfield for me", "kind": "login"})
@@ -84,12 +86,16 @@ class Window:
 
 @asynccontextmanager
 async def window(
-    make_config: Callable[..., Config], tmp_path: Path, browser: Browser, model: Callable[[], Any]
+    make_config: Callable[..., Config],
+    tmp_path: Path,
+    browser: Browser,
+    model: Callable[[], Any],
+    **sections: Any,
 ) -> AsyncIterator[Window]:
     folder = browser_extension.install(tmp_path / "state" / "extension")
     # The file that says where the service is stays in the test's own folder, apart from a service
     # the developer may have running.
-    config = make_config(tmp_path, server={"state_file": str(tmp_path / "service.json")})
+    config = make_config(tmp_path, server={"state_file": str(tmp_path / "service.json")}, **sections)
     running = asyncio.create_task(
         run_studio(config, lambda service: model(), open_viewer=False, extension=folder)
     )
@@ -157,6 +163,44 @@ async def test_the_window_has_a_page_for_each_browser(
         await page.get_by_role("heading", name="The desktop could not be started").wait_for()
         assert "Install Docker" in await page.locator(".studio-wait-lead").inner_text()
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+async def test_the_computer_page_set_to_this_machine_says_what_it_lacks_and_offers_to_set_it_up(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec 22.10.1: a real machine with no driver yet. The page says so, its two buttons do their
+    work, and once the driver is there the page goes on to the chat by itself."""
+    home = tmp_path / "no-driver-here"
+    this_machine = {"runs": "machine", "base": {"home": str(home), "ready_poll_s": 0.1}}
+
+    def installs(into: Path, **how: Any) -> Path:
+        """Puts a program where the driver's would be, as a download would."""
+        binary = driver.folder(into, driver.pinned()) / driver.binary_in(driver.target())
+        binary.parent.mkdir(parents=True)
+        binary.write_text("", encoding="utf-8")
+        return binary
+
+    monkeypatch.setattr(driver, "install", installs)
+    monkeypatch.setattr(commands, "not_ready", lambda config, binary: None)
+    async with window(make_config, tmp_path, browser, asks_then_answers, computer=this_machine) as opened:
+        page = opened.page
+        await opened.open("Computer")
+        await page.get_by_role("heading", name="Let the agent use this machine").wait_for()
+        lacks = page.get_by_text("The driver of computer use is not installed on this machine.")
+        await lacks.wait_for()
+        shots = Path(__file__).parents[2] / ".bap-browser" / "viewer-shots"
+        shots.mkdir(parents=True, exist_ok=True)
+        await page.screenshot(path=str(shots / "computer-this-machine.png"))
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        # With no driver there is nothing for macOS to allow yet, and elsewhere nothing to allow at all:
+        # the button says which, and does not fail.
+        await page.get_by_role("button", name="Allow it on this Mac").click()
+        said = await page.get_by_role("status").inner_text()
+        assert "macOS did not show its question" in said or "Only macOS asks for this" in said
+        await page.get_by_role("button", name="Install the driver").click()
+        # The machine lacks nothing now: the page becomes the desktop and its chat, unasked.
+        await page.get_by_label("Your task").wait_for()
+        assert (await opened.room("computer", "agent"))["state"] == "agent"
 
 
 async def test_a_page_that_needs_a_person_pops_up_and_says_so_on_its_tab(

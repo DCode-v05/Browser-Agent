@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from bap_browser.config import Config
 from bap_browser.driver.base import Box, Driver, Happened, MouseButton, TabInfo
+from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BapError
 from bap_browser.service.check_news import ASKED_OF_THE_CHECK, CheckNews
@@ -663,6 +664,8 @@ class ServiceSession(CheckNews):
             # Nothing brings an ended session back.
             return
         self.control = state
+        if isinstance(driver := self.browser.started_driver, HermesDriver):
+            await driver.control_is(state)
         self.hub.publish({"type": "control_changed", "state": state, "since": self._clock()})
         await self._announce()
 
