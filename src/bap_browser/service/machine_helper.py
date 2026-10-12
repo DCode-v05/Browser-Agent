@@ -21,7 +21,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from http import HTTPStatus
-from typing import Any
+from typing import IO, Any
 
 import uvicorn
 from starlette import status
@@ -87,7 +87,7 @@ class Helper:
     run_timeout_s: float
     message_bytes: int
     stopped: bool = False
-    running: list[asyncio.subprocess.Process] = field(default_factory=list)
+    running: list[subprocess.Popen[bytes]] = field(default_factory=list)
 
     def refusal(self, caller: HTTPConnection) -> int | None:
         """Why a caller is not let in, as a status. None when it is."""
@@ -108,6 +108,18 @@ class Helper:
     def environment(self) -> dict[str, str]:
         return {**sanitize_subprocess_env(os.environ), "CUA_DRIVER_RS_TELEMETRY_ENABLED": "0"}
 
+    def start_driver(self, with_it: Sequence[str]) -> subprocess.Popen[bytes]:
+        """Starts the driver for one conversation with an engine."""
+        driver = subprocess.Popen(
+            [*self.driver, THE_CONVERSATION, *with_it],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            env=self.environment(),
+            creationflags=windows_hide_flags(),
+        )
+        self.running.append(driver)
+        return driver
+
     def note(self, line: str) -> None:
         """Tells the person of a step the engine takes: its kind, and how much is typed, never what."""
         try:
@@ -127,8 +139,25 @@ class Helper:
         """Ends it for good: what is running is ended, and every later call is refused."""
         self.stopped = True
         for process in self.running:
-            with contextlib.suppress(ProcessLookupError):
-                process.terminate()
+            if process.poll() is None:
+                process.kill()
+
+
+def pass_on(to: IO[bytes], line: str) -> None:
+    """One line of the engine's, to the driver."""
+    to.write(line.encode("utf-8") + (b"" if line.endswith("\n") else b"\n"))
+    to.flush()
+
+
+def end(driver: subprocess.Popen[bytes]) -> None:
+    """Ends the driver and closes its pipes, without waiting on anything but the process itself."""
+    if driver.poll() is None:
+        driver.kill()
+    driver.wait()
+    for pipe in (driver.stdin, driver.stdout):
+        if pipe is not None:
+            with contextlib.suppress(OSError):
+                pipe.close()
 
 
 def allowed_to_run(asked: Any) -> list[str] | None:
@@ -182,51 +211,35 @@ def helper_app(helper: Helper) -> Starlette:
             return
         await socket.accept()
         helper.say("An engine has started working on this machine.")
-        driver = await asyncio.create_subprocess_exec(
-            *helper.driver,
-            THE_CONVERSATION,
-            *with_it,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            env=helper.environment(),
-            limit=helper.message_bytes,
-        )
-        helper.running.append(driver)
+        # An ordinary process with its pipes, read on a thread: it is ended at once and for certain
+        # when the engine goes away, whatever the loop is doing.
+        driver = await asyncio.to_thread(helper.start_driver, with_it)
+        assert driver.stdin is not None and driver.stdout is not None
+        said, heard = driver.stdout, driver.stdin
 
         async def answers() -> None:
-            assert driver.stdout is not None
-            while line := await driver.stdout.readline():
-                await socket.send_text(line.decode("utf-8", errors="replace"))
+            while line := await asyncio.to_thread(said.readline):
+                await socket.send_text(line.decode("utf-8", errors="replace").rstrip("\r\n"))
 
         async def requests() -> None:
-            assert driver.stdin is not None
             async for line in socket.iter_text():
                 if line == NO_MORE:
-                    driver.stdin.close()
+                    heard.close()
                     return
                 helper.note(line)
-                driver.stdin.write(line.encode("utf-8") + (b"" if line.endswith("\n") else b"\n"))
-                await driver.stdin.drain()
+                await asyncio.to_thread(pass_on, heard, line)
 
         outward, inward = asyncio.create_task(answers()), asyncio.create_task(requests())
         try:
             # The driver ending ends the conversation. So does the engine going away.
             await asyncio.wait({outward, inward}, return_when=asyncio.FIRST_EXCEPTION)
             await outward
-        except (WebSocketDisconnect, ConnectionError, RuntimeError):
+        except (WebSocketDisconnect, ConnectionError, RuntimeError, OSError):
             pass
         finally:
             inward.cancel()
             outward.cancel()
-            await asyncio.gather(inward, outward, return_exceptions=True)
-            with contextlib.suppress(ProcessLookupError):
-                driver.terminate()
-            # Both pipes are closed and the driver is waited for, so that nothing of it is left open.
-            if driver.stdin is not None and not driver.stdin.is_closing():
-                driver.stdin.close()
-            await driver.wait()
-            if driver.stdout is not None:
-                await driver.stdout.read()
+            end(driver)
             helper.running.remove(driver)
             helper.say("The engine has stopped working on this machine.")
             with contextlib.suppress(RuntimeError):
