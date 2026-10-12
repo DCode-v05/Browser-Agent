@@ -11,6 +11,7 @@ import sys
 from collections.abc import Callable, Mapping
 from typing import Any, Protocol
 
+from bap_browser import computer
 from bap_browser.agent.models import Message, Model, Said, ToolOutput
 from bap_browser.config import Agent, Config
 from bap_browser.results import ToolResult
@@ -92,11 +93,19 @@ MACHINE_SYSTEM = (
 )
 
 
+THEIR_MANUAL = (
+    "\n\nWhat follows is the manual of the tool computer_use, written by its makers. The rules above "
+    "come first. Where the manual names a tool you do not have, or sending a screenshot to the "
+    "user, that part does not apply here.\n\n"
+)
+
+
 def instructions_for(config: Config) -> str:
     """What the model is told of its work on the desktop of computer use: the contained desktop, or
     the person's own Mac."""
-    if config.computer.runs == "machine":
-        return MACHINE_SYSTEM.format(system=THIS_SYSTEM.get(sys.platform, "Linux"))
+    if config.computer.runs in ("machine", "remote"):
+        rules = MACHINE_SYSTEM.format(system=THIS_SYSTEM.get(sys.platform, "Linux"))
+        return rules + THEIR_MANUAL + computer.manual() if config.computer.base.manual else rules
     return MAC_SYSTEM if config.computer.runs == "mac" else COMPUTER_SYSTEM
 
 

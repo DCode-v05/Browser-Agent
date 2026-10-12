@@ -23,6 +23,11 @@ service.json
 serve.json
 remote-service.json
 helper.json
+# The pairing code an engine was given for a helper elsewhere, and anything of Tailscale's that holds a key.
+link.json
+*.authkey
+tailscale*.state
+tailscaled.state
 # No trailing slash: a link named node_modules is kept out too, not only a folder.
 node_modules
 viewer/dist/

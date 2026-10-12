@@ -126,6 +126,17 @@ def build_parser() -> argparse.ArgumentParser:
     permissions.add_argument("what", nargs="?", choices=["status", "grant"], default="status")
     permissions.add_argument("--config", help="path of config.json")
     permissions.set_defaults(run=_computer)
+    its_helper = computer_commands.add_parser(
+        "helper",
+        help="on a person's own machine: let an engine elsewhere drive it, over the tailnet, with a pairing code",
+    )
+    its_helper.add_argument("--config", help="path of config.json")
+    its_helper.add_argument(
+        "--this-machine-alone",
+        action="store_true",
+        help="take calls from this machine only, not from the tailnet",
+    )
+    its_helper.set_defaults(run=_computer)
 
     doctor = commands.add_parser(
         "doctor", help="check that this machine has what bap-browser needs, and which browsers launch here"
@@ -255,6 +266,13 @@ def _computer(args: argparse.Namespace) -> int:
         return commands.install(config)
     if args.computer_command == "doctor":
         return commands.doctor(config, as_json=args.json)
+    if args.computer_command == "helper":
+        # Imported here: only the helper needs the web server.
+        from bap_browser.service.machine_helper import run_helper
+
+        with contextlib.suppress(KeyboardInterrupt):
+            return run_helper(config, this_machine_alone=args.this_machine_alone)
+        return 0
     return commands.permissions(config, grant=args.what == "grant")
 
 

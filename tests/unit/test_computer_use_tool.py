@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from bap_browser.agent.loop import instructions_for
 from bap_browser.computer.hermes.computer_use.backend import (
     ActionResult,
     CaptureResult,
@@ -237,3 +238,22 @@ async def test_an_action_that_only_looks_is_never_counted_as_acting(
         await session.close()
 
     assert not looked.is_error, looked.text
+
+
+def test_the_model_is_given_this_engines_rules_and_then_hermes_own_manual(
+    make_config, tmp_path: Path
+) -> None:
+    told = instructions_for(make_config(tmp_path, computer={"runs": "machine"}))
+
+    ours, theirs = told.index("computer_request_human"), told.index("The verify → escalate ladder")
+    assert ours < theirs
+    assert "Capture first" in told
+    # The manual's own heading for a skill of Hermes is not an instruction to this model.
+    assert not told.lstrip().startswith("---")
+
+
+def test_the_manual_can_be_left_out(make_config, tmp_path: Path) -> None:
+    told = instructions_for(make_config(tmp_path, computer={"runs": "machine", "base": {"manual": False}}))
+
+    assert "computer_request_human" in told
+    assert "The verify → escalate ladder" not in told

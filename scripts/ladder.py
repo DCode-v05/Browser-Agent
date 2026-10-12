@@ -14,10 +14,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import io
 import json
+import os
 import platform
 import re
+import secrets
+import socket
 import subprocess
 import sys
 import time
@@ -110,7 +114,8 @@ def capture(mode: str, app: str) -> tuple[bool, str]:
 async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
     """Rung 3: the agent's own way in. Through the session and its check, the tool finds a field of
     the known app by its number, types into it, and reads back what it typed."""
-    machine = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": "machine"})})
+    runs = config.computer.runs if config.computer.runs == "remote" else "machine"
+    machine = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": runs})})
     session = ServiceSession(
         machine, HermesDriver(machine), name="ladder", backend="contained_desktop", tools=computer_tools_for
     )
@@ -187,6 +192,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--config", help="path of config.json")
     parser.add_argument("--rungs", type=int, default=3, help="the highest rung to climb: 2 or 3")
+    parser.add_argument(
+        "--through-helper",
+        action="store_true",
+        help="climb as an engine elsewhere would: through the helper, started here for this machine alone",
+    )
     asked = parser.parse_args(arguments)
     # What a screen holds is printed as it is, on a console of any encoding.
     for stream in (sys.stdout, sys.stderr):
@@ -201,6 +211,65 @@ def main(arguments: list[str] | None = None) -> int:
     binary = driver.installed(computer.home_of(config))
     problem = "it is not installed" if binary is None else commands.not_ready(config, binary)
     rungs.append(("1, the pinned driver is installed and answers", problem is None, problem or str(binary)))
+    with contextlib.ExitStack() as held:
+        if asked.through_helper and problem is None:
+            # The engine reaches this machine as it would reach one elsewhere: through the helper.
+            config = held.enter_context(a_helper_here(config))
+            rungs.append(
+                (
+                    "the helper is started, and the engine is given its pairing code",
+                    True,
+                    config.computer.helper_url,
+                )
+            )
+        climb(config, asked.rungs, problem is None, rungs)
+
+    for name, passed, seen in rungs:
+        print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
+    failed = [name for name, passed, _ in rungs if not passed]
+    print(
+        "The ladder is passed as far as it goes."
+        if not failed
+        else f"The ladder stopped: {len(failed)} failed."
+    )
+    return 1 if failed else 0
+
+
+@contextmanager
+def a_helper_here(config: Config) -> Iterator[Config]:
+    """The helper on this machine, for this machine alone, and the settings of an engine that drives
+    the machine through it."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    variable, code = config.computer.helper_token_env, secrets.token_urlsafe(18)
+    os.environ[variable] = code
+    started = subprocess.Popen(
+        [sys.executable, "-m", "bap_browser", "computer", "helper", "--this-machine-alone"],
+        env={**os.environ, "BAP_BROWSER__COMPUTER__HELPER_PORT": str(port)},
+        stdout=subprocess.DEVNULL,
+    )
+    try:
+        ends = time.monotonic() + WAIT_FOR_THE_APP_S
+        while time.monotonic() < ends:
+            with (
+                contextlib.suppress(OSError),
+                socket.create_connection(("127.0.0.1", port), timeout=LOOK_AGAIN_S),
+            ):
+                break
+            time.sleep(LOOK_AGAIN_S)
+        elsewhere = config.computer.model_copy(
+            update={"runs": "remote", "helper_url": f"http://127.0.0.1:{port}"}
+        )
+        yield config.model_copy(update={"computer": elsewhere})
+    finally:
+        started.terminate()
+        os.environ.pop(variable, None)
+
+
+def climb(config: Config, highest: int, installed: bool, rungs: list[tuple[str, bool, str]]) -> None:
+    """Rungs 2 and 3, added to what was climbed so far."""
+    problem = None if installed else "not installed"
     if problem is None:
         with computer.base(config):
             status = permissions.computer_use_status()
@@ -217,18 +286,8 @@ def main(arguments: list[str] | None = None) -> int:
                         passed, seen = capture(mode, app)
                         rungs.append((f"2, a capture of {app} in the mode {mode}", passed, seen))
 
-    if asked.rungs >= 3 and not [name for name, passed, _ in rungs if not passed]:
+    if highest >= 3 and not [name for name, passed, _ in rungs if not passed]:
         rungs += asyncio.run(through_the_engine(config))
-
-    for name, passed, seen in rungs:
-        print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
-    failed = [name for name, passed, _ in rungs if not passed]
-    print(
-        "The ladder is passed as far as it goes."
-        if not failed
-        else f"The ladder stopped: {len(failed)} failed."
-    )
-    return 1 if failed else 0
 
 
 if __name__ == "__main__":

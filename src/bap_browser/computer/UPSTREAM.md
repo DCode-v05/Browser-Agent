@@ -7,9 +7,35 @@ and how to take a later Hermes in.
 |---|---|
 | Source | [NousResearch/hermes-agent](https://github.com/nousresearch/hermes-agent), MIT, Copyright (c) 2025 Nous Research |
 | Commit | `3569e846` (12 October 2026) |
-| Taken | `tools/computer_use/` to `hermes/computer_use/`, `tools/bot_desktop/` to `hermes/bot_desktop/`: 25 files |
+| Taken | `tools/computer_use/` to `hermes/computer_use/`, `tools/bot_desktop/` to `hermes/bot_desktop/`, and the tool's manual, `skills/autonomous-ai-agents/computer-use/SKILL.md`, to `hermes/skill/`: 26 files |
 | Record | `hermes/TAKEN.json`: for each file, the SHA-256 of Hermes' and of ours |
 | Licence | `hermes/LICENSE`, and a two-line notice at the head of each Python file |
+
+## Everything computer use is made of in Hermes
+
+Checked on 12 October 2026 by searching the whole of Hermes at this commit for `computer_use`,
+`cua-driver` and `bot_desktop`. Two modules hold the tool and the desktop. Fourteen other parts
+touch them. Each is here, with what stands in its place.
+
+| Part of Hermes | What it does there | Here |
+|---|---|---|
+| `tools/computer_use/` | The tool, its schema, the driver backend, doctor, permissions | Taken whole |
+| `tools/bot_desktop/` | The contained Linux desktop, its lease, where it lives | Taken whole. Run only as far as the lease so far |
+| `skills/.../computer-use/SKILL.md` | The manual a model is given for the tool: capture first, act by number, verify and escalate | Taken whole. Given to the model after our rules (`computer.base.manual`) |
+| `plugins/computer_use/` | Chooses one driver among plugins | Seam `provider`: one driver, `cua-driver` |
+| `tools/computer_use_tool.py`, `toolsets.py` | Registers the tool; offers it on the three systems | `tools/computer_use_tool.py`, `computer_tools_for` |
+| `pm/packages.py` (`CuaDriver`), `pm/lock.json` | Downloads the pinned driver and finds its program | `computer/driver.py`, `driver.lock.json` |
+| `hermes_cli/subcommands/computer_use.py`, `tools_config_cua.py` | `install`, `doctor`, `permissions`; registers the macOS app; the Windows logon task | `computer/commands.py`. The Windows logon task (`computer.base.autostart`) is a setting only: not built |
+| `hermes_cli/subcommands/computer_use_screen.py` | `screen status, start, stop, install` for the Linux desktop | Not built: with the contained desktop |
+| `docker/sandbox-desktop.Dockerfile`, its smoke test | An image with TigerVNC, Xfce and the driver | Not taken. Our micro VM's image installs the pinned driver (`deploy/Dockerfile`) |
+| `tools/approval.py` | The shared approval gate | Seam `approval`, behind our own check |
+| `agent/client_lifecycle.py` | Stops a session's driver when its task ends | `driver/hermes_driver.py`, when the session closes |
+| `agent/prompt_builder.py` | Two sentences for a model that has both this tool and a browser | Not needed: a room here has one or the other |
+| Hermes' model adapters | Keep only the newest screenshots in the conversation | Ours already sends only the newest picture (`agent/openai_model.py`) |
+| `hermes_cli/web_routers/display.py`, `tui_gateway/methods_display*.py` | Streams the Linux desktop to Hermes' own app as RFB over a WebSocket | Not taken. Our viewer has its own live picture; the driver's captures feed it |
+| `apps/desktop/.../computer-use-panel.tsx` | The settings panel in Hermes' app | Our settings screen, drawn from the catalogue. The base's settings are not in the catalogue yet |
+| `gateway/media_repair.py` | Mends screenshot paths in a chat reply | Not needed: no reply here attaches a file |
+| `plugin-catalog/hermes-windows-computer-use.yaml` | A community plugin by another author, with 30 tools of its own | Not Hermes' own computer use. Not taken |
 
 ## The one rule
 

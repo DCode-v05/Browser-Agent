@@ -81,16 +81,34 @@ class Base(Section):
     register_timeout_s: float = setting(
         15.0, "On macOS: longest wait for the system to take note of the driver's app after it is installed"
     )
+    helper_allow: list[str] = setting(
+        ["tag:bap-vm"],
+        "Who on the tailnet the helper on a person's machine lets in: Tailscale tags, or the logins of people",
+    )
+    helper_tailnet: bool = setting(
+        True,
+        "Whether the helper takes calls from the tailnet. Off, it takes them from its own machine alone",
+    )
+    helper_run_timeout_s: float = setting(30.0, "Longest wait for one command the helper runs of the driver")
+    helper_message_bytes: int = setting(
+        67108864, "The largest message the helper and its link carry, in bytes. A screenshot is in one"
+    )
+    pairing_bytes: int = setting(18, "How many random bytes the helper's pairing code is made of")
+    whois_timeout_s: float = setting(5.0, "Longest wait for Tailscale to say who a caller is")
+    manual: bool = setting(
+        True, "Whether the model is given Hermes' own manual for the tool, after this engine's rules"
+    )
     desktop: DesktopOfTheBase = DesktopOfTheBase()
 
 
 class Computer(Section):
-    runs: Literal["container", "here", "mac", "machine"] = setting(
+    runs: Literal["container", "here", "mac", "machine", "remote"] = setting(
         "container",
         "Where the desktop runs: in a container of its own, on this machine's own virtual screen "
         "(`here`, for a machine that is itself the boundary, such as the micro VM), on a person's "
         "real Mac through the helper they run there (`mac`), or on this machine's own screen through "
-        "Hermes' driver, on Windows, macOS or Linux (`machine`)",
+        "Hermes' driver, on Windows, macOS or Linux (`machine`), or on a person's machine elsewhere, "
+        "through the helper they run there and the tailnet (`remote`)",
     )
     helper_url: str = setting(
         "http://127.0.0.1:8796", "Where the helper on the person's Mac answers, when the desktop is `mac`"

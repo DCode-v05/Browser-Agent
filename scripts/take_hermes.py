@@ -31,7 +31,13 @@ OURS = "bap_browser.computer.hermes"
 SEAMS = "bap_browser.computer.seams"
 
 # Hermes' folder, and the folder it becomes under `INTO`.
-MODULES = {"tools/computer_use": "computer_use", "tools/bot_desktop": "bot_desktop"}
+MODULES = {
+    "tools/computer_use": "computer_use",
+    "tools/bot_desktop": "bot_desktop",
+    # The manual Hermes gives a model for the tool. It is outside the two modules, and the tool is
+    # used poorly without it.
+    "skills/autonomous-ai-agents/computer-use": "skill",
+}
 # A module of Hermes, and the module of ours that stands in its place. Longest names first.
 STAND_INS = (
     ("tools.computer_use", f"{OURS}.computer_use"),
