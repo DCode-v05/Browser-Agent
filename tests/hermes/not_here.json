@@ -19,6 +19,36 @@
  "test_bot_desktop_browser_fence.py::test_secret_write_re_admits_after_a_takeover_during_the_code_prompt": "It reaches into a part of Hermes that is not taken.",
  "test_bot_desktop_browser_fence.py::test_vault_page_operations_respect_the_human_lease": "It reaches into a part of Hermes that is not taken.",
  "test_bot_desktop_install.py::test_timeout_finishes_the_group_when_only_the_leader_dies_on_term": "It needs a package or a file of Hermes' own repository.",
+ "test_bot_desktop_launcher_seed.py::test_browser_launcher_follows_the_profile_without_reseeding_the_panel": {
+  "why": "It looks for the desktop's launcher where Hermes' repository keeps it. The contained desktop is proven by its own unit (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_launcher_seed.py::test_browser_launcher_seeded_before_the_marker_still_follows_a_rename": {
+  "why": "It looks for the desktop's launcher where Hermes' repository keeps it. The contained desktop is proven by its own unit (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_launcher_seed.py::test_dock_lists_only_programs_present_on_path": {
+  "why": "It looks for the desktop's launcher where Hermes' repository keeps it. The contained desktop is proven by its own unit (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_launcher_seed.py::test_look_is_seeded_with_wallpaper_and_theme": {
+  "why": "It looks for the desktop's launcher where Hermes' repository keeps it. The contained desktop is proven by its own unit (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_launcher_xvnc.py::test_xvnc_never_sends_the_holders_clipboard_to_watchers": {
+  "why": "It looks for the desktop's launcher where Hermes' repository keeps it. The contained desktop is proven by its own unit (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
  "test_bot_desktop_lease.py::test_lease_authority_is_shared_across_processes": "It starts a second process that finds the home folder in Hermes' variable. Here the folder is given to the engine.",
  "test_bot_desktop_placement.py::test_forward_port_carries_bytes_both_ways_through_the_exec_stream": "It reaches into a part of Hermes that is not taken.",
  "test_bot_desktop_placement.py::test_refused_placement_never_falls_back_to_the_host": "It reaches into a part of Hermes that is not taken.",
@@ -28,8 +58,56 @@
  "test_bot_desktop_placement.py::test_sandbox_screen_that_cannot_come_up_is_an_error_not_a_host_browser": "It reaches into a part of Hermes that is not taken.",
  "test_bot_desktop_placement.py::test_sandbox_status_offers_the_image_switch_instead_of_a_config_hint": "It reaches into a part of Hermes that is not taken.",
  "test_bot_desktop_placement.py::test_terminal_placement_starts_the_sandbox_screen_instead_of_running_on_the_host": "It reaches into a part of Hermes that is not taken.",
+ "test_bot_desktop_resources.py::test_running_screen_is_not_reported_blocked_by_later_pressure": {
+  "why": "It reaches into a part of Hermes that is not taken.",
+  "on": [
+   "linux"
+  ]
+ },
  "test_bot_desktop_resources.py::test_start_refuses_and_status_explains_when_memory_is_short": "It fails here. The contained desktop is proven by its own unit (spec 22.11, unit 6), not by this test.",
  "test_bot_desktop_runtime.py::test_a_running_desktop_is_never_refused_for_the_memory_it_is_using": "It reaches into a part of Hermes that is not taken.",
+ "test_bot_desktop_runtime.py::test_allocation_lock_is_released_once_xvnc_claims_the_number": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_concurrent_cold_starts_of_two_profiles_get_distinct_displays": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_concurrent_starts_of_one_profile_spawn_one_launcher": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_failed_start_does_not_pin_the_profile_to_the_number_that_failed": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_orphaned_x_server_is_found_by_its_socket_when_the_lock_file_is_gone": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_orphaned_x_server_of_a_dead_launcher_is_reaped_on_next_start": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
+ "test_bot_desktop_runtime.py::test_readiness_timeout_terminates_the_launch_it_gave_up_on": {
+  "why": "It needs the package psutil, which Hermes' desktop uses on Linux and this engine does not have yet. Whether to add it is decided with the contained desktop (spec 22.11, unit 6).",
+  "on": [
+   "linux"
+  ]
+ },
  "test_bot_desktop_runtime.py::test_recycled_pid_is_not_our_launcher": "It needs a package or a file of Hermes' own repository.",
  "test_bot_desktop_runtime.py::test_the_image_bakes_the_same_apt_packages_the_runtime_would_install": "It needs a package or a file of Hermes' own repository.",
  "test_computer_use.py::TestAnthropicAdapterMultimodal::test_a_batch_that_would_blind_the_model_stops_at_the_floor": "It reaches into a part of Hermes that is not taken.",
@@ -41,10 +119,22 @@
  "test_computer_use.py::TestCapturePayloadBudget::test_aux_vision_branch_respects_element_cap": "It tests describing a screenshot with a second model, which this engine does not do.",
  "test_computer_use.py::TestCompressorScreenshotPruning::test_prunes_multimodal_envelope_dict": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use.py::TestCompressorScreenshotPruning::test_prunes_openai_content_parts_image": "It reaches into a part of Hermes that is not taken.",
+ "test_computer_use.py::TestCuaDriverSessionReconnect::test_cli_fallback_reads_screenshot_from_file": {
+  "why": "The test stands a file with no `.exe` ending in for the driver, which Windows does not start. Hermes runs it on Linux only.",
+  "on": [
+   "windows"
+  ]
+ },
  "test_computer_use.py::TestElementSpillFile::test_spill_file_holds_full_untruncated_tree": "The test leaves a file open, and tests here fail on any warning.",
  "test_computer_use.py::TestImageAwareTokenEstimator::test_multimodal_envelope_counts_images": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use.py::TestLazyMcpInstall::test_start_lazy_installs_mcp": "It tests Hermes' package manager, which is not taken: the driver is installed by ours.",
  "test_computer_use.py::TestLazyMcpInstall::test_start_propagates_feature_unavailable": "It tests Hermes' package manager, which is not taken: the driver is installed by ours.",
+ "test_computer_use.py::TestRegistration::test_cua_driver_cmd_env_override_is_resolved_dynamically": {
+  "why": "The test stands a file with no `.exe` ending in for the driver, which Windows does not start. Hermes runs it on Linux only.",
+  "on": [
+   "windows"
+  ]
+ },
  "test_computer_use.py::TestRunAgentMultimodalHelpers::test_append_subdir_hint_to_multimodal_appends_to_text_part": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use.py::TestSessionLifecycle::test_session_lifecycle_failures_are_non_fatal": "It tests Hermes' package manager, which is not taken: the driver is installed by ours.",
  "test_computer_use.py::TestSessionLifecycle::test_start_invokes_start_session_with_run_id": "It tests Hermes' package manager, which is not taken: the driver is installed by ours.",
@@ -67,9 +157,13 @@
  "test_computer_use_delivery_ladder.py::test_approval_state_is_session_scoped": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_delivery_ladder.py::test_background_approval_does_not_authorize_foreground": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args0-capture-darwin]": "It reaches into a part of Hermes that is not taken.",
+ "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args0-capture-win32]": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args1-click-darwin]": "It reaches into a part of Hermes that is not taken.",
+ "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args1-click-win32]": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args2-type-darwin]": "It reaches into a part of Hermes that is not taken.",
+ "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args2-type-win32]": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args3-list_windows-darwin]": "It reaches into a part of Hermes that is not taken.",
+ "test_computer_use_native_platform.py::test_native_computer_use_dispatches_to_backend[args3-list_windows-win32]": "It reaches into a part of Hermes that is not taken.",
  "test_computer_use_screenshot_dedup.py::TestScreenshotDedup::test_compaction_boundary_redelivers_pixels": "It reaches into a part of Hermes that is not taken.",
  "test_cua_perf_knobs.py::test_aux_vision_route_follows_a_config_change_without_restart": "It reaches into a part of Hermes that is not taken.",
  "test_cua_spawn_env_sanitization.py::test_cli_fallback_sanitizes_env_and_hides_console_on_windows": "It reaches into a part of Hermes that is not taken.",

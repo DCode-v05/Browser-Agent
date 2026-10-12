@@ -733,9 +733,14 @@ one that runs.
 
 - Measured on macOS, Python 3.12: `uv run pytest tests/unit/test_hermes_base.py tests/hermes` gave
   282 passed, 31 skipped, 94 deselected. The 31 are Hermes' tests for Linux or Windows and run there.
-- Of Hermes' own tests, 273 pass against our seams. 94 are left out, each named with its reason in
-  `tests/hermes/not_here.json`: they test Hermes' package manager, settings file, second model for
-  pictures and terminal sandbox, none of which was taken.
+- Of Hermes' own tests, 273 pass against our seams. 94 are left out on every system, each named with
+  its reason in `tests/hermes/not_here.json`: they test Hermes' package manager, settings file, second
+  model for pictures and terminal sandbox, none of which was taken.
+- CI's first run on Linux and Windows found what this Mac could not. On Linux 13 tests of the contained
+  desktop failed: 7 need the package `psutil`, which Hermes' desktop uses and this engine does not have,
+  and 6 look for files where Hermes' repository keeps them. On Windows 2 tests stand a file with no
+  `.exe` ending in for the driver, and the tests of the contained desktop cannot run there at all, as it
+  is for Linux. Each is in the same list, named for its system, and none is a fault of the taken code.
 - Seen by hand, with a stand-in backend: `cmd+shift+q` answered "blocked key combo"; a click with
   nobody to ask answered "requires approval but no interactive user"; with no driver installed a
   capture answered "The driver of computer use is not installed. Run `bap-browser computer install`."
@@ -746,7 +751,8 @@ Not built, and not checked:
 
 - The driver itself is not installed or run. `bap-browser computer install` does not exist yet: unit 2.
 - Nothing of the base is behind the session, the viewer or a tool an agent can call: units 3 and 4.
-- No Windows or Linux machine has run any of this. CI's Windows and macOS jobs are the first run there.
+- Whether to add `psutil` for the contained desktop on Linux: with unit 6.
+- No Windows or Linux desktop has run any of this. CI runs the tests there, not a screen.
 - Some of Hermes' results still say "Hermes" to the model. They are reworded in unit 3.
 
 ### 3. Waiting for your word

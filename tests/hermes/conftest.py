@@ -11,6 +11,7 @@ import json
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -34,17 +35,35 @@ def a_home_of_its_own(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
 NOT_HERE = Path(__file__).with_name("not_here.json")
 
 
+def here() -> str:
+    """This system, by the name Hermes' marks and our list use."""
+    if sys.platform.startswith("linux"):
+        return "linux"
+    return {"darwin": "macos", "win32": "windows"}.get(sys.platform, sys.platform)
+
+
+def left_out_here(test: Path, entry: str | dict[str, Any]) -> bool:
+    """Whether a test is left out on this system: one the list names for it, and on Windows every
+    test of the contained desktop but its lease, since that desktop is for Linux (spec 22.2.2)."""
+    return isinstance(entry, str) or here() in entry["on"]
+
+
 def leave_out(config: pytest.Config, items: list[pytest.Item]) -> None:
     ours = [item for item in items if Path(str(item.fspath)).parent == NOT_HERE.parent]
     if not ours:
         return
-    not_here: dict[str, str] = json.loads(NOT_HERE.read_text(encoding="utf-8"))
+    not_here: dict[str, str | dict[str, Any]] = json.loads(NOT_HERE.read_text(encoding="utf-8"))
     names = {item.nodeid.split("/")[-1]: item for item in ours}
     whole_files = {Path(str(item.fspath)).name for item in ours}
     stale = [name for name in not_here if name not in names and name.split("::")[0] in whole_files]
     if stale:
         raise pytest.UsageError(f"tests/hermes/not_here.json names tests that are not there: {stale}")
-    left_out = [names[name] for name in not_here if name in names]
+    left_out = [
+        item
+        for name, item in names.items()
+        if (name in not_here and left_out_here(Path(str(item.fspath)), not_here[name]))
+        or (here() == "windows" and name.startswith("test_bot_desktop_") and "_lease" not in name)
+    ]
     config.hook.pytest_deselected(items=left_out)
     items[:] = [item for item in items if item not in left_out]
 
