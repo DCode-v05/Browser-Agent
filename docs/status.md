@@ -806,7 +806,21 @@ Not built, and not checked:
 - The driver's background process keeps running after a command. It was stopped by hand with
   `cua-driver stop`. Stopping it when the engine ends is part of unit 3.
 - The desktop's image and the micro VM do not read the lock file yet: unit 6.
-- Windows and Linux: see CI's output for this pull request, recorded below when it has run.
+
+On CI's own machines, with the real driver (run of 2026-10-12, pull request #48):
+
+| System | Rung 1: installed and answers | Rung 2: a capture of a known app, in each mode |
+|---|---|---|
+| Linux (Ubuntu 24.04, x86_64, X11 on a virtual screen) | Passed | Passed, a small dialog: 310 by 231, 4 elements read through AT-SPI, a picture in `som` and `vision` |
+| Windows (Server 2025, x86_64) | Passed. The doctor: "UIAutomation is reachable", "Windows Graphics Capture will succeed" | Passed, Notepad: 754 by 512, 11 elements, a picture in `som` and `vision` |
+| macOS (26.6, arm64) | Passed | Not run: nobody is there to allow the driver |
+
+- This answers a question the spec left open: a hosted Windows runner does give the driver a desktop
+  it can read. The ladder is now a check that must pass on Linux and Windows for every pull request.
+- These are runners, not a person's machine. By the spec's grades Linux (X11) and Windows are "early".
+- Two mistakes of mine were found on the way and are fixed: the ladder asked for a capture with no
+  app in front (on Windows the front window was the driver's own, which it refuses to read), and it
+  misread a result that holds a picture.
 
 ## How to go on
 

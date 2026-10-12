@@ -37,9 +37,10 @@ jobs:
           # Hosted runners do not allow the user namespaces Chromium's sandbox needs.
           BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"
 
-  # Computer use is the same on Windows, macOS and Linux (spec 22.10.1). The tests of the base run on
-  # each, and the pinned driver is installed and asked what it can do: rung 1 of the ladder. What a
-  # hosted runner's screen allows beyond that is printed, and does not fail the job.
+  # Computer use is the same on Windows, macOS and Linux (spec 22.10.1). On each system the tests of
+  # the base run, the pinned driver is installed, and the ladder is climbed against a real app on
+  # the runner's own screen. On Linux and Windows the ladder must pass. On macOS it cannot go past
+  # rung 1: nobody is there to allow the driver, so what it says is printed and the job goes on.
   computer-on-each-system:
     strategy:
       fail-fast: false
@@ -52,17 +53,15 @@ jobs:
       - run: uv sync
       - run: uv run pytest tests/unit/test_hermes_base.py tests/unit/test_driver_install.py tests/hermes -q
       - run: uv run bap-browser computer install
-      - run: uv run bap-browser computer permissions || echo "The driver is not ready on this runner."
-        shell: bash
       - run: uv run bap-browser computer doctor || echo "The doctor found something on this runner."
         shell: bash
       # Linux has no screen on a runner: a virtual one, the accessibility bus and one small app.
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity
-      - run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
-          else
-            uv run python scripts/ladder.py
-          fi || echo "The ladder did not pass on this runner."
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity
+          dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
+      - if: runner.os == 'Windows'
+        run: uv run python scripts/ladder.py
+      - if: runner.os == 'macOS'
+        run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."
         shell: bash
