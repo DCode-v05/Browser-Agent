@@ -56,6 +56,12 @@ class Base(Section):
         "",
         "The file that says what the driver may touch, when the mode is `bounded`. Written from the allowed apps",
     )
+    capability_expires_after: str = setting(
+        "8h", "How long a `bounded` session may run before the driver must be given a fresh manifest"
+    )
+    capability_idle_timeout: str = setting(
+        "30m", "How long a `bounded` session may sit idle before the driver ends it"
+    )
     no_overlay: Literal["auto", "on", "off"] = setting(
         "auto",
         "Whether the driver's pointer overlay is left out. `auto` decides by the system, as Hermes does",

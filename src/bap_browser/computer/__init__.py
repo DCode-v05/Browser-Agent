@@ -18,9 +18,11 @@ from bap_browser.computer import driver, remote
 from bap_browser.computer.hermes.bot_desktop import lease
 from bap_browser.computer.hermes.computer_use import cua_backend, permissions, tool
 from bap_browser.computer.hermes.computer_use.backend import CaptureResult
+from bap_browser.computer.seams import manifest as capability_manifest
 from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
+from bap_browser.config_computer import Computer
 
 # The whole screen, as Hermes' tool names it, and who holds it when a person takes over in the viewer.
 THE_SCREEN = "screen"
@@ -42,6 +44,17 @@ def home_of(config: Config) -> Path:
     return Path(config.computer.base.home).expanduser()
 
 
+def _held_to_the_allowed_apps(settings: Computer, home: Path) -> Computer:
+    """Writes the manifest that holds the agent to the allowed apps, and points `settings` at it,
+    when the mode is `bounded` and nothing has named a manifest already (spec 22.7)."""
+    if settings.base.permission_mode != "bounded" or settings.base.capability_manifest:
+        return settings
+    written = capability_manifest.write(home, settings.apps, settings.base, sys.platform)
+    return settings.model_copy(
+        update={"base": settings.base.model_copy(update={"capability_manifest": str(written)})}
+    )
+
+
 @contextmanager
 def base(
     config: Config, home: Path | None = None, backend: Callable[[], Any] | None = None
@@ -52,6 +65,7 @@ def base(
     home = home or home_of(config)
     elsewhere = config.computer.runs == "remote"
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
+    settings = _held_to_the_allowed_apps(settings, home)
     before = work_for(Working(computer=settings, home=home, backend=backend))
     # A session that ended while a person held the screen must not hold the next one.
     lease.release()

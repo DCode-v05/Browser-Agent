@@ -703,6 +703,30 @@ front, and closes at once an app that the agent's action started and the person 
 person's own hand is not held. Checked with tests over real HTTP; with the closing step broken on
 purpose its test fails.
 
+### 1ac. Built on 2026-10-12, not yet proven on the real driver: the driver's own hold on the allowed apps
+
+Remaining piece 3 of "Computer use on Hermes: built and remaining" (the artifact; section 22.7 of the
+spec is not yet written). Until now `computer_open_app` was the only hold on an app: once open, a
+click or a type could still reach any window, because `permission_mode` was `bounded` in the settings
+but never took effect (`capability_manifest` was always empty, so the engine fell back to `standard`).
+
+A new `capability-manifest.json` is written at the start of every session that drives a real machine,
+naming the apps the admin's allowlist allows, one name per system: a bundle id on macOS, an
+executable's absolute path on Windows and Linux (the driver's own schema, cua-driver/trycua). Full
+screen capture is left open, for the person's own live view. The file is written under the agent's
+own `computer.base.home`, from `bap_browser.computer.seams.manifest`, only when a real session
+begins (`computer.base()`); the bare, unconfigured state stays `standard`, as Hermes' own tests
+(`tests/hermes/test_computer_use_cua_0_10_permissions.py`) require.
+
+Checked: the manifest's shape, one app per system, for all three systems; that a real session writes
+it and points the driver at it; that nothing is written outside a session. Not checked: whether the
+real driver, given this file, actually refuses a click or a type outside the allowed apps once
+full-screen capture is left open for the viewer — the driver's own docs do not say how the two
+interact, and nothing here starts the real driver. This is exactly piece 1 and 8's gap: proof needs a
+person's own machine.
+
+Windows and Linux executable paths (Calculator and the terminal on Windows, and every Linux path) are
+a first guess, not yet seen on a real machine of either system.
 
 | What | Note |
 |---|---|
