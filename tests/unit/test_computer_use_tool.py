@@ -3,6 +3,8 @@ on a machine, and what the check, the log and the timeline make of each action."
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import shutil
 from pathlib import Path
 from typing import Any
@@ -279,3 +281,53 @@ async def test_a_machine_that_is_to_start_its_own_screen_and_has_none_says_what_
 
     assert seen.is_error
     assert "virtual screen" in seen.text
+
+
+class Screen(Desk):
+    """A machine whose whole screen is one picture, which a test can change."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.showing = b"first"
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        # A real PNG's first bytes and size, then what the test says is on the screen.
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (64).to_bytes(4, "big") * 2 + self.showing
+        return CaptureResult(
+            mode=mode, width=64, height=64, png_b64=base64.b64encode(png).decode(), app="screen"
+        )
+
+
+async def test_a_screen_that_stands_still_is_shown_once_and_again_when_it_changes(
+    make_config, tmp_path: Path
+) -> None:
+    computer = {"runs": "machine", "frame_ms": 1, "base": {"home": str(tmp_path / "home")}}
+    config = make_config(tmp_path, computer=computer)
+    screen = Screen()
+    driver = HermesDriver(config, backend=lambda: screen)
+    frames: list[bytes] = []
+    first, changed = asyncio.Event(), asyncio.Event()
+
+    def shown(frame: bytes) -> None:
+        frames.append(frame)
+        first.set()
+        if len(frames) == 2:
+            changed.set()
+
+    await driver.start()
+    try:
+        await driver.start_frames(shown, config.viewer.quality_levels.standard)
+        await asyncio.wait_for(first.wait(), 10)
+        # Long enough for many more looks at a screen that does not change.
+        for _ in range(20):
+            await asyncio.sleep(0.01)
+        still = len(frames)
+        screen.showing = b"second"
+        await asyncio.wait_for(changed.wait(), 10)
+    finally:
+        await driver.close()
+
+    assert still == 1
+    assert len(frames) == 2 and frames[0] != frames[1]

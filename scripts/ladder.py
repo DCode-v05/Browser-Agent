@@ -140,15 +140,19 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             )
             # What a person watching would be shown: the machine's whole screen, as it changes.
             frames: list[bytes] = []
-            twice = asyncio.Event()
+            once, twice = asyncio.Event(), asyncio.Event()
 
             def shown(frame: bytes) -> None:
                 frames.append(frame)
+                once.set()
                 if len(set(frames)) >= 2:
                     twice.set()
 
             viewer = machine.viewer
             await watching.start_frames(shown, getattr(viewer.quality_levels, viewer.quality))
+            # The first picture is of the screen as it is now, before anything is typed.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(once.wait(), WAIT_FOR_THE_APP_S)
             await session.toolkit.call("computer_use", {"action": "click", "element": number})
             typed = await session.toolkit.call("computer_use", {"action": "type", "text": TYPED})
             rungs.append(

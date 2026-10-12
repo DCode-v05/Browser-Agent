@@ -923,6 +923,10 @@ Found on the way:
   left the driver's process open. It now uses a plain process read on a thread, ended for certain.
 - I pushed one commit with a lint error, because my command went on after the gate had stopped. It
   was fixed in the next commit; CI would have refused it.
+- The live picture of a machine sent the same picture again while the screen stood still. One CI run
+  in two caught it: 15 pictures, all the same. The driver now sends a picture only when its bytes
+  differ from the last one sent, and a test holds it to that. My check of the stream also depended on
+  timing; it now waits for the first picture before anything on the screen is changed.
 
 ## How to go on
 

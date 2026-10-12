@@ -162,13 +162,14 @@ class HermesDriver(DesktopDriver):
 
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         pause = max(self._settings.frame_ms / 1000, 1 / level.max_fps)
+        sent: bytes | None = None
         while self._base is not None:
             with contextlib.suppress(BapError):
-                before = self._last
                 shot = await self.screenshot(full_page=False, annotate=False)
                 # A screen that stands still is sent once.
-                if shot is not before:
-                    on_frame(shot.picture.data)
+                if shot.picture.data != sent:
+                    sent = shot.picture.data
+                    on_frame(sent)
             await asyncio.sleep(pause)
 
     # A person at their own machine has their own mouse and keyboard: nothing is sent for them.
