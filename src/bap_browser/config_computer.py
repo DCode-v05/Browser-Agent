@@ -85,11 +85,12 @@ class Base(Section):
 
 
 class Computer(Section):
-    runs: Literal["container", "here", "mac"] = setting(
+    runs: Literal["container", "here", "mac", "machine"] = setting(
         "container",
         "Where the desktop runs: in a container of its own, on this machine's own virtual screen "
-        "(`here`, for a machine that is itself the boundary, such as the micro VM), or on a person's "
-        "real Mac through the helper they run there (`mac`)",
+        "(`here`, for a machine that is itself the boundary, such as the micro VM), on a person's "
+        "real Mac through the helper they run there (`mac`), or on this machine's own screen through "
+        "Hermes' driver, on Windows, macOS or Linux (`machine`)",
     )
     helper_url: str = setting(
         "http://127.0.0.1:8796", "Where the helper on the person's Mac answers, when the desktop is `mac`"

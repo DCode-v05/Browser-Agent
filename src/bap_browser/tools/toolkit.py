@@ -41,10 +41,14 @@ from bap_browser.tools.kinds import (
     NO_STEP_ON_A_PAGE,
     POINTED,
     PRESSES_KEYS,
+    PRESSES_ON_A_MACHINE,
     READS,
     RUN_BESIDE_A_DIALOG,
+    SETS_ON_A_MACHINE,
     TOLD_BY_ITS_RESULT,
+    TYPES_ON_A_MACHINE,
 )
+from bap_browser.tools.kinds import of as kind_of
 from bap_browser.tools.observer import StepObserver
 from bap_browser.tools.offered import TOOLS
 from bap_browser.tools.registry import REF_PATTERN, Args, Shown, ToolDefinition, describe_problem
@@ -108,17 +112,21 @@ def _typed(name: str, arguments: Mapping[str, Any]) -> str | None:
             if isinstance(field, Mapping) and isinstance(field.get("value"), str)
         ]
         return "\n".join(values) or None
+    kind = kind_of(name, arguments)
     put = arguments.get(
         {
             "browser_type": "text",
             "browser_press_key": "keys",
             "computer_type": "text",
             "computer_press_key": "keys",
+            TYPES_ON_A_MACHINE: "text",
+            PRESSES_ON_A_MACHINE: "keys",
+            SETS_ON_A_MACHINE: "value",
             ANSWERS_A_DIALOG: "prompt_text",
             "browser_evaluate": "expression",
-        }.get(name, "")
+        }.get(kind, "")
     )
-    if not isinstance(put, str) or (name in PRESSES_KEYS and not keys.is_typed_text(put)):
+    if not isinstance(put, str) or (kind in PRESSES_KEYS and not keys.is_typed_text(put)):
         return None
     return put
 
@@ -344,7 +352,7 @@ class Toolkit:
                         done = made
                     else:
                         outcome = Outcome(decision.text, decision.reason)
-                if self._session.site_done is not None and name not in NEED_NO_SITE:
+                if self._session.site_done is not None and kind_of(name, arguments) not in NEED_NO_SITE:
                     # What the person allowed once was for this call.
                     await self._session.site_done()
                 logged = masked(arguments, redact)
@@ -412,20 +420,21 @@ class Toolkit:
         if name in OPENS_AN_ADDRESS and isinstance(arguments.get("url"), str):
             opens = presentable_address(arguments["url"])
         control = target
+        kind = kind_of(name, arguments)
         fields: list[Located] = []
         # A page with a dialog open answers nothing, so it is not asked.
         if driver is not None and self._session.pending_dialog() is None:
             with contextlib.suppress(BapError):
                 if target is not None and target.role == POINT and target.box is not None:
                     control = await driver.locate_point(target.box.x, target.box.y)
-                elif target is None and name in GO_WHERE_THE_FOCUS_IS and arguments.get("ref") is None:
+                elif target is None and kind in GO_WHERE_THE_FOCUS_IS and arguments.get("ref") is None:
                     control = await driver.locate_focus()
                 asked = arguments.get("fields") if name == "browser_fill_form" else None
                 for entry in asked if isinstance(asked, list) else []:
                     ref = entry.get("ref") if isinstance(entry, Mapping) else None
                     if isinstance(ref, str) and re.fullmatch(REF_PATTERN, ref):
                         fields.append(await driver.locate(ref))
-        if name in GO_WHERE_THE_FOCUS_IS and control is not None:
+        if kind in GO_WHERE_THE_FOCUS_IS and control is not None:
             fields = [control]
         # An element in a frame is on the frame's own site, which may not be the page's.
         in_a_frame = control is not None and control.document.startswith(("http://", "https://"))
@@ -434,15 +443,15 @@ class Toolkit:
             number,
             name,
             arguments,
-            acts=name not in READS and (name, arguments.get("action")) != LISTS_THE_TABS,
-            address="" if name in NEED_NO_SITE else without_credentials(address),
+            acts=kind not in READS and (name, arguments.get("action")) != LISTS_THE_TABS,
+            address="" if kind in NEED_NO_SITE else without_credentials(address),
             opens=opens,
             tab=tab,
             control=control,
             fields=tuple(fields),
             typed=_typed(name, arguments),
             label=self._session.redact(label_for(name, arguments, target, self._room())),
-            on_a_site=name not in NEED_NO_SITE,
+            on_a_site=kind not in NEED_NO_SITE,
         )
 
     def _validated(self, name: str, arguments: dict[str, Any]) -> tuple[ToolDefinition, Args] | CannotRun:
@@ -469,7 +478,8 @@ class Toolkit:
         self._reached = None
         if admitted is not None:
             return Outcome(admitted, "too many calls at once")
-        if name in TOLD_BY_ITS_RESULT or name in NO_STEP_ON_A_PAGE:
+        kind = kind_of(name, arguments)
+        if kind in TOLD_BY_ITS_RESULT or kind in NO_STEP_ON_A_PAGE:
             return None
         again = self.limits.goes_in_circles(same_step(name, arguments))
         if again is None:
@@ -516,14 +526,15 @@ class Toolkit:
 
     async def _noted(self, name: str, arguments: Mapping[str, Any], outcome: Outcome) -> Outcome:
         """What a result gains when the step changed nothing, or is the same once more (spec 18.8)."""
-        if name in NO_STEP_ON_A_PAGE:
+        kind = kind_of(name, arguments)
+        if kind in NO_STEP_ON_A_PAGE:
             return outcome
         step = same_step(name, arguments)
-        if name in TOLD_BY_ITS_RESULT:
+        if kind in TOLD_BY_ITS_RESULT:
             note = self.limits.read(step, outcome.text)
         else:
             note = self.limits.acted(step, changed=await self._page_moved())
-            if outcome.failure is not None or name in CHANGES_UNSEEN:
+            if outcome.failure is not None or kind in CHANGES_UNSEEN:
                 # A step that failed has said so; and what a hover changes is not always seen.
                 note = note.removeprefix(NOTHING_CHANGED)
         return replace(outcome, text=outcome.text + note) if note else outcome
@@ -611,7 +622,7 @@ class Toolkit:
         except Exception as exc:
             # The last line of defence: an agent's call must never take the service down.
             logger.exception("%s failed unexpectedly", name)
-            if name not in READS and self._lost_on_the_way(exc):
+            if kind_of(name, args.model_dump()) not in READS and self._lost_on_the_way(exc):
                 # Reading again is safe. Acting again may do the thing twice.
                 return Outcome(OUTCOME_UNKNOWN, "it is not known whether it was done")
             return Outcome(

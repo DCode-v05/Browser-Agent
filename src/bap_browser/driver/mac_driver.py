@@ -32,6 +32,7 @@ from bap_browser.driver.base import (
 )
 from bap_browser.driver.contained_desktop import App, allowed_apps
 from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.driver.mac_hands import MAC_APPS
 from bap_browser.errors import BadInput, BrowserError
 from bap_browser.private_file import write_json
@@ -370,4 +371,6 @@ class MacDriver(DesktopDriver):
 
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
     """The driver of the desktop the configuration names: a container's, this machine's, or a Mac's."""
+    if config.computer.runs == "machine":
+        return HermesDriver(config, name)
     return MacDriver(config, name) if config.computer.runs == "mac" else DesktopDriver(config, name)
