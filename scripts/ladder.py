@@ -40,17 +40,19 @@ LOOK_AGAIN_S = 0.5
 
 
 def said(result: Any) -> dict[str, Any]:
-    """A result of the tool as a dictionary, whether it came as text or with a picture."""
+    """A result of the tool as a dictionary. Text comes as JSON. A capture with a picture comes as a
+    dictionary whose `meta` says what the picture is of."""
     if isinstance(result, str):
         answer = json.loads(result)
         return answer if isinstance(answer, dict) else {"error": result}
-    text = result.get("text_summary") or ""
+    meta = result.get("meta", {})
     picture = any(part.get("type") == "image_url" for part in result.get("content", []))
-    try:
-        answer = json.loads(text)
-    except ValueError:
-        answer = {"summary": text}
-    return {**(answer if isinstance(answer, dict) else {}), "picture": picture}
+    return {
+        "width": meta.get("width", 0),
+        "height": meta.get("height", 0),
+        "total_elements": meta.get("elements", 0),
+        "picture": picture,
+    }
 
 
 @contextmanager
@@ -87,7 +89,7 @@ def capture(mode: str, app: str) -> tuple[bool, str]:
     passed = width > 0 and height > 0
     passed = passed and (not wants_picture or bool(answer.get("picture")))
     passed = passed and (not wants_elements or elements > 0)
-    return passed, f"{seen}, in {answer.get('app') or 'no app'}"
+    return passed, seen
 
 
 def main(arguments: list[str] | None = None) -> int:
