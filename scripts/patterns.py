@@ -31,7 +31,10 @@ BASELINE = Path(__file__).with_name("patterns_baseline.json")
 SRC = "src/bap_browser"
 VIEWER = "viewer/src"
 # Folders that are built or installed, not written.
-NOT_OURS = ("viewer_dist", "node_modules", "__pycache__", "/dist/")
+# Hermes' code and Hermes' tests of it, taken whole by scripts/take_hermes.py and never edited by
+# hand (spec 22.3). Its rules are Hermes'; a test holds each file to what was taken.
+TAKEN = ("computer/hermes/", "tests/hermes/test_")
+NOT_OURS = ("viewer_dist", "node_modules", "__pycache__", "/dist/", *TAKEN)
 # A file longer than this is hard for a reader with little context to hold, a person or an agent.
 LONGEST_PYTHON_FILE = 700
 LONGEST_VIEWER_FILE = 500
@@ -98,6 +101,7 @@ LAYERS = (
     ("config_safeguards", "config_computer"),
     ("config", "keys"),
     ("policy", "config_doc", "desktop_app", "browser_extension"),
+    ("computer",),
     ("driver", "code", "settings"),
     ("safeguards",),
     ("tools",),

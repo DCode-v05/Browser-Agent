@@ -37,7 +37,8 @@ artifacts = ["src/bap_browser/viewer_dist/**"]
 line-length = 110
 target-version = "py312"
 # Documents are not code: the formatter must not rewrite the examples inside them.
-extend-exclude = ["docs"]
+# Hermes' code and its tests are taken whole (scripts/take_hermes.py): they keep Hermes' own layout.
+extend-exclude = ["docs", "src/bap_browser/computer/hermes", "tests/hermes/test_*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
@@ -53,6 +54,8 @@ ignore = ["E501"]
 
 [tool.pyright]
 include = ["src", "tests"]
+# Taken whole from Hermes, which has its own checks. What we wrote around it is checked here.
+exclude = ["src/bap_browser/computer/hermes", "tests/hermes/test_*.py"]
 extraPaths = ["tests/support"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"

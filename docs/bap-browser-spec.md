@@ -5308,3 +5308,455 @@ uv run bap-browser helper --allow text_editor,calculator
 
 `tests/unit/test_mac_helper.py` runs the helper over real HTTP with a stand-in for the Mac's hands:
 the token, the missing permission, the stop in the corner, and the apps.
+
+## 22. Computer use on Hermes
+
+Date: 2026-10-12 · Status: decided; being built unit by unit (section 22.11). It replaces section 21 as its units land. Inside this section, "section N" means 22.N.
+
+Computer use in bap-browser is rebuilt on Hermes' computer-use module as its base, and works the same way on Windows, macOS and Linux: one tool, one set of actions, one driver built for each system. Today's own drivers, which reach only a Linux container and a Mac, are replaced by it. What today's system does better (an app allowlist on by default, opening an app, the benchmark, tests on a real screen) is kept on top. The two remote arrangements run over Tailscale.
+
+To verify this spec, check six things:
+
+- **The base is Hermes.** Sections 2 and 2.1: what is copied from Hermes, and how one call travels through it.
+- **It is universal.** Section 2.2: the same tool on Windows, macOS and Linux, and what differs below it.
+- **Our requirements sit on top.** Section 3.1: each requirement, what Hermes gives, what we add.
+- **Today's computer use is replaced.** Section 9: every file, deleted, rewritten or kept.
+- **The three gaps are answered.** Section 10.1 (Windows and Linux are proven by a ladder, and graded until then), section 2.4 (Linux), section 2.3 (one driver version).
+- **The decisions are the ones you made.** Section 12: nine are decided; the tailnet's owner is still to be named.
+
+### 22.1 The decision
+
+Hermes' computer-use code becomes the base of ours. Its two modules are taken into this repository under their MIT licence, and today's own drivers and twelve tools are removed in their favour.
+
+|  | Today (spec section 21) | After this spec |
+| --- | --- | --- |
+| Base | Our own drivers: `xdotool` in a container, CoreGraphics on a Mac | Hermes' `tools/computer_use` and `tools/bot_desktop`, driving through the `cua-driver` project |
+| Tools the agent gets | Twelve `computer_*` tools | One `computer_use` tool with Hermes' 14 actions, plus `computer_open_app` and `computer_request_human` kept from ours |
+| What the model sees | A screenshot only | Three modes: screenshot with numbered elements and the accessibility tree (default), plain screenshot, tree only |
+| Real machines | macOS only | macOS, Windows and Linux |
+| Input on a real machine | Moves the person's pointer; needs the app in front | Goes to the app in the background; the person keeps working |
+| macOS permissions | Asked for Terminal | Asked once for the driver's own app, `com.trycua.driver` |
+| Remote | A token over HTTP, a tailnet design not built | Tailscale for both remote arrangements (section 6) |
+| Kept from today |  | The app allowlist on by default, opening an app, the 13-task benchmark, tests on a real screen, the viewer, the check on every step |
+
+This document replaces spec section 21 once finalized. Nothing here is built yet.
+
+### 22.2 What is taken from Hermes
+
+Hermes at commit `3569e846` (12 October 2026) holds 6,400 lines in two modules, read for this spec. Both Hermes and the driver it uses are MIT licensed, so both may be built on with their notices kept.
+
+| Part | Where in Hermes | Lines | What it is |
+| --- | --- | --- | --- |
+| The tool and its schema | `tools/computer_use/tool.py`, `schema.py` | 1,187 | One `computer_use` tool, 14 actions, approvals, hard blocks, the unchanged-picture rule |
+| The backend interface | `tools/computer_use/backend.py` | 199 | `ComputerUseBackend`: capture, click, drag, scroll, type, key, set a value, list apps and windows, focus an app |
+| The driver backend | `tools/computer_use/cua_backend*.py` | 2,192 | Speaks MCP over a standard-input pipe to `cua-driver` |
+| Readiness and permissions | `doctor.py`, `permissions.py` | 614 | Whether the machine is ready; the macOS grants |
+| The contained desktop | `tools/bot_desktop/` | 2,196 | A Linux desktop of the agent's own (Xvnc and Xfce), its placement, memory floor, idle stop, and the lease that says who drives |
+| The driver itself | `trycua/cua`, release `cua-driver-rs` 0.21.0 | not ours | A signed binary for macOS, Linux (x86\_64, arm64) and Windows (x86\_64, arm64), pinned by address in Hermes' `pm/lock.json` |
+
+Hermes' module is not a library that can be installed alone. It imports six things from the rest of Hermes, and each becomes a seam we write:
+
+| Hermes import | What it does there | Ours |
+| --- | --- | --- |
+| `hermes_cli.config` | Reads the `computer_use` and `bot_desktop` settings | `config_computer.py` (section 8) |
+| `pm` | Downloads and pins `cua-driver` | A pinned download with a checksum into the data folder |
+| `tools.approval` | The approval gate | Our check on every step (spec 18) |
+| `agent.provider_base`, `plugins.computer_use` | A registry of drivers | Kept as one backend; the registry is dropped |
+| `tools.environments.local` | Strips model keys from the driver's environment | Our own stripping, tested |
+| `hermes_cli._subprocess_compat`, `hermes_platform` | Windows and WSL details | Copied as they are |
+
+#### 22.2.1 How Hermes' computer use works, one call at a time
+
+Hermes does not look at pixels and guess. It asks the operating system which buttons and fields a window holds, numbers them, and acts on a number. Every call from the model goes through the same eleven steps, on every system.
+
+1. **One tool.** The model calls `computer_use` with an `action`, such as `capture` or `click`.
+2. **Who holds the screen.** If a person has taken the screen over, the call is refused, a capture included. The check is made again just before the action is sent.
+3. **Hard blocks.** Some key chords and typed commands are refused before anyone is asked (section 7).
+4. **Approval.** An action that changes something asks the person first. Captures, waits and lists do not.
+5. **The driver is started, once per session.** Hermes checks the driver is present and current (`cua-driver manifest`), starts `cua-driver mcp` as a child process with keys taken out of its environment, and speaks MCP to it over standard input and output. It names the session and sets the picture's size cap.
+6. **Capture.** Hermes lists the windows, front first, picks the front one or the app that was named, and asks the driver for that window's state: a screenshot and the accessibility tree. Each element gets a number and a token. Hermes remembers the window (process id and window id) as the target.
+7. **Action.** `click` on element 14 is sent to the remembered window with that element's token. If the window changed since the capture, the driver answers "stale" and nothing is clicked. Coordinates are the fallback where an app shows no elements.
+8. **Delivery.** By default the driver acts in the background: the person's pointer and the window in front are left alone. `delivery_mode: foreground` is a separate request with its own approval.
+9. **Verdict.** The result says which route the driver used, whether an effect was confirmed, and when to try the foreground. `capture_after` adds a fresh capture to the same result.
+10. **No picture twice.** A capture identical to the last one is answered with "screen unchanged" and no image, up to two times in a row.
+11. **Failure.** If a call times out or the pipe breaks, the outcome is reported as unknown and the action is never sent again by itself: the session is rebuilt and the model is told to capture first.
+
+#### 22.2.2 One tool on Windows, macOS and Linux
+
+The three systems differ only below the tool: how the driver is installed, what the person must allow, and when it is ready. The tool, its 14 actions, the MCP calls and our code above the backend are the same on all three.
+
+|  | macOS | Windows | Linux |
+| --- | --- | --- | --- |
+| Driver build | One universal build (Intel and Apple silicon) | x86\_64 and arm64 | x86\_64 and arm64 |
+| Comes as | The signed `CuaDriver.app`; a bare binary is refused | `cua-driver.exe`, which may start a helper, `cua-driver-uia.exe` | One binary |
+| Elements are read through | Accessibility | UI Automation | AT-SPI |
+| What the person allows | Accessibility and Screen Recording, given to the driver itself, once | Nothing in settings. SmartScreen may ask the first time it runs | Nothing |
+| Ready when | Both are allowed | The driver's own `doctor` passes | The driver's own `doctor` passes |
+| Screen it needs | A display that is awake; a headless Mac needs a dummy display | A signed-in desktop. Driven over SSH, it needs the driver's logon task (`autostart`) | X11 or XWayland reachable through `DISPLAY`, and an unlocked session. Native Wayland is opt-in |
+| Pointer overlay by default | Off | On | Off on X11, on on Wayland |
+| Limits Hermes records | Background input uses private macOS interfaces. After a driver update a permission can go stale and must be reset and given again. App names come localized | Listing windows can hang; a full-screen capture still works | Hermes' installer calls Linux support alpha. Some apps report a generic name |
+| Contained desktop (`bot_desktop`) | No | No | Yes: Xvnc and Xfce. In Docker it runs on a host of any of the three |
+
+What this spec requires for it to hold on all three:
+
+- **No branch on the system above the backend.** The tool, the instructions, the check, the settings and the viewer hold no `if` on the operating system. Every such difference lives in the copied Hermes code.
+- **Three commands on every system.** `bap-browser computer install` fetches the pinned driver for that system by checksum. `bap-browser computer doctor` reports each check with pass, fail or skip. `bap-browser computer permissions` shows and requests what macOS needs, and says there is nothing to give elsewhere.
+- **One readiness answer.** The Computer tab draws from one status: system, installed, version, ready, the checks, and whether there is anything to allow. It is Hermes' `computer_use_status`.
+- **The model is told the system.** The instructions name the operating system, so the model presses `cmd+s` on macOS and `ctrl+s` elsewhere. This is ours: Hermes' tool accepts both spellings but does not choose.
+- **The allowlist names an app per system.** An allowed app has its macOS bundle id and its Windows and Linux names. This is ours.
+- **Tests on all three.** The unit tests run on Windows, macOS and Linux. A smoke test on a real machine of each is run by a person before a release.
+
+#### 22.2.3 One driver version, in one place
+
+Hermes pins the driver twice: `cua-driver-rs` 0.21.0 for the three host systems in `pm/lock.json`, and 0.28.2 in its Linux desktop image. This spec allows one version, written in one file.
+
+- **One lock file.** `src/bap_browser/computer/driver.lock.json` holds the version and, for each of the six builds (macOS universal, Windows x86\_64 and arm64, Linux x86\_64 and arm64, and the same Linux build inside the desktop image), its address and SHA-256.
+- **Everything reads it.** `bap-browser computer install`, the desktop image's build and the micro VM's build take the version and checksum from that file. A test fails if a driver version is written anywhere else.
+- **The first pin is 0.21.0,** with the six checksums Hermes records. Both releases carry all six builds (checked on GitHub, 12 October 2026). The driver's publisher marks both as pre-releases.
+- **Never a split.** Hermes runs its Linux desktop on 0.28.2, so the contained desktop on 0.21.0 is a pairing Hermes does not run itself. If the contained desktop fails section 10.1's ladder on 0.21.0, the pin moves to 0.28.2 for every system at once.
+- **Checked at every start.** The driver's own `manifest` is read before a session; a driver older than the pin, or unsigned, is refused with the command that repairs it.
+- **Moving the pin** is a pull request that changes only the lock file. It is merged when the ladder passes again on every system marked proven. Its note tells macOS users that a permission can go stale after the update, and how to give it again.
+
+#### 22.2.4 Linux: what is offered, and how its weakness is contained
+
+Linux is the least proven of the three in Hermes: its installer says "Linux support is alpha", and native Wayland is off unless asked for. This spec offers Linux in three grades and does not offer what it cannot check.
+
+| Linux target | Offered as | Why |
+| --- | --- | --- |
+| The contained desktop (Xvnc and Xfce, X11) | The default on a Linux machine, and the only desktop in the micro VM | It is the Linux setup Hermes itself builds and runs, and CI can prove it on every pull request |
+| A person's own desktop in an X11 session | Early, after the ladder passes on one | The driver reaches it through `DISPLAY`; it is real but proven by nobody here yet |
+| A person's own desktop in a Wayland session | Not offered at first | The driver sees only apps running through XWayland; native Wayland is Hermes' opt-in (`computer.native_wayland`), off by default |
+
+What is built for Linux:
+
+- **The doctor says why, not only that.** From Hermes: no `DISPLAY`, a locked session, AT-SPI missing, a daemon unit pointing at a removed driver. Ours, added: the session type, with a plain sentence when it is Wayland telling the person to use the contained desktop or sign in to an X11 session.
+- **Accessibility is on in the image.** The contained desktop installs AT-SPI and starts each desktop with its own session bus as an ordinary user, as Hermes' launcher does, so the element tree is there.
+- **An app with no elements still works.** A capture that returns a picture and no elements tells the model to act by coordinates. The `vision` mode stays for this.
+- **No overlay on X11.** The pointer overlay stays off there, as Hermes sets it: left behind after a crash it can cover every app.
+- **An empty screen is explained.** When no window is found, the result names the cause Hermes can detect (locked session, no display) instead of an empty picture.
+
+### 22.3 Target architecture
+
+The engine, the viewer and the check on every step stay ours. Everything below the tool is Hermes' code, and below that the driver.
+
+```
+  agent (any model)
+      |  computer_use, computer_open_app, computer_request_human
+  bap-browser engine          ours: session, check on every step, approvals,
+      |                        viewer, live picture, logs, evaluations
+  computer/  (from Hermes)     tool.py, schema.py: actions, hard blocks,
+      |                        unchanged-picture rule, element cap
+  ComputerUseBackend           backend.py: one interface
+      |
+  cua backend                  cua_backend*.py: MCP over a standard-input pipe
+      |
+  cua-driver 0.21.0            signed binary; each system's own accessibility
+      |                        and input stack
+  the screen                   a real Mac, Windows or Linux machine,
+                               or the contained desktop (bot_desktop)
+```
+
+- **Where the code goes.** Hermes' two modules are copied to `src/bap_browser/computer/` and `src/bap_browser/computer/desktop/`, each file with Hermes' MIT notice and the commit it came from. A file `computer/UPSTREAM.md` names that commit and every local change, so a later Hermes release can be taken in.
+- **One adapter to our driver seam.** `driver/hermes_driver.py` puts a `ComputerUseBackend` behind our existing driver interface, so the session, the live picture, Pause, Take over, Stop, the log and the Evaluations work without change. It replaces `desktop_driver.py`, `contained_desktop.py`, `screen_here.py`, `mac_driver.py` and `mac_hands.py`.
+- **The pipe stays a pipe.** The engine talks to the driver over a standard-input pipe to a child process, as Hermes does. There is no network listener on the machine being driven, except the one tailnet case of section 6.
+- **The driver's environment.** The driver is another project's binary. It is started with the model keys and the service token taken out of its environment, and with its telemetry turned off (`CUA_DRIVER_RS_TELEMETRY_ENABLED=0`), as Hermes does.
+
+#### 22.3.1 Our requirements, built on the base
+
+Hermes is the base and is changed as little as possible. Each requirement of ours is a layer above it or beside it, never a rewrite of what Hermes already does.
+
+| Our requirement | What Hermes gives | What we build on top |
+| --- | --- | --- |
+| A Computer tab on the home page | Nothing: Hermes has its own desktop app | Kept from today. It draws the live picture, the timeline and the readiness answer |
+| The person sees the screen live from anywhere | Captures on request | The viewer's live picture, fed by captures; in the remote arrangements it travels over the tailnet |
+| Settings for which apps may be used | A permission mode, `bounded`, with a manifest of what may be touched | The allowlist in the settings, on by default, written out as that manifest; one app name per system |
+| Opening an app | `launch_app` in the backend, not offered to the model | `computer_open_app`, held to the allowlist |
+| Asking before an action | Approval written into the tool | Our settings decide who is asked; the question appears in the viewer |
+| Pause, Take over, Stop | A lease: while a person holds the screen, no action and no capture | The three controls in the viewer take and give back that lease |
+| The check on every step (safeguards, attack tests) | Hard blocks on some keys and typed commands | Our check runs before every action, as it does for the browser |
+| Typed text never in a log, an event or a result | Not a rule in Hermes | Our tool layer says "typed 12 characters", never the text |
+| Every tunable value in one place | Its own config file | Every Hermes setting is mapped into `config_computer.py` (section 8) |
+| A local machine proves who is asking | The driver has no network listener | The helper's three checks: tailnet grant, Tailscale identity, pairing code (section 6.2) |
+| The engine in a micro VM | A desktop that can live inside a sandbox | Kept from today: the VM image, with Hermes' desktop inside |
+| A remote engine reaches the person's data | Nothing | Tailscale, arrangement C |
+| A remote engine takes over the local machine and gets its screenshots | Nothing | The helper over Tailscale, arrangement D, on all three systems |
+| Evaluations like the browser's | Unit tests only | The 13 tasks and the Evaluations view, kept, with tasks added for each system |
+| Admin settings apart from the user's | One config for one person | Kept from today: the admin's values lie above the user's |
+
+### 22.4 The tool the agent gets
+
+The agent gets Hermes' one `computer_use` tool, with its schema taken byte for byte, and two tools of ours beside it. The twelve `computer_*` tools of today are removed.
+
+| Action of `computer_use` | What it does | Asked about first |
+| --- | --- | --- |
+| `capture` | The screen, in one of three modes (section 5); one app, the whole screen, or the desktop | No |
+| `click`, `double_click`, `right_click`, `middle_click` | By element number from the last capture, or by coordinates | Yes |
+| `drag` | Between two elements or two points | Yes |
+| `scroll` | Wheel ticks, in a direction | Yes |
+| `type` | Text, in the current layout | Yes |
+| `key` | A combination such as `cmd+s` | Yes |
+| `set_value` | Sets a slider or picks a menu option through the accessibility interface, without opening the menu | Yes |
+| `wait` | Up to 30 seconds | No |
+| `list_apps`, `list_windows` | What is running, with process and window numbers | No |
+| `focus_app` | Routes input to an app; raising its window is a separate, asked step | Yes |
+
+Input is delivered in the background by default: it reaches the target window without moving the person's pointer or taking the keyboard. `delivery_mode: foreground` briefly fronts the window and is asked about separately. Each result carries a `verdict` (confirmed, unverifiable, suspected no effect) and the next step to try.
+
+| Kept from today | Why | How on Hermes' base |
+| --- | --- | --- |
+| `computer_open_app` | Hermes has no action that opens an app: its backend has `launch_app` and the tool never calls it. Ours is the only one of the three systems compared that can | A tool of ours that calls the backend's `launch_app`, inside the allowlist of section 7 |
+| `computer_request_human` | A password, a sign-in or a payment is the person's to do | Unchanged |
+
+Removed with no replacement: `computer_zoom` (element numbers and the tree replace reading small print), and `computer_move` (background input has no pointer to move).
+
+### 22.5 What the model sees
+
+Three capture modes replace today's screenshot-only view, with Hermes' caps and its rule for an unchanged picture.
+
+| Mode | What the model gets | For |
+| --- | --- | --- |
+| `som` (default) | A screenshot with a number drawn on every element that can be acted on, and the accessibility tree | Models with vision: click by number, not by guessed pixels |
+| `vision` | A plain screenshot | Models trained on coordinates |
+| `ax` | The tree only, no picture | Models with no vision; the cheapest |
+
+| Rule | Value | Setting |
+| --- | --- | --- |
+| Longest edge of a picture | 1,456 px | `computer.max_image_dimension` |
+| A picture under 8 by 8 px | Left out | fixed |
+| Elements walked in the tree | 200 | `computer.ax_max_elements` |
+| Elements given to the model | 100, each at most 120 characters; the rest go to a capped file | fixed |
+| An unchanged picture of the same window | Not sent again, up to 2 times in a row | fixed |
+| A picture after an action | Only when the call asks (`capture_after`) | per call |
+
+Our rule holds: no result carries a picture that was not asked for. Text in a picture and in the tree was written by what is on screen, and is marked as data, never instructions (spec 18.5). The tree is new text from the screen, so it goes through the same reader as page text.
+
+### 22.6 The four arrangements, and Tailscale
+
+The same Hermes-based engine runs in four arrangements. Two are local and need no network; the two remote ones use Tailscale and nothing else to connect machines.
+
+| # | Engine runs | Screen driven | Systems | How they connect |
+| --- | --- | --- | --- | --- |
+| A | The person's machine | That machine itself, in the background | Windows, macOS, Linux | A pipe to the driver; no network |
+| B | The person's machine, or a micro VM | A contained desktop (Hermes' `bot_desktop`: Xvnc and Xfce) | A Linux desktop, in Docker on any of the three | A pipe to the driver inside the desktop |
+| C | A remote micro VM | The VM's contained desktop, reaching the person's private data | A Linux VM | Tailscale: the VM joins the person's tailnet |
+| D | A remote micro VM | The person's own local machine | Windows, macOS, Linux | Tailscale: the VM reaches a helper on that machine, which returns the screenshots |
+
+#### 22.6.1 Arrangement C: a remote engine that reaches the person's data
+
+```
+  micro VM  (tag:bap-vm, ephemeral)             person's tailnet
+  engine + contained desktop  --- Tailscale --->  private services, files, intranet
+  viewer over tailscale serve <--- Tailscale ---  the person's browser
+```
+
+- The VM joins with a reusable, ephemeral, tagged auth key given as `TS_AUTHKEY`, as in Tailscale's Codex Cloud setup. Ephemeral means Tailscale removes the node when the VM ends.
+- Tailscale runs in the VM without root (userspace networking) and keeps its state in memory.
+- The tag, not a person, holds the rights. The tailnet's access policy grants `tag:bap-vm` only the hosts and ports the person lists.
+- The VM takes no connection from the internet. The viewer and the tools are served to the tailnet only, over HTTPS, with the service on the VM's own address.
+- The browser's and the desktop's traffic to the tailnet goes through Tailscale's local proxy in the VM.
+- This is today's section 21.12, already built and waiting for a key; it carries over unchanged.
+
+#### 22.6.2 Arrangement D: a remote engine that takes over the local machine
+
+```
+  micro VM  (tag:bap-vm)                         person's machine (on the tailnet)
+  engine: computer_use  --- MCP over Tailscale -->  bap-browser helper (127.0.0.1 only)
+                                                       |  pipe
+  screenshots, elements <-- capture results ------   cua-driver --> the real screen
+```
+
+- Hermes' driver speaks over a pipe and has no network listener by design. The one new part is a **helper** on the person's machine that starts the driver on a pipe and relays the engine's MCP calls to it.
+- The helper listens on the machine's own address only. `tailscale serve` publishes it to the tailnet; it is never on the LAN or the internet.
+- The VM dials the helper, never the other way, so the VM still takes no inbound connection.
+- Three checks stand before any action: the tailnet's grant (only `tag:bap-vm` may reach that port), the caller's Tailscale identity as the helper is told it, and a pairing code the person reads from the helper and types into the window once.
+- Screenshots and the element tree travel back in the capture results. Nothing else of the machine is sent.
+- The person starts the helper and ends it. It shows what is being done, and a Stop control ends the session at once.
+- This replaces today's token over HTTP and its `--host` flag, which could be bound beyond the machine's own address ahead of any tailnet design.
+
+The helper is the same program on Windows, macOS and Linux. It starts the driver for that system exactly as arrangement A does, and Tailscale and `tailscale serve` run on all three. Today's helper works on a Mac only.
+
+#### 22.6.3 What the tailnet's owner sets up, once
+
+| Step | Value |
+| --- | --- |
+| A tag for the engine | `tag:bap-vm` |
+| An auth key | Reusable, ephemeral, tagged, with an expiry |
+| Grants | `tag:bap-vm` to the private services (C); `tag:bap-vm` to the helper's port on the person's device (D) |
+| Also advised by Tailscale | Device approval for new nodes; network flow logs |
+
+The key is never in an image, in `config.json`, in a log or in a result.
+
+### 22.7 Safety, permissions and consent
+
+Hermes' rules are taken as they are, and today's stricter ones are kept on top. Where the two differ, the stricter holds.
+
+| Rule | From | What it does |
+| --- | --- | --- |
+| Approval written into the tool | Hermes | Every action but `capture`, `wait` and the two lists needs a yes. With nobody to answer, it is refused |
+| The check on every step | Ours | Approvals, Auto Mode, limits and the step counter run as today (spec 18) |
+| Hard-blocked keys | Hermes | Empty trash, force delete, lock screen, log out, force log out, `ctrl+alt+delete`, `alt+f4`: refused whatever was approved. Key names are made one form first, so another system's name for a key cannot slip past |
+| Hard-blocked typing | Hermes | A download piped to a shell, `sudo rm -r`, `rm -rf /`, a fork bomb: refused before the approval is even asked |
+| App allowlist, on by default | Ours | Hermes has none unless `bounded` mode is turned on. Ours stays on: the driver runs in `bounded` mode with a capability list written from the apps the admin allows, and `computer_open_app` opens nothing outside it |
+| A switched-off app cannot run | Ours | In the contained desktop, an empty file still stands where its program is |
+| The lease | Hermes | One file says who drives: the agent or one person. While a person holds it, the tool refuses every action and every screenshot, because they may be typing a password. Checked before an action and again right after |
+| Take over, Hand back, Pause, Stop | Ours | Unchanged in the viewer; Take over takes the lease |
+| macOS permissions | Hermes | Screen Recording and Accessibility are granted once to the driver's own app (`com.trycua.driver`), not to Terminal. The engine says which is missing |
+| Signed driver only | Hermes | An unsigned driver is refused unless a developer setting allows it |
+| The driver's environment | Hermes | No model key, no service token; telemetry off |
+| Typed text | Ours | A character count in the log, the timeline and every event, never the text |
+| Passwords, sign-ins, payments | Both | The agent asks the person (`computer_request_human`); Hermes' docs say a password goes through the system's own autofill, never typed by the agent |
+
+Three gaps the comparison found in today's system close with this: screenshots are held back while a person has control, the helper can no longer be bound beyond the machine's own address, and approval for desktop actions is written into the tool and not only inherited.
+
+### 22.8 Settings
+
+Hermes' settings come over under our `computer` section, each in `config.py`; the admin's Computer group in the window shows the ones a person may change.
+
+| Setting (ours) | From Hermes | Default | In the window |
+| --- | --- | --- | --- |
+| `computer.runs` | new values | `desktop` | Where the agent works: the contained desktop, this machine, a machine over the tailnet |
+| `computer.capture_mode` | `capture(mode=)` default | `som` | What the agent sees: numbered elements, picture only, text only |
+| `computer.capture_after_mode` | `capture_after_mode` | `som` | no |
+| `computer.max_image_dimension` | `max_image_dimension` | 1456 | no |
+| `computer.ax_max_elements` | `ax_max_elements` | 200 | no |
+| `computer.permission_mode` | `permission_mode` | `bounded` (Hermes: `standard`) | no: the allowlist stays on |
+| `computer.apps.*`, `computer.any_app` | ours | terminal off, any app off | Yes, as today |
+| `computer.ask_before_apps` | ours | off | Yes, as today |
+| `computer.no_overlay` | `no_overlay` | auto | Show where the agent acts |
+| `computer.native_wayland` | `native_wayland` | false | no |
+| `computer.driver_telemetry` | `cua_telemetry` | false | no |
+| `computer.allow_unsigned_driver` | `allow_unsigned_driver` | false | no |
+| `computer.desktop.geometry` | `bot_desktop.geometry` | 1440x900 | Screen size |
+| `computer.desktop.min_free_memory_mb` | `bot_desktop.min_free_memory_mb` | 1536 | no |
+| `computer.desktop.idle_stop_minutes` | `bot_desktop.idle_stop_minutes` | 30 | no |
+| `computer.network`, `computer.share_folder`, `computer.folder` | ours | off, on, `~/bap-browser-files` | Yes, as today |
+| `computer.helper.*` | new | tailnet only | Pairing code |
+
+Removed with today's drivers: `computer.screen`, `computer.zoom`, `computer.picture_after_action`, `computer.image`, `computer.display`, the `xdotool` waits, `computer.helper_stop_corner`, `computer.helper_token_env`.
+
+One setting is for Windows alone: `computer.autostart` (Hermes' `autostart`, default off) registers the driver's logon task, which is needed only when a Windows machine is driven with nobody signed in at its desktop. No other setting is tied to a system; `computer.native_wayland` and `computer.no_overlay` are read on every system and matter on Linux.
+
+### 22.9 Migration: every file of today's computer use
+
+Today's computer use is replaced, not kept beside the new one. Of its files, seven are deleted, six are rewritten on Hermes' base, and the rest stay.
+
+| File today | Becomes |
+| --- | --- |
+| `driver/desktop_driver.py` | Deleted. `driver/hermes_driver.py` puts Hermes' backend behind our driver interface |
+| `driver/contained_desktop.py` | Deleted. Hermes' `bot_desktop/runtime.py` runs the contained desktop |
+| `driver/screen_here.py` | Deleted. The same `bot_desktop` runs inside the micro VM |
+| `driver/mac_driver.py`, `driver/mac_hands.py` | Deleted. `cua-driver` drives macOS, Windows and Linux |
+| `service/mac_helper.py` | Deleted. `service/helper.py` is the tailnet relay of section 6.2 |
+| `deploy/desktop.Dockerfile`, `desktop-start.sh`, `desktop-menu.xml` | Rewritten: Xvnc and Xfce with the pinned Linux driver, as Hermes' desktop image has them; the empty-file block for switched-off apps is kept |
+| `tools/computer_tools.py` | Rewritten: `computer_use` from Hermes' `tool.py` and `schema.py`, plus `computer_open_app` and `computer_request_human` |
+| `tools/kinds.py`, `tools/sentences.py` | Rewritten for the new tool: its actions, not twelve tool names |
+| `config_computer.py`, the Computer group of `settings/catalogue.py` | Rewritten to section 8 |
+| `agent/loop.py` (the desktop's instructions) | Rewritten: capture with numbers first, click by element, follow each verdict |
+| `evals/desktop_ground.py`, the 13 tasks | Kept. Their reference solutions are rewritten in `computer_use` actions |
+| `agent/studio.py`, the viewer's Computer tab, `deploy/vm-start.sh` | Kept, with the helper panel changed from Terminal and tokens to the driver's own permission and a pairing code |
+| Spec section 21 | Replaced by this document |
+
+New, from Hermes: `src/bap_browser/computer/` (the tool, schema, backend, driver backend, doctor, permissions) and `src/bap_browser/computer/desktop/` (runtime, lease, placement, resources), with `UPSTREAM.md`.
+
+### 22.10 Tests and evaluations
+
+The two things today's system has and Hermes lacks are kept: tests on a real screen, and a graded benchmark. Hermes' kind of test is added beside them.
+
+| Test | Kept, changed or new |
+| --- | --- |
+| The 13 tasks (short, long, attack, infeasible) on a real contained desktop, by reference solution | Kept; solutions rewritten in the new actions |
+| No network, a switched-off app cannot run, nothing left running | Kept |
+| The micro VM driven over MCP from outside | Kept |
+| Unit tests of the tool against a stand-in backend, as Hermes has them | New: taken from Hermes where they test the copied code |
+| Capture in each mode on a real desktop: numbers drawn, tree returned, caps held | New |
+| An unchanged screen is not sent twice | New |
+| Hard-blocked keys and typing are refused before approval, under every alias | New |
+| While a person holds the lease, no action and no screenshot | New |
+| The driver's environment holds no key and no token | New |
+| The helper: refused without the grant, the identity or the pairing code; never bound beyond the machine | New |
+| A real macOS, Windows and Linux machine each | New, one smoke test each, run by a person on that machine |
+
+Every new test is written first and seen to fail, per the repository's rules.
+
+#### 22.10.1 How each system is proven, and what is offered until then
+
+Nothing about Windows or Linux has been run by us: every claim comes from reading Hermes' code on a Mac. So a system is offered in the Computer tab only as far as it has been proven, and the proof is the same five-rung ladder everywhere.
+
+| Rung | What must pass |
+| --- | --- |
+| 1 | The pinned driver installs by checksum and `bap-browser computer doctor` passes |
+| 2 | `capture` in all three modes returns a picture and numbered elements for a known app |
+| 3 | Three tasks by reference solution: open an allowed app, type and save a note, be refused an app that is not allowed |
+| 4 | A background action leaves the person's front window and pointer where they were |
+| 5 | Take over and Stop end the agent's actions and captures within one action |
+
+| System | Proven automatically, on every pull request | Proven by a person, before it is called proven |
+| --- | --- | --- |
+| Linux, contained desktop | All five rungs, in the desktop image on CI's Linux runner | Not needed |
+| Linux, a person's X11 desktop | Nothing | All five rungs on an Ubuntu desktop in an X11 session. A virtual machine on this Mac serves: the Mac is Apple silicon and the driver has a Linux arm64 build |
+| Windows | Rungs 1 to 3 on a Windows runner added to CI, if a hosted runner gives the driver a desktop it can act on; unit 2 finds out | All five rungs on a real Windows 11 machine. A Windows arm64 virtual machine on this Mac serves for a first pass |
+| macOS | Unit tests only on a macOS runner: nobody can answer the permission question there | All five rungs on this Mac |
+
+CI today runs on Linux only. This spec adds a Windows and a macOS runner for the unit tests, and the Linux ladder in the desktop image.
+
+| Grade shown in the Computer tab | Means | The person can |
+| --- | --- | --- |
+| Proven | The ladder passed automatically where it can, and by a person on a real machine | Use it |
+| Early | The ladder passed only automatically, or only in a virtual machine | Use it, with a sentence saying so |
+| Not offered | The ladder has not passed | Not choose it; the tab says why and offers the contained desktop |
+
+Each pass is recorded in `docs/status.md` with the system and its version, the driver version and the date. The grades are read from one file beside the driver's lock, so a grade changes by a pull request that carries its proof. At the first release the expected grades are: the contained desktop and macOS proven; Windows early until a person has run it on a real machine; a person's Linux X11 desktop early; Wayland not offered.
+
+### 22.11 Order of work
+
+Eight units, each one pull request ending in a check that passes. Today's computer use keeps working until unit 4 removes it. Units 2, 5 and 8 need a real Windows machine and a real Linux desktop as well as this Mac.
+
+| # | Unit | Accepted when |
+| --- | --- | --- |
+| 1 | Copy Hermes' two modules in, with notices and `UPSTREAM.md`; write the six seams of section 2; add Windows and macOS runners to CI | Hermes' own tests of the copied code pass in CI on Windows, macOS and Linux, against a stand-in backend |
+| 2 | The one lock file; `bap-browser computer install`, `doctor` and `permissions`; the ladder as a script | Rungs 1 and 2 pass on this Mac, in the desktop image on CI, and on a Windows runner or virtual machine. A test fails on a second driver version |
+| 3 | `hermes_driver.py` and the new tools behind the session; the lease joined to Take over | One real task in the window on the contained desktop; no screenshot while a person holds the lease |
+| 4 | Remove today's drivers, tools, settings and helper; rewrite the tasks' solutions | The full gate passes; the 13 tasks pass by reference; no file of section 9's deleted list remains |
+| 5 | Arrangement A on each system: the allowlist per system, the system named in the instructions, the grades in the Computer tab | All five rungs pass on this Mac, a Windows machine and a Linux X11 desktop; each system shows the grade its proof earns |
+| 6 | The contained desktop on `bot_desktop` in the container and the micro VM | All five rungs pass in CI; the desktop stops when idle and refuses to start under the memory floor |
+| 7 | Arrangement C on Tailscale, with a real key | The VM joins, leaves when it ends, and a task reads one private service |
+| 8 | Arrangement D: the helper over the tailnet, on each system | A task on a machine of each system from a VM; refused without grant, identity or pairing code |
+
+Units 7 and 8 need the tailnet's owner to do section 6.3 first.
+
+### 22.12 Risks, and decisions to finalize
+
+Seven risks come with this base. Of ten decisions, nine are made; one, the tailnet's owner, is open and holds back only units 7 and 8.
+
+| Risk | What it means | What the spec does about it |
+| --- | --- | --- |
+| The driver uses private macOS interfaces | Hermes' and the driver's own docs say Apple can change them in any update | The driver is pinned; a smoke test on macOS runs before a new pin is taken; `delivery_mode: foreground` is the fallback |
+| Linux is the least proven of the three | Hermes' installer calls Linux support alpha, and native Wayland is opt-in | The contained desktop is X11, where Hermes itself runs it. A person's own Linux desktop is accepted only by unit 5's check |
+| Windows cannot be proven on this Mac | Every Windows claim here is from reading code | Units 2, 5 and 8 are not accepted without a real Windows machine |
+| The driver is another project's binary | It sees the screen and sends input | Pinned by checksum, signed only, started with no keys, telemetry off |
+| Copied code drifts from Hermes | Hermes changes often: its head moved between 9 and 12 October | `UPSTREAM.md` records the commit and each local change |
+| Some apps expose no accessibility tree | Hermes names modern Windows apps, older Electron apps on Linux, some macOS apps | The tool falls back to coordinates; the `vision` mode stays |
+| Read, not run | This spec is from reading Hermes' code. Nothing of Hermes was installed or run | Unit 2's check is the first real proof |
+
+| # | Decision | Decided | Status |
+| --- | --- | --- | --- |
+| 1 | Copy Hermes' modules into our repository, or depend on Hermes as a package | Copy. Hermes is an application, and its module imports six of its own parts | Decided, 12 October 2026 |
+| 2 | Keep the allowlist on by default (`bounded` mode), where Hermes' default is none | Kept on. It is one of three rows our system won | Decided, 12 October 2026 |
+| 3 | Background input by default, with the dependence on private macOS interfaces | Yes, with foreground as the fallback | Decided, 12 October 2026 |
+| 4 | Drop `computer_zoom` and `computer_move` | Both dropped | Decided, 12 October 2026 |
+| 5 | The person's own hand in the viewer: through the driver in the foreground, or Hermes' VNC bridge | Through the driver. The VNC bridge would need a VNC client in the viewer, a new dependency | Decided, 12 October 2026 |
+| 6 | Who owns the tailnet and makes the key | A named person. Units 7 and 8 wait on it; units 1 to 6 do not | Open: the person is not named |
+| 7 | The first driver pin (section 2.3) | 0.21.0 everywhere, moving to 0.28.2 everywhere if the contained desktop fails on it | Decided, 12 October 2026 |
+| 8 | Where Windows is proven by a person | A virtual machine on this Mac for the first pass, which earns the grade early; a real machine before it is called proven | Decided, 12 October 2026 |
+| 9 | Adding Windows and macOS runners to CI | Both for the unit tests; the Windows ladder only on pull requests that touch computer use | Decided, 12 October 2026 |
+| 10 | Shipping a first release with Windows and a person's Linux desktop graded early | Yes. The grade is shown, and the contained desktop is offered beside it | Decided, 12 October 2026 |
+
+### 22.13 Sources
+
+Read on 12 October 2026. Hermes' code was read from a fresh copy and not run.
+
+- [Hermes agent](https://github.com/nousresearch/hermes-agent) at commit `3569e846`: `tools/computer_use/` (schema, backend, tool, the driver backend with its capture, input, session and daemon parts, doctor, permissions), `tools/bot_desktop/` (runtime, lease, placement), `hermes_cli/tools_config_cua.py` (install on each system), `hermes_cli/config_defaults.py`, `pm/lock.json`, `docker/sandbox-desktop.Dockerfile`, `LICENSE` (MIT)
+- [trycua/cua](https://github.com/trycua/cua): the driver's project, MIT; releases `cua-driver-rs-v0.21.0` and `v0.28.2`, as pinned by Hermes
+- [Tailscale in Codex Cloud](https://tailscale.com/blog/codex-cloud-tailscale): reusable, ephemeral, tagged keys; grants; device approval; flow logs
+- The comparison page `computer-use-comparison.html` (10 October 2026): the rows this spec answers, B1 to B3, C1, D1, E1 to E6, G1 and G2
+- bap-browser `main` at `0b4ae4f`: today's computer use, spec section 21
