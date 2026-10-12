@@ -27,4 +27,9 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
   export HTTP_PROXY="http://$proxy" HTTPS_PROXY="http://$proxy"
   echo "Joined the tailnet as $name. The viewer is at https://$name" >&2
 fi
+# A desktop's apps tell the driver of computer use what they hold over the session's bus (spec 22.2.2).
+# An image with a desktop has one to give; one without does not need it.
+if command -v dbus-run-session >/dev/null 2>&1; then
+  exec dbus-run-session -- "$@"
+fi
 exec "$@"

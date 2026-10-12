@@ -30,6 +30,11 @@ KEPT_OUT = [
     "secrets/openai.txt",
     "credentials.json",
     "tailscale.key",
+    "link.json",
+    ".bap-browser/computer/link.json",
+    "deploy/vm.authkey",
+    "tailscaled.state",
+    "deploy/tailscale-vm.state",
 ]
 
 

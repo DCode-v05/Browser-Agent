@@ -1,7 +1,7 @@
 # The browser service in a container (spec 17.2): one session, its tools over MCP on HTTP, the viewer.
 # Build from the repository's root:   docker build -f deploy/Dockerfile -t bap-browser .
 # Run:   docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-browser
-# With the desktop of computer use (spec 21.1, arrangement 2): build with --build-arg DESKTOP=true,
+# With the desktop of computer use (spec 21.1 and 22.6): build with --build-arg DESKTOP=true,
 # then run it with `uv run --project /app --no-sync bap-browser serve --desktop` as its command.
 
 # The viewer is built first: the Python package carries it.
@@ -39,7 +39,8 @@ COPY deploy/desktop-menu.xml /tmp/desktop-menu.xml
 RUN if [ "$DESKTOP" = true ]; then \
       apt-get update \
       && apt-get install -y --no-install-recommends \
-         xvfb openbox xdotool imagemagick x11-xserver-utils x11-utils dbus-x11 mousepad pcmanfm galculator \
+         xvfb openbox xdotool imagemagick x11-xserver-utils x11-utils dbus-x11 at-spi2-core \
+         mousepad pcmanfm galculator \
       && rm -rf /var/lib/apt/lists/* \
       && install -d -o pwuser -g pwuser /home/pwuser/.config/openbox /home/pwuser/Files \
       && install -o pwuser -g pwuser -m 644 /tmp/desktop-menu.xml /home/pwuser/.config/openbox/menu.xml; \
@@ -60,6 +61,11 @@ COPY --chmod=755 deploy/vm-start.sh /usr/local/bin/vm-start
 USER pwuser
 WORKDIR /data
 ENV HOME=/home/pwuser BAP_BROWSER_CONFIG=/etc/bap-browser/config.json
+# With a desktop, the driver of computer use on Hermes' base (spec 22): the one pinned version, fetched
+# by its checksum by the engine's own installer, for the user the service runs as. To have the engine
+# in this VM drive its own screen through it, run the container with
+#   -e BAP_BROWSER__COMPUTER__RUNS=machine -e BAP_BROWSER__COMPUTER__BASE__VIRTUAL_SCREEN=true
+RUN if [ "$DESKTOP" = true ]; then uv run --project /app --no-sync bap-browser computer install; fi
 EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
   CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=2)"

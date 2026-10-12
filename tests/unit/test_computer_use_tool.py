@@ -3,11 +3,15 @@ on a machine, and what the check, the log and the timeline make of each action."
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from bap_browser.agent.loop import instructions_for
 from bap_browser.computer.hermes.computer_use.backend import (
     ActionResult,
     CaptureResult,
@@ -237,3 +241,93 @@ async def test_an_action_that_only_looks_is_never_counted_as_acting(
         await session.close()
 
     assert not looked.is_error, looked.text
+
+
+def test_the_model_is_given_this_engines_rules_and_then_hermes_own_manual(
+    make_config, tmp_path: Path
+) -> None:
+    told = instructions_for(make_config(tmp_path, computer={"runs": "machine"}))
+
+    ours, theirs = told.index("computer_request_human"), told.index("The verify → escalate ladder")
+    assert ours < theirs
+    assert "Capture first" in told
+    # The manual's own heading for a skill of Hermes is not an instruction to this model.
+    assert not told.lstrip().startswith("---")
+
+
+def test_the_manual_can_be_left_out(make_config, tmp_path: Path) -> None:
+    told = instructions_for(make_config(tmp_path, computer={"runs": "machine", "base": {"manual": False}}))
+
+    assert "computer_request_human" in told
+    assert "The verify → escalate ladder" not in told
+
+
+@pytest.mark.skipif(shutil.which("Xvfb") is not None, reason="this machine has a virtual screen to start")
+async def test_a_machine_that_is_to_start_its_own_screen_and_has_none_says_what_it_lacks(
+    make_config, tmp_path: Path
+) -> None:
+    computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), "virtual_screen": True}}
+    config = make_config(tmp_path, computer=computer)
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=Desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+
+    seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    await session.close()
+
+    assert seen.is_error
+    assert "virtual screen" in seen.text
+
+
+class Screen(Desk):
+    """A machine whose whole screen is one picture, which a test can change."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.showing = b"first"
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        # A real PNG's first bytes and size, then what the test says is on the screen.
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (64).to_bytes(4, "big") * 2 + self.showing
+        return CaptureResult(
+            mode=mode, width=64, height=64, png_b64=base64.b64encode(png).decode(), app="screen"
+        )
+
+
+async def test_a_screen_that_stands_still_is_shown_once_and_again_when_it_changes(
+    make_config, tmp_path: Path
+) -> None:
+    computer = {"runs": "machine", "frame_ms": 1, "base": {"home": str(tmp_path / "home")}}
+    config = make_config(tmp_path, computer=computer)
+    screen = Screen()
+    driver = HermesDriver(config, backend=lambda: screen)
+    frames: list[bytes] = []
+    first, changed = asyncio.Event(), asyncio.Event()
+
+    def shown(frame: bytes) -> None:
+        frames.append(frame)
+        first.set()
+        if len(frames) == 2:
+            changed.set()
+
+    await driver.start()
+    try:
+        await driver.start_frames(shown, config.viewer.quality_levels.standard)
+        await asyncio.wait_for(first.wait(), 10)
+        # Long enough for many more looks at a screen that does not change.
+        for _ in range(20):
+            await asyncio.sleep(0.01)
+        still = len(frames)
+        screen.showing = b"second"
+        await asyncio.wait_for(changed.wait(), 10)
+    finally:
+        await driver.close()
+
+    assert still == 1
+    assert len(frames) == 2 and frames[0] != frames[1]

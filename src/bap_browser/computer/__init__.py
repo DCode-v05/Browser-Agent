@@ -11,12 +11,22 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from bap_browser.computer import remote
 from bap_browser.computer.hermes.computer_use import cua_backend, tool
 from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
 
-__all__ = ["ask_with", "base", "computer_use", "driver_environment", "home_of", "open_app", "settings_seen"]
+__all__ = [
+    "ask_with",
+    "base",
+    "computer_use",
+    "driver_environment",
+    "home_of",
+    "manual",
+    "open_app",
+    "settings_seen",
+]
 
 
 def home_of(config: Config) -> Path:
@@ -31,13 +41,17 @@ def base(
     """Computer use for one configuration, with its files in `home` (the configuration's, unless
     another is given). On the way out every driver it started is stopped. `backend` names a backend
     to use in place of the driver."""
-    working = Working(computer=config.computer, home=home or home_of(config), backend=backend)
-    before = work_for(working)
+    home = home or home_of(config)
+    elsewhere = config.computer.runs == "remote"
+    settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
+    before = work_for(Working(computer=settings, home=home, backend=backend))
     try:
         yield
     finally:
         tool.reset_backend_for_tests()
         work_for(before)
+        if elsewhere:
+            remote.forget(home)
 
 
 def ask_with(ask: Asker | None) -> None:
@@ -59,6 +73,14 @@ def open_app(name: str, session: str) -> bool:
             return False
         launch(name=name)
         return True
+
+
+def manual() -> str:
+    """The manual Hermes gives a model for the tool, without the heading that files it among
+    Hermes' skills."""
+    text = (Path(__file__).parent / "hermes" / "skill" / "SKILL.md").read_text(encoding="utf-8")
+    _, _, body = text.removeprefix("---").partition("\n---\n")
+    return body.strip() if text.startswith("---") and body else text.strip()
 
 
 def settings_seen() -> dict[str, Any]:

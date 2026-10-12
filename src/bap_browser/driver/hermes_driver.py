@@ -11,6 +11,7 @@ import asyncio
 import base64
 import contextlib
 import json
+import os
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -18,9 +19,11 @@ from typing import Any
 
 from bap_browser import computer
 from bap_browser.config import Config
+from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
 from bap_browser.driver.contained_desktop import App
 from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
 from bap_browser.results import Picture
 
@@ -60,6 +63,15 @@ def as_shot(result: Any) -> Shot | None:
     return None
 
 
+async def own_screen(settings: Computer) -> ScreenHere:
+    """Starts this machine's own virtual screen, and has the driver work on it. For a machine with
+    no screen that is itself the boundary: the micro VM, where the engine runs (spec 22.6)."""
+    screen = ScreenHere(settings)
+    await screen.start()
+    os.environ["DISPLAY"] = settings.display
+    return screen
+
+
 class HermesDriver(DesktopDriver):
     def __init__(
         self, config: Config, name: str = "computer", backend: Callable[[], Any] | None = None
@@ -69,10 +81,13 @@ class HermesDriver(DesktopDriver):
         self._stand_in = backend
         self._base: AbstractContextManager[None] | None = None
         self._last: Shot | None = None
+        self._screen: ScreenHere | None = None
 
     # The session.
 
     async def start(self) -> None:
+        if self._settings.base.virtual_screen:
+            self._screen = await own_screen(self._settings)
         self._base = computer.base(self._config, backend=self._stand_in)
         self._base.__enter__()
         # The engine's own check has judged a call, and asked a person where the settings say so,
@@ -85,6 +100,9 @@ class HermesDriver(DesktopDriver):
         if base is not None:
             # Stopping the driver waits for it, so it is not done on the loop.
             await asyncio.to_thread(base.__exit__, None, None, None)
+        screen, self._screen = self._screen, None
+        if screen is not None:
+            await screen.close()
 
     def is_alive(self) -> bool:
         return self._base is not None
@@ -144,13 +162,14 @@ class HermesDriver(DesktopDriver):
 
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         pause = max(self._settings.frame_ms / 1000, 1 / level.max_fps)
+        sent: bytes | None = None
         while self._base is not None:
             with contextlib.suppress(BapError):
-                before = self._last
                 shot = await self.screenshot(full_page=False, annotate=False)
                 # A screen that stands still is sent once.
-                if shot is not before:
-                    on_frame(shot.picture.data)
+                if shot.picture.data != sent:
+                    sent = shot.picture.data
+                    on_frame(sent)
             await asyncio.sleep(pause)
 
     # A person at their own machine has their own mouse and keyboard: nothing is sent for them.

@@ -371,6 +371,6 @@ class MacDriver(DesktopDriver):
 
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
     """The driver of the desktop the configuration names: a container's, this machine's, or a Mac's."""
-    if config.computer.runs == "machine":
+    if config.computer.runs in ("machine", "remote"):
         return HermesDriver(config, name)
     return MacDriver(config, name) if config.computer.runs == "mac" else DesktopDriver(config, name)

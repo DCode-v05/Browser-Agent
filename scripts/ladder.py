@@ -14,10 +14,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import io
 import json
+import os
 import platform
 import re
+import secrets
+import socket
 import subprocess
 import sys
 import time
@@ -110,9 +114,11 @@ def capture(mode: str, app: str) -> tuple[bool, str]:
 async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
     """Rung 3: the agent's own way in. Through the session and its check, the tool finds a field of
     the known app by its number, types into it, and reads back what it typed."""
-    machine = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": "machine"})})
+    runs = config.computer.runs if config.computer.runs == "remote" else "machine"
+    machine = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": runs})})
+    watching = HermesDriver(machine)
     session = ServiceSession(
-        machine, HermesDriver(machine), name="ladder", backend="contained_desktop", tools=computer_tools_for
+        machine, watching, name="ladder", backend="contained_desktop", tools=computer_tools_for
     )
     rungs: list[tuple[str, bool, str]] = []
     await session.start()
@@ -132,6 +138,21 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             rungs.append(
                 (f"3, a field of {app} is found by its number", True, f"element {number}, {field.group(2)}")
             )
+            # What a person watching would be shown: the machine's whole screen, as it changes.
+            frames: list[bytes] = []
+            once, twice = asyncio.Event(), asyncio.Event()
+
+            def shown(frame: bytes) -> None:
+                frames.append(frame)
+                once.set()
+                if len(set(frames)) >= 2:
+                    twice.set()
+
+            viewer = machine.viewer
+            await watching.start_frames(shown, getattr(viewer.quality_levels, viewer.quality))
+            # The first picture is of the screen as it is now, before anything is typed.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(once.wait(), WAIT_FOR_THE_APP_S)
             await session.toolkit.call("computer_use", {"action": "click", "element": number})
             typed = await session.toolkit.call("computer_use", {"action": "type", "text": TYPED})
             rungs.append(
@@ -145,6 +166,18 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 "computer_use", {"action": "capture", "mode": "ax", "app": app}
             )
             rungs.append(await read_back(session, after.text, process))
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(twice.wait(), WAIT_FOR_THE_APP_S)
+            await watching.stop_frames()
+            pictures = [frame for frame in frames if frame[:2] == b"\xff\xd8" or frame[:4] == b"\x89PNG"]
+            rungs.append(
+                (
+                    "the screen is streamed to whoever watches, and again when it changes",
+                    len(pictures) >= 2 and len(set(pictures)) >= 2,
+                    f"{len(pictures)} pictures of the whole screen, {len(set(pictures))} of them different, "
+                    f"the first of {len(pictures[0]) if pictures else 0} bytes",
+                )
+            )
     finally:
         await session.close()
     return rungs
@@ -187,12 +220,25 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--config", help="path of config.json")
     parser.add_argument("--rungs", type=int, default=3, help="the highest rung to climb: 2 or 3")
+    parser.add_argument(
+        "--virtual-screen",
+        action="store_true",
+        help="climb as the engine in the micro VM does: it starts this machine's own virtual screen first",
+    )
+    parser.add_argument(
+        "--through-helper",
+        action="store_true",
+        help="climb as an engine elsewhere would: through the helper, started here for this machine alone",
+    )
     asked = parser.parse_args(arguments)
     # What a screen holds is printed as it is, on a console of any encoding.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
     config = load_config(asked.config)
+    if asked.virtual_screen:
+        base = config.computer.base.model_copy(update={"virtual_screen": True})
+        config = config.model_copy(update={"computer": config.computer.model_copy(update={"base": base})})
     print(
         f"The ladder on {platform.system()} {platform.release()} ({platform.machine()}), Python {platform.python_version()}"
     )
@@ -201,7 +247,68 @@ def main(arguments: list[str] | None = None) -> int:
     binary = driver.installed(computer.home_of(config))
     problem = "it is not installed" if binary is None else commands.not_ready(config, binary)
     rungs.append(("1, the pinned driver is installed and answers", problem is None, problem or str(binary)))
-    if problem is None:
+    with contextlib.ExitStack() as held:
+        if asked.through_helper and problem is None:
+            # The engine reaches this machine as it would reach one elsewhere: through the helper.
+            config = held.enter_context(a_helper_here(config))
+            rungs.append(
+                (
+                    "the helper is started, and the engine is given its pairing code",
+                    True,
+                    config.computer.helper_url,
+                )
+            )
+        climb(config, asked.rungs, problem is None, rungs)
+
+    for name, passed, seen in rungs:
+        print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
+    failed = [name for name, passed, _ in rungs if not passed]
+    print(
+        "The ladder is passed as far as it goes."
+        if not failed
+        else f"The ladder stopped: {len(failed)} failed."
+    )
+    return 1 if failed else 0
+
+
+@contextmanager
+def a_helper_here(config: Config) -> Iterator[Config]:
+    """The helper on this machine, for this machine alone, and the settings of an engine that drives
+    the machine through it."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    variable, code = config.computer.helper_token_env, secrets.token_urlsafe(18)
+    os.environ[variable] = code
+    started = subprocess.Popen(
+        [sys.executable, "-m", "bap_browser", "computer", "helper", "--this-machine-alone"],
+        env={**os.environ, "BAP_BROWSER__COMPUTER__HELPER_PORT": str(port)},
+        stdout=subprocess.DEVNULL,
+    )
+    try:
+        ends = time.monotonic() + WAIT_FOR_THE_APP_S
+        while time.monotonic() < ends:
+            with (
+                contextlib.suppress(OSError),
+                socket.create_connection(("127.0.0.1", port), timeout=LOOK_AGAIN_S),
+            ):
+                break
+            time.sleep(LOOK_AGAIN_S)
+        elsewhere = config.computer.model_copy(
+            update={"runs": "remote", "helper_url": f"http://127.0.0.1:{port}"}
+        )
+        yield config.model_copy(update={"computer": elsewhere})
+    finally:
+        started.terminate()
+        os.environ.pop(variable, None)
+
+
+def climb(config: Config, highest: int, installed: bool, rungs: list[tuple[str, bool, str]]) -> None:
+    """Rungs 2 and 3, added to what was climbed so far."""
+    problem = None if installed else "not installed"
+    # With a screen the engine starts itself, there is none until its session has begun: the
+    # captures of rung 2 are then the ones rung 3 takes.
+    if problem is None and not config.computer.base.virtual_screen:
         with computer.base(config):
             status = permissions.computer_use_status()
             if status["can_grant"] and not status["ready"]:
@@ -217,18 +324,8 @@ def main(arguments: list[str] | None = None) -> int:
                         passed, seen = capture(mode, app)
                         rungs.append((f"2, a capture of {app} in the mode {mode}", passed, seen))
 
-    if asked.rungs >= 3 and not [name for name, passed, _ in rungs if not passed]:
+    if highest >= 3 and not [name for name, passed, _ in rungs if not passed]:
         rungs += asyncio.run(through_the_engine(config))
-
-    for name, passed, seen in rungs:
-        print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
-    failed = [name for name, passed, _ in rungs if not passed]
-    print(
-        "The ladder is passed as far as it goes."
-        if not failed
-        else f"The ladder stopped: {len(failed)} failed."
-    )
-    return 1 if failed else 0
 
 
 if __name__ == "__main__":

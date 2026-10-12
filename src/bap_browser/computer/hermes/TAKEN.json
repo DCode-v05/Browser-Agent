@@ -126,6 +126,11 @@
       "from": "tools/bot_desktop/wallpaper.png",
       "theirs": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2",
       "sha256": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2"
+    },
+    "skill/SKILL.md": {
+      "from": "skills/autonomous-ai-agents/computer-use/SKILL.md",
+      "theirs": "778833ecfea4385cab79ec4dda0ffe956e3f4bf9231eb80e52c5d113ee4e6cdf",
+      "sha256": "778833ecfea4385cab79ec4dda0ffe956e3f4bf9231eb80e52c5d113ee4e6cdf"
     }
   },
   "tests": {
