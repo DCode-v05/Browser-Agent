@@ -306,7 +306,68 @@ def _on_a_desktop(tool: str, arguments: Mapping[str, Any]) -> tuple[str, str, st
         case "computer_request_human":
             reason = _reason(arguments)
             return f"Asking for help: {reason}", f"Asked for help: {reason}", "get help"
+        case "computer_use":
+            return _on_a_machine(arguments)
     return None
+
+
+def _on_a_machine(arguments: Mapping[str, Any]) -> tuple[str, str, str]:
+    """One action of Hermes' tool on a real machine (spec 22.4), the same three ways."""
+    where = _element_or_point(arguments)
+    typed = _count(arguments, None)
+    match arguments.get("action"):
+        case "capture":
+            return "Looking at the screen", "Looked at the screen", "look at the screen"
+        case "click":
+            return f"Clicking{where}", f"Clicked{where}", f"click{where}"
+        case "double_click":
+            return f"Double-clicking{where}", f"Double-clicked{where}", f"double-click{where}"
+        case "right_click":
+            return f"Right-clicking{where}", f"Right-clicked{where}", f"right-click{where}"
+        case "middle_click":
+            return f"Middle-clicking{where}", f"Middle-clicked{where}", f"middle-click{where}"
+        case "drag":
+            return "Dragging on the screen", "Dragged on the screen", "drag on the screen"
+        case "scroll":
+            way = _direction(arguments)
+            return f"Scrolling{way}", f"Scrolled{way}", f"scroll{way}"
+        case "type":
+            return f"Typing {typed}".rstrip(), f"Typed {typed}".rstrip(), "type"
+        case "key":
+            chord = _chord(arguments)
+            return f"Pressing {chord}", f"Pressed {chord}", f"press {chord}"
+        case "set_value":
+            return "Setting a value", "Set a value", "set a value"
+        case "wait":
+            return "Waiting", "Waited", "finish waiting"
+        case "list_apps":
+            return "Looking at the apps", "Looked at the apps", "look at the apps"
+        case "list_windows":
+            return "Looking at the windows", "Looked at the windows", "look at the windows"
+        case "focus_app":
+            app = _app(arguments)
+            return f"Turning to {app}", f"Turned to {app}", f"turn to {app}"
+    return "Working on the screen", "Worked on the screen", "work on the screen"
+
+
+def _element_or_point(arguments: Mapping[str, Any]) -> str:
+    element, point = arguments.get("element"), arguments.get("coordinate")
+    if isinstance(element, int) and not isinstance(element, bool):
+        return f" element {element}"
+    if isinstance(point, list) and len(point) == 2:
+        return _at({"x": point[0], "y": point[1]})
+    return ""
+
+
+def _chord(arguments: Mapping[str, Any]) -> str:
+    """A key or a chord as Hermes' tool names it, such as `cmd+s`. A key alone that types a
+    character is typed text, and so is anything that is not made of key names: neither is named."""
+    pressed = arguments.get("keys")
+    parts = [part.strip().lower() for part in re.split(r"[+-]", pressed)] if isinstance(pressed, str) else []
+    named = all(re.fullmatch(r"[a-z0-9]{1,12}", part) for part in parts)
+    if not parts or not named or (len(parts) == 1 and len(parts[0]) == 1):
+        return "a key"
+    return "+".join(parts)
 
 
 def _at(arguments: Mapping[str, Any]) -> str:

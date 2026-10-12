@@ -10,6 +10,7 @@ from typing import Any
 from bap_browser.config import Config
 from bap_browser.evals.suite import SETS
 from bap_browser.tools.computer_tools import COMPUTER_TOOLS
+from bap_browser.tools.computer_use_tool import COMPUTER_USE
 from bap_browser.tools.offered import TOOLS
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -37,8 +38,8 @@ def test_every_file_the_map_names_is_there() -> None:
 
 def test_every_tool_is_in_the_map_and_the_map_names_no_tool_that_is_gone() -> None:
     mapped = [tool for feature in features() for tool in feature["tools"]]
-    # A browser's tools and the desktop's (spec 21.5).
-    assert sorted(mapped) == sorted(tool.name for tool in (*TOOLS, *COMPUTER_TOOLS))
+    # A browser's tools, the desktop's (spec 21.5) and Hermes' one for a machine (spec 22.4).
+    assert sorted(mapped) == sorted(tool.name for tool in (*TOOLS, *COMPUTER_TOOLS, COMPUTER_USE))
 
 
 def test_every_address_of_the_service_is_in_the_map() -> None:

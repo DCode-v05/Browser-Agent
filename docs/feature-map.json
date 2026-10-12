@@ -583,7 +583,7 @@
     },
     {
       "id": "computer-on-hermes",
-      "title": "Computer use on Hermes' base: Hermes' tool and desktop code, taken whole, behind our seams",
+      "title": "Computer use on Hermes' base: Hermes' tool and desktop code, taken whole, behind our seams and our session",
       "spec": "22",
       "source": [
         "src/bap_browser/computer/__init__.py",
@@ -604,18 +604,23 @@
         "src/bap_browser/computer/driver.py",
         "src/bap_browser/computer/driver.lock.json",
         "src/bap_browser/computer/commands.py",
-        "scripts/ladder.py"
+        "scripts/ladder.py",
+        "src/bap_browser/driver/hermes_driver.py",
+        "src/bap_browser/tools/computer_use_tool.py"
       ],
       "tests": [
         "tests/unit/test_hermes_base.py",
         "tests/hermes/conftest.py",
         "tests/hermes/not_here.json",
         "tests/hermes/test_computer_use.py",
-        "tests/unit/test_driver_install.py"
+        "tests/unit/test_driver_install.py",
+        "tests/unit/test_computer_use_tool.py"
       ],
       "reach": "Not on a screen yet: the tool is put behind the session in a later unit (spec 22.11). Install the driver with `uv run bap-browser computer install`, see what is ready with `uv run bap-browser computer doctor`, and run `uv run python scripts/ladder.py`.",
       "addresses": [],
-      "tools": []
+      "tools": [
+        "computer_use"
+      ]
     }
   ]
 }

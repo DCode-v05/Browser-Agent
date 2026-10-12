@@ -17,7 +17,7 @@ from bap_browser.results import ToolResult
 logger = stdlib_logging.getLogger(__name__)
 
 # What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.
-TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression", "task"})
+TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression", "task", "value"})
 ADDRESS_ARGUMENTS = frozenset({"url"})
 # A key press that types a character is typed text. A named key, such as Enter, is not.
 KEYS_ARGUMENT = "keys"

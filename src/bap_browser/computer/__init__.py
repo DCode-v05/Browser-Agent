@@ -16,7 +16,7 @@ from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
 
-__all__ = ["ask_with", "base", "computer_use", "driver_environment", "home_of", "settings_seen"]
+__all__ = ["ask_with", "base", "computer_use", "driver_environment", "home_of", "open_app", "settings_seen"]
 
 
 def home_of(config: Config) -> Path:
@@ -49,6 +49,16 @@ def computer_use(arguments: dict[str, Any], session: str) -> Any:
     """One call of Hermes' `computer_use` tool. Text as a JSON string, or a dictionary that holds a
     picture."""
     return tool.handle_computer_use(arguments, session_id=session)
+
+
+def open_app(name: str, session: str) -> bool:
+    """Opens an app by its name, or brings it to the front. False when the backend opens none."""
+    with tool._backend_for_call(session) as backend:
+        launch = getattr(backend, "launch_app", None)
+        if launch is None:
+            return False
+        launch(name=name)
+        return True
 
 
 def settings_seen() -> dict[str, Any]:

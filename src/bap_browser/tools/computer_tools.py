@@ -20,6 +20,7 @@ from bap_browser.errors import BadInput, BrowserError
 from bap_browser.safeguards.reading import from_page
 from bap_browser.tools.arguments import Modifier, NoArgs, RequestHumanArgs
 from bap_browser.tools.browser_tools import request_human
+from bap_browser.tools.computer_use_tool import COMPUTER_USE
 from bap_browser.tools.registry import Args, Shown, ToolDefinition
 
 LOOK = " Take a screenshot to see the result."
@@ -89,7 +90,7 @@ class OpenAppArgs(Args):
 
 def any_app(config: Config) -> bool:
     """Whether the agent may open any app by its name: on the person's own Mac, where they allow it."""
-    return config.computer.runs == "mac" and config.computer.mac_any_app
+    return config.computer.runs in ("mac", "machine") and config.computer.mac_any_app
 
 
 async def _desktop(session: BrowserSession) -> DesktopDriver:
@@ -312,6 +313,13 @@ COMPUTER_NAMES = frozenset(tool.name for tool in COMPUTER_TOOLS)
 COMPUTER_NO_STEP = frozenset({"computer_wait", "computer_list_apps", "computer_request_human"})
 
 
+KEPT_ON_A_MACHINE = frozenset({"computer_open_app", "computer_request_human"})
+
+
 def computer_tools_for(config: Config) -> tuple[ToolDefinition, ...]:
-    """The desktop's tools as the configuration offers them: zoom only where it is turned on."""
+    """The desktop's tools as the configuration offers them: zoom only where it is turned on. On a
+    machine driven through Hermes' driver it is Hermes' one tool, and the two of ours it has none of."""
+    if config.computer.runs == "machine":
+        kept = tuple(tool for tool in COMPUTER_TOOLS if tool.name in KEPT_ON_A_MACHINE)
+        return (COMPUTER_USE, *kept)
     return tuple(tool for tool in COMPUTER_TOOLS if tool.name != "computer_zoom" or config.computer.zoom)
