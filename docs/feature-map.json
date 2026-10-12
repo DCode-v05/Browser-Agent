@@ -606,7 +606,13 @@
         "src/bap_browser/computer/commands.py",
         "scripts/ladder.py",
         "src/bap_browser/driver/hermes_driver.py",
-        "src/bap_browser/tools/computer_use_tool.py"
+        "src/bap_browser/tools/computer_use_tool.py",
+        "src/bap_browser/service/machine_helper.py",
+        "src/bap_browser/computer/link.py",
+        "src/bap_browser/computer/remote.py",
+        "src/bap_browser/computer/hermes/skill/SKILL.md",
+        "deploy/Dockerfile",
+        "deploy/vm-start.sh"
       ],
       "tests": [
         "tests/unit/test_hermes_base.py",
@@ -614,9 +620,12 @@
         "tests/hermes/not_here.json",
         "tests/hermes/test_computer_use.py",
         "tests/unit/test_driver_install.py",
-        "tests/unit/test_computer_use_tool.py"
+        "tests/unit/test_computer_use_tool.py",
+        "tests/unit/test_machine_helper.py",
+        "tests/unit/test_remote_machine.py",
+        "tests/unit/test_deploy.py"
       ],
-      "reach": "Not on a screen yet: the tool is put behind the session in a later unit (spec 22.11). Install the driver with `uv run bap-browser computer install`, see what is ready with `uv run bap-browser computer doctor`, and run `uv run python scripts/ladder.py`.",
+      "reach": "Set `computer.runs` to `machine` (this machine) or `remote` (a machine elsewhere, through `bap-browser computer helper` there). Install the driver with `uv run bap-browser computer install`. Prove it with `uv run python scripts/ladder.py`, with `--through-helper`, or on Linux with `--virtual-screen`. The Computer tab has no choice for these yet.",
       "addresses": [],
       "tools": [
         "computer_use"

@@ -865,6 +865,65 @@ Not built, and not checked:
 - The marks around text from the screen still say "written by the site". On a desktop it is the screen.
 - macOS, on this Mac: waiting for you to allow the driver.
 
+
+### 1af. Built on 2026-10-12: the four arrangements on Hermes' base, and an audit of what Hermes' computer use is made of
+
+**The audit.** Hermes was searched whole for `computer_use`, `cua-driver` and `bot_desktop`. Two
+modules hold the tool and the desktop; fourteen other parts touch them. One that matters was missing
+here: the manual Hermes gives a model for the tool (`skills/.../computer-use/SKILL.md`, 18 KB). It is
+now taken, and given to the model after our own rules. `computer/UPSTREAM.md` has the table of all
+sixteen parts and what stands in each one's place. Three are still not built here: the Windows logon
+task, the `screen` commands of Hermes' Linux desktop, and the base's settings in the settings screen.
+
+**The four arrangements.** Each is a value of `computer.runs`, or one setting beside it.
+
+| # | The arrangement | How it is set | Proven |
+|---|---|---|---|
+| 1a | The engine on a person's own machine, on its operating system | `runs: machine` | Linux and Windows, all rungs. macOS waits for the driver to be allowed |
+| 1b | The engine in a micro VM, on the VM's own screen | `runs: machine` with `base.virtual_screen: true`. The VM's image installs the pinned driver | On a real Linux machine given no screen: the engine started one, drove it and streamed it. The image itself was not built |
+| 2 | A remote engine in a micro VM reaches the person's data over Tailscale | As before: the VM joins with `TS_AUTHKEY` (spec 21.12). Unchanged by this work | Not proven: no tailnet key. The start script's tests pass |
+| 3 | A remote engine takes over a person's machine, and its screenshots come back | `runs: remote`, `helper_url`, and the pairing code in `BAP_BROWSER_HELPER_TOKEN`. On the person's machine: `bap-browser computer helper` | Linux and Windows, all rungs, with the engine and the helper as two programs on one machine. Not over a real tailnet |
+| 4 | The person's screen is streamed to the remote engine's viewer | The viewer's live picture, fed by captures of the whole screen through the helper | Linux and Windows: two different pictures of the whole screen arrived, the second after the screen changed |
+
+What was built for them:
+
+- `service/machine_helper.py`: the helper. It listens on its own machine's address only, and prints the
+  `tailscale serve` command that shows it to the tailnet. It lets a caller in on three conditions: the
+  pairing code, who Tailscale says the caller is (`tailscale whois`, against `base.helper_allow`), and
+  that the call came through the tailnet. It runs only eight commands of the driver, none that updates
+  it or changes its settings. It tells the person what is done, never what is typed.
+- `computer/link.py` (`bap-browser-driver-link`): what the engine starts in the driver's place. The
+  pairing code reaches it in a file only the engine's user can read, removed when the work ends.
+- `driver/hermes_driver.py`: starts the machine's own virtual screen first, where it is told to.
+- `deploy/Dockerfile`, `deploy/vm-start.sh`: the VM's image installs the pinned driver through the
+  engine's own installer, and gives its desktop a session bus.
+
+Measured: `scripts/ladder.py` on CI's machines, with the real driver, in three ways (direct,
+`--through-helper`, and on Linux `--virtual-screen`). All passed on Linux and Windows, and all three
+are now checks a pull request must pass. 23 new tests.
+
+Secrets: every tracked file was searched for keys and tokens. None holds one; the matches are made-up
+values in tests. `.gitignore` now also keeps out `link.json`, `*.authkey` and Tailscale's state files,
+and `tests/unit/test_secrets_stay_out.py` holds it to that.
+
+Not proven, and what would prove it:
+
+- **A real tailnet.** This Mac has no Tailscale and there is no key. That a call through
+  `tailscale serve` carries the caller's address as `X-Forwarded-For`, and that `tailscale whois` names
+  the VM's tag, are taken from Tailscale's documentation, not seen. One engine VM and one machine on a
+  real tailnet would show it.
+- **The VM's image.** `docker build --build-arg DESKTOP=true` was not run: Docker is not running here.
+- **macOS.** Nothing past the driver's install, until the driver is allowed on this Mac.
+- **The Computer tab.** It has no choice named "This machine" or "A machine elsewhere". Both are
+  settings in `config.json` only.
+
+Found on the way:
+
+- The helper first used the event loop's own subprocess support. On Linux, a connection cut mid-way
+  left the driver's process open. It now uses a plain process read on a thread, ended for certain.
+- I pushed one commit with a lint error, because my command went on after the gate had stopped. It
+  was fixed in the next commit; CI would have refused it.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
