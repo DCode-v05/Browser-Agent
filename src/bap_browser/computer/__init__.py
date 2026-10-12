@@ -63,7 +63,7 @@ def base(
     another is given). On the way out every driver it started is stopped. `backend` names a backend
     to use in place of the driver."""
     home = home or home_of(config)
-    elsewhere = config.computer.runs == "remote"
+    elsewhere = config.computer.runs in ("mac", "remote")
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
     settings = _held_to_the_allowed_apps(settings, home)
     before = work_for(Working(computer=settings, home=home, backend=backend))

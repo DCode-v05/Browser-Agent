@@ -233,19 +233,6 @@ export const W = {
     noBrowserLead: "Your admin has not let users use any browser. Ask them to turn one on for users: it is in that browser's Configuration.",
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
-    /** The person's own Mac as the desktop of computer use (spec 21.13). */
-    mac: {
-      title: 'Let the agent use this Mac',
-      lead: 'The agent works on your own screen, mouse and keyboard, through a helper you run in Terminal. It opens only the apps allowed in Configuration.',
-      start: 'Start the helper in Terminal',
-      startHint: 'Opens Terminal and starts the helper there. You see it, and Ctrl+C in Terminal ends it.',
-      started: 'Terminal is starting the helper. This page connects by itself when it is ready.',
-      allow: 'macOS asks you to allow Terminal for Screen Recording and for Accessibility: switch Terminal on in both. After Screen Recording, macOS asks to quit Terminal; quit it, then press Start the helper again. This page connects by itself once both are allowed.',
-      screenRecording: 'Open Screen Recording settings',
-      accessibility: 'Open Accessibility settings',
-      stop: 'To stop the agent at once, push the pointer into the top left corner of the screen.',
-      adminOnly: 'Your admin starts the helper on this Mac.',
-    },
     /** A real machine as the desktop of computer use, through the installed driver (spec 22). */
     machine: {
       title: 'Let the agent use this machine',

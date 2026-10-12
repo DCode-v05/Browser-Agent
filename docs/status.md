@@ -703,31 +703,6 @@ front, and closes at once an app that the agent's action started and the person 
 person's own hand is not held. Checked with tests over real HTTP; with the closing step broken on
 purpose its test fails.
 
-### 1ac. Built on 2026-10-12, not yet proven on the real driver: the driver's own hold on the allowed apps
-
-Remaining piece 3 of "Computer use on Hermes: built and remaining" (the artifact; section 22.7 of the
-spec is not yet written). Until now `computer_open_app` was the only hold on an app: once open, a
-click or a type could still reach any window, because `permission_mode` was `bounded` in the settings
-but never took effect (`capability_manifest` was always empty, so the engine fell back to `standard`).
-
-A new `capability-manifest.json` is written at the start of every session that drives a real machine,
-naming the apps the admin's allowlist allows, one name per system: a bundle id on macOS, an
-executable's absolute path on Windows and Linux (the driver's own schema, cua-driver/trycua). Full
-screen capture is left open, for the person's own live view. The file is written under the agent's
-own `computer.base.home`, from `bap_browser.computer.seams.manifest`, only when a real session
-begins (`computer.base()`); the bare, unconfigured state stays `standard`, as Hermes' own tests
-(`tests/hermes/test_computer_use_cua_0_10_permissions.py`) require.
-
-Checked: the manifest's shape, one app per system, for all three systems; that a real session writes
-it and points the driver at it; that nothing is written outside a session. Not checked: whether the
-real driver, given this file, actually refuses a click or a type outside the allowed apps once
-full-screen capture is left open for the viewer — the driver's own docs do not say how the two
-interact, and nothing here starts the real driver. This is exactly piece 1 and 8's gap: proof needs a
-person's own machine.
-
-Windows and Linux executable paths (Calculator and the terminal on Windows, and every Linux path) are
-a first guess, not yet seen on a real machine of either system.
-
 | What | Note |
 |---|---|
 | Settings, the rest | My Chrome, In my Chrome and Approved sites (the bridge's); the desktop app's three, with Clear browsing data for the built-in browser; notifications |
@@ -986,6 +961,61 @@ Not built, and not checked:
   `config.json`. The base's other settings are not in the settings screen either.
 - A user (not the admin) sees "Your admin sets this machine up for the agent." That is tested in the
   viewer's own tests, not walked in a real browser.
+
+### 1ah. Built on 2026-10-12, not yet proven on the real driver: the driver's own hold on the allowed apps
+
+Remaining piece 3 of "Computer use on Hermes: built and remaining" (the artifact; section 22.7 of the
+spec is not yet written). Until now `computer_open_app` was the only hold on an app: once open, a
+click or a type could still reach any window, because `permission_mode` was `bounded` in the settings
+but never took effect (`capability_manifest` was always empty, so the engine fell back to `standard`).
+
+A new `capability-manifest.json` is written at the start of every session that drives a real machine,
+naming the apps the admin's allowlist allows, one name per system: a bundle id on macOS, an
+executable's absolute path on Windows and Linux (the driver's own schema, cua-driver/trycua). Full
+screen capture is left open, for the person's own live view. The file is written under the agent's
+own `computer.base.home`, from `bap_browser.computer.seams.manifest`, only when a real session
+begins (`computer.base()`); the bare, unconfigured state stays `standard`, as Hermes' own tests
+(`tests/hermes/test_computer_use_cua_0_10_permissions.py`) require.
+
+Checked: the manifest's shape, one app per system, for all three systems; that a real session writes
+it and points the driver at it; that nothing is written outside a session. Not checked: whether the
+real driver, given this file, actually refuses a click or a type outside the allowed apps once
+full-screen capture is left open for the viewer — the driver's own docs do not say how the two
+interact, and nothing here starts the real driver. This is exactly piece 1 and 8's gap: proof needs a
+person's own machine.
+
+Windows and Linux executable paths (Calculator and the terminal on Windows, and every Linux path) are
+a first guess, not yet seen on a real machine of either system.
+
+### 1ai. Built on 2026-10-12: "mac" joins "machine" and "remote" on Hermes' driver; the old Mac helper is gone
+
+Remaining piece 4 ("Removing today's computer use"), the part of it that needed nothing else first.
+Checking it against section 9 of the external spec ("Migration: every file of today's computer use")
+found that piece 4 is mostly not independent of pieces 5 and 6: the 13 eval tasks' solutions, the
+removal of the twelve old `computer_*` tools, and the config and settings-catalogue cleanup all assume
+`container`/`here` mode already runs on Hermes' code, which it does not yet (pieces 5 and 6, waiting
+on a yes to `psutil` and on Docker). Touching those now would not defer them; it would break every
+evaluation, since the new `computer_use` tool refuses any session that is not a `HermesDriver`.
+
+The one part that was independent: `computer.runs == "mac"` drove through its own, older implementation
+(`driver/mac_driver.py`, `driver/mac_hands.py`, `service/mac_helper.py`), a full HTTP protocol of its
+own, never touching Hermes. It now drives through `HermesDriver`, the same as `machine` and `remote`,
+through the same `bap-browser computer helper` and `computer.remote.through_the_link`. The three old
+files, the old top-level `bap-browser helper` command, and their test and viewer UI (the "Start helper
+in Terminal" button and panel, the pairing-file poll) are removed. The regression this accepts, named
+to you before building it: a person using "mac" mode no longer gets auto-pairing or a one-click
+Terminal launch from the Computer tab; they run `bap-browser computer helper` themselves and copy its
+token into `BAP_BROWSER_HELPER_TOKEN`, exactly as "remote" already asks.
+
+Checked: `uv run pytest tests/unit tests/service tests/hermes` (1988 passed; the 2 failures and 2
+long-parameter-id errors are unrelated and were confirmed against the unmodified base commit); the
+full gate's bad-patterns, format, lint and types stages; the viewer's typecheck, lint, 618 tests and
+build. Not checked: a person actually pairing "mac" mode against a real Mac, since remaining piece 1's
+real-machine proof is still outstanding.
+
+Not built: the rest of piece 4 (the 13 eval tasks' reference solutions, the tools.py tool removal, the
+config and `settings/catalogue.py` cleanup, and deleting `contained_desktop.py`, `desktop_driver.py`
+and `screen_here.py`), which waits on pieces 5 and 6.
 
 ## How to go on
 
