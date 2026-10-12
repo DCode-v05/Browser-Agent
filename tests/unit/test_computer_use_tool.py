@@ -3,6 +3,7 @@ on a machine, and what the check, the log and the timeline make of each action."
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -257,3 +258,24 @@ def test_the_manual_can_be_left_out(make_config, tmp_path: Path) -> None:
 
     assert "computer_request_human" in told
     assert "The verify → escalate ladder" not in told
+
+
+@pytest.mark.skipif(shutil.which("Xvfb") is not None, reason="this machine has a virtual screen to start")
+async def test_a_machine_that_is_to_start_its_own_screen_and_has_none_says_what_it_lacks(
+    make_config, tmp_path: Path
+) -> None:
+    computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), "virtual_screen": True}}
+    config = make_config(tmp_path, computer=computer)
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=Desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+
+    seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    await session.close()
+
+    assert seen.is_error
+    assert "virtual screen" in seen.text

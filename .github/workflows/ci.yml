@@ -59,9 +59,11 @@ jobs:
       # Linux has no screen on a runner: a virtual one, the accessibility bus and one small app.
       - if: runner.os == 'Linux'
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity
+          sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity openbox xdotool imagemagick x11-utils
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --through-helper
+          # As in the micro VM: no screen is given, and the engine starts the machine's own.
+          dbus-run-session -- uv run python scripts/ladder.py --virtual-screen
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py
       - if: runner.os == 'Windows'

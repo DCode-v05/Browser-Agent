@@ -137,6 +137,11 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             rungs.append(
                 (f"3, a field of {app} is found by its number", True, f"element {number}, {field.group(2)}")
             )
+            # What a person watching would be shown: the machine's whole screen, as it changes.
+            frames: list[bytes] = []
+            viewer = machine.viewer
+            watching = await session.driver()
+            await watching.start_frames(frames.append, getattr(viewer.quality_levels, viewer.quality))
             await session.toolkit.call("computer_use", {"action": "click", "element": number})
             typed = await session.toolkit.call("computer_use", {"action": "type", "text": TYPED})
             rungs.append(
@@ -150,6 +155,19 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 "computer_use", {"action": "capture", "mode": "ax", "app": app}
             )
             rungs.append(await read_back(session, after.text, process))
+            ends = time.monotonic() + WAIT_FOR_THE_APP_S
+            while len(frames) < 2 and time.monotonic() < ends:
+                await asyncio.sleep(LOOK_AGAIN_S)
+            await watching.stop_frames()
+            pictures = [frame for frame in frames if frame[:2] == b"\xff\xd8" or frame[:4] == b"\x89PNG"]
+            rungs.append(
+                (
+                    "the screen is streamed to whoever watches, and again when it changes",
+                    len(pictures) >= 2 and len(set(pictures)) >= 2,
+                    f"{len(pictures)} pictures of the whole screen, {len(set(pictures))} of them different, "
+                    f"the first of {len(pictures[0]) if pictures else 0} bytes",
+                )
+            )
     finally:
         await session.close()
     return rungs
@@ -193,6 +211,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path of config.json")
     parser.add_argument("--rungs", type=int, default=3, help="the highest rung to climb: 2 or 3")
     parser.add_argument(
+        "--virtual-screen",
+        action="store_true",
+        help="climb as the engine in the micro VM does: it starts this machine's own virtual screen first",
+    )
+    parser.add_argument(
         "--through-helper",
         action="store_true",
         help="climb as an engine elsewhere would: through the helper, started here for this machine alone",
@@ -203,6 +226,9 @@ def main(arguments: list[str] | None = None) -> int:
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
     config = load_config(asked.config)
+    if asked.virtual_screen:
+        base = config.computer.base.model_copy(update={"virtual_screen": True})
+        config = config.model_copy(update={"computer": config.computer.model_copy(update={"base": base})})
     print(
         f"The ladder on {platform.system()} {platform.release()} ({platform.machine()}), Python {platform.python_version()}"
     )
@@ -270,7 +296,9 @@ def a_helper_here(config: Config) -> Iterator[Config]:
 def climb(config: Config, highest: int, installed: bool, rungs: list[tuple[str, bool, str]]) -> None:
     """Rungs 2 and 3, added to what was climbed so far."""
     problem = None if installed else "not installed"
-    if problem is None:
+    # With a screen the engine starts itself, there is none until its session has begun: the
+    # captures of rung 2 are then the ones rung 3 takes.
+    if problem is None and not config.computer.base.virtual_screen:
         with computer.base(config):
             status = permissions.computer_use_status()
             if status["can_grant"] and not status["ready"]:

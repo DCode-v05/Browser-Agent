@@ -57,3 +57,19 @@ def test_the_vm_joins_a_tailnet_only_when_it_is_given_a_key_and_then_forgets_the
     # The key's value is never written out: not echoed, not logged.
     assert not [line for line in START.splitlines() if "echo" in line and "$TS_AUTHKEY" in line]
     assert "--state=mem:" in START, "the VM's node is ephemeral: it leaves the tailnet when the VM ends"
+
+
+def test_the_image_with_a_desktop_installs_the_pinned_driver_and_names_no_version_of_it() -> None:
+    """Spec 22.2.3: the micro VM's image reads the one lock file, through the engine's own installer."""
+    assert "bap-browser computer install" in DOCKERFILE
+    assert DOCKERFILE.index("USER pwuser") < DOCKERFILE.index("bap-browser computer install"), (
+        "the driver is installed for the user the service runs as"
+    )
+    assert "at-spi2-core" in DOCKERFILE, "the driver reads a Linux app's elements through AT-SPI"
+    assert not re.search(r"cua-driver-rs-v?\d|CUA_DRIVER_VERSION", DOCKERFILE)
+
+
+def test_the_vm_gives_its_desktop_a_session_bus_when_it_has_one_to_give() -> None:
+    """The driver finds a Linux app's elements on the session's bus. Without a desktop there is none."""
+    assert "dbus-run-session" in START
+    assert START.rstrip().splitlines()[-1].startswith("exec ")

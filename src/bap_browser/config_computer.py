@@ -95,6 +95,11 @@ class Base(Section):
     )
     pairing_bytes: int = setting(18, "How many random bytes the helper's pairing code is made of")
     whois_timeout_s: float = setting(5.0, "Longest wait for Tailscale to say who a caller is")
+    virtual_screen: bool = setting(
+        False,
+        "Whether the engine starts this machine's own virtual screen before it drives it. For a machine "
+        "with no screen that is itself the boundary: the micro VM",
+    )
     manual: bool = setting(
         True, "Whether the model is given Hermes' own manual for the tool, after this engine's rules"
     )
