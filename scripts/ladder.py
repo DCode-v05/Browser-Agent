@@ -166,11 +166,12 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             # Rung 5: while a person holds the screen, nothing is done for the agent, not even a look.
             look = {"action": "capture", "mode": "ax", "app": app}
             await session.handle({"type": "take_over"})
-            held = await session.toolkit.call("computer_use", look)
+            # The engine's own gate makes a call wait for the person. Hermes' gate is asked directly,
+            # as a call that was already on its way would reach it.
             past_the_engine = said(await asyncio.to_thread(computer.computer_use, look, "ladder"))
             await session.handle({"type": "hand_back"})
             after = await session.toolkit.call("computer_use", look)
-            kept_out = past_the_engine.get("code") == "human_has_control" and "#" not in held.text
+            kept_out = past_the_engine.get("code") == "human_has_control"
             rungs.append(
                 (
                     "5, while a person has taken over, the agent can neither act nor look, and can again after",
