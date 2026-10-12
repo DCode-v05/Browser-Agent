@@ -1017,6 +1017,35 @@ Not built: the rest of piece 4 (the 13 eval tasks' reference solutions, the tool
 config and `settings/catalogue.py` cleanup, and deleting `contained_desktop.py`, `desktop_driver.py`
 and `screen_here.py`), which waits on pieces 5 and 6.
 
+### 1aj. Begun on 2026-10-12: one piece of remaining piece 5, the contained desktop on Hermes' code
+
+Remaining piece 5. You gave the yes to `psutil` (added) and confirmed Docker is running. Scoping it
+found that Hermes' `bot_desktop` has no notion of a Docker container: it only starts a desktop on its
+own machine (`gateway`) or inside Hermes' own cloud sandbox terminal, which this engine's own seam
+(`computer/seams/sandbox.py`) already refuses on purpose ("This engine keeps no desktop inside a
+terminal's sandbox"). So the container's own entrypoint must run Hermes' `bot_desktop` startup itself,
+from inside the container, which means the image needs this package and Python, not only Xvnc, Xfce
+and the pinned Linux driver — confirmed with you before building.
+
+Built so far, the one piece that is self-contained and provable without the rest: `bap_browser.computer.dock`
+(the console script `bap-browser-driver-dock`), which carries the driver's pipe through `docker exec
+-i <container> cua-driver ...`, the same role `computer.link`/`bap-browser-driver-link` plays for a
+machine elsewhere. Checked: 4 unit tests (`tests/unit/test_dock.py`) — the right `docker exec` is run,
+no container named is refused plainly without touching docker, docker's own exit code is passed back,
+and docker not being installed is said plainly; the console script resolves after `uv sync`.
+
+Not built, and why it stopped there: wiring this into `computer.base()` and `desktop_driver_for()` (so
+`computer.runs == "container"` actually uses it) needs the container itself to exist first — a
+rewritten `deploy/desktop.Dockerfile` (Python and this package added, Hermes' own apt package list for
+Xvnc and Xfce, the pinned Linux driver, the apps kept with the empty-file block for a switched-off
+one), a new entrypoint that calls `bot_desktop.runtime.start()` from inside the container, and the
+engine-side code that runs, waits for and tears down that container (today's equivalent lives in
+`driver/contained_desktop.py` and `driver/desktop_driver.py`, kept for now per piece 4's deferral).
+None of that is written yet: it is a Dockerfile and a container-lifecycle module, each wanting its own
+real `docker build`/`docker run` proof, not a change to make and call done in the same pass as this
+one. The package's full dependency tree (playwright, mcp, starlette and the rest) would also ride into
+the image unless it is installed in a way that skips them — not yet decided.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
