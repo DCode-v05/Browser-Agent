@@ -116,8 +116,9 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
     the known app by its number, types into it, and reads back what it typed."""
     runs = config.computer.runs if config.computer.runs == "remote" else "machine"
     machine = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": runs})})
+    watching = HermesDriver(machine)
     session = ServiceSession(
-        machine, HermesDriver(machine), name="ladder", backend="contained_desktop", tools=computer_tools_for
+        machine, watching, name="ladder", backend="contained_desktop", tools=computer_tools_for
     )
     rungs: list[tuple[str, bool, str]] = []
     await session.start()
@@ -139,9 +140,15 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             )
             # What a person watching would be shown: the machine's whole screen, as it changes.
             frames: list[bytes] = []
+            twice = asyncio.Event()
+
+            def shown(frame: bytes) -> None:
+                frames.append(frame)
+                if len(set(frames)) >= 2:
+                    twice.set()
+
             viewer = machine.viewer
-            watching = await session.driver()
-            await watching.start_frames(frames.append, getattr(viewer.quality_levels, viewer.quality))
+            await watching.start_frames(shown, getattr(viewer.quality_levels, viewer.quality))
             await session.toolkit.call("computer_use", {"action": "click", "element": number})
             typed = await session.toolkit.call("computer_use", {"action": "type", "text": TYPED})
             rungs.append(
@@ -155,9 +162,8 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 "computer_use", {"action": "capture", "mode": "ax", "app": app}
             )
             rungs.append(await read_back(session, after.text, process))
-            ends = time.monotonic() + WAIT_FOR_THE_APP_S
-            while len(frames) < 2 and time.monotonic() < ends:
-                await asyncio.sleep(LOOK_AGAIN_S)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(twice.wait(), WAIT_FOR_THE_APP_S)
             await watching.stop_frames()
             pictures = [frame for frame in frames if frame[:2] == b"\xff\xd8" or frame[:4] == b"\x89PNG"]
             rungs.append(
