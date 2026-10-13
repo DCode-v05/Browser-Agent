@@ -1478,19 +1478,25 @@ Found by running it, and mended:
   macOS lets through only after a consent of its own. The app gained a window with every run, and
   the driver does not type in the background into an app with several windows. It is ended by its
   process now, and opened afresh with a document of its own.
-- **A driver that stops answering is started again**, on a desktop the engine itself started, and
-  the desktop's apps are closed with it. Proven in a real container by freezing the driver. On a
-  person's own machine nothing of theirs is ended.
+- **The stall of the Linux desktop under a model, found.** On Linux the driver pictures a window
+  with a program of its own (ImageMagick's `import`). When the window has gone, that program waits
+  for ever with the screen held, and then nothing on the desktop is answered: not a list of the
+  windows, not a fresh driver. It was caught in a container that had just stalled: `import -window
+  14682248` had been waiting for 4 minutes 47 seconds; plain questions to the screen hung, and
+  answered within a second once it was ended. On a desktop the engine itself started, a call that
+  times out now ends that program and the driver, and the next call starts afresh. The desktop's
+  apps are left open. Proven in a real container both ways it can happen: with the driver frozen,
+  and with `import -window 99999999` holding the screen. On a person's own machine nothing of theirs
+  is ended.
 - **The page named the contained desktop "This machine's own screen"**, and the chat said "in the
   browser" on a desktop. The driver's own windows were listed among the open windows on Windows
   and macOS.
 
 Not done:
 
-- **The computer's sets were still not got through with the model on Linux.** A third try ran into
-  the same stall: every call timed out, a fresh driver's too, and starting the driver again alone
-  did not end it. Closing the desktop's apps as well was added after that try and has not been run
-  with a model. Two frozen apps did not reproduce the stall, so its cause is still not known.
+- **The computer's sets have not been run to the end with the model since the cause was found.**
+  Three tries stalled before it was. Each stall still costs the call that meets it: 30 seconds and
+  one failed step. The driver's own fault, a picture with no limit on its time, is not mended.
 - The driver says on its error stream that a newer version of it exists (0.34.1; 0.21.0 is pinned).
   It installs nothing. Moving to a newer driver is a choice of yours.
 - Nothing has run over a real tailnet.

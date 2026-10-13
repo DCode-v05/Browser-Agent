@@ -23,7 +23,7 @@ from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
-from bap_browser.driver.contained_desktop import APPS, App, ContainedDesktop
+from bap_browser.driver.contained_desktop import App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
@@ -48,6 +48,8 @@ NAMED = {
 # The driver's own program. Among the windows it is named `cua-driver.exe` on Windows and
 # `Cua Driver` on macOS: with what is no letter taken out, both begin alike.
 THE_DRIVER = "cua-driver"
+# The program the driver pictures a window with on Linux (ImageMagick's).
+ITS_PICTURES = "import"
 NOT_A_LETTER = re.compile(r"[^a-z]")
 ITS_OWN = "cuadriver"
 # How the desktop's own pointer does each press: the button, and how many times.
@@ -186,15 +188,16 @@ class HermesDriver(DesktopDriver):
         return "pressed"
 
     async def started_again(self) -> bool:
-        """Puts right a desktop whose driver has stopped answering, where this engine itself started
-        the desktop: the driver is ended, so that the next call starts a fresh one, and so are the
-        desktop's apps. An app that no longer answers makes every driver wait for it, a fresh one
-        too, and it cannot be told which app it is. False on a person's own machine: their driver
-        and their apps are theirs, and are left as they are."""
+        """Puts right a desktop that has stopped answering, where this engine itself started the
+        desktop. On Linux the driver pictures a window with a program of its own, and when the window
+        has gone that program waits for ever with the screen held: nothing else is answered, a fresh
+        driver neither. It is ended, and the driver with it, so that the next call starts a fresh
+        one. The desktop's apps are left as they are. False on a person's own machine: what runs
+        there is theirs."""
         own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
         if own is None:
             return False
-        for program in (THE_DRIVER, *(app.command for app in APPS)):
+        for program in (ITS_PICTURES, THE_DRIVER):
             with contextlib.suppress(BapError):
                 # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
                 await own.run("pkill", "-9", "-x", program)

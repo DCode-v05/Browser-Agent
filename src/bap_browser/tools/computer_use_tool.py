@@ -55,9 +55,8 @@ LOOK_AGAIN = " Capture to see what it changed."
 # after it, every call failed the same way until the session ended.
 STOPPED_ANSWERING = ("timed out", "never reached ready")
 STARTED_AGAIN = (
-    "The desktop stopped answering. Its apps were closed and its driver was started again, so what "
-    "was not saved is lost, and what you asked for may or may not have been done. Open the app again "
-    "with computer_open_app, then capture."
+    "The desktop stopped answering and was put right: its driver was started again. What you asked "
+    "for may or may not have been done. Capture again to see the desktop as it is."
 )
 # The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
