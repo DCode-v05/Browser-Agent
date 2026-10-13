@@ -1420,6 +1420,10 @@ What was left of spec 22.8 for the window is built.
 
 Both are the admin's alone and hold from the next session.
 
+The strip over the live picture now says which desktop it is: "A desktop of its own, in a
+container", "This machine's own virtual screen", "This machine's own screen" or "A machine
+elsewhere". It said "This machine's own screen" of all four.
+
 Seen:
 
 - `uv run pytest tests/viewer/test_studio.py -k what_the_agent_sees`, in a real browser: 1 passed.
@@ -1439,8 +1443,6 @@ Not built, and not checked:
 - Neither setting was tried against the real driver: the pointer was not seen drawn or left out on
   a screen.
 - A user cannot set either. The admin's value holds for everyone.
-- The strip over the contained desktop's picture says "This machine's own screen". It is a
-  desktop in a container, and the words are not mended.
 - Of Hermes' parts around the tool, three stay untaken: its Linux desktop's own runtime with
   `screen status, start, stop, install`, its second model for pictures, and its stream of the
   desktop.

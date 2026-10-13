@@ -693,3 +693,20 @@ async def test_a_capture_holds_the_mode_the_model_names_whatever_the_admin_chose
     make_config, tmp_path: Path
 ) -> None:
     assert (await captured(make_config, tmp_path, {"mode": "vision"}, capture_mode="ax"))["mode"] == "vision"
+
+
+@pytest.mark.parametrize(
+    ("runs", "said"),
+    [
+        ("container", "A desktop of its own, in a container"),
+        ("here", "This machine's own virtual screen"),
+        ("machine", "This machine's own screen"),
+        ("remote", "A machine elsewhere"),
+    ],
+)
+def test_the_strip_over_the_picture_says_which_desktop_it_is(
+    runs: str, said: str, make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": runs})
+
+    assert HermesDriver(config, backend=Desk).description() == said
