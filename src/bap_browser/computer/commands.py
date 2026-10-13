@@ -25,15 +25,20 @@ ON_MACOS = (
 )
 
 
-def tell(config: Config, binary: Path, *words: str) -> None:
-    """Tells the driver something it keeps in its own settings, once."""
-    subprocess.run(
-        [str(binary), *words],
-        capture_output=True,
-        env=cua_backend.sanitized_cua_driver_env(),
-        timeout=config.computer.base.register_timeout_s,
-        check=False,
-    )
+def tell(config: Config, binary: Path, *words: str) -> bool:
+    """Tells the driver something it keeps in its own settings, once. False when it did not take it
+    in the time it is given, or could not be started."""
+    try:
+        subprocess.run(
+            [str(binary), *words],
+            capture_output=True,
+            env=cua_backend.sanitized_cua_driver_env(),
+            timeout=config.computer.base.register_timeout_s,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
 
 
 def not_ready(config: Config, binary: Path, system: str = sys.platform) -> str | None:
@@ -48,10 +53,15 @@ def not_ready(config: Config, binary: Path, system: str = sys.platform) -> str |
             # The setting in the driver's environment does not reach a daemon the system starts for
             # it, so the driver is told once, in its own settings.
             tell(config, binary, "telemetry", "disable")
-        if system == "win32" and config.computer.base.autostart:
-            # The driver registers its own logon task, so that it is there before anybody opens a
-            # window: a machine driven from elsewhere.
-            tell(config, binary, "autostart", "enable")
+        # The driver registers its own logon task, so that it is there before anybody opens a
+        # window: a machine driven from elsewhere.
+        wanted = system == "win32" and config.computer.base.autostart
+        if wanted and not tell(config, binary, "autostart", "enable"):
+            waited = config.computer.base.register_timeout_s
+            return (
+                f"The driver did not register its logon task in time ({waited:g} s). "
+                "Run bap-browser computer install again."
+            )
         if system != "darwin":
             return None
         app = cua_backend_daemon.resolve_cua_driver_app_path(str(binary))
