@@ -53,7 +53,7 @@ def base(
     another is given). On the way out every driver it started is stopped. `backend` names a backend
     to use in place of the driver."""
     home = home or home_of(config)
-    elsewhere = config.computer.runs in ("mac", "remote")
+    elsewhere = config.computer.runs == "remote"
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
     if container is not None:
         # The desktop is in a container, and so is its driver: the dock reaches it (spec 22.6).

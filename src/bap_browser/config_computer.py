@@ -133,12 +133,12 @@ class Base(Section):
 
 
 class Computer(Section):
-    runs: Literal["container", "here", "mac", "machine", "remote"] = setting(
+    runs: Literal["container", "here", "machine", "remote"] = setting(
         "container",
         "Where the desktop runs: in a container of its own, on this machine's own virtual screen "
-        "(`here`, for a machine that is itself the boundary, such as the micro VM), on a person's "
-        "real Mac through the helper they run there (`mac`), or on this machine's own screen through "
-        "Hermes' driver, on Windows, macOS or Linux (`machine`), or on a person's machine elsewhere, "
+        "(`here`, for a machine that is itself the boundary, such as the micro VM), on this machine's "
+        "own screen through Hermes' driver, on Windows, macOS or Linux (`machine`), or on a person's "
+        "machine elsewhere, a Mac among them, "
         "through the helper they run there and the tailnet (`remote`)",
     )
     helper_url: str = setting(
