@@ -1092,6 +1092,24 @@ real `docker build`/`docker run` proof, not a change to make and call done in th
 one. The package's full dependency tree (playwright, mcp, starlette and the rest) would also ride into
 the image unless it is installed in a way that skips them — not yet decided.
 
+
+### 1ai. Merged on 2026-10-13: a teammate's three branches, two taken and one left
+
+DCode-v05 pushed three branches. Two are in `main` now; the third is not, and is still on GitHub.
+
+| Branch | What it held | What was done |
+|---|---|---|
+| `feature/hold-agent-to-allowed-apps` | Four commits on Hermes' base: the allowed apps through `bounded` mode; the person's own Mac through Hermes' driver, with the older Mac helper removed; the driver's pipe carried into the contained desktop's container; that desktop's own screen started from inside its container | Merged, but for its first commit. That piece was already in `main` (entry 1ah), and the branch's version failed CI on the two things 1ah had learned from the driver: it allowed a tool the driver does not have, and named Windows apps by path. Its module and test were left out; the proven one stays |
+| `docs/desktop-app-comparison` | Two comparisons with Hermes and the OpenAI Agents SDK, a plan, the earlier design of spec 21.14 to 21.16, and `spec_to_html.py` made to render any page | Merged. The spec keeps 21.14 to 21.16 as the record of the earlier design, with a line saying section 22 replaced it |
+| `worktree-computer-use-helpers` | One checkpoint commit: the Mac helper renamed and widened to Windows, with input of our own through `user32.dll` | Not merged. It extends the Mac helper that the first branch, by the same author and later, removes. Of its 20 files 12 conflict, most as "changed here, deleted there". Only `windows_hands.py` and `helper_link.py` are new, and neither can be used without the helper that is gone |
+
+- With this merge the package `psutil` is a dependency (the teammate's choice, for the contained
+  desktop), and `computer.runs: mac` now goes through Hermes' driver. `bap-browser helper`, the
+  Mac's own hands and their 437 lines of tests are gone.
+- Measured after the merge: "The gate is passed: 10 stages."
+- Not checked by me: the teammate's dock (`computer/dock.py`, `dock_entry.py`) against a real
+  container. Docker is not running on this Mac. Their unit tests pass.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
