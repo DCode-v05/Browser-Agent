@@ -48,6 +48,8 @@ LAB = "demo-site/lab"
 RUNS = "runs.jsonl"
 STATE = re.compile(r"LABSTATE(\{.*\})ENDSTATE", re.DOTALL)
 MISSING = object()
+# A model writes "isn't" with a curly apostrophe. An answer is compared as it would be typed.
+AS_TYPED = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201d": '"'})
 # The ends of a task that are not the agent's own doing, and what a try that ended so says.
 NOT_THE_AGENTS = {
     "failed": "the model did not answer",
@@ -171,7 +173,8 @@ def holds(check: Mapping[str, Any], state: Any, answer: str, asked: int) -> tupl
     if "answer" in check:
         asked_for: Any = check["answer"]
         wanted_words = [str(words) for words in (asked_for if isinstance(asked_for, list) else [asked_for])]
-        found = any(words.removeprefix("~").lower() in answer.lower() for words in wanted_words)
+        said = answer.lower().translate(AS_TYPED)
+        found = any(words.removeprefix("~").lower() in said for words in wanted_words)
         return found, f"the answer does not say {' or '.join(wanted_words)}"
     path = str(check.get("state", ""))
     found_value = look(state, path)

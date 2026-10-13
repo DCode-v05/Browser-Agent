@@ -261,3 +261,22 @@ def test_no_logon_task_is_registered_unless_the_settings_ask_for_it(tmp_path: Pa
     commands.not_ready(a_home(tmp_path, driver_telemetry=True), binary, system="win32")
 
     assert not (tmp_path / "asked.txt").exists()
+
+
+@ON_A_SYSTEM_WITH_SCRIPTS
+def test_a_driver_too_slow_to_register_its_logon_task_is_said_and_is_no_crash(tmp_path: Path) -> None:
+    """Seen on a Windows runner: registering took longer than the wait, and the command ended in a traceback."""
+    binary = tmp_path / "cua-driver"
+    binary.write_text(
+        f"#!{sys.executable}\nimport json, sys, threading\n"
+        f"if sys.argv[1:] == ['manifest']:\n    print(json.dumps({GOOD!r}))\n"
+        # It never answers: it is ended when the wait for it is over.
+        "else:\n    threading.Event().wait()\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o755)
+    config = a_home(tmp_path, autostart=True, driver_telemetry=True, register_timeout_s=1)
+
+    problem = commands.not_ready(config, binary, system="win32")
+
+    assert problem is not None and "logon task" in problem and "in time" in problem
