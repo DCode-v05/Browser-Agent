@@ -38,6 +38,7 @@ from bap_browser.computer import allowed, commands, driver
 from bap_browser.computer.hermes.computer_use import permissions
 from bap_browser.config import Config, load_config
 from bap_browser.driver.hermes_driver import HermesDriver
+from bap_browser.results import ToolResult
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools.computer_tools import computer_tools_for
 
@@ -251,6 +252,28 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
     return rungs
 
 
+def started(program: str) -> int:
+    """Starts a program of the system and leaves it open. Its process."""
+    return subprocess.Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
+
+
+async def looked_at(session: ServiceSession, pid: int, name: str) -> ToolResult:
+    """A capture of one app's window, asked for exactly, by what the driver itself lists: a name
+    that matched nothing would prove nothing."""
+    ends = time.monotonic() + WAIT_FOR_THE_APP_S
+    while True:
+        rows = [row for row in await the_windows() if row.get("pid") == pid]
+        rows = rows or [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
+        # A window takes a moment to open, and longer on a machine that is busy.
+        if rows or time.monotonic() > ends:
+            break
+        await asyncio.sleep(LOOK_AGAIN_S)
+    if not rows:
+        return ToolResult(f"its window was not among the driver's: {await windows_like('')}", is_error=True)
+    exactly = {"pid": rows[0].get("pid"), "window_id": rows[0].get("window_id")}
+    return await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax", **exactly})
+
+
 async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
     """Rung 3: the agent's own way in. Through the session and its check, the tool finds a field of
     the known app by its number, types into it, and reads back what it typed."""
@@ -304,36 +327,46 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 )
             )
             here = machine.computer.model_copy(update={"runs": "machine"})
-            if allowed.held(here):
+            if allowed.held(here) or here.any_app:
                 # Rung 4: the driver itself refuses an app the person did not allow. Through the
-                # helper it is the helper's driver that refuses, with the same settings.
+                # helper it is the helper's driver that refuses, with the same settings. Where the
+                # person allows any app, the same window is looked at instead.
                 with an_app_not_allowed() as (other, its_pid):
                     await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
-                    # Its window is asked for exactly, by what the driver itself lists: a name that
-                    # matched nothing would prove nothing.
-                    rows = [row for row in await the_windows() if row.get("pid") == its_pid]
-                    rows = rows or [
-                        row for row in await the_windows() if other.lower() in json.dumps(row).lower()
-                    ]
-                    if rows:
-                        exactly = {"pid": rows[0].get("pid"), "window_id": rows[0].get("window_id")}
-                        there = await session.toolkit.call(
-                            "computer_use", {"action": "capture", "mode": "ax", **exactly}
+                    there = await looked_at(session, its_pid, other)
+                seen_there = " | ".join(there.text.splitlines())[:300]
+                if here.any_app:
+                    rungs.append(
+                        (
+                            f"4, any app is allowed, and {other}, outside the list, is looked at",
+                            not there.is_error,
+                            seen_there,
                         )
-                        refused = there.is_error and bool(REFUSED_FOR_THE_LIST.search(there.text))
-                        seen_there = " | ".join(there.text.splitlines())[:300]
-                    else:
-                        refused, seen_there = (
-                            False,
-                            f"its window was not among the driver's: {await windows_like('')}",
-                        )
-                rungs.append(
-                    (
-                        f"4, {other}, which is not allowed, cannot be looked at or worked in",
-                        refused,
-                        seen_there,
                     )
-                )
+                else:
+                    refused = there.is_error and bool(REFUSED_FOR_THE_LIST.search(there.text))
+                    rungs.append(
+                        (
+                            f"4, {other}, which is not allowed, cannot be looked at or worked in",
+                            refused,
+                            seen_there,
+                        )
+                    )
+            if here.any_app and sys.platform == "win32":
+                # The two apps of Windows that the list of allowed apps cannot name.
+                for program, title in (("explorer.exe", "File Explorer"), ("wt.exe", "")):
+                    if shutil.which(program) is None:
+                        continue
+                    its_pid = await asyncio.to_thread(started, program)
+                    await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
+                    there = await looked_at(session, its_pid, title or "WindowsTerminal")
+                    rungs.append(
+                        (
+                            f"4, any app is allowed, and {program} is looked at",
+                            not there.is_error,
+                            " | ".join(there.text.splitlines())[:300],
+                        )
+                    )
             # Rung 5: while a person holds the screen, nothing is done for the agent, not even a look.
             look = {"action": "capture", "mode": "ax", "app": app}
             await session.handle({"type": "take_over"})
@@ -424,12 +457,19 @@ def main(arguments: list[str] | None = None) -> int:
         action="store_true",
         help="climb as an engine elsewhere would: through the helper, started here for this machine alone",
     )
+    parser.add_argument(
+        "--any-app",
+        action="store_true",
+        help="climb with the person's switch on: the agent is not held to the allowed apps",
+    )
     asked = parser.parse_args(arguments)
     # What a screen holds is printed as it is, on a console of any encoding.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
     config = with_the_known_app_allowed(load_config(asked.config))
+    if asked.any_app:
+        config = config.model_copy(update={"computer": config.computer.model_copy(update={"any_app": True})})
     if asked.virtual_screen:
         base = config.computer.base.model_copy(update={"virtual_screen": True})
         config = config.model_copy(update={"computer": config.computer.model_copy(update={"base": base})})

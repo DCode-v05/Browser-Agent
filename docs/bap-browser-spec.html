@@ -14056,6 +14056,11 @@ named and pressed as Hermes' tool does it.</p>
 <td>The helper on that machine starts the driver in <code>bounded</code> mode with the list written from that machine's own settings, and passes the engine on to that driver alone. The engine is not trusted to hold itself: it cannot start another driver there, and it cannot stop that one</td>
 </tr>
 <tr>
+<td>Any app, where the person says so</td>
+<td>Ours</td>
+<td><code>computer.any_app</code>, off by default, on the Computer's configuration as "Let the agent work in any app on the machine". On Windows, macOS or Linux the driver is then started without the list: the agent may read and work in any window, and open any app by its name, and each opening asks the person first. It is the way to File Explorer and Windows Terminal on Windows, which the list cannot name. For a machine elsewhere it is set on that machine, where its helper runs</td>
+</tr>
+<tr>
 <td>A switched-off app cannot run</td>
 <td>Ours</td>
 <td>In the contained desktop, an empty file still stands where its program is</td>

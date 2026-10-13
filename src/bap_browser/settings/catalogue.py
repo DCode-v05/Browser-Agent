@@ -367,14 +367,14 @@ CATALOGUE: tuple[Entry, ...] = (
         applies="next_session",
     ),
     Switch(
-        id="computer_mac_any_app",
+        id="computer_any_app",
         backends=(COMPUTER,),
         per_system=True,
         group="Computer",
         surfaces=NOT_ON_MOBILE,
-        title="On this Mac, let the agent open any app",
-        description="As GPT-6 Astra does: the agent may open any app on your Mac by its name. Each opening asks you first. Holds from the next start of the helper.",
-        key="computer.mac_any_app",
+        title="Let the agent work in any app on the machine",
+        description="On a real machine, Windows, macOS or Linux: the agent is not held to the apps switched on below. It may read and work in any window, and open any app by its name. Each opening asks you first. Off: it works only in the apps you allow. On a machine elsewhere, this is set on that machine, where its helper runs.",
+        key="computer.any_app",
         applies="next_session",
     ),
     Choice(

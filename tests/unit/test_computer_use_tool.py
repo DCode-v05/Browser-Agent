@@ -680,7 +680,8 @@ async def captured(make_config, tmp_path: Path, asked: dict[str, Any], **base: A
     finally:
         await session.close()
     assert not result.is_error, result.text
-    return did(machine, "capture")[-1]
+    # The person's live picture is a capture of the whole screen, and is not the agent's.
+    return next(how for how in reversed(did(machine, "capture")) if how["app"] != "screen")
 
 
 async def test_a_capture_with_no_mode_named_holds_what_the_admin_chose(make_config, tmp_path: Path) -> None:
