@@ -205,13 +205,17 @@ _ENGINE_MARKS = re.compile(
 _UNSEEN_LINE = re.compile(r"^(Unseen):", re.IGNORECASE | re.MULTILINE)
 
 
-def marked(page_text: str, token: str) -> tuple[str, bool]:
+ON_THE_SCREEN = PAGE_NOTE.replace("the site", "what is on the screen")
+"""The same of a desktop, where an app wrote it and there is no site."""
+
+
+def marked(page_text: str, token: str, note: str = PAGE_NOTE) -> tuple[str, bool]:
     """The page's text between `<<page TOKEN>>` and `<<end page TOKEN>>`, each on a line of its
     own, with PAGE_NOTE on the line after. Inside, whatever imitates the engine's own lines is
     made harmless (rule 4). The second value says whether there was any (finding
     `fake_engine_words`)."""
     defanged, found = _defang_engine_words(page_text)
-    wrapped = f"<<page {token}>>\n{defanged}\n<<end page {token}>>\n{PAGE_NOTE}"
+    wrapped = f"<<page {token}>>\n{defanged}\n<<end page {token}>>\n{note}"
     return wrapped, found
 
 

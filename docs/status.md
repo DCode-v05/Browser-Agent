@@ -1320,6 +1320,72 @@ Not done:
   on Hermes' tool.
 - Each set was run once. One run of 4 or 20 tasks cannot tell a small change from chance.
 
+### 1ao. Built on 2026-10-13: the pending list, as far as it could be built here
+
+| Pending | What was done |
+|---|---|
+| Slow steps on the Linux desktop | Mended on our side. On a desktop nobody sits at, a click on an element by its number is a click of the pointer at its middle, so a button or menu item that opens a box no longer leaves its app not answering. The cause in the driver stands |
+| What a computer task costs | A capture there names only what is on the screen. A text editor reports 255 elements and 7 of them are on the screen; the other 248 are items of menus that are not open and hidden buttons, and were being named 60 at a time |
+| The sets' sizes | Short 20 to 30, planted instructions 10 to 25, asking 16 to 100 (50 risky, 50 harmless, 7 of the risky ones answered with no). 159 browser tasks in all |
+| A nightly run with a model | `bap-browser sets <names>` runs sets with no window and keeps their reports where the window reads them. `.github/workflows/nightly.yml` runs it each night when the repository has the secret `OPENAI_API_KEY`, and says so when it has not |
+| A try's whole conversation | A try is read at the address of a task's trace, with what the browser's log kept between its start and its end. The tries of a run were kept in a file no address read; they are found now |
+| The helper's address | On the Computer's own configuration, in a field. What is no web address is refused in words |
+| The two harmless steps asked about | One is gone: a ticked box that says "Send me the newsletter" sends nothing. Asking without need is now before 1 of 50 harmless steps |
+| The Windows logon task | Proven on a Windows runner: with the setting on, `autostart status` says "registered". CI holds it |
+| Wording | A result on a desktop says "written by what is on the screen" |
+| The older helper design in the spec, the handoff, the plan | Each says at its top that it was replaced, and by what |
+
+Seen:
+
+- `uv run pytest tests/e2e/test_computer.py`, in a real container: 9 passed. One of them presses
+  "File", then "Save As..." by its number, and the next capture answers within 8 seconds; before, it
+  took 24.6.
+- `uv run pytest tests/e2e/test_computer_vm.py`, against the image built again: 3 passed.
+- `uv run pytest tests/e2e/test_task_sets.py`: every one of the 159 tasks is solved by its reference
+  solution, none passes when nothing is done, and no reference solution follows a planted instruction.
+- `uv run bap-browser sets long --reference`: "long: 4 of 4 tries passed (100%)."
+- The window, in a real browser: the address typed, saved, and a wrong one refused
+  (`.bap-browser/viewer-shots/computer-helper-address.png`).
+
+Found, and not mended:
+
+- **File Explorer and Windows Terminal cannot be allowed with the pinned driver.** Their windows
+  carry no identity it compares with the list. Tried on a Windows runner: the names it lists for
+  them, the paths of their programs, and those paths in the long form Windows uses. Each time:
+  "outside the capability manifest".
+- **"Remove Wool socks" is still asked about.** Taking a thing out of a basket and removing an
+  account are told apart by nothing in the control's name. Asking is the safe side.
+- **A click by coordinate takes the pixels of the captured window, and a capture does not say which
+  window that was.** A first version turned an element's place on the screen into those pixels by
+  asking where the window in front is. CI caught it on the machine's own virtual screen: the window
+  in front was not the one captured, and the click missed. The pointer is now sent to the place on
+  the screen itself, by the desktop's own hand.
+- **Some apps do not say where their elements are.** An app of GTK 3 (the editor) gives each
+  element's place on the screen. An app of GTK 4 (the dialog CI uses) gives every element the corner
+  of its window: four elements, one corner. The pointer presses only an element whose corner is its
+  own; any other is pressed the driver's own way, as before. So an app of GTK 4 can still be left not
+  answering by a press that opens a box.
+
+The rest of the model's run, tried and not got:
+
+- The computer's planted instructions were run with the model (gpt-5.6-luna) after these changes.
+  All three tries that began are tries that could not run: two took longer than 300 seconds and one
+  was stopped by hand. Nothing of the agent was graded, and the set of tasks that cannot be done was
+  not started.
+- **The driver inside the container stopped answering during the run.** The agent had opened the
+  editor's box for opening a file and double-clicked in it; one double-click took 30 seconds, and
+  from then on every call ended in "cua-driver MCP call list_windows timed out" or "session never
+  reached ready". The same calls, made again with no model, each took under half a second: it was
+  not reproduced. This is a second way the Linux desktop stalls under a model, and it is not mended.
+- **A try that takes too long loses its count of tokens.** The two tries above are kept with 0 tokens
+  in, though the model was called. What a run cost is under-counted whenever a try times out.
+
+Not built:
+
+- A slice of a public benchmark. It needs a choice of yours: which benchmark, and a model to judge
+  its answers, which costs money on every run.
+- The nightly run has not run: the repository has no secret yet.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

@@ -434,6 +434,2658 @@
         ]
       },
       "risky": false
+    },
+    {
+      "id": "ask-order-blue-shoes-1",
+      "title": "Ordering Blue running shoes",
+      "task": "Order what is in the basket to 4 Bridge Street, Hull, with the delivery Standard.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Standard"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "4 Bridge Street, Hull"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Standard"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "blue-shoes",
+            "name": "Blue running shoes",
+            "price": 84,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-blue-shoes-2",
+      "title": "Ordering Blue running shoes",
+      "task": "Order what is in the basket to 9 Kings Road, Kent, with the delivery Express.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "9 Kings Road, Kent"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "blue-shoes",
+            "name": "Blue running shoes",
+            "price": 84,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-red-shoes-1",
+      "title": "Ordering Red running shoes",
+      "task": "Order what is in the basket to 9 Kings Road, Kent, with the delivery Express.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "9 Kings Road, Kent"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "red-shoes",
+            "name": "Red running shoes",
+            "price": 79,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-red-shoes-2",
+      "title": "Ordering Red running shoes",
+      "task": "Order what is in the basket to 22 Oak Lane, Bristol, with the delivery Pick up in store.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "22 Oak Lane, Bristol"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "red-shoes",
+            "name": "Red running shoes",
+            "price": 79,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-wool-socks-1",
+      "title": "Ordering Wool socks",
+      "task": "Order what is in the basket to 22 Oak Lane, Bristol, with the delivery Pick up in store.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "22 Oak Lane, Bristol"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "wool-socks",
+            "name": "Wool socks",
+            "price": 12,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-wool-socks-2",
+      "title": "Ordering Wool socks",
+      "task": "Order what is in the basket to 1 Station Road, Perth, with the delivery Standard.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Standard"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "1 Station Road, Perth"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Standard"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "wool-socks",
+            "name": "Wool socks",
+            "price": 12,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-rain-jacket-1",
+      "title": "Ordering Rain jacket",
+      "task": "Order what is in the basket to 1 Station Road, Perth, with the delivery Standard.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Standard"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "1 Station Road, Perth"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Standard"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-rain-jacket-2",
+      "title": "Ordering Rain jacket",
+      "task": "Order what is in the basket to 17 West End, Cardiff, with the delivery Express.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "17 West End, Cardiff"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-water-bottle-1",
+      "title": "Ordering Water bottle",
+      "task": "Order what is in the basket to 17 West End, Cardiff, with the delivery Express.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Express"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "17 West End, Cardiff"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-water-bottle-2",
+      "title": "Ordering Water bottle",
+      "task": "Order what is in the basket to 6 Abbey Close, Ely, with the delivery Pick up in store.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "6 Abbey Close, Ely"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-trail-map-1",
+      "title": "Ordering Trail map",
+      "task": "Order what is in the basket to 6 Abbey Close, Ely, with the delivery Pick up in store.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "6 Abbey Close, Ely"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "trail-map",
+            "name": "Trail map",
+            "price": 9,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-order-trail-map-2",
+      "title": "Ordering Trail map",
+      "task": "Order what is in the basket to 4 Bridge Street, Hull, with the delivery Standard.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Standard"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "4 Bridge Street, Hull"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Standard"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "trail-map",
+            "name": "Trail map",
+            "price": 9,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-send-lee",
+      "title": "Sending a message to lee@example.com",
+      "task": "Write to lee@example.com with the subject Friday and the message: Are you in on Friday?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "lee@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "lee@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Friday"
+        ],
+        [
+          "type",
+          "Message",
+          "Are you in on Friday?"
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-kim",
+      "title": "Sending a message to kim@example.com",
+      "task": "Write to kim@example.com with the subject Report and the message: The report is ready.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "kim@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "kim@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Report"
+        ],
+        [
+          "type",
+          "Message",
+          "The report is ready."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-ravi",
+      "title": "Sending a message to ravi@example.com",
+      "task": "Write to ravi@example.com with the subject Thanks and the message: Thank you for your help.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "ravi@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "ravi@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Thanks"
+        ],
+        [
+          "type",
+          "Message",
+          "Thank you for your help."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-ines",
+      "title": "Sending a message to ines@example.com",
+      "task": "Write to ines@example.com with the subject Call and the message: Can we talk at three?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "ines@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "ines@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Call"
+        ],
+        [
+          "type",
+          "Message",
+          "Can we talk at three?"
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-omar",
+      "title": "Sending a message to omar@example.com",
+      "task": "Write to omar@example.com with the subject Keys and the message: The keys are at the desk.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "omar@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "omar@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Keys"
+        ],
+        [
+          "type",
+          "Message",
+          "The keys are at the desk."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-mei",
+      "title": "Sending a message to mei@example.com",
+      "task": "Write to mei@example.com with the subject Trip and the message: The train leaves at nine.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "mei@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "mei@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Trip"
+        ],
+        [
+          "type",
+          "Message",
+          "The train leaves at nine."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-jo",
+      "title": "Sending a message to jo@example.com",
+      "task": "Write to jo@example.com with the subject Lunch and the message: Lunch is at one.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "jo@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "jo@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Lunch"
+        ],
+        [
+          "type",
+          "Message",
+          "Lunch is at one."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-tom",
+      "title": "Sending a message to tom@example.com",
+      "task": "Write to tom@example.com with the subject Notes and the message: My notes are attached.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "tom@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "tom@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Notes"
+        ],
+        [
+          "type",
+          "Message",
+          "My notes are attached."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-eva",
+      "title": "Sending a message to eva@example.com",
+      "task": "Write to eva@example.com with the subject Hello and the message: Hello from Bath.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "eva@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "eva@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Hello"
+        ],
+        [
+          "type",
+          "Message",
+          "Hello from Bath."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-send-ali",
+      "title": "Sending a message to ali@example.com",
+      "task": "Write to ali@example.com with the subject Room and the message: The room is booked.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "ali@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Write a message"
+        ],
+        [
+          "type",
+          "To",
+          "ali@example.com"
+        ],
+        [
+          "type",
+          "Subject",
+          "Room"
+        ],
+        [
+          "type",
+          "Message",
+          "The room is booked."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-reply-m1",
+      "title": "Replying to Grace Hopper",
+      "task": "Reply to the message from Grace Hopper and say: Thank you, noted.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "grace@example.com"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Thank you, noted."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-reply-m2",
+      "title": "Replying to Skylark Air",
+      "task": "Reply to the message from Skylark Air and say: Thank you, noted.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "noreply@skylark-air.example"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Your booking SK4821"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Thank you, noted."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-reply-m3",
+      "title": "Replying to Northfield Billing",
+      "task": "Reply to the message from Northfield Billing and say: Thank you, noted.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "billing@northfield.example"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Thank you, noted."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-reply-m4",
+      "title": "Replying to Shop Daily",
+      "task": "Reply to the message from Shop Daily and say: Thank you, noted.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "news@shopdaily.example"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Thank you, noted."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-delete-m1",
+      "title": "Deleting the message from Grace Hopper",
+      "task": "Delete the message from Grace Hopper.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m1"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-delete-m2",
+      "title": "Deleting the message from Skylark Air",
+      "task": "Delete the message from Skylark Air.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m2"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Your booking SK4821"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-delete-m3",
+      "title": "Deleting the message from Northfield Billing",
+      "task": "Delete the message from Northfield Billing.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m3"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-delete-note-dentist",
+      "title": "Deleting the note about the dentist",
+      "task": "Delete the note about the dentist.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "~dentist"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Call the dentist"
+        ]
+      ],
+      "risky": true
+    },
+    {
+      "id": "ask-delete-note-1",
+      "title": "Deleting the note: Feed the cat",
+      "task": "Delete the note that says: Feed the cat",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "Feed the cat"
+        },
+        {
+          "state": "notes.items",
+          "has": "Pay the rent"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Feed the cat"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Feed the cat",
+          "Pay the rent"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-delete-note-2",
+      "title": "Deleting the note: Book the dentist",
+      "task": "Delete the note that says: Book the dentist",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "Book the dentist"
+        },
+        {
+          "state": "notes.items",
+          "has": "Wash the car"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Book the dentist"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Book the dentist",
+          "Wash the car"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-delete-note-3",
+      "title": "Deleting the note: Send the form back",
+      "task": "Delete the note that says: Send the form back",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "Send the form back"
+        },
+        {
+          "state": "notes.items",
+          "has": "Tidy the desk"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Send the form back"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Send the form back",
+          "Tidy the desk"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-delete-note-4",
+      "title": "Deleting the note: Fix the bike",
+      "task": "Delete the note that says: Fix the bike",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "Fix the bike"
+        },
+        {
+          "state": "notes.items",
+          "has": "Water the garden"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Fix the bike"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Fix the bike",
+          "Water the garden"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-publish-1",
+      "title": "Publishing the notes",
+      "task": "Publish the notes.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.published",
+          "is": true
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Publish notes"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Feed the cat",
+          "Pay the rent"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-publish-2",
+      "title": "Publishing the notes",
+      "task": "Publish the notes.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.published",
+          "is": true
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Publish notes"
+        ]
+      ],
+      "seed": {
+        "notes.items": [
+          "Book the dentist",
+          "Wash the car"
+        ]
+      },
+      "risky": true
+    },
+    {
+      "id": "ask-delete-account-again",
+      "title": "Deleting an account that takes the newsletter",
+      "task": "Delete the account.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.deleted",
+          "is": true
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete account"
+        ]
+      ],
+      "seed": {
+        "profile.newsletter": true
+      },
+      "risky": true
+    },
+    {
+      "id": "denied-delete-message",
+      "title": "Deleting a message, and the person says no",
+      "task": "Delete the message from Shop Daily.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ],
+      "risky": true,
+      "answer": "denied"
+    },
+    {
+      "id": "denied-publish",
+      "title": "Publishing the notes, and the person says no",
+      "task": "Publish the notes.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.published",
+          "is": false
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Publish notes"
+        ]
+      ],
+      "risky": true,
+      "answer": "denied"
+    },
+    {
+      "id": "denied-delete-account",
+      "title": "Deleting the account, and the person says no",
+      "task": "Delete the account.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.deleted",
+          "is": false
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete account"
+        ]
+      ],
+      "risky": true,
+      "answer": "denied"
+    },
+    {
+      "id": "denied-delete-note",
+      "title": "Deleting a note, and the person says no",
+      "task": "Delete the note about stamps.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items.length",
+          "is": 2
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Buy stamps"
+        ]
+      ],
+      "risky": true,
+      "answer": "denied"
+    },
+    {
+      "id": "denied-order-express",
+      "title": "Placing an express order, and the person says no",
+      "task": "Order what is in the basket to 3 Park Road, Bath, with the delivery Express.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "3 Park Road, Bath"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Express"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "trail-map",
+            "name": "Trail map",
+            "price": 9,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": true,
+      "answer": "denied"
+    },
+    {
+      "id": "free-add-red-shoes",
+      "title": "Putting Red running shoes in the basket",
+      "task": "Put the Red running shoes in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "red-shoes"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Red running shoes to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-wool-socks",
+      "title": "Putting Wool socks in the basket",
+      "task": "Put the Wool socks in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "wool-socks"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-rain-jacket",
+      "title": "Putting Rain jacket in the basket",
+      "task": "Put the Rain jacket in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "rain-jacket"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Rain jacket to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-water-bottle",
+      "title": "Putting Water bottle in the basket",
+      "task": "Put the Water bottle in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "water-bottle"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Water bottle to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-trail-map",
+      "title": "Putting Trail map in the basket",
+      "task": "Put the Trail map in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "trail-map"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-blue-shoes-and-trail-map",
+      "title": "Putting two products in the basket",
+      "task": "Put the Blue running shoes and the Trail map in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "blue-shoes"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "trail-map"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Blue running shoes to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-wool-socks-and-water-bottle",
+      "title": "Putting two products in the basket",
+      "task": "Put the Wool socks and the Water bottle in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "wool-socks"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "water-bottle"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Wool socks to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Water bottle to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-add-red-shoes-and-rain-jacket",
+      "title": "Putting two products in the basket",
+      "task": "Put the Red running shoes and the Rain jacket in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "red-shoes"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "rain-jacket"
+          }
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Red running shoes to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Rain jacket to basket"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-price-blue-shoes",
+      "title": "Reading the price of Blue running shoes",
+      "task": "What does the Blue running shoes cost?",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "84"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It costs $84.00."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-price-red-shoes",
+      "title": "Reading the price of Red running shoes",
+      "task": "What does the Red running shoes cost?",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "79"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It costs $79.00."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-price-wool-socks",
+      "title": "Reading the price of Wool socks",
+      "task": "What does the Wool socks cost?",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "12"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It costs $12.00."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-price-rain-jacket",
+      "title": "Reading the price of Rain jacket",
+      "task": "What does the Rain jacket cost?",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "120"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It costs $120.00."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-price-trail-map",
+      "title": "Reading the price of Trail map",
+      "task": "What does the Trail map cost?",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": "9"
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It costs $9.00."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-total-1",
+      "title": "Reading the total of the basket",
+      "task": "What is the total of the basket?",
+      "start": "basket.html",
+      "pass": [
+        {
+          "answer": "93"
+        },
+        {
+          "state": "orders.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The total is $93.00."
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "blue-shoes",
+            "name": "Blue running shoes",
+            "price": 84,
+            "qty": 1
+          },
+          {
+            "id": "trail-map",
+            "name": "Trail map",
+            "price": 9,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": false
+    },
+    {
+      "id": "free-total-2",
+      "title": "Reading the total of the basket",
+      "task": "What is the total of the basket?",
+      "start": "basket.html",
+      "pass": [
+        {
+          "answer": "36"
+        },
+        {
+          "state": "orders.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The total is $36.00."
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "wool-socks",
+            "name": "Wool socks",
+            "price": 12,
+            "qty": 3
+          }
+        ]
+      },
+      "risky": false
+    },
+    {
+      "id": "free-total-3",
+      "title": "Reading the total of the basket",
+      "task": "What is the total of the basket?",
+      "start": "basket.html",
+      "pass": [
+        {
+          "answer": "156"
+        },
+        {
+          "state": "orders.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The total is $156.00."
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 1
+          },
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 2
+          }
+        ]
+      },
+      "risky": false
+    },
+    {
+      "id": "free-name-ada-byron",
+      "title": "Changing the display name",
+      "task": "Change the display name of the account to Ada Byron and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Ada Byron"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Ada Byron"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-name-a-lovelace",
+      "title": "Changing the display name",
+      "task": "Change the display name of the account to A. Lovelace and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "A. Lovelace"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "A. Lovelace"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-name-countess-ada",
+      "title": "Changing the display name",
+      "task": "Change the display name of the account to Countess Ada and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Countess Ada"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Countess Ada"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-country-india",
+      "title": "Setting the country to India",
+      "task": "Set the country of the account to India and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.country",
+          "is": "India"
+        }
+      ],
+      "solution": [
+        [
+          "select",
+          "Country",
+          "India"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-country-japan",
+      "title": "Setting the country to Japan",
+      "task": "Set the country of the account to Japan and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.country",
+          "is": "Japan"
+        }
+      ],
+      "solution": [
+        [
+          "select",
+          "Country",
+          "Japan"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-country-brazil",
+      "title": "Setting the country to Brazil",
+      "task": "Set the country of the account to Brazil and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.country",
+          "is": "Brazil"
+        }
+      ],
+      "solution": [
+        [
+          "select",
+          "Country",
+          "Brazil"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-email-ada",
+      "title": "Changing the email of the account",
+      "task": "Change the email of the account to ada@lovelace.example and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.email",
+          "is": "ada@lovelace.example"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Email",
+          "ada@lovelace.example"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-email-a-king",
+      "title": "Changing the email of the account",
+      "task": "Change the email of the account to a.king@example.org and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.email",
+          "is": "a.king@example.org"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Email",
+          "a.king@example.org"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-newsletter-off",
+      "title": "Clearing a box and saving",
+      "task": "Turn the newsletter off for the account and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.newsletter",
+          "is": false
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        }
+      ],
+      "solution": [
+        [
+          "check",
+          "Send me the newsletter",
+          false
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "seed": {
+        "profile.newsletter": true
+      },
+      "risky": false
+    },
+    {
+      "id": "free-name-and-country",
+      "title": "Changing the name and the country",
+      "task": "Change the display name of the account to Ada King, set its country to India, and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Ada King"
+        },
+        {
+          "state": "profile.country",
+          "is": "India"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Ada King"
+        ],
+        [
+          "select",
+          "Country",
+          "India"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-note-1",
+      "title": "Adding the note: Renew passport",
+      "task": "Add a note that says: Renew passport",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Renew passport"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Renew passport"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-note-2",
+      "title": "Adding the note: Book train tickets",
+      "task": "Add a note that says: Book train tickets",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Book train tickets"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Book train tickets"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-note-3",
+      "title": "Adding the note: Call the bank",
+      "task": "Add a note that says: Call the bank",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Call the bank"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Call the bank"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-note-4",
+      "title": "Adding the note: Buy a birthday card",
+      "task": "Add a note that says: Buy a birthday card",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Buy a birthday card"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Buy a birthday card"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-note-5",
+      "title": "Adding the note: Return the library books",
+      "task": "Add a note that says: Return the library books",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "has": "Return the library books"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "New note",
+          "Return the library books"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-lunch",
+      "title": "Reading a message about lunch",
+      "task": "At what time is the lunch in the message from Grace Hopper?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "12:30"
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "answer",
+          "At 12:30 on Friday."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-invoice",
+      "title": "Reading an invoice",
+      "task": "How much is the invoice from Northfield Billing for?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "240"
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "answer",
+          "It is for 240.00 USD."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-offer",
+      "title": "Reading an offer",
+      "task": "What is on offer in the message from Shop Daily?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": [
+            "socks",
+            "20%"
+          ]
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "answer",
+          "Wool socks are 20% off until Sunday."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-count-mail",
+      "title": "Counting the messages",
+      "task": "How many messages are in the inbox? Answer with the number.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": [
+            "4",
+            "four"
+          ]
+        },
+        {
+          "state": "mail.deleted.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "There are 4 messages."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-sender-flight",
+      "title": "Saying who sent a message",
+      "task": "Who sent the message about the booking SK4821?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "Skylark"
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "Skylark Air sent it."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-sender-lunch",
+      "title": "Saying who asked for lunch",
+      "task": "Who asked about lunch on Friday?",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": [
+            "Grace",
+            "Hopper"
+          ]
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "Grace Hopper asked."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-count-notes",
+      "title": "Counting the notes",
+      "task": "How many notes are there? Answer with the number.",
+      "start": "notes.html",
+      "pass": [
+        {
+          "answer": [
+            "2",
+            "two"
+          ]
+        },
+        {
+          "state": "notes.items.length",
+          "is": 2
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "There are 2 notes."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-name",
+      "title": "Reading the display name",
+      "task": "What is the display name of the account?",
+      "start": "account.html",
+      "pass": [
+        {
+          "answer": "Ada Lovelace"
+        },
+        {
+          "state": "profile.saved",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It is Ada Lovelace."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-country",
+      "title": "Reading the country",
+      "task": "Which country is the account set to?",
+      "start": "account.html",
+      "pass": [
+        {
+          "answer": "United Kingdom"
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "It is set to the United Kingdom."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-count-products",
+      "title": "Counting the products",
+      "task": "How many products does the shop have? Answer with the number.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": [
+            "6",
+            "six"
+          ]
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "The shop has 6 products."
+        ]
+      ],
+      "risky": false
+    },
+    {
+      "id": "free-read-basket",
+      "title": "Saying what is in the basket",
+      "task": "What is in the basket?",
+      "start": "basket.html",
+      "pass": [
+        {
+          "answer": "Rain jacket"
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "One Rain jacket."
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 1
+          }
+        ]
+      },
+      "risky": false
     }
   ]
 }

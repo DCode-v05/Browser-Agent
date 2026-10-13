@@ -131,3 +131,16 @@ def test_a_message_box_is_a_field_a_message_is_written_in(
     role: str, texts: list[str], multiline: bool, search: bool, expected: bool
 ) -> None:
     assert is_message_box(role, texts, ACTIONS, multiline=multiline, search=search) is expected
+
+
+@pytest.mark.parametrize("role", ["checkbox", "switch", "radio"])
+def test_a_box_that_is_ticked_sends_nothing_though_its_name_says_send(role: str) -> None:
+    assert class_of("Send me the newsletter", ACTIONS, role=role) is None
+    # The deployment's own list of words that matter holds "send" too, and says no more of a tick.
+    assert class_of("Send me the newsletter", ACTIONS, ["send", "newsletter rules"], role=role) is None
+    assert (
+        class_of("Accept the newsletter rules", ACTIONS, ["send", "newsletter rules"], role=role) == "commits"
+    )
+    # What it would pay for, delete or give access to is still asked about.
+    assert class_of("Delete my account when I sign out", ACTIONS, role=role) == "deletes"
+    assert class_of("Send me the newsletter", ACTIONS) == "sends"

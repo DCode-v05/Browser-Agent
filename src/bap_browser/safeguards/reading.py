@@ -19,7 +19,14 @@ from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import ModelError
 from bap_browser.policy.sites import site_of
 from bap_browser.safeguards.check import Check
-from bap_browser.safeguards.incoming import CUT, marked, new_token, without_invisible
+from bap_browser.safeguards.incoming import (
+    CUT,
+    ON_THE_SCREEN,
+    PAGE_NOTE,
+    marked,
+    new_token,
+    without_invisible,
+)
 from bap_browser.safeguards.model import ModelClient
 from bap_browser.safeguards.scan import (
     SCAN_INSTRUCTIONS,
@@ -54,6 +61,8 @@ HELD_LONG, HELD_SHORT = chr(0xFDD2), chr(0xFDD3)
 # A whole read of a page: when it finds nothing planted any more, the page is no longer flagged.
 WHOLE_READS = frozenset({"browser_snapshot", "browser_get_text"})
 TAKES_A_PICTURE = frozenset({"browser_screenshot", "browser_zoom"})
+# How the name of a tool of the desktop begins. What it reads was written by an app, not by a site.
+OF_A_DESKTOP = "computer_"
 # The tools whose result is a new read of the page.
 READS_THE_PAGE = frozenset({"browser_snapshot", "browser_get_text", "browser_find", "browser_navigate"})
 INSTRUCTED = (
@@ -127,7 +136,9 @@ class Reader:
                 # What the engine itself put in place of withheld text is not the page's imitation
                 # of the engine: it is kept out of the way while the page's own words are made harmless.
                 page = page.replace(WITHHELD, HELD_LONG).replace(NAME_HELD, HELD_SHORT)
-                page, imitates = marked(page, token)
+                page, imitates = marked(
+                    page, token, ON_THE_SCREEN if tool.startswith(OF_A_DESKTOP) else PAGE_NOTE
+                )
                 page = page.replace(HELD_LONG, WITHHELD).replace(HELD_SHORT, NAME_HELD)
                 faked |= imitates and scanning
             parts[index] = page

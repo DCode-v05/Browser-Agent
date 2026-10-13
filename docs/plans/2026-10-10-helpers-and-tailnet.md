@@ -14,8 +14,9 @@
 > | Settings and the viewer | 21 to 23 | Met. "This machine" and "A machine elsewhere" are in the settings, and the Computer tab has a setup page (status 1ag). One choice covers all three systems, in place of "This PC" and "This Linux machine" |
 > | Reach a helper over the tailnet | 24 to 26 | Built differently, and not proven live. The helper listens on its own machine only and `tailscale serve` shows it to the tailnet, in place of binding to the tailnet's address with `--host`. It checks a pairing code and who Tailscale says the caller is |
 >
-> The branch `worktree-computer-use-helpers` holds steps 6 to 13 as they were first built. It is not
-> merged and cannot be: it extends the helper that was removed.
+> The branch `worktree-computer-use-helpers` held steps 6 to 13 as they were first built. It is
+> recorded in `main` as merged with none of its code taken, because it extends the helper that was
+> removed, and it is deleted from GitHub.
 
 Written on 2026-10-10. Spec sections 21.1, 21.10, 21.12, 21.14, 21.15 and 21.16 already say what
 this builds; this is the order to build it in. Three things, asked for together:

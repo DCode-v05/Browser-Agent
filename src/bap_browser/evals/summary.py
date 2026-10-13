@@ -3,8 +3,10 @@ the model, and how the tasks ended."""
 
 from __future__ import annotations
 
+import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 from bap_browser.config import Evals
@@ -171,9 +173,33 @@ def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], setting
     }
 
 
-def trace_of(recorder: Recorder, task: str) -> dict[str, Any] | None:
-    """One task with its trace: every reply of the model and every step, in order."""
-    for record in reversed(recorder.tasks()):
-        if record["id"] == task:
-            return {**record, "rating": recorder.ratings().get(task)}
+def during(log: Path | None, started: float, duration_ms: float) -> list[dict[str, Any]]:
+    """What a browser's log kept between the start of a task and its end: each call with what it
+    was given, typed text left out, and the first line of what it answered."""
+    if log is None:
+        return []
+    try:
+        lines = log.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    kept: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            one = json.loads(line)
+        except ValueError:
+            continue
+        at = one.get("ts") if isinstance(one, dict) else None
+        if isinstance(at, int | float) and started <= at <= started + duration_ms / 1000:
+            kept.append(one)
+    return kept
+
+
+def trace_among(recorders: Iterable[Recorder], task: str, log: Path | None) -> dict[str, Any] | None:
+    """One task with its trace: every reply of the model and every step, in order, and what the log
+    kept of its calls. It is looked for among a browser's own tasks and the tries of its task sets."""
+    for recorder in recorders:
+        for record in reversed(recorder.tasks()):
+            if record["id"] == task:
+                said = during(log, record.get("started", 0.0), record.get("duration_ms", 0.0))
+                return {**record, "rating": recorder.ratings().get(task), "log": said}
     return None

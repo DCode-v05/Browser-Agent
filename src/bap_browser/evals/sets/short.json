@@ -657,6 +657,399 @@
           "Delete note: Call the dentist"
         ]
       ]
+    },
+    {
+      "id": "shop-add-three-kinds",
+      "title": "Put three different products in the basket",
+      "task": "Put one pair of Red running shoes, one Trail map and one Water bottle in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "red-shoes"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "trail-map"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "water-bottle"
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 3
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Red running shoes to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Trail map to basket"
+        ],
+        [
+          "click",
+          "button",
+          "Add Water bottle to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-dearest",
+      "title": "Put the dearest product in the basket",
+      "task": "Put the most expensive product of the shop in the basket.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "state": "basket",
+          "has": {
+            "id": "rain-jacket"
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Add Rain jacket to basket"
+        ]
+      ]
+    },
+    {
+      "id": "shop-under-twenty",
+      "title": "Count the products under a price",
+      "task": "How many products in the shop cost less than $20? Answer with the number.",
+      "start": "shop.html",
+      "pass": [
+        {
+          "answer": [
+            "3",
+            "three"
+          ]
+        },
+        {
+          "state": "basket.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "3 products cost less than $20."
+        ]
+      ]
+    },
+    {
+      "id": "basket-remove-two",
+      "title": "Take two products out of the basket",
+      "task": "Take the Water bottle and the Trail map out of the basket, and leave the rest.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "basket",
+          "lacks": {
+            "id": "water-bottle"
+          }
+        },
+        {
+          "state": "basket",
+          "lacks": {
+            "id": "trail-map"
+          }
+        },
+        {
+          "state": "basket",
+          "has": {
+            "id": "rain-jacket"
+          }
+        },
+        {
+          "state": "basket.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Remove Water bottle"
+        ],
+        [
+          "click",
+          "button",
+          "Remove Trail map"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "rain-jacket",
+            "name": "Rain jacket",
+            "price": 120,
+            "qty": 1
+          },
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 1
+          },
+          {
+            "id": "trail-map",
+            "name": "Trail map",
+            "price": 9,
+            "qty": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "order-pick-up",
+      "title": "Order for picking up in the store",
+      "task": "Order what is in the basket to 8 Hill Row, Derby, to be picked up in the store.",
+      "start": "basket.html",
+      "pass": [
+        {
+          "state": "orders.length",
+          "is": 1
+        },
+        {
+          "state": "orders.0.delivery",
+          "is": "Pick up in store"
+        },
+        {
+          "state": "orders.0.address",
+          "is": "~8 hill row"
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Delivery address",
+          "8 Hill Row, Derby"
+        ],
+        [
+          "select",
+          "Delivery",
+          "Pick up in store"
+        ],
+        [
+          "click",
+          "button",
+          "Place order"
+        ]
+      ],
+      "seed": {
+        "basket": [
+          {
+            "id": "water-bottle",
+            "name": "Water bottle",
+            "price": 18,
+            "qty": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "mail-sender",
+      "title": "Say who sent a message",
+      "task": "Who sent the invoice? Answer with the sender's name.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "answer": "Northfield"
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 0
+        }
+      ],
+      "solution": [
+        [
+          "answer",
+          "Northfield Billing sent it."
+        ]
+      ]
+    },
+    {
+      "id": "mail-reply-no",
+      "title": "Reply to a message and say no",
+      "task": "Reply to Grace Hopper's message and say that you cannot come on Friday.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.sent",
+          "has": {
+            "to": "grace@example.com",
+            "body": "~cannot"
+          }
+        },
+        {
+          "state": "mail.sent.length",
+          "is": 1
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Lunch on Friday"
+        ],
+        [
+          "click",
+          "link",
+          "Reply"
+        ],
+        [
+          "type",
+          "Message",
+          "Sorry, I cannot come on Friday."
+        ],
+        [
+          "click",
+          "button",
+          "Send"
+        ]
+      ]
+    },
+    {
+      "id": "mail-delete-two",
+      "title": "Delete two messages",
+      "task": "Delete the message from Shop Daily and the invoice from Northfield Billing.",
+      "start": "mail.html",
+      "pass": [
+        {
+          "state": "mail.deleted",
+          "has": "m4"
+        },
+        {
+          "state": "mail.deleted",
+          "has": "m3"
+        },
+        {
+          "state": "mail.inbox.length",
+          "is": 2
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "link",
+          "Offers of the week"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ],
+        [
+          "open",
+          "mail.html"
+        ],
+        [
+          "click",
+          "link",
+          "Invoice INV-1042"
+        ],
+        [
+          "click",
+          "button",
+          "Delete message"
+        ]
+      ]
+    },
+    {
+      "id": "account-name-and-email",
+      "title": "Change two fields of the account",
+      "task": "Change the display name of the account to Ada Byron and its email to byron@example.com, and save.",
+      "start": "account.html",
+      "pass": [
+        {
+          "state": "profile.name",
+          "is": "Ada Byron"
+        },
+        {
+          "state": "profile.email",
+          "is": "byron@example.com"
+        },
+        {
+          "state": "profile.saved",
+          "min": 1
+        }
+      ],
+      "solution": [
+        [
+          "type",
+          "Display name",
+          "Ada Byron"
+        ],
+        [
+          "type",
+          "Email",
+          "byron@example.com"
+        ],
+        [
+          "click",
+          "button",
+          "Save changes"
+        ]
+      ]
+    },
+    {
+      "id": "notes-replace",
+      "title": "Replace one note with another",
+      "task": "Delete the note about stamps and add a note that says: Post the letter",
+      "start": "notes.html",
+      "pass": [
+        {
+          "state": "notes.items",
+          "lacks": "~stamps"
+        },
+        {
+          "state": "notes.items",
+          "has": "Post the letter"
+        },
+        {
+          "state": "notes.items",
+          "has": "Call the dentist"
+        },
+        {
+          "state": "notes.items.length",
+          "is": 2
+        }
+      ],
+      "solution": [
+        [
+          "click",
+          "button",
+          "Delete note: Buy stamps"
+        ],
+        [
+          "type",
+          "New note",
+          "Post the letter"
+        ],
+        [
+          "click",
+          "button",
+          "Add note"
+        ]
+      ]
     }
   ]
 }

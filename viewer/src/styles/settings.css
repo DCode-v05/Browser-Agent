@@ -288,6 +288,12 @@
   resize: vertical;
 }
 
+/* One line, where a list of sites has several. */
+.sites.one-line {
+  min-height: var(--target-min);
+  resize: none;
+}
+
 .setting-locked,
 .setting-status {
   display: inline-flex;

@@ -72,6 +72,24 @@ jobs:
         run: uv run python scripts/ladder.py
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py --through-helper
+      # With the setting on, the installer has the driver register its own logon task (spec 22.10).
+      - if: runner.os == 'Windows'
+        name: The driver's logon task is registered when the settings ask for it
+        shell: bash
+        env:
+          BAP_BROWSER__COMPUTER__BASE__AUTOSTART: "true"
+        run: |
+          uv run bap-browser computer install
+          uv run python - <<'EOF'
+          import subprocess, sys
+          from bap_browser import computer
+          from bap_browser.computer import driver
+          from bap_browser.config import load_config
+          binary = driver.installed(computer.home_of(load_config()))
+          said = subprocess.run([str(binary), "autostart", "status"], capture_output=True, text=True).stdout.strip()
+          print(said)
+          sys.exit(0 if said.startswith("registered") else 1)
+          EOF
       - if: runner.os == 'macOS'
         run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."
         shell: bash

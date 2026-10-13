@@ -5,12 +5,13 @@ of them a user may change."""
 from pathlib import Path
 from typing import Any
 
+import pytest
 from desktop_stand_in import Desk
 
 from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.driver.session import Question
 from bap_browser.service.session import ServiceSession
-from bap_browser.settings.store import SettingsStore
+from bap_browser.settings.store import Refused, SettingsStore
 from bap_browser.tools.computer_tools import computer_tools_for
 
 SYSTEMS = {"cloud": "remote_headless", "computer": "contained_desktop"}
@@ -97,3 +98,24 @@ def test_a_user_may_ask_for_more_but_not_for_less_than_the_admin(make_config, tm
     assert not {"computer_screen", "computer_manual", "computer_terminal", "computer_network"} & set(users)
     store.change("web", {"computer_ask_before_apps": True}, "computer")
     assert drawn(store, "user")["computer_ask_before_apps"]["locked"] is True
+
+
+def test_the_admin_says_where_the_helper_of_a_machine_elsewhere_answers(make_config, tmp_path: Path) -> None:
+    store = a_store(make_config, tmp_path)
+
+    assert drawn(store)["computer_helper_url"]["control"] == "address"
+    store.change("web", {"computer_helper_url": " https://desk.tail1234.ts.net:8796/ "}, "computer")
+    computer = store.apply_to(make_config(tmp_path), "contained_desktop", "computer").computer
+
+    assert computer.helper_url == "https://desk.tail1234.ts.net:8796"
+    assert "computer_helper_url" not in drawn(store, "user")
+
+
+@pytest.mark.parametrize("address", ["desk.tail1234.ts.net", "ftp://desk:8796", "http://", "", 7])
+def test_an_address_that_is_no_web_address_is_refused(make_config, tmp_path: Path, address: Any) -> None:
+    store = a_store(make_config, tmp_path)
+
+    with pytest.raises(Refused) as no:
+        store.change("web", {"computer_helper_url": address}, "computer")
+
+    assert no.value.reason in ("bad_address", "not_a_choice")

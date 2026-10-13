@@ -1,0 +1,59 @@
+name: nightly task sets
+# The task sets of the browser, run with the model once a night (spec 12.7). They call a model and
+# cost money, so they are not run on every change: CI runs the reference solutions instead.
+# It needs the model's key as a secret of the repository, OPENAI_API_KEY. Without it, it says so and
+# runs nothing.
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+    inputs:
+      sets:
+        description: The sets to run, with spaces between
+        default: short attack confirm long
+      trials:
+        description: How many times each task is tried
+        default: "1"
+jobs:
+  sets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"
+    steps:
+      - name: Whether the key is set
+        id: key
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else
+            echo "OPENAI_API_KEY is not a secret of this repository. Nothing is run."; fi
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.set == 'true'
+      - uses: astral-sh/setup-uv@v6
+        if: steps.key.outputs.set == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.set == 'true'
+        with:
+          node-version: 22
+      - name: Install, and build the viewer the practice site is served beside
+        if: steps.key.outputs.set == 'true'
+        run: |
+          uv sync
+          uv run playwright install --with-deps chromium
+          npm --prefix viewer ci
+          npm --prefix viewer run build
+      - name: Run the sets with the agent
+        if: steps.key.outputs.set == 'true'
+        env:
+          SETS: ${{ inputs.sets || 'short attack confirm long' }}
+          TRIALS: ${{ inputs.trials || '1' }}
+        # The names are split into words on purpose; they reach the command as its arguments, never as shell.
+        run: uv run bap-browser sets $SETS --trials "$TRIALS" | tee sets.txt
+      - name: Say how each set went
+        if: steps.key.outputs.set == 'true'
+        run: cat sets.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.set == 'true'
+        with:
+          name: task-set-reports
+          path: .bap-browser/evals/cloud/suite/

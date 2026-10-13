@@ -23,6 +23,9 @@ NEVER_ON_A_MODELS_WORD = frozenset({"pays", "sends", "deletes", "grants"})
 TYPED_INTO = frozenset({"textbox", "searchbox", "combobox", "spinbutton", "slider"})
 # A link goes somewhere. Links that pay or delete exist; a link named "Blog post" sends nothing.
 NOT_FOR_A_LINK = frozenset({"sends", "commits"})
+# A box that is ticked says what is wanted. "Send me the newsletter" sends nothing when it is ticked.
+TICKED = frozenset({"checkbox", "switch", "radio"})
+NOT_FOR_A_TICK = frozenset({"sends"})
 # The keys that send what a message box holds.
 SENDING_KEYS = frozenset({"Enter", "Control+Enter", "Meta+Enter"})
 
@@ -64,11 +67,15 @@ def class_of(
     found: ActionClass | None = None
     most = 0
     for kind in CLASSES:
-        if role == "link" and kind in NOT_FOR_A_LINK:
+        if (role == "link" and kind in NOT_FOR_A_LINK) or (role in TICKED and kind in NOT_FOR_A_TICK):
             continue
         held = longest_held(name, getattr(actions, kind))
         if held > most:
             found, most = kind, held
+    if role in TICKED:
+        # The deployment's own words that say "send" say no more of a tick than the class does.
+        left_out = {word.lower() for kind in NOT_FOR_A_TICK for word in getattr(actions, kind)}
+        more_words = [word for word in more_words if word.lower() not in left_out]
     if found is None and role != "link" and holds(name, more_words):
         return "commits"
     return found

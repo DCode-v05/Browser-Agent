@@ -15,7 +15,7 @@ import os
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from typing import Any
+from typing import Any, Literal
 
 from bap_browser import computer
 from bap_browser.computer import contained
@@ -44,6 +44,8 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
+# How the desktop's own pointer does each press: the button, and how many times.
+PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
 # The states of a session in which a person is at the screen.
@@ -84,6 +86,7 @@ class HermesDriver(DesktopDriver):
         self._base: AbstractContextManager[None] | None = None
         self._last: Shot | None = None
         self._screen: ScreenHere | None = None
+        self._placed: dict[int, tuple[int, int, int, int]] = {}
 
     # The session.
 
@@ -140,6 +143,39 @@ class HermesDriver(DesktopDriver):
                 "The machine's screen is not being driven any more.", reason="the session ended"
             )
         return await asyncio.to_thread(computer.computer_use, arguments, session or self._name)
+
+    # Where things are, on a desktop this engine itself started (spec 22.5).
+
+    def saw(self, elements: list[dict[str, Any]]) -> None:
+        """Keeps where each element of the newest capture is on the screen, by its number."""
+        self._placed = {
+            int(one["index"]): (int(x), int(y), int(wide), int(high))
+            for one in elements
+            for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
+        }
+
+    async def press(self, element: int, action: str) -> Literal["pressed", "nowhere"] | None:
+        """Presses an element with the desktop's own pointer, at its middle on the screen. "nowhere"
+        for one with no size: an item of a menu that is not open, or a hidden button. None where the
+        press is left to the driver: the element is not known, the desktop is not this engine's own,
+        or the app does not say where the element is. An app of GTK 4 gives every element the corner
+        of its window, so a corner that another element has too is nobody's place."""
+        own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
+        if own is None or element not in self._placed:
+            return None
+        x, y, wide, high = self._placed[element]
+        if not wide or not high:
+            return "nowhere"
+        shared = [
+            other
+            for number, other in self._placed.items()
+            if number != element and other[:2] == (x, y) and other[2] and other[3]
+        ]
+        if shared:
+            return None
+        button, times = PRESSED[action]
+        await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
+        return "pressed"
 
     # What the two tools kept from before ask.
 

@@ -8,12 +8,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar, Literal
+from urllib.parse import urlsplit
 
 from bap_browser.config import Config
 from bap_browser.policy.url_policy import site_pattern
 
 Value = str | bool | list[str] | None
-Reason = Literal["locked", "not_on_this_surface", "would_loosen", "not_a_choice", "bad_site"]
+Reason = Literal["locked", "not_on_this_surface", "would_loosen", "not_a_choice", "bad_site", "bad_address"]
 Patch = dict[str, Any]
 """Configuration keys, written with dots, and the values a setting gives them."""
 
@@ -375,6 +376,30 @@ class SiteList(Entry):
             if site and site not in seen:
                 seen.append(site)
         return seen
+
+
+@dataclass(frozen=True, kw_only=True)
+class Address(Entry):
+    """A configuration key that holds one web address, such as where a service answers."""
+
+    key: str
+
+    CONTROL: ClassVar[str] = "address"
+
+    def deployed(self, config: Config) -> Value:
+        return str(read(config, self.key))
+
+    def problem(self, value: Any, config: Config) -> Reason | None:
+        if not isinstance(value, str):
+            return "not_a_choice"
+        parts = urlsplit(value.strip())
+        return None if parts.scheme in ("http", "https") and parts.hostname else "bad_address"
+
+    def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
+        return {self.key: str(value)}
+
+    def tidy(self, value: Any) -> Value:
+        return str(value).strip().rstrip("/")
 
 
 def _inside(site: str, wide: str) -> bool:

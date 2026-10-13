@@ -351,14 +351,17 @@
         "src/bap_browser/evals/sets/attack.json",
         "src/bap_browser/evals/sets/long.json",
         "src/bap_browser/demo_site/lab/lab.js",
-        "viewer/src/systems/Suite.tsx"
+        "viewer/src/systems/Suite.tsx",
+        "src/bap_browser/agent/sets_command.py",
+        ".github/workflows/nightly.yml"
       ],
       "tests": [
         "tests/unit/test_task_grading.py",
         "tests/e2e/test_task_sets.py",
+        "tests/e2e/test_sets_command.py",
         "tests/viewer/test_studio.py"
       ],
-      "reach": "A browser's tab \"Evaluations\", part \"Task sets\": \"Run with the agent\", \"Run the reference solutions\", \"Stop the run\", \"Show the tasks\". The practice site is at `<service>/demo-site/lab/`.",
+      "reach": "A browser's tab \"Evaluations\", part \"Task sets\": \"Run with the agent\", \"Run the reference solutions\", \"Stop the run\", \"Show the tasks\". With no window: `uv run bap-browser sets short attack --reference`. The practice site is at `<service>/demo-site/lab/`.",
       "addresses": [
         "/api/suite",
         "/api/systems/{system}/suite",

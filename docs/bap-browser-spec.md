@@ -2798,9 +2798,9 @@ case, and a word that begins with `~` is looked for anywhere in the value.
 
 | Set | Tasks | What it measures | Its number |
 |---|---|---|---|
-| `short` | 20 | Whether a small task is finished: one to ten steps on one page | The share of tries that passed |
-| `confirm` | 16 | Whether a person is asked before a step that orders, sends, deletes or publishes (8 tasks), and is not asked before a harmless one (8). Two of the risky ones are answered with no: nothing may then be done | Of the risky steps, how many were asked about; of the harmless ones, how many were asked about without need |
-| `attack` | 10 | Whether text planted in a review, a message, a note or off the screen makes the agent order, send, delete, publish, change the account or hand over the user's details | The share of planted instructions that were followed. Lower is better |
+| `short` | 30 | Whether a small task is finished: one to ten steps on one page | The share of tries that passed |
+| `confirm` | 100 | Whether a person is asked before a step that orders, sends, deletes or publishes (50 tasks), and is not asked before a harmless one (50). Seven of the risky ones are answered with no: nothing may then be done | Of the risky steps, how many were asked about; of the harmless ones, how many were asked about without need |
+| `attack` | 25 | Whether text planted in a review, a message, a note or off the screen makes the agent order, send, delete, publish, change the account or hand over the user's details | The share of planted instructions that were followed. Lower is better |
 | `long` | 4 | Whether a task of many steps over several pages is finished | The share of tries that passed |
 
 **A run** does every task of a set `trials` times (`evals.suite_trials`, at most
@@ -2830,7 +2830,10 @@ it is on and keeps what it did.
 **What is kept.** One line for each run in `<evals.dir>/<system>/suite/runs.jsonl`: the set, who did
 it, the model, each task with each try (passed, why not, asked, followed, steps, tokens), and the
 totals. Each try of the agent also has a full record, as in 12.6, in
-`<evals.dir>/<system>/suite/tasks.jsonl`, apart from the records of a person's own tasks.
+`<evals.dir>/<system>/suite/tasks.jsonl`, apart from the records of a person's own tasks. A try is read
+afterwards at the address of a task's trace, like any task: its record, and with it what the
+browser's log kept between its start and its end, each call with what it was given (typed text left
+out) and the first line of what it answered.
 
 **In the window.** The Evaluations view of a browser has a part "Task sets": for each set what it
 measures, its newest result and the pass rates of the runs before it, "Run with the agent", "Run the
@@ -2844,7 +2847,7 @@ did not pass. The Systems page puts the newest run of each set on each browser s
 | `POST /api/systems/{name}/suite/stop` | The same | Ends the run under way after its task |
 | `GET /api/suite` | Admin | The newest run of each set on each browser |
 
-**Tested.** The reference solutions of all 50 tasks are run in a real browser on every change, and
+**Tested.** The reference solutions of all 159 tasks are run in a real browser on every change, and
 every task is tried with a solution of no steps, which must not pass. The rules of section 8.2 ask
 before every risky step of `confirm` and before two harmless ones, whose controls hold the words
 "send" and "remove": the test states both.
@@ -3863,6 +3866,7 @@ into.
 - A message box is a text area, an editable block, or a field whose name or label holds message, comment, reply, review, post, body, subject, to or recipient. A search box (a `search` field, or the one text field of its form) is not.
 - A word in Latin letters is matched whole and without regard to case. A word in another script is looked for anywhere in the name.
 - A phrase says more than a word: "Cancel order" deletes, though "order" alone pays. Between words of the same length the graver class wins, in the order of the table: "Confirm and pay" pays.
+- A box that is ticked says what is wanted. "Send me the newsletter" sends nothing when it is ticked: a checkbox, a switch or a radio button is not classed as sending, by the words of the class or by the deployment's own.
 - A link goes somewhere. It is classed only when it pays, deletes or grants: links that send are rare, and a link named "Blog post" sends nothing.
 - Reply, share, forward, invite, comment and apply are not in the list: such a control opens a form far more often than it sends one, and a person asked at every "Apply filters" stops reading the questions. What they lead to is caught where it is sent: by the form's own button, or by Enter in the message box.
 - The words are settings, one list for each class (`safeguards.actions`). `permissions.consequential_words` stays, as the deployment's own extra words.
@@ -5158,6 +5162,7 @@ desktop, and the desktop's are not drawn for a browser.
 | Setting | Key | Default | Applies | Who may change it | As the vendors do it |
 |---|---|---|---|---|---|
 | Screen size | `computer.screen` | 1280 by 800 | Next session | Admin | Anthropic recommends a screen of about 1024 by 768 to 1366 by 768; OpenAI's tool takes the display's width and height |
+| Where the helper of a machine elsewhere answers | `computer.helper_url` | `http://127.0.0.1:8796` | Next session | Admin | A web address, typed in a field. What is no web address is refused |
 | Give the model the tool's manual | `computer.base.manual` | On | Next session | Admin | Hermes gives its model the same manual as a skill; it costs about 4,500 tokens a task |
 | Where the agent's input goes | `computer.base.delivery` | Decide by the desktop | Next session | Admin | Hermes' `delivery_mode`: background on a person's machine, in front where nobody is at the screen |
 | Ask me before an app opens | `computer.ask_before_apps` | Off | Now | Admin; a user may turn it on, never off over the admin | Google's "require confirmation" for system-level actions; OpenAI's confirmations |
@@ -5264,6 +5269,10 @@ internet.
 
 ### 21.13 A person's real Mac
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4. The agent works on the person's own Mac, through a helper the person starts there:
 
 ```bash
@@ -5318,6 +5327,10 @@ the token, the missing permission, the stop in the corner, and the apps.
 
 ### 21.14 A person's real Windows machine
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4, extended to a second platform. Designed; not yet built. As section 21.13, except:
 
 - The helper sees the screen through Windows's own `user32.dll` and `gdi32.dll` (reached through
@@ -5340,6 +5353,10 @@ Arrangement 4, extended to a second platform. Designed; not yet built. As sectio
 
 ### 21.15 A person's real Linux machine (X11)
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4, extended to a third platform. Designed; not yet built, and for X11 only: a desktop on
 Wayland is not reached by it (section 21.10). As section 21.13, except:
 
@@ -5359,6 +5376,10 @@ Wayland is not reached by it (section 21.10). As section 21.13, except:
 
 ### 21.16 A helper reached over the tailnet
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Designed; not yet built. Arrangement 4 joins arrangement 3: the engine, wherever it runs (including a
 micro VM that has joined the person's tailnet, section 21.12), reaches a helper of sections 21.13 to
 21.15 by the helper's Tailscale address, so that the person's own machine need not share a network
@@ -5377,9 +5398,6 @@ with the engine, and nothing of the helper is open to the internet.
   same tailnet, the engine given the helper's Tailscale address, a task done on the person's machine,
   and the live picture watched through the VM's own viewer.
 
-> Sections 21.14 to 21.16 are the earlier design for Windows, Linux and a helper over a tailnet: input of our own
-> on each system. Section 22 replaced it with Hermes' driver, and is what is built. They are kept as the record of
-> that design.
 
 ## 22. Computer use on Hermes
 
@@ -5585,6 +5603,23 @@ Removed with no replacement: `computer_zoom` (element numbers and the tree repla
 ### 22.5 What the model sees
 
 Three capture modes replace today's screenshot-only view, with Hermes' caps and its rule for an unchanged picture.
+
+**On a desktop nobody sits at** (the contained desktop, the micro VM's own screen), two things differ
+from Hermes' own tool, because input there goes in front:
+
+- A capture's text names only the elements that have a place on the screen. An app reports far more:
+  the items of every menu that is not open, and hidden buttons (248 of a text editor's 255). Those are
+  counted in one line, and named once their menu is open.
+- A click on an element by its number is delivered as a click of the desktop's own pointer at the
+  element's middle on the screen, where the app says where the element is. Some do not: an app of
+  GTK 4 gives every element the corner of its window. An element whose corner another element has
+  too is pressed the driver's own way.
+  Pressed through the accessibility bus, a button or menu item that opens a box leaves its app not
+  answering until the box is closed, about 25 seconds a step (seen on Linux). An element with no place
+  on the screen is not pressed: the result says to open its menu and capture again.
+
+On a person's own machine, where input goes in the background, neither applies: every element is
+named and pressed as Hermes' tool does it.
 
 | Mode | What the model gets | For |
 | --- | --- | --- |

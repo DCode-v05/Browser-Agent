@@ -12,6 +12,7 @@ change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`
 - Run as an MCP server: `uv run bap-browser mcp`
 - Run the whole path with no model key: `uv run bap-browser agent --demo --open` (the viewer must be built)
 - Show the configuration: `uv run bap-browser config show --sources`
+- Run task sets with no window: `uv run bap-browser sets short attack --reference` (leave out `--reference` to run them with the model; that spends the key)
 - Every check in one order, stopping at the first that fails: `uv run python scripts/gate.py` (`--quick` leaves out the tests that start a browser)
 - The bad patterns, read from the code: `uv run python scripts/patterns.py` (`--list` shows every place a rule matches)
 - Viewer install: `npm --prefix viewer install`

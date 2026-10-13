@@ -140,6 +140,17 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--only", action="append", default=[], help="run this line only; may be repeated")
     bench.set_defaults(run=_bench)
 
+    sets = commands.add_parser(
+        "sets", help="run task sets in a browser with no window, and keep their reports (spec 12.7)"
+    )
+    sets.add_argument("names", nargs="+", help="the sets to run: short, confirm, attack, long")
+    sets.add_argument("--trials", type=int, default=1, help="how many times each task is tried (default: 1)")
+    sets.add_argument(
+        "--reference", action="store_true", help="do each task by its reference solution, with no model"
+    )
+    sets.add_argument("--config", help="path of config.json")
+    sets.set_defaults(run=_sets)
+
     agent = commands.add_parser(
         "agent", help="run the reference agent on a task, with the viewer to watch and control it"
     )
@@ -335,6 +346,29 @@ def _key_for_the_model(config: Config) -> str:
             "in the environment. To try without a model: bap-browser agent --demo"
         )
     return key
+
+
+def _sets(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    key = "" if args.reference else _key_for_the_model(config)
+    from bap_browser.agent.openai_model import OpenAIModel
+    from bap_browser.agent.sets_command import run_sets
+    from bap_browser.safeguards.model import ModelClient
+
+    logging.basicConfig(level=config.logging.level, stream=sys.stderr)
+    asyncio.run(
+        run_sets(
+            config,
+            lambda service: OpenAIModel(
+                config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
+            ),
+            args.names,
+            trials=args.trials,
+            mode="reference" if args.reference else "agent",
+            tell=print,
+        )
+    )
+    return 0
 
 
 def _studio(args: argparse.Namespace) -> int:

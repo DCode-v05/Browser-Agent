@@ -3,7 +3,7 @@
 
 import type { Surface } from '../protocol';
 
-export type SettingControl = 'choice' | 'select' | 'switch' | 'list' | 'action' | 'path' | 'about';
+export type SettingControl = 'choice' | 'select' | 'switch' | 'list' | 'address' | 'action' | 'path' | 'about';
 export type SettingValue = string | boolean | string[] | null;
 
 export interface SettingChoice {
@@ -51,7 +51,7 @@ export interface SettingsAnswer {
   groups: SettingsGroup[];
 }
 
-export type RefusalReason = 'locked' | 'not_on_this_surface' | 'would_loosen' | 'not_a_choice' | 'bad_site';
+export type RefusalReason = 'locked' | 'not_on_this_surface' | 'would_loosen' | 'not_a_choice' | 'bad_site' | 'bad_address';
 
 export type ChangeResult = { ok: true; answer: SettingsAnswer } | { ok: false; setting: string; reason: RefusalReason };
 

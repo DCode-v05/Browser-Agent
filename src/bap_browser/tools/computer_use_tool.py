@@ -16,7 +16,7 @@ from pydantic import Field
 from bap_browser.config_computer import Computer
 from bap_browser.driver.hermes_driver import HermesDriver, as_shot
 from bap_browser.driver.session import BrowserSession
-from bap_browser.errors import BrowserError
+from bap_browser.errors import BadInput, BrowserError
 from bap_browser.safeguards.reading import from_page
 from bap_browser.tools.registry import Args, Shown, ToolDefinition
 
@@ -44,6 +44,13 @@ LOOKS = frozenset({"capture", "wait", "list_apps", "list_windows"})
 DELIVERED = frozenset(
     {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key"}
 )
+# The actions that press one element.
+PRESSES = frozenset({"click", "double_click", "right_click", "middle_click"})
+NOT_ON_THE_SCREEN = (
+    "Element {element} is not on the screen now: it is an item of a menu that is not open, or a hidden "
+    "button. Click its menu to open it, capture again, and act on what the capture names."
+)
+LOOK_AGAIN = " Capture to see what it changed."
 # The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
 # What marks a line of the tool's text that names a file on the engine's machine. No model here
@@ -99,10 +106,21 @@ def cleared(summary: str) -> str:
     )
 
 
-def of_a_capture(summary: str, elements: list[dict[str, Any]], shown: int, label: int) -> str:
+def sized(one: dict[str, Any]) -> bool:
+    """Whether an element has a place on the screen. An item of a menu that is not open has none."""
+    bounds = list(one.get("bounds") or ())
+    return len(bounds) == 4 and bool(bounds[2]) and bool(bounds[3])
+
+
+def of_a_capture(
+    summary: str, elements: list[dict[str, Any]], shown: int, label: int, *, on_the_screen: bool = False
+) -> str:
     """What a capture says in text: what was captured, and its elements by number. Hermes' own text
     names the first forty as the window gives them, which in an app with large menus is menus alone.
-    Here the page comes first and the menus after, and no file of the engine's machine is named."""
+    Here the page comes first and the menus after, and no file of the engine's machine is named.
+    With `on_the_screen`, only what has a place on the screen is named: the rest is counted."""
+    away = [] if not on_the_screen else [one for one in elements if not sized(one)]
+    elements = [one for one in elements if one not in away]
     kept = [
         line
         for line in summary.splitlines()
@@ -124,6 +142,11 @@ def of_a_capture(summary: str, elements: list[dict[str, Any]], shown: int, label
         )
     if of_the_menus:
         lines.append(f"This window has {len(of_the_menus)} menu items.")
+    if away:
+        lines.append(
+            f"{len(away)} more {'is' if len(away) == 1 else 'are'} not on the screen: items of menus that are "
+            "not open, and hidden buttons. Click a menu to open it, then capture again."
+        )
     return "\n".join([*kept, *lines])
 
 
@@ -168,17 +191,35 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
         raise BrowserError("This session drives no machine.", reason="this is not a machine")
     asked = args.model_dump(exclude_none=True)
     how = delivery_for(session.config.computer)
+    in_front = how == "foreground"
     if how and args.action in DELIVERED and "delivery_mode" not in asked:
         asked["delivery_mode"] = how
+    if in_front and args.action in PRESSES and args.element is not None and args.coordinate is None:
+        # Pressed by its number, a button that opens a box leaves its app not answering until the
+        # box is closed (seen on Linux). On a desktop nobody sits at, the pointer presses it.
+        pressed = await driver.press(args.element, args.action)
+        if pressed == "nowhere":
+            raise BadInput(NOT_ON_THE_SCREEN.format(element=args.element), reason="not on the screen")
+        if pressed == "pressed" and not args.capture_after:
+            return f"{args.action}: done. The pointer pressed element {args.element}.{LOOK_AGAIN}"
+        if pressed == "pressed":
+            # What it changed is looked at the way the tool itself would after an action.
+            await asyncio.sleep(session.config.computer.settle_ms / 1000)
+            asked = {"action": "capture", "mode": "ax"}
     result = await driver.use(asked)
     shown = session.config.computer.base.elements_shown
     label = session.config.computer.window_title_chars
+
+    def said(summary: str, elements: list[dict[str, Any]]) -> str:
+        driver.saw(elements)
+        return of_a_capture(summary, elements, shown, label, on_the_screen=in_front)
+
     shot = as_shot(result)
     if shot is not None:
         elements = await asyncio.to_thread(every_element, result)
         summary = str(result.get("text_summary", ""))
         # Up to a hundred elements the tool's own text stands; past that, ours names the page first.
-        text = of_a_capture(summary, elements, shown, label) if elements is not None else cleared(summary)
+        text = said(summary, elements) if elements is not None else cleared(summary)
         return Shown(from_page(text), shot.picture)
     answer = json.loads(result) if isinstance(result, str) else result
     if not isinstance(answer, dict):
@@ -186,7 +227,7 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if "error" not in answer and isinstance(answer.get("summary"), str):
         elements = await asyncio.to_thread(every_element, answer)
         if elements is not None:
-            return from_page(of_a_capture(answer["summary"], elements, shown, label))
+            return from_page(said(answer["summary"], elements))
     if "error" in answer:
         hint = f" {answer['hint']}" if answer.get("hint") else ""
         reason = REFUSALS.get(str(answer.get("code")), "the machine did not do it")
