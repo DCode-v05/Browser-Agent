@@ -78,6 +78,8 @@ jobs:
       # which the list of allowed apps cannot name.
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py --any-app
+      - if: runner.os == 'Windows'
+        run: uv run python scripts/ladder.py --any-app --site "Microsoft Edge" https://example.com "Example Domain"
       # With the setting on, the installer has the driver register its own logon task (spec 22.10).
       - if: runner.os == 'Windows'
         name: The driver's logon task is registered when the settings ask for it

@@ -260,6 +260,29 @@ def test_the_model_is_given_this_engines_rules_and_then_hermes_own_manual(
     assert not told.lstrip().startswith("---")
 
 
+def test_where_any_app_is_allowed_the_model_is_told_it_may_open_any_and_how_to_reach_a_site(
+    make_config, tmp_path: Path
+) -> None:
+    whole = {"runs": "machine", "any_app": True, "base": {"manual": False}}
+    told = instructions_for(make_config(tmp_path, computer=whole))
+
+    assert "opens any app on this computer by its name" in told
+    assert "address bar" in told and "browser" in told
+    assert "an app the person allowed" not in told
+    # A password, a sign-in or a payment is still the person's to do.
+    assert "computer_request_human" in told
+
+
+def test_where_the_agent_is_held_to_the_allowed_apps_the_model_is_not_told_of_any_other(
+    make_config, tmp_path: Path
+) -> None:
+    held = {"runs": "machine", "base": {"manual": False}}
+    told = instructions_for(make_config(tmp_path, computer=held))
+
+    assert "computer_open_app opens an app the person allowed" in told
+    assert "any app on this computer" not in told
+
+
 def test_the_manual_can_be_left_out(make_config, tmp_path: Path) -> None:
     told = instructions_for(make_config(tmp_path, computer={"runs": "machine", "base": {"manual": False}}))
 

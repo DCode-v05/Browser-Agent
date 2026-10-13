@@ -76,6 +76,14 @@ OK_BUTTON = re.compile(r"#(\d+) \S*button\S* 'OK'")
 TYPED = "ladder 4711"
 WAIT_FOR_THE_APP_S = 20.0
 WAIT_FOR_THE_OTHER_APP_S = 3.0
+# How long a page of a website is given to load before it is read.
+WAIT_FOR_THE_PAGE_S = 8.0
+# How often the address is given before the page is said not to have come.
+TRIES_FOR_THE_PAGE = 3
+# The chord that reaches a browser's address bar.
+ADDRESS_BAR = {"darwin": "cmd+l"}
+# A line of a capture that names a browser's address bar: its number.
+THE_ADDRESS_BAR = re.compile(r"#(\d+) \S+ '[^'\n]*(?:[Aa]ddress|URL)[^'\n]*'")
 LOOK_AGAIN_S = 0.5
 
 
@@ -301,7 +309,72 @@ async def looked_at(session: ServiceSession, pid: int, name: str) -> ToolResult:
     return await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax", **exactly})
 
 
-async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
+async def a_site_is_read(
+    session: ServiceSession, browser: str, address: str, expects: str
+) -> tuple[str, bool, str]:
+    """With any app allowed: the machine's own browser is opened by its name, its address bar is
+    clicked by its number, an address is typed, and what the page shows is read. This is how the
+    agent reaches a website."""
+
+    async def does(step: dict[str, Any]) -> ToolResult:
+        did = await session.toolkit.call("computer_use", step)
+        if did.is_error and "foreground" in did.text:
+            # The tool says where background delivery is not to be had, and what to do: the agent
+            # is told to follow it.
+            did = await session.toolkit.call("computer_use", {**step, "delivery_mode": "foreground"})
+        return did
+
+    opened = await session.toolkit.call("computer_open_app", {"app": browser})
+    # A browser takes a while to show its first window.
+    await a_window_of(browser)
+    look = {"action": "capture", "mode": "ax", "app": browser}
+    done = [opened]
+    bar = None
+    read = opened
+    # A new browser may put a page of its own in the way of the first try. The agent, told that
+    # the effect was not seen, captures and tries again: so does this.
+    for _ in range(TRIES_FOR_THE_PAGE):
+        first = await session.toolkit.call("computer_use", look)
+        done.append(first)
+        bar = THE_ADDRESS_BAR.search(first.text)
+        if bar is not None:
+            # The bar is given its value as a field is.
+            number = int(bar.group(1))
+            steps: list[dict[str, Any]] = [
+                {"action": "click", "element": number},
+                {"action": "set_value", "element": number, "value": address},
+            ]
+        else:
+            steps = [
+                {"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")},
+                {"action": "type", "text": address},
+            ]
+        steps += [{"action": "key", "keys": "return"}, {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S}]
+        for step in steps:
+            done.append(await does(step))
+        read = await session.toolkit.call("computer_use", look)
+        if read.is_error or expects.lower() in read.text.lower():
+            break
+    wrong = next((" | ".join(one.text.splitlines())[:200] for one in [*done, read] if one.is_error), None)
+    how = f"the address bar was {'element ' + bar.group(1) if bar else 'reached by its key'}; "
+    return (
+        f"4, any app is allowed, and {address} is opened in {browser} and read",
+        wrong is None and expects.lower() in read.text.lower(),
+        wrong
+        or how
+        + (
+            " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
+            or "each step said: "
+            + " || ".join(" ".join(one.text.split())[:110] for one in done[2:])
+            + " || the page read: "
+            + " | ".join(read.text.splitlines())[:900]
+        ),
+    )
+
+
+async def through_the_engine(
+    config: Config, site: tuple[str, str, str] | None = None
+) -> list[tuple[str, bool, str]]:
     """Rung 3: the agent's own way in. Through the session and its check, the tool finds a field of
     the known app by its number, types into it, and reads back what it typed."""
     runs = config.computer.runs if config.computer.runs == "remote" else "machine"
@@ -399,6 +472,8 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                         f"{' | '.join(opened.text.splitlines())[:200]} | asked: {asked_of_a_person} | {(await windows_like(shown_as))[:200]}",
                     )
                 )
+            if here.any_app and site is not None:
+                rungs.append(await a_site_is_read(session, *site))
             if here.any_app and sys.platform == "win32":
                 # The two apps of Windows that the list of allowed apps cannot name.
                 for program, title in (("explorer.exe", "File Explorer"), ("wt.exe", "")):
@@ -509,7 +584,14 @@ def main(arguments: list[str] | None = None) -> int:
         action="store_true",
         help="climb with the person's switch on: the agent is not held to the allowed apps",
     )
+    parser.add_argument(
+        "--site",
+        nargs=3,
+        metavar=("BROWSER", "ADDRESS", "EXPECTS"),
+        help="with --any-app: open this browser by its name, go to this address, and find this word on the page",
+    )
     asked = parser.parse_args(arguments)
+    site = (asked.site[0], asked.site[1], asked.site[2]) if asked.site and asked.any_app else None
     # What a screen holds is printed as it is, on a console of any encoding.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
@@ -550,7 +632,7 @@ def main(arguments: list[str] | None = None) -> int:
                     config.computer.helper_url,
                 )
             )
-        climb(config, asked.rungs, problem is None, rungs)
+        climb(config, asked.rungs, problem is None, rungs, site)
 
     for name, passed, seen in rungs:
         print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
@@ -600,7 +682,13 @@ def a_helper_here(config: Config) -> Iterator[Config]:
         os.environ.pop(variable, None)
 
 
-def climb(config: Config, highest: int, installed: bool, rungs: list[tuple[str, bool, str]]) -> None:
+def climb(
+    config: Config,
+    highest: int,
+    installed: bool,
+    rungs: list[tuple[str, bool, str]],
+    site: tuple[str, str, str] | None = None,
+) -> None:
     """Rungs 2 and 3, added to what was climbed so far."""
     problem = None if installed else "not installed"
     # With a screen the engine starts itself, there is none until its session has begun: the
@@ -622,7 +710,7 @@ def climb(config: Config, highest: int, installed: bool, rungs: list[tuple[str, 
                         rungs.append((f"2, a capture of {app} in the mode {mode}", passed, seen))
 
     if highest >= 3 and not [name for name, passed, _ in rungs if not passed]:
-        rungs += asyncio.run(through_the_engine(config))
+        rungs += asyncio.run(through_the_engine(config, site))
 
 
 if __name__ == "__main__":

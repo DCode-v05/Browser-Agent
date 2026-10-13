@@ -1524,6 +1524,44 @@ computer on Hermes' tool but the second long task, which was stopped by hand tha
 - **One task took 36 steps and 391,350 tokens** to say a file was not there. A computer task still
   costs between 140,000 and 390,000 tokens in.
 - Each set was run once. Four and three tasks cannot tell a small change from chance.
+### 1at. Built on 2026-10-13: the whole machine, any app and a website through its own browser
+
+Asked for: the agent works across the whole computer on macOS, Windows and Linux, in any app, and
+reaches sites such as YouTube and Google. The switch for it was there (`computer.any_app`, entry
+1ap). Two things were missing.
+
+| | |
+|---|---|
+| What the model is told | With the switch on, on a real machine: it may open any app on the computer by its name, the person is asked before each opening, and a website is reached through the machine's own browser. With the switch off it is told, as before, of the allowed apps alone |
+| The proof of a website | `scripts/ladder.py --any-app --site <browser> <address> <word>`: the browser is opened by its name after a person's yes, its address bar is found by its number and given the address, return is pressed, and the page is read for the word |
+
+Seen, on GitHub's Windows runner with the real driver, in both runs of the last push: "Rung 4, any
+app is allowed, and https://example.com is opened in Microsoft Edge and read: passed. the address
+bar was element 5; #15 TabItem 'Example Domain - Memory usage - 24.7 MB'". CI holds it on Windows.
+
+Found by running it:
+
+- **A chord does not reach a browser in the background on Windows.** The tool answered "Background
+  delivery is not available for target window class 'Chrome_WidgetWin_1'" and said to deliver in
+  front. Followed, the key was sent.
+- **A new browser puts a page of its own in the way.** Edge on a runner opens on
+  `edge://welcome-new-device/`, and the first return went to it in one run of two. The address is
+  now given again, up to three times, when the page read is not the one asked for.
+- **Typing an address did not navigate; giving the bar its value did.** Typed, "htt" reached the bar
+  and the rest was lost to the welcome page. `set_value` on the bar's element holds.
+
+Not done, and not checked:
+
+- **Linux.** On the runner Firefox opened by its name and was read (757 elements), and it stayed on
+  "Welcome to Firefox": the address bar is not among the 60 elements a capture names, and the chord
+  and the typing, both answered "done", changed nothing. The step is left out of CI. Not mended.
+- **macOS.** Not run. The script that would open Safari and go to a site on this Mac was not
+  allowed to this session, because it answers yes to every question on a person's own machine. A
+  person runs it: `uv run python scripts/ladder.py --any-app --site Safari https://www.youtube.com YouTube`.
+- **No model has done a task across a real machine.** The reference steps did. A run with a model
+  on your own screen spends your key and is yours to start: Systems, Computer, "This machine", "Let
+  the agent work in any app on the machine" on, then a task in the chat.
+- YouTube and Google themselves were not opened anywhere: the runner's proof is example.com.
 
 ## How to go on
 
