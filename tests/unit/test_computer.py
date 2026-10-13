@@ -155,3 +155,31 @@ def test_the_switch_for_any_app_is_named_for_every_system(make_config, tmp_path:
 
     assert one["title"] == "Let the agent work in any app on the machine"
     assert "Mac" not in one["title"] + one["description"]
+
+
+async def test_the_drivers_own_windows_are_not_among_the_open_windows(make_config, tmp_path: Path) -> None:
+    """On Windows the driver draws the agent's pointer in windows of its own. They are nothing to work in."""
+
+    class WithTheDriversOwn(Desk):
+        def list_windows(self) -> list[dict[str, Any]]:
+            return [
+                {"title": "Cua.AgentCursorOverlay.default", "app_name": "cua-driver.exe", "pid": 3},
+                {"title": "Cua Driver", "app_name": "Cua Driver", "pid": 4},
+                {"title": "Untitled - Notepad", "app_name": "notepad.exe", "pid": 7},
+            ]
+
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=WithTheDriversOwn),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    try:
+        listed = await session.toolkit.call("computer_list_apps", {})
+    finally:
+        await session.close()
+
+    assert "Untitled - Notepad" in listed.text and "Cua" not in listed.text

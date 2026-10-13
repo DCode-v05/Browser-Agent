@@ -566,7 +566,7 @@ export const W = {
   chat: {
     title: 'Chat',
     messages: 'Messages',
-    empty: 'Tell the agent what to do in the browser. It answers here when it has finished.',
+    empty: 'Tell the agent what to do. It answers here when it has finished.',
     you: 'You',
     agent: 'Agent',
     working: 'Working on it…',

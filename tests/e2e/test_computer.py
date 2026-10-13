@@ -180,6 +180,47 @@ async def test_a_menu_item_that_opens_a_box_is_pressed_by_its_number_and_the_app
         await session.close()
 
 
+@pytest.mark.parametrize(
+    "hung",
+    ["pkill -STOP -x cua-driver", "(import -window 99999999 png:- >/dev/null 2>&1 &) ; sleep 1"],
+    ids=["the driver hangs", "its picture of a window that has gone holds the screen"],
+)
+async def test_a_desktop_that_stops_answering_is_put_right_and_worked_on_after(
+    make_config, tmp_path: Path, hung: str
+) -> None:
+    """Under a model the desktop in the container stopped answering, and every call after it timed
+    out, a fresh driver's too: the driver's program for picturing a window was waiting for a window
+    that had gone, with the screen held. Both that and a driver that hangs are made here."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, "e2e-stall"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    call = session.toolkit.call
+    try:
+        assert not (await call("computer_open_app", {"app": "Text editor"})).is_error
+        assert not (
+            await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        ).is_error
+        desktop = session.browser.started_driver.desktop  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+        await desktop.run("sh", "-c", hung)
+
+        stalled = await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        assert stalled.is_error and "The desktop stopped answering" in stalled.text, stalled.text
+
+        began = time.perf_counter()
+        again = await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        # The editor was left open: its page is there, with no app to open again.
+        assert not again.is_error and A_PAGE.search(again.text) is not None, again.text
+        assert time.perf_counter() - began < 20, "the desktop was still slow after it was put right"
+    finally:
+        await session.close()
+
+
 async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_config, tmp_path: Path) -> None:
     """A task set makes the desktop ready before each task. An app left stuck by the task before is
     ended by force, so the run goes on."""

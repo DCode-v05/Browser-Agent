@@ -12,6 +12,7 @@ import base64
 import contextlib
 import json
 import os
+import re
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -44,6 +45,13 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
+# The driver's own program. Among the windows it is named `cua-driver.exe` on Windows and
+# `Cua Driver` on macOS: with what is no letter taken out, both begin alike.
+THE_DRIVER = "cua-driver"
+# The program the driver pictures a window with on Linux (ImageMagick's).
+ITS_PICTURES = "import"
+NOT_A_LETTER = re.compile(r"[^a-z]")
+ITS_OWN = "cuadriver"
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
@@ -74,15 +82,6 @@ async def own_screen(settings: Computer) -> ScreenHere:
     await screen.start()
     os.environ["DISPLAY"] = settings.display
     return screen
-
-
-# What the strip over the live picture says of each place a desktop runs.
-WHERE = {
-    "container": "A desktop of its own, in a container",
-    "here": "This machine's own virtual screen",
-    "machine": "This machine's own screen",
-    "remote": "A machine elsewhere",
-}
 
 
 class HermesDriver(DesktopDriver):
@@ -136,7 +135,9 @@ class HermesDriver(DesktopDriver):
         return self._base is not None
 
     def description(self) -> str:
-        return WHERE[self._settings.runs]
+        if self._settings.runs == "container":
+            return super().description()
+        return "A machine elsewhere" if self._settings.runs == "remote" else "This machine's own screen"
 
     async def viewport(self) -> tuple[int, int]:
         if self._last is None:
@@ -186,6 +187,22 @@ class HermesDriver(DesktopDriver):
         await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
         return "pressed"
 
+    async def started_again(self) -> bool:
+        """Puts right a desktop that has stopped answering, where this engine itself started the
+        desktop. On Linux the driver pictures a window with a program of its own, and when the window
+        has gone that program waits for ever with the screen held: nothing else is answered, a fresh
+        driver neither. It is ended, and the driver with it, so that the next call starts a fresh
+        one. The desktop's apps are left as they are. False on a person's own machine: what runs
+        there is theirs."""
+        own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
+        if own is None:
+            return False
+        for program in (ITS_PICTURES, THE_DRIVER):
+            with contextlib.suppress(BapError):
+                # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
+                await own.run("pkill", "-9", "-x", program)
+        return True
+
     # What the two tools kept from before ask.
 
     async def windows(self) -> list[str]:
@@ -193,7 +210,10 @@ class HermesDriver(DesktopDriver):
         listed = await self.use({"action": "list_windows"})
         answer = json.loads(listed) if isinstance(listed, str) else {}
         titles = [
-            str(window.get("title") or window.get("app_name") or "") for window in answer.get("windows", [])
+            str(window.get("title") or window.get("app_name") or "")
+            for window in answer.get("windows", [])
+            # The driver draws the agent's pointer in windows of its own: nothing to work in.
+            if not NOT_A_LETTER.sub("", str(window.get("app_name", "")).lower()).startswith(ITS_OWN)
         ]
         kept = [title[: self._settings.window_title_chars] for title in titles if title.strip()]
         return kept[: self._settings.windows_listed]

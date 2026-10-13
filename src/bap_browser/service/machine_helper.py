@@ -95,6 +95,9 @@ class Helper:
     endpoint: str = ""
     """The driver this helper started with the list of allowed apps, by its own private endpoint.
     Every way to the driver then goes to that one. Empty where the person allows any app."""
+    renew: Callable[[], str] | None = None
+    """Starts that driver afresh and gives its new endpoint. A driver that has run a while refuses
+    an app that was closed and opened again (seen on macOS), so each session of an engine gets one."""
     stopped: bool = False
     running: list[subprocess.Popen[bytes]] = field(default_factory=list)
 
@@ -231,6 +234,10 @@ def helper_app(helper: Helper) -> Starlette:
         helper.say("An engine has started working on this machine.")
         # An ordinary process with its pipes, read on a thread: it is ended at once and for certain
         # when the engine goes away, whatever the loop is doing.
+        if helper.renew is not None and not helper.running:
+            # No conversation is under way: this one begins a session, which gets a fresh driver. A
+            # second conversation of the session, the viewer's beside the agent's, shares it.
+            helper.endpoint = await asyncio.to_thread(helper.renew)
         driver = await asyncio.to_thread(helper.start_driver, with_it)
         assert driver.stdin is not None and driver.stdout is not None
         said, heard = driver.stdout, driver.stdin
@@ -267,22 +274,31 @@ def helper_app(helper: Helper) -> Starlette:
 
 
 @contextmanager
-def holding_to_the_allowed_apps(config: Config, binary: Path) -> Iterator[str]:
-    """The driver started with the list of apps this machine's person allows (spec 22.7), for as long
-    as the helper runs: its private endpoint. Empty where the settings do not hold the agent to a list.
-    The engine is elsewhere and is not trusted to hold itself, so the driver is started here."""
+def holding_to_the_allowed_apps(config: Config, binary: Path) -> Iterator[Callable[[], str] | None]:
+    """The driver started with the list of apps this machine's person allows (spec 22.7): a way to
+    start it afresh, which gives its private endpoint. None where the settings do not hold the
+    agent to a list. The engine is elsewhere and is not trusted to hold itself, so the driver is
+    started here. The one that runs when the helper ends is stopped."""
     here = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": "machine"})})
     if not allowed.held(here.computer):
-        yield ""
+        yield None
         return
     with computer.base(here):
         listed = computer.settings_seen()["computer_use"]["capability_manifest"]
-        held = EmbeddedCuaDaemon(str(binary), "bounded", capability_manifest=listed)
-        held.start()
+        held: list[EmbeddedCuaDaemon] = []
+
+        def afresh() -> str:
+            for before in held:
+                before.stop()
+            held[:] = [EmbeddedCuaDaemon(str(binary), "bounded", capability_manifest=listed)]
+            held[0].start()
+            return held[0].socket_path
+
         try:
-            yield held.socket_path
+            yield afresh
         finally:
-            held.stop()
+            for last in held:
+                last.stop()
 
 
 def run_helper(config: Config, this_machine_alone: bool) -> int:
@@ -319,11 +335,14 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
     else:
         print("It takes calls from this machine alone.")
     try:
-        with holding_to_the_allowed_apps(config, binary) as endpoint:
-            it.endpoint = endpoint
+        with holding_to_the_allowed_apps(config, binary) as afresh:
+            it.renew = afresh
+            if afresh is not None:
+                # Started now, so that a driver that cannot be started is known before an engine calls.
+                it.endpoint = afresh()
             print(
                 "The engine is held to the apps you allow in the settings."
-                if endpoint
+                if afresh is not None
                 else "The engine is not held to a list of apps."
             )
             uvicorn.run(

@@ -51,6 +51,13 @@ NOT_ON_THE_SCREEN = (
     "button. Click its menu to open it, capture again, and act on what the capture names."
 )
 LOOK_AGAIN = " Capture to see what it changed."
+# What Hermes' backend says when the driver has stopped answering. Seen under a model on Linux:
+# after it, every call failed the same way until the session ended.
+STOPPED_ANSWERING = ("timed out", "never reached ready")
+STARTED_AGAIN = (
+    "The desktop stopped answering and was put right: its driver was started again. What you asked "
+    "for may or may not have been done. Capture again to see the desktop as it is."
+)
 # The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
 # What marks a line of the tool's text that names a file on the engine's machine. No model here
@@ -235,6 +242,8 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
         reason = REFUSALS.get(str(answer.get("code")), "the machine did not do it")
         if NO_WINDOW in str(answer["error"]):
             raise BrowserError(NOTHING_IS_OPEN, reason="no window is open")
+        if any(sign in str(answer["error"]) for sign in STOPPED_ANSWERING) and await driver.started_again():
+            raise BrowserError(STARTED_AGAIN, reason="the driver stopped answering")
         raise BrowserError(f"{answer['error']}{hint}", reason=reason)
     if answer.get("ok") is False:
         # The driver answered, and did not do it. That is a failure, with what the driver said.

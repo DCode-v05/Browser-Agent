@@ -48,14 +48,24 @@ MODES = ("som", "vision", "ax")
 KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["notepad.exe"], "Notepad", []),
     "linux": (["zenity", "--entry", "--title=Ladder", "--text=A window the ladder knows"], "zenity", []),
-    "darwin": (["open", "-a", "TextEdit"], "TextEdit", ["osascript", "-e", 'quit app "TextEdit"']),
+    # `-F` opens it afresh: macOS would bring back the windows of its last run, and the driver does
+    # not type in the background into an app that has several windows. It is ended by its process:
+    # asking it to quit goes through AppleScript, which macOS lets through only after a consent.
+    "darwin": (["open", "-F", "-a", "TextEdit"], "TextEdit", ["pkill", "-x", "TextEdit"]),
 }
 # An app each system has that the settings do not allow: how it is started, the name a capture would
 # find it by, and how it is closed.
 NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["charmap.exe"], "Character Map", []),
     "linux": (["xmessage", "-name", "Other", "A window that is not allowed"], "xmessage", []),
-    "darwin": (["open", "-a", "Stickies"], "Stickies", ["osascript", "-e", 'quit app "Stickies"']),
+    "darwin": (["open", "-a", "Stickies"], "Stickies", ["pkill", "-x", "Stickies"]),
+}
+# An app each system has that is none of the four the settings name: the name it is opened by, and
+# what its window is found by.
+BY_NAME: dict[str, tuple[str, str]] = {
+    "win32": ("Character Map", "Character Map"),
+    "linux": ("xclock", "xclock"),
+    "darwin": ("Stickies", "Stickies"),
 }
 # What the driver says when it refuses for the list of allowed apps.
 REFUSED_FOR_THE_LIST = re.compile(r"manifest|authoriz|not allowed|denied|outside", re.IGNORECASE)
@@ -94,14 +104,20 @@ def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
     and its process come out: on Linux the app prints what was typed into it when it is closed."""
     system = next(name for name in KNOWN if sys.platform.startswith(name))
     command, name, closing = KNOWN[system]
-    started = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    try:
-        yield name, started
-    finally:
-        if started.poll() is None:
-            started.terminate()
-        if closing:
-            subprocess.run(closing, capture_output=True, check=False)
+    with tempfile.TemporaryDirectory() as folder:
+        if system == "darwin":
+            # TextEdit begins with its box for opening a file, and no document. It is given one.
+            page = Path(folder) / "ladder.txt"
+            page.write_text("", encoding="utf-8")
+            command = [*command, str(page)]
+        started = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            yield name, started
+        finally:
+            if started.poll() is None:
+                started.terminate()
+            if closing:
+                subprocess.run(closing, capture_output=True, check=False)
 
 
 async def the_windows() -> list[dict[str, Any]]:
@@ -252,6 +268,17 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
     return rungs
 
 
+async def a_window_of(name: str) -> bool:
+    """Whether the driver lists a window that names something, once it has had time to open."""
+    ends = time.monotonic() + WAIT_FOR_THE_APP_S
+    while True:
+        if any(name.lower() in json.dumps(row).lower() for row in await the_windows()):
+            return True
+        if time.monotonic() > ends:
+            return False
+        await asyncio.sleep(LOOK_AGAIN_S)
+
+
 def started(program: str) -> int:
     """Starts a program of the system and leaves it open. Its process."""
     return subprocess.Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
@@ -352,6 +379,26 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                             seen_there,
                         )
                     )
+            if here.any_app:
+                # An app outside the four the settings name is opened by its name, after a yes.
+                system = next(name for name in BY_NAME if sys.platform.startswith(name))
+                named, shown_as = BY_NAME[system]
+                asked_of_a_person: list[str] = []
+
+                async def yes(question: Any) -> Any:
+                    asked_of_a_person.append(question.tool)
+                    return "allowed"
+
+                session.browser.ask_approval = yes
+                opened = await session.toolkit.call("computer_open_app", {"app": named})
+                is_open = await a_window_of(shown_as)
+                rungs.append(
+                    (
+                        f"4, any app is allowed, and {named} is opened by its name after a person's yes",
+                        not opened.is_error and is_open and asked_of_a_person == ["computer_open_app"],
+                        f"{' | '.join(opened.text.splitlines())[:200]} | asked: {asked_of_a_person} | {(await windows_like(shown_as))[:200]}",
+                    )
+                )
             if here.any_app and sys.platform == "win32":
                 # The two apps of Windows that the list of allowed apps cannot name.
                 for program, title in (("explorer.exe", "File Explorer"), ("wt.exe", "")):

@@ -549,9 +549,14 @@ class ItsOwnDesktop:
 
     def __init__(self) -> None:
         self.sent: list[str] = []
+        self.ran: list[tuple[str, ...]] = []
 
     async def send(self, line: str) -> None:
         self.sent.append(line)
+
+    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
+        self.ran.append(command)
+        return b""
 
 
 def where_nobody_sits(
@@ -663,6 +668,55 @@ async def test_on_a_persons_machine_an_item_of_a_closed_menu_is_still_named_and_
     assert [how.get("element") for how in did(desk, "click")] == [3]
 
 
+class Stalled(WithAMenu):
+    """A desktop whose driver has stopped answering, as it did under a model: every call times out."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        if app == "screen":
+            return super().capture(mode, app, pid, window_id)
+        raise RuntimeError("cua-driver MCP call list_windows timed out; the action outcome is unknown")
+
+
+async def test_a_driver_that_stops_answering_on_the_engines_own_desktop_is_started_again(
+    make_config, tmp_path: Path
+) -> None:
+    session, _, own = where_nobody_sits(make_config, tmp_path, Stalled())
+    await session.start()
+    try:
+        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    finally:
+        await session.close()
+
+    assert seen.is_error and "The desktop stopped answering" in seen.text
+    # The model is told what it can do next, not the driver's own words about a session.
+    assert "MCP" not in seen.text and "Capture again" in seen.text
+    # The driver is ended, and the program it pictures a window with, which can hold the screen.
+    # The desktop's apps are left as they are.
+    assert [command[-1] for command in own.ran] == ["import", "cua-driver"]
+
+
+async def test_on_a_persons_machine_a_driver_that_stops_answering_is_left_alone(
+    make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=Stalled),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    finally:
+        await session.close()
+
+    assert seen.is_error and "stopped answering" not in seen.text
+
+
 async def captured(make_config, tmp_path: Path, asked: dict[str, Any], **base: Any) -> dict[str, Any]:
     computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), **base}}
     config = make_config(tmp_path, computer=computer)
@@ -693,20 +747,3 @@ async def test_a_capture_holds_the_mode_the_model_names_whatever_the_admin_chose
     make_config, tmp_path: Path
 ) -> None:
     assert (await captured(make_config, tmp_path, {"mode": "vision"}, capture_mode="ax"))["mode"] == "vision"
-
-
-@pytest.mark.parametrize(
-    ("runs", "said"),
-    [
-        ("container", "A desktop of its own, in a container"),
-        ("here", "This machine's own virtual screen"),
-        ("machine", "This machine's own screen"),
-        ("remote", "A machine elsewhere"),
-    ],
-)
-def test_the_strip_over_the_picture_says_which_desktop_it_is(
-    runs: str, said: str, make_config, tmp_path: Path
-) -> None:
-    config = make_config(tmp_path, computer={"runs": runs})
-
-    assert HermesDriver(config, backend=Desk).description() == said

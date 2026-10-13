@@ -260,7 +260,7 @@ async def test_a_stopped_session_is_started_again_from_its_page(
 
         # A new browser and a new conversation on the same page of the window.
         await opened.room("cloud", "agent")
-        await page.get_by_text("Tell the agent what to do in the browser.").wait_for()
+        await page.get_by_text("Tell the agent what to do. It answers here when it has finished.").wait_for()
         assert await page.get_by_text("Done.", exact=True).count() == 0
         await task.fill("Say done again")
         await task.press("Enter")

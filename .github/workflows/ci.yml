@@ -59,7 +59,7 @@ jobs:
       # Linux has no screen on a runner: a virtual one, the accessibility bus and one small app.
       - if: runner.os == 'Linux'
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity openbox xdotool imagemagick x11-utils x11-xserver-utils
+          sudo apt-get update && sudo apt-get install -y xvfb at-spi2-core dbus-x11 zenity openbox xdotool imagemagick x11-utils x11-xserver-utils x11-apps
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --through-helper
           # With the person's switch on, the agent is not held to the allowed apps.
