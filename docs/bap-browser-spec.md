@@ -2811,8 +2811,10 @@ the chat as if a person had sent it; or by the reference solution, with no model
 back to where it was.
 
 **A try that could not run is not a failed task.** A try that takes longer than
-`evals.suite_trial_timeout_s`, one whose model did not answer, one a person stopped and one whose
-session was ended say nothing of the agent. Each is kept with its reason (`error`), counted apart
+`evals.suite_trial_timeout_s`, one whose model did not answer, one a person stopped, one whose
+session was ended and one whose site or desktop could not be made ready say nothing of the agent.
+Before a task of the desktop its apps are closed; one that has not closed after
+`computer.app_close_wait_s` is ended by force. Each is kept with its reason (`error`), counted apart
 (`errors` in the totals), and left out of every rate: the share that passed, the tasks that passed
 every time, the asking and the planted instructions are all of the tries that ran. The window says how
 many could not run.

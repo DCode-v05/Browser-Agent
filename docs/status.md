@@ -1275,6 +1275,51 @@ Loose ends closed:
   met on Hermes' base (entry 1ai), and its code extends the Mac helper that was removed.
 - `handoff.md` and `computer-use-comparison.html` are in `docs/`.
 
+### 1an. Run on 2026-10-13: the task sets with the model, and what the run found
+
+At your word, each set was run once with the agent (gpt-5.6-luna) through the studio's own task-set
+addresses. The computer's run was stopped before its last two sets: it was using far more tokens than
+was said beforehand.
+
+| System | Set | Result | Took | Tokens in |
+|---|---|---|---|---|
+| Cloud browser | Short tasks | 20 of 20 passed | 210 s | 284,170 |
+| Cloud browser | Planted instructions | 0 of 10 followed; all 10 of the user's tasks done | 125 s | 219,239 |
+| Cloud browser | Long tasks | 4 of 4 passed | 167 s | 338,463 |
+| Cloud browser | Asking before risky steps | Asked before 8 of 8 risky steps; asked without need before 2 of 8 harmless ones | 184 s | 249,235 |
+| Computer, on Hermes' tool | Short tasks | 4 of 4 passed | 257 s | 1,038,798 |
+| Computer, on Hermes' tool | Long tasks | 1 of 1 passed; the second was stopped and is counted as a try that could not run | 365 s | 581,165 |
+| Computer | Planted instructions; tasks that cannot be done | Not run | | |
+
+About 2.7 million tokens in were spent in all, against "about 1 million" said beforehand. The
+estimate was wrong for the computer: a task there takes 16 to 36 steps and each step sends the
+whole conversation again, with the tool's manual in it.
+
+What the run found, and what was done:
+
+- **Pressed by its number, a button that opens a box leaves its app not answering.** The agent
+  pressed "Close Tab" by its number; the editor asked whether to save; from then on every step took
+  about 25 seconds, the wait of the accessibility bus. Reproduced with no model
+  (a click by number: 24.9 s, and each capture after it 24.6 s; the same by a coordinate: 0.2 s). The
+  model is now told to press such a button by its key or by a coordinate. That lessened it and did
+  not end it: in the run after, 8 of 131 steps still took about 25 seconds, after one click by number.
+  The cause is in how the driver presses an element on Linux and is not mended.
+- **An app that would not close ended the whole run, and nothing was kept.** Making the desktop
+  ready waited for the app for ever, the command ran out of time, and the run of all four sets was
+  dropped with one line in the log. An app is now given `computer.app_close_wait_s` (2 s) and then
+  ended by force, and a ground that cannot be made ready is a try that could not run, not the end of
+  the run.
+- **The same two harmless steps are still asked about** ("Send me the newsletter", "Remove Wool
+  socks"), as in entry 1o.
+- **A computer task costs about 260,000 tokens in.** On the tools before, a try cost about 120,000.
+  The manual and the list of 60 elements in every capture are sent again with every step.
+
+Not done:
+
+- The computer's planted instructions and its tasks that cannot be done were not run with the model
+  on Hermes' tool.
+- Each set was run once. One run of 4 or 20 tasks cannot tell a small change from chance.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

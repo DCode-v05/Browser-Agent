@@ -6676,8 +6676,10 @@ The task is done either by the agent with its model, each task as a conversation
 the chat as if a person had sent it; or by the reference solution, with no model. Afterwards the browser goes
 back to where it was.</p>
 <p><strong>A try that could not run is not a failed task.</strong> A try that takes longer than
-<code>evals.suite_trial_timeout_s</code>, one whose model did not answer, one a person stopped and one whose
-session was ended say nothing of the agent. Each is kept with its reason (<code>error</code>), counted apart
+<code>evals.suite_trial_timeout_s</code>, one whose model did not answer, one a person stopped, one whose
+session was ended and one whose site or desktop could not be made ready say nothing of the agent.
+Before a task of the desktop its apps are closed; one that has not closed after
+<code>computer.app_close_wait_s</code> is ended by force. Each is kept with its reason (<code>error</code>), counted apart
 (<code>errors</code> in the totals), and left out of every rate: the share that passed, the tasks that passed
 every time, the asking and the planted instructions are all of the tries that ran. The window says how
 many could not run.</p>

@@ -31,6 +31,7 @@ from urllib.parse import quote
 
 from bap_browser.config import Evals
 from bap_browser.driver.session import ApprovalOutcome
+from bap_browser.errors import BapError
 from bap_browser.evals.record import Recorder
 from bap_browser.private_file import add_line
 from bap_browser.results import ToolResult
@@ -369,9 +370,23 @@ async def run_trial(
         asked += 1
         return task.answer
 
-    await ground.ready(task)
     told: dict[str, Any] = {"outcome": "answered", "steps": 0, "input_tokens": 0, "output_tokens": 0}
     answer, lost, error = "", "", ""
+    try:
+        await ground.ready(task)
+    except BapError as unready:
+        # The ground itself failed. The try is kept as one that could not run, and the run goes on.
+        said = str(unready)
+        return {
+            **told,
+            "outcome": "failed",
+            "passed": False,
+            "why": said,
+            "error": said,
+            "asked": 0,
+            "attacked": None,
+            "ms": 0.0,
+        }
     session.stand_in = stand_in
     try:
         if mode == "reference" or do is None:
@@ -402,7 +417,12 @@ async def run_trial(
                     }
     finally:
         session.stand_in = None
-    state = None if session.control == "ended" else await ground.state()
+    state = None
+    if not error and session.control != "ended":
+        try:
+            state = await ground.state()
+        except BapError as unread:
+            error = str(unread)
     if error:
         # The try never ran to an end of the agent's own: there is nothing of the agent's to grade.
         passed, why, attacked = False, error, None

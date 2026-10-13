@@ -10,6 +10,7 @@ import pytest
 
 from bap_browser.agent.command import Did
 from bap_browser.config import Config
+from bap_browser.errors import BrowserError
 from bap_browser.evals.suite import SETS, Lab, Progress, load_set, run_set, run_trial
 from bap_browser.service.server import Service
 from bap_browser.service.session import ServiceSession
@@ -136,6 +137,33 @@ async def test_a_try_that_takes_too_long_is_an_error_and_not_a_failed_task(
     trial = await run_trial(session, Lab(session, service.address), task, "agent", never, brief)
 
     assert not trial["passed"] and "longer than" in trial["error"]
+
+
+async def test_a_site_that_could_not_be_made_ready_is_an_error_and_the_run_goes_on(
+    lab: tuple[ServiceSession, Service],
+) -> None:
+    session, service = lab
+
+    class Broken(Lab):
+        async def ready(self, task: Any) -> None:
+            raise BrowserError("The practice site did not answer.", reason="no answer")
+
+    tasks = load_set("short")[:2]
+    report = await run_set(
+        session,
+        Broken(session, service.address),
+        "short",
+        trials=1,
+        mode="reference",
+        do=None,
+        settings=session.config.evals,
+        model="",
+        progress=Progress("short", "reference", 1, len(tasks)),
+        tasks=tasks,
+    )
+
+    assert [row["trials"][0]["error"] for row in report["tasks"]] == ["The practice site did not answer."] * 2
+    assert report["totals"]["errors"] == 2 and report["totals"]["pass_rate"] is None
 
 
 async def test_a_task_the_agent_answered_wrongly_is_a_failure_and_no_error(
