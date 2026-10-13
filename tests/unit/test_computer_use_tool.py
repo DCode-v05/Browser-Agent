@@ -465,3 +465,41 @@ def test_input_is_in_the_background_only_where_a_person_is_at_the_screen(
     config = make_config(tmp_path, computer={"runs": runs, "base": base})
 
     assert delivery_for(config.computer) == how
+
+
+class NothingOpen(Desk):
+    """A desktop with no window, as Hermes' backend says it on a Mac."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        if app == "screen":
+            # The person's own look at the whole screen, which needs no window.
+            return super().capture(mode, app, pid, window_id)
+        raise RuntimeError(
+            "window discovery returned no windows; on macOS this usually means no shareable display "
+            "(headless Mac or panel asleep), then run `bap-browser computer doctor`"
+        )
+
+
+async def test_a_desktop_with_no_window_says_so_in_words_a_model_can_act_on(
+    make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=NothingOpen),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    finally:
+        await session.close()
+
+    assert seen.is_error
+    assert "No window is open" in seen.text and "computer_open_app" in seen.text
+    # The engine's own system, and a command for a person, are nothing a model can use.
+    assert "macOS" not in seen.text and "doctor" not in seen.text

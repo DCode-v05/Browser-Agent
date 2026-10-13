@@ -23,7 +23,7 @@ from bap_browser.computer.seams.process import windows_hide_flags
 from bap_browser.computer.seams.home import is_wsl
 from bap_browser.computer.hermes.computer_use.backend import ActionResult, ComputerUseBackend
 from bap_browser.computer.hermes.computer_use.cua_backend_capture import _CaptureMixin
-from bap_browser.computer.hermes.computer_use.cua_backend_daemon import _EmbeddedCuaDaemon
+from bap_browser.computer.hermes.computer_use.cua_backend_daemon import EmbeddedCuaDaemon
 from bap_browser.computer.hermes.computer_use.cua_backend_driver import (
     _CUA_DRIVER_CMD_ENV, cua_driver_binary_available, cua_driver_runtime_contract_status,
     resolve_cua_driver_cmd)
@@ -254,13 +254,13 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         if permission_mode not in {"standard", "bounded", "unrestricted"}:
             raise ValueError(f"unsupported cua-driver permission mode: {permission_mode}")
         self.permission_mode = permission_mode
-        self._embedded_daemon: Optional[_EmbeddedCuaDaemon] = None
+        self._embedded_daemon: Optional[EmbeddedCuaDaemon] = None
         if permission_mode != "standard":
             # Manifest: mandatory for bounded (the daemon validates it), optional for unrestricted where it still
             # caps what an approval-bypassed run may touch.
             raw = _computer_use_cfg().get("capability_manifest")
             # Resolve at daemon launch, after start() reconciles the PM pin.
-            self._embedded_daemon = _EmbeddedCuaDaemon(
+            self._embedded_daemon = EmbeddedCuaDaemon(
                 "", permission_mode,
                 capability_manifest=raw.strip() if isinstance(raw, str) and raw.strip() else None)
         self._bridge = _AsyncBridge()

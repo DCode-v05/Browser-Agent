@@ -15,7 +15,7 @@
     "computer_use/cua_backend.py": {
       "from": "tools/computer_use/cua_backend.py",
       "theirs": "6c0287de53eb3fbfd3307d961898554343271e406c4e6bd31ba4a43194ab5821",
-      "sha256": "a70c3c4f5a4fca268bb33795a4a4fb41ef2fbc456f4fd7cce374c55acc97c3e4"
+      "sha256": "089820a3a187b595e86ea780f95251b4ded287639a01fe2ad4b1fe97ed4bce3c"
     },
     "computer_use/cua_backend_capture.py": {
       "from": "tools/computer_use/cua_backend_capture.py",
@@ -25,7 +25,7 @@
     "computer_use/cua_backend_daemon.py": {
       "from": "tools/computer_use/cua_backend_daemon.py",
       "theirs": "523e9b93c6f71f4a3925a808ed3b0dbeea70fdb054a6f0994dd380f9c4c52d7e",
-      "sha256": "a6a90d6dda60b3c9817187f3045cde2460973c931b5b865164dab4015d969486"
+      "sha256": "5393879fc992937bc94c8f6250e5a02ac7046a2feea89641cea1a9e52eb7efae"
     },
     "computer_use/cua_backend_driver.py": {
       "from": "tools/computer_use/cua_backend_driver.py",

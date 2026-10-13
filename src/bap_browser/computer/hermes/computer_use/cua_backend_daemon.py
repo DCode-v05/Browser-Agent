@@ -93,7 +93,7 @@ def _wait_or_kill(process: Any) -> None:
             process.wait(timeout=2.0)
 
 
-class _EmbeddedCuaDaemon:
+class EmbeddedCuaDaemon:
     """Private daemon for a non-standard permission mode. cua-driver's permission mode is immutable after daemon
     startup, so reusing the machine-wide daemon would let one Hermes session's YOLO choice affect another. A
     private daemon gives the session its own socket, runtime and launch-time authorization; on macOS it is

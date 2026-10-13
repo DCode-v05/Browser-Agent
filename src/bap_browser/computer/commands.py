@@ -25,7 +25,18 @@ ON_MACOS = (
 )
 
 
-def not_ready(config: Config, binary: Path) -> str | None:
+def tell(config: Config, binary: Path, *words: str) -> None:
+    """Tells the driver something it keeps in its own settings, once."""
+    subprocess.run(
+        [str(binary), *words],
+        capture_output=True,
+        env=cua_backend.sanitized_cua_driver_env(),
+        timeout=config.computer.base.register_timeout_s,
+        check=False,
+    )
+
+
+def not_ready(config: Config, binary: Path, system: str = sys.platform) -> str | None:
     """Why an installed driver cannot be used here, or None when it can. It is asked what it can
     do; on macOS its app must be the makers' own, and the system is told where it is, as Hermes'
     installer does: the driver starts itself through the system by its app's name."""
@@ -36,14 +47,12 @@ def not_ready(config: Config, binary: Path) -> str | None:
         if not config.computer.base.driver_telemetry:
             # The setting in the driver's environment does not reach a daemon the system starts for
             # it, so the driver is told once, in its own settings.
-            subprocess.run(
-                [str(binary), "telemetry", "disable"],
-                capture_output=True,
-                env=cua_backend.sanitized_cua_driver_env(),
-                timeout=config.computer.base.register_timeout_s,
-                check=False,
-            )
-        if sys.platform != "darwin":
+            tell(config, binary, "telemetry", "disable")
+        if system == "win32" and config.computer.base.autostart:
+            # The driver registers its own logon task, so that it is there before anybody opens a
+            # window: a machine driven from elsewhere.
+            tell(config, binary, "autostart", "enable")
+        if system != "darwin":
             return None
         app = cua_backend_daemon.resolve_cua_driver_app_path(str(binary))
         if app is None:

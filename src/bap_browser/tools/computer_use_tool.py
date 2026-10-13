@@ -50,6 +50,11 @@ MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMen
 # can read one, and its path is nothing a result should hold.
 OF_THIS_MACHINE = ("saved to", "read_file", "search_files")
 REFUSALS = {"human_has_control": "a person has the screen"}
+# How Hermes' backend begins what it says of a desktop with no window. What follows it is about the
+# engine's own system and a command for a person: nothing a model can use, and wrong for a desktop
+# that is elsewhere.
+NO_WINDOW = "window discovery returned no windows"
+NOTHING_IS_OPEN = "No window is open on the desktop. Open an app with computer_open_app, then capture."
 
 
 class ComputerUseArgs(Args):
@@ -185,6 +190,8 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if "error" in answer:
         hint = f" {answer['hint']}" if answer.get("hint") else ""
         reason = REFUSALS.get(str(answer.get("code")), "the machine did not do it")
+        if NO_WINDOW in str(answer["error"]):
+            raise BrowserError(NOTHING_IS_OPEN, reason="no window is open")
         raise BrowserError(f"{answer['error']}{hint}", reason=reason)
     if answer.get("ok") is False:
         # The driver answered, and did not do it. That is a failure, with what the driver said.

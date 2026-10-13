@@ -243,3 +243,21 @@ def test_the_drivers_telemetry_is_left_alone_when_the_settings_allow_it(tmp_path
     commands.not_ready(a_home(tmp_path, driver_telemetry=True), binary)
 
     assert not (tmp_path / "asked.txt").exists()
+
+
+@ON_A_SYSTEM_WITH_SCRIPTS
+def test_on_windows_the_drivers_logon_task_is_registered_when_the_settings_ask_for_it(tmp_path: Path) -> None:
+    binary = a_driver_that_says(tmp_path, GOOD)
+
+    commands.not_ready(a_home(tmp_path, autostart=True, driver_telemetry=True), binary, system="win32")
+
+    assert (tmp_path / "asked.txt").read_text(encoding="utf-8").splitlines() == ["autostart enable"]
+
+
+@ON_A_SYSTEM_WITH_SCRIPTS
+def test_no_logon_task_is_registered_unless_the_settings_ask_for_it(tmp_path: Path) -> None:
+    binary = a_driver_that_says(tmp_path, GOOD)
+
+    commands.not_ready(a_home(tmp_path, driver_telemetry=True), binary, system="win32")
+
+    assert not (tmp_path / "asked.txt").exists()

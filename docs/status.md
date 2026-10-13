@@ -1002,8 +1002,7 @@ Not built, and not checked:
   have not been read from the driver, so those three are not in the list on Windows. They can be added
   with `also_allowed`.
 - **macOS is unproven.** The bundle ids are written; the driver has not run there.
-- **A machine elsewhere is not held.** The driver there is started by the helper, which does not start
-  it in `bounded` mode yet.
+- **A machine elsewhere was not held.** Entry 1al changes that.
 - The agent can still see the whole screen and the names of its windows, in an app that is not
   allowed too. It cannot read that window's elements or act in it.
 - The list ends after `allowed_for` (12 hours) or `allowed_idle` (2 hours) unused, and the driver then
@@ -1191,6 +1190,44 @@ Not built, and not checked:
   `remote` is. It is no longer offered on the Configuration.
 - Not checked on macOS (the driver's app is not allowed under Accessibility on this Mac), over a
   real tailnet, or on a person's own Windows or Linux machine.
+
+### 1al. Built on 2026-10-13: a machine elsewhere is held to its allowed apps, and smaller things
+
+| | |
+|---|---|
+| The helper holds the engine | `bap-browser computer helper` starts the driver in `bounded` mode with the list written from that machine's own settings, and passes the engine on to that driver alone. A single call goes to it too. The engine cannot stop it |
+| Windows' logon task | With `computer.base.autostart` on, `bap-browser computer install` has the driver register its logon task |
+| A desktop with no window | The tool says "No window is open on the desktop. Open an app with computer_open_app, then capture." Hermes' own words named macOS and a command for a person |
+| The calculator on Windows | Named as the driver lists it on Windows Server 2025, and allowed with the text editor |
+
+Seen on GitHub's runners, with the real driver:
+
+- Linux, `scripts/ladder.py --through-helper`: "Rung 4, not-allowed-dialog, which is not allowed,
+  cannot be looked at or worked in: passed. capture failed: cua-driver get_window_state failed:
+  protected resource is outside the capability manifest". Rungs 1, 2, 3 and 5 passed through the same
+  held driver.
+- Windows, the same command: "Rung 4, Character Map, which is not allowed, cannot be looked at or
+  worked in: passed", with the same refusal.
+
+- Windows, with the calculator allowed by that name: a capture of its window numbered its elements
+  ("Result", "Memory clear").
+
+Found by running it:
+
+- **File Explorer and Windows Terminal are not allowed by the names the driver lists for them.** With
+  `c5e2524a-ea46-4f67-841f-6a9465d9d515_cw5n1h2txyewy` and `Microsoft.WindowsTerminal_8wekyb3d8bbwe`
+  in the list, the driver still answered "outside the capability manifest" for their windows. Those
+  two stay out of the list on Windows.
+
+Not built, and not checked:
+
+- Files and Terminal on Windows, for the reason above. Windows 11 has another Calculator, whose
+  identity has not been read from the driver.
+- The logon task was not registered on a real Windows machine. A test sees the driver asked for it.
+- The driver's check for a newer release is called by nothing here, so there was nothing to switch off.
+- On macOS the driver's background process is started by the system. Whether it ends with the engine
+  was not looked at: the driver is not allowed on this Mac.
+- A result still says "written by the site" of what an app wrote on a desktop.
 
 ## How to go on
 
