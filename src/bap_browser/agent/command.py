@@ -14,8 +14,9 @@ from bap_browser.agent.loop import SYSTEM, Unfinished, run_agent
 from bap_browser.agent.models import Message, Model, Said, ToolOutput
 from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
+from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.playwright_driver import PlaywrightDriver
-from bap_browser.errors import ModelError
+from bap_browser.errors import BapError, ModelError
 from bap_browser.evals.record import Outcome, Recorder, TaskRecord
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.server import Service
@@ -282,7 +283,7 @@ async def do_task(
     record: TaskRecord | None = None
     try:
         answer = await run_agent(
-            await with_where_the_browser_is(task, session),
+            await as_it_begins(task, session),
             session.toolkit if trace is None else TimedTools(session.toolkit, trace),
             model if trace is None else TimedModel(model, trace),
             config.agent,
@@ -324,6 +325,26 @@ async def with_where_the_browser_is(task: str, session: ServiceSession) -> str:
     return (
         f"{task}\n\n[The browser is on {here.url} now. Read the page with browser_snapshot before you act.]"
     )
+
+
+CARRY_ON = (
+    "{task}\n\n[Open on the screen now: {windows}. This task follows what was done before: carry on "
+    "from the screen as it is. Capture before you act, and do not open again an app that is already open.]"
+)
+
+
+async def as_it_begins(task: str, session: ServiceSession) -> str:
+    """The task as the model is given it: with where the work stands now (spec 22.4). On a desktop
+    that is the windows that are open, so that "open Chrome" and then "search for the weather" are
+    one piece of work."""
+    driver = session.browser.started_driver
+    if not isinstance(driver, DesktopDriver):
+        return await with_where_the_browser_is(task, session)
+    try:
+        windows = await driver.windows()
+    except BapError:
+        return task
+    return CARRY_ON.format(task=task, windows="; ".join(windows)) if windows else task
 
 
 def _tidy(history: list[Message], begun: int) -> None:

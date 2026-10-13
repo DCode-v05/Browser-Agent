@@ -19,6 +19,7 @@ import { ParityCard } from './Suite';
 import { CardHead, LogLines, NOT_RUNNING, SwitchRow } from './parts';
 import { SettingsList } from './SettingsList';
 import { UserSettings } from './UserSettings';
+import { useWords } from '../words';
 
 /** What the Systems page shows: what users are allowed, or the three browsers compared. */
 type View = 'users' | 'overview';
@@ -104,6 +105,7 @@ interface PanelProps extends Props {
 
 /** One system by itself, under its own tab of the window: how it is set up, or what its tasks took. */
 export function SystemPanel({ api, system: id, view, role, me, onPrefer, surface, pollMs, wordFor, onChanged, onSettings }: PanelProps) {
+  const L = useWords();
   const { systems, failed, load, asked } = useSystems(api, pollMs);
   const { policy, change: changePolicy } = usePolicy(api, role);
   const [said, setSaid] = useState('');
@@ -112,7 +114,7 @@ export function SystemPanel({ api, system: id, view, role, me, onPrefer, surface
     await load();
     onChanged?.();
   }, [load, onChanged]);
-  const P = W.systems.panel;
+  const P = L.systems.panel;
 
   return (
     <section className="systems" data-single="true" aria-label={view === 'settings' ? W.systems.user.title : W.systems[view]}>
@@ -254,6 +256,7 @@ interface ConfigurationProps {
 /** The admin's configuration of one system: whether it runs, whether users may use it, and every
  *  setting it has, each with what it does and a control that works. */
 function Configuration({ system, api, surface, word, version, onChanged, onSettings, onToast, policy, onPolicy }: ConfigurationProps) {
+  const L = useWords();
   const source = api.settings(system.id);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<SystemAction | null>(null);
@@ -350,7 +353,7 @@ function Configuration({ system, api, surface, word, version, onChanged, onSetti
       />
 
       <h4 className="system-section">{W.systems.log}</h4>
-      <p className="system-hint">{W.systems.logLead}</p>
+      <p className="system-hint">{L.systems.logLead}</p>
       {system.log ? (
         <>
           <code className="system-path">{system.log}</code>
@@ -362,12 +365,12 @@ function Configuration({ system, api, surface, word, version, onChanged, onSetti
           {log && <LogLines log={log} />}
         </>
       ) : (
-        <p className="system-note">{W.systems.logOff}</p>
+        <p className="system-note">{L.systems.logOff}</p>
       )}
       {system.records && (
         <>
           <h4 className="system-section">{W.systems.records}</h4>
-          <p className="system-hint">{W.systems.recordsLead}</p>
+          <p className="system-hint">{L.systems.recordsLead}</p>
           <code className="system-path">{system.records}</code>
         </>
       )}

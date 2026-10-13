@@ -17,13 +17,14 @@ import { StepDrawer, Timeline } from './components/Timeline';
 import type { Connection } from './connection/connection';
 import { DEFAULT_OPTIONS, type ViewerOptions } from './options';
 import type { ClientCommand, Surface } from './protocol';
-import { initialState, reduce, unseenNotices, type Notice } from './state/reducer';
+import { initialState, reduce, unseenNotices } from './state/reducer';
 import { lookOf, tellPanel, type Look } from './state/look';
-import { formatSize } from './state/timeline';
 import { describeState, type ControlName, type StateKey } from './state/view';
 import { DEFAULT_PREFERENCES, preferencesFrom, type Preferences } from './preferences';
 import type { SettingsSource } from './settings/types';
 import { W } from './wording';
+import { TheWords, wordsFor } from './words';
+import { type Toast, toastFor } from './state/toasts';
 
 /** The commands that take hold only when the agent's action in progress has finished. */
 const TAKES_A_MOMENT: Partial<Record<ClientCommand['type'], ControlName>> = { pause: 'pause', resume: 'resume', take_over: 'take_over', hand_back: 'hand_back' };
@@ -47,24 +48,6 @@ export interface AppProps {
   beside?: boolean;
 }
 
-interface Toast {
-  key: string;
-  text: string;
-}
-
-function toastFor(notice: Notice): Toast | null {
-  const key = `notice-${notice.id}`;
-  switch (notice.kind) {
-    case 'approval':
-      // Nobody saw that approval, so it stays on screen as a card until someone does.
-      return notice.outcome === 'unwatched' ? null : { key, text: W.approval.outcome[notice.outcome] };
-    case 'help':
-      return { key, text: W.help.outcome[notice.outcome] };
-    case 'download':
-      return { key, text: W.notice.download(notice.name, formatSize(notice.size)) };
-  }
-}
-
 export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false, beside: chatAlone = false }: AppProps) {
   const hosted = onOpenSettings !== undefined;
   // A page has one bar that is its banner and one main part. In the window, those are the window's.
@@ -72,6 +55,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const Workspace = inWindow ? 'div' : 'main';
   const connection = useMemo(() => createConnection(), [createConnection]);
   const [state, dispatch] = useReducer(reduce, initialState);
+  const L = wordsFor(state.session?.backend);
   const [, setTick] = useState(0);
   const [wantsFull, setWantsFull] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -323,6 +307,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const selectedStep = selected === null ? undefined : state.steps.find((step) => step.n === selected);
 
   return (
+    <TheWords.Provider value={L}>
     <div className="app" data-view={full ? 'full' : 'split'} data-state={view.key} data-embedded={embedded} data-beside={beside || undefined}>
       {talking ? (
         <Conversation
@@ -345,7 +330,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         <>
       <Bar className="top-bar">
         {inWindow ? null : embedded ? (
-          <h1 className="sr-only">{W.topBar.embeddedTitle}</h1>
+          <h1 className="sr-only">{L.topBar.embeddedTitle}</h1>
         ) : (
           <h1 className="brand">
             <span className="brand-mark" aria-hidden="true" />
@@ -365,7 +350,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
             </span>
             <span className="chip" data-kind="browser" title={state.session.browser}>
               <Icon name={state.session.backend === 'contained_desktop' ? 'computer' : 'globe'} />
-              <span className="chip-name sr-only">{W.topBar.browser}</span>
+              <span className="chip-name sr-only">{L.topBar.browser}</span>
               {W.backend[state.session.backend]}
             </span>
             <ModeChip auto={state.auto} onClick={openSettings} />
@@ -378,7 +363,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         </span>
         {!full && !beside && state.session && (
           <span className="wide-only">
-            <Button kind="quiet" icon="expand" onClick={() => setWantsFull(true)} label={W.buttons.showFull}>
+            <Button kind="quiet" icon="expand" onClick={() => setWantsFull(true)} label={L.buttons.showFull}>
               {null}
             </Button>
           </span>
@@ -474,7 +459,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
       {confirmingStop && (
         <Confirm
           question={W.stop.question}
-          consequence={W.stop.consequence}
+          consequence={L.stop.consequence}
           confirm={W.buttons.stop}
           cancel={W.buttons.keepRunning}
           onConfirm={() => {
@@ -496,5 +481,6 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         {assertive}
       </div>
     </div>
+    </TheWords.Provider>
   );
 }

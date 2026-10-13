@@ -141,3 +141,21 @@ def test_the_admin_says_what_a_capture_holds_and_whether_the_drivers_pointer_sho
 
     assert (base.capture_mode, base.no_overlay) == ("ax", "on")
     assert not {"computer_capture_mode", "computer_no_overlay"} & set(drawn(store, "user"))
+
+
+def test_a_setting_both_have_is_described_for_the_desktop_on_its_page_and_as_it_was_for_a_browser(
+    make_config, tmp_path: Path
+) -> None:
+    store = a_store(make_config, tmp_path)
+    of_a_browser = {
+        setting["id"]: setting["description"]
+        for group in store.answer("web", "cloud")["groups"]
+        for setting in group["settings"]
+    }
+    of_the_desktop = {name: setting["description"] for name, setting in drawn(store).items()}
+    shared = of_a_browser.keys() & of_the_desktop.keys()
+    assert "browser" not in " ".join(of_the_desktop[name] for name in shared).replace(
+        "every browser and the desktop", ""
+    )
+    assert "How sharp the live picture of the browser is." in " ".join(of_a_browser.values())
+    assert "How sharp the live picture of the desktop is." in " ".join(of_the_desktop.values())

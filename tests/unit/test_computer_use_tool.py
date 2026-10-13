@@ -11,7 +11,8 @@ from typing import Any
 
 import pytest
 
-from bap_browser.agent.loop import instructions_for
+from bap_browser.agent.command import as_it_begins
+from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.computer.hermes.computer_use.backend import (
     ActionResult,
     CaptureResult,
@@ -845,3 +846,48 @@ async def test_a_harmless_press_a_field_and_a_ticked_box_ask_nobody(make_config,
 
     assert asked == [] and failed == [False, False, False]
     assert [how["element"] for how in did(desk, "click")] == [4, 1, 5]
+
+
+class WithWindows(Desk):
+    """A desktop that shows a window for each app that was opened on it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.opened: list[str] = []
+
+    def list_windows(self) -> list[dict[str, Any]]:
+        return [{"title": f"Untitled 1 - {name}", "app_name": name, "pid": 7} for name in self.opened]
+
+
+async def test_a_task_on_a_desktop_is_given_with_what_is_open_so_that_it_carries_on_from_there(
+    make_config, tmp_path: Path
+) -> None:
+    """ "Open Chrome", then "search for the weather": the second task begins where the first ended."""
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    desk = WithWindows()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        # A desktop with nothing open adds nothing.
+        assert await as_it_begins("Open Chrome", session) == "Open Chrome"
+        desk.opened.append("Google Chrome")
+        assert await as_it_begins("search for the weather", session) == (
+            "search for the weather\n\n[Open on the screen now: Untitled 1 - Google Chrome. This task follows "
+            "what was done before: carry on from the screen as it is. Capture before you act, and do not "
+            "open again an app that is already open.]"
+        )
+    finally:
+        await session.close()
+
+
+@pytest.mark.parametrize("runs", ["machine", "container"])
+def test_the_model_is_told_to_read_past_a_slip_of_typing(make_config, tmp_path: Path, runs: str) -> None:
+    for told in (instructions_for(make_config(tmp_path, computer={"runs": runs})), SYSTEM):
+        assert "read past a slip of spelling" in told
+        assert "ask only when two readings would do different things" in told

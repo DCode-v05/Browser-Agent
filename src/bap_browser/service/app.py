@@ -30,10 +30,11 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from bap_browser import browser_extension
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
-from bap_browser.errors import BapError, ConfigError
+from bap_browser.errors import ConfigError
 from bap_browser.service.accounts import ROLES, Accounts, BadPassword, LockedOut, Role
 from bap_browser.service.bridge import Bridge
 from bap_browser.service.browsing_data import CLEAR, clear_browsing_data
+from bap_browser.service.desktop_door import desktop_routes
 from bap_browser.service.session import ServiceSession
 from bap_browser.service.systems import Systems
 from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE, Close, command_of, send, serve_viewer
@@ -156,18 +157,6 @@ def create_app(
             # People sign in, as the admin or as a user (spec 4.11).
             listed["role"] = role
         return JSONResponse(listed)
-
-    async def open_desktop(request: Request) -> Response:
-        role = allowed(request, "admin")
-        if isinstance(role, Response):
-            return role
-        if desktop is None:
-            return Response(status_code=404)
-        try:
-            opened = await asyncio.to_thread(desktop.start)
-        except BapError as failed:
-            return JSONResponse({"error": str(failed)}, status_code=409)
-        return JSONResponse({"state": "opened" if opened else "open"})
 
     # Signing in (spec 4.11).
 
@@ -657,7 +646,7 @@ def create_app(
             Route("/api/admin/policy", change_policy, methods=["PATCH"]),
             Route("/api/evals", overall_evals, methods=["GET"]),
             Route("/api/suite", overall_suite, methods=["GET"]),
-            Route("/api/desktop", open_desktop, methods=["POST"]),
+            *desktop_routes(desktop, sessions, config, allowed, may_use, bearer),
             Route("/api/settings", read_settings, methods=["GET"]),
             Route("/api/settings", change_settings, methods=["PATCH"]),
             Route("/api/config", read_config, methods=["GET"]),

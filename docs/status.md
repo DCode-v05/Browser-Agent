@@ -1588,6 +1588,56 @@ Not done, and not checked:
 - Not seen with the real Mac as the desktop, only with a stand-in for its driver.
 - The window's bar still says the product's name where a desktop is meant.
 
+### 1av. Built on 2026-10-14: a press that sends or deletes asks first, and the chat above every app
+
+| Asked for | What was built |
+|---|---|
+| Safeguards for computer use | On a desktop, a click on an element by its number is judged by that element's name, as a press is in a browser: one that pays, sends, deletes or grants waits for a person's yes. A field and a ticked box are not judged as a button is |
+| The chat must come along when the agent opens Safari or another app | The chat of the Computer page opens in a narrow window that stays above every other app, at the right edge of the screen. It opens by itself when a task is given on a real machine's page, and from the button "Chat beside your screen" |
+| The same, with the engine in a micro VM | `bap-browser computer chat <the service's address>` opens that window on the person's own machine |
+| The Computer page said "browser" | It speaks of the desktop: the hints of Take over, Stop and the task box, the live picture's name, the leads of Configuration and Evaluations. One table of differences, `ON_A_DESKTOP`, given to every part of the page |
+| The next task must start from where the last one left | The conversation was already kept for the session. Now each task on a desktop is given to the model with the windows open then, and told to carry on from the screen as it is and not to open again an app that is open |
+| Understand a prompt typed with slips | The model is told, in a browser and on a desktop, to read past a slip of spelling, a missing word or a loose name of an app, and to ask only when two readings would do different things |
+| Evals for computer use | The desktop has a `confirm` set of its own (4 tasks): two press the editor's "Delete Selection" and pass only when a person was asked; two press "Select All" and "Paste" and fail when a person was asked. A reference solution has a new step, `press`, that clicks a control by its name's number |
+| Tailscale, a Mac and a VM | The steps are written (`docs/plans/2026-10-14-engine-in-a-vm-and-a-mac.md`). The link is tested through a proxy that alone knows the helper's name, as on a box where Tailscale has no root |
+| The model | This checkout's `config.json` names the Anthropic provider, `claude-opus-5-5` and the variable `ANTHROPIC_API_KEY` |
+
+Seen:
+
+- In a real container: the editor's own "Edit, Delete" pressed by its number. A person's no left
+  the text "kept" in the page; a yes took it away (`tests/e2e/test_computer.py`, 12 passed).
+- In a real container: the four tasks of the desktop's `confirm` set by their reference solutions,
+  1 passed in 32 s. Both presses of "Delete Selection" asked; "Select All" and "Paste" did not.
+- The same run found that text typed on this desktop does not replace a selection: "old", Select
+  All, then "new" gave "newold". The task erases with Backspace. An agent meets the same thing.
+- In a real browser, the Computer page's three views listed for the word "browser": before, 25
+  places said it of the page itself ("Type what the agent should do in this browser", "Live
+  browser view", "A step in the browser"); after, none. What remains is the product's name, the
+  other tabs' names and hints, and "One value for every browser and the desktop".
+- On this Mac, with the studio running: `POST /api/sessions/computer/beside` answered "opened",
+  then "open"; the window said of itself "The chat's window is open at 2160, 31, 400 by 1409;
+  shown: true; above the other apps: true; page: bap-browser".
+
+Not done, and not checked:
+
+- **The key is not in `.env`.** The rules of this repository do not let an agent type or keep a
+  key. Until the person puts it there, the studio says "ANTHROPIC_API_KEY is not set" and does not
+  start. No call has been made to Anthropic's service from this system yet: whether it accepts the
+  request this system builds is still not verified.
+- **Take over on a real Mac does not let the page's picture be clicked.** The pinned driver clicks
+  only inside a window it is told about, and does not say where windows are on the screen. Chosen:
+  the person uses the machine's own mouse and keyboard, and the page says so once they have taken over.
+- **A click by a coordinate on a desktop is not judged by a name**: it names no element.
+- **Nothing has run over a real tailnet**: Tailscale is not on this Mac. The steps are in
+  `docs/plans/2026-10-14-engine-in-a-vm-and-a-mac.md`. On the shared team box, the pairing code
+  and the keys are readable by anybody with its one login: the plan says so and asks for a choice.
+- **Carrying on and reading past slips have not been tried with a model**: the key is not set. The
+  tests show what the model is told, not what it then does.
+- **The desktop's `confirm` set has not been run by a model**, and `bap-browser sets` runs a
+  browser's sets only: a desktop's are run from the Computer page's Evaluations.
+- What the chat's window shows was not looked at by me: a picture of the screen would have held the
+  person's own screen. The page it loads is the one the browser tests walk.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

@@ -106,3 +106,83 @@ def test_it_is_opened_once_and_can_be_opened_again_after_it_was_closed(
 
 def test_closing_an_app_that_was_never_opened_does_nothing(tmp_path: Path) -> None:
     app_in(tmp_path).close()
+
+
+# Stands in for the side chat: it says what it was started with, and stays open until it is ended.
+SIDE_STAND_IN = """
+import json, os, sys, threading
+from pathlib import Path
+
+Path(__file__).parent.joinpath("side.json").write_text(
+    json.dumps(
+        {
+            "chat": os.environ.get("BAP_SIDE_CHAT"),
+            "width": os.environ.get("BAP_SIDE_CHAT_WIDTH"),
+            "as_node": os.environ.get("ELECTRON_RUN_AS_NODE"),
+        }
+    ),
+    encoding="utf-8",
+)
+threading.Event().wait()
+"""
+THE_CHAT = "http://127.0.0.1:8765/?session=computer&beside#token=a-visit"
+
+
+def said_by_the_side(folder: Path) -> dict[str, str | None]:
+    said = folder / "electron" / "side.json"
+    for _ in range(200):
+        if said.is_file() and said.read_text(encoding="utf-8"):
+            return json.loads(said.read_text(encoding="utf-8"))
+        time.sleep(0.05)
+    raise AssertionError("the side chat was not started")
+
+
+def test_the_chat_is_opened_in_a_window_of_its_own_above_the_other_apps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """While the agent works in Safari or any other app of this machine, the chat stays with the
+    person (spec 22.3.1). It is one window: asked again, the one that is open is the one."""
+    (tmp_path / "electron").mkdir()
+    (tmp_path / "electron" / "side.cjs").write_text(SIDE_STAND_IN, encoding="utf-8")
+    monkeypatch.setattr(DesktopApp, "program", lambda self: Path(sys.executable))
+    monkeypatch.setenv("ELECTRON_RUN_AS_NODE", "1")
+    app = app_in(tmp_path)
+    try:
+        assert app.chat_beside(THE_CHAT, 400) is True
+        told = said_by_the_side(tmp_path)
+        assert (told["chat"], told["width"], told["as_node"]) == (THE_CHAT, "400", None)
+        assert app.chat_beside(THE_CHAT, 400) is False
+    finally:
+        app.close()
+
+
+def test_a_side_chat_with_no_app_installed_says_how_to_install_it(tmp_path: Path) -> None:
+    with pytest.raises(BapError, match="npm --prefix desktop install"):
+        DesktopApp(tmp_path, tmp_path / "s.json", close_wait_s=1).chat_beside(THE_CHAT, 400)
+
+
+# Stands in for the side chat when it is run to its end: it says what it was started with, and ends.
+SIDE_THAT_ENDS = SIDE_STAND_IN.replace("threading.Event().wait()", "sys.exit(0)")
+
+
+def test_a_person_opens_the_chat_of_a_service_elsewhere_from_their_own_machine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The engine in a micro VM cannot open a window on the person's Mac. The person opens the chat
+    there themselves, by the service's address, and it stays above their apps (spec 22.6)."""
+    (tmp_path / "electron").mkdir()
+    (tmp_path / "electron" / "side.cjs").write_text(SIDE_THAT_ENDS, encoding="utf-8")
+    monkeypatch.setattr(DesktopApp, "program", lambda self: Path(sys.executable))
+
+    ended = app_in(tmp_path).chat_beside_until_closed("https://vm.tail1234.ts.net/", "computer", 400)
+
+    assert ended == 0
+    assert said_by_the_side(tmp_path)["chat"] == "https://vm.tail1234.ts.net/?session=computer&beside"
+
+
+@pytest.mark.parametrize("service", ["vm.tail1234.ts.net", "file:///etc/passwd", "", "ftp://vm:8765"])
+def test_what_is_no_address_of_a_service_is_refused_before_anything_is_opened(
+    tmp_path: Path, service: str
+) -> None:
+    with pytest.raises(BapError, match="http:// or https://"):
+        app_in(tmp_path).chat_beside_until_closed(service, "computer", 400)

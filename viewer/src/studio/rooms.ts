@@ -99,6 +99,23 @@ export function desktopOpener(pageAddress: string, token: string): OpenDesktop {
   };
 }
 
+/**
+ * Opens the chat of one page beside the machine's own screen (spec 22.3.1). The service on this
+ * machine is asked for a window of its own, which stays above every other app. Where it has none to
+ * give (it runs elsewhere, or its desktop app is not installed) the chat opens `inTheBrowser`.
+ */
+export function besideOpener(pageAddress: string, token: string, inTheBrowser: (room: string) => void): (room: string) => Promise<void> {
+  return async (room) => {
+    const address = new URL(`api/sessions/${encodeURIComponent(room)}/beside`, pageAddress).href;
+    try {
+      if ((await fetch(address, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })).ok) return;
+    } catch {
+      // The service does not answer just now: the browser's own window still can.
+    }
+    inTheBrowser(room);
+  };
+}
+
 /** Asks the service which pages it has. The token goes in a header, never in the address.
  *  `onEnded` is told when the service no longer knows the token: the visit it was for is over. */
 export function roomsFrom(pageAddress: string, token: string, onEnded?: () => void): LoadRooms {

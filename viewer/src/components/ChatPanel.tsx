@@ -8,6 +8,7 @@ import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 import { richText } from './richText';
+import { useWords } from '../words';
 
 /** What the agent is doing, in a word, for the top of the chat. */
 export type AgentStatus = 'working' | 'ready' | 'paused' | 'person' | 'waiting' | 'stopped' | 'offline';
@@ -44,6 +45,7 @@ interface Props {
 }
 
 export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props) {
+  const L = useWords();
   const [draft, setDraft] = useState('');
   const end = useRef<HTMLDivElement>(null);
   const count = chat.messages.length;
@@ -113,7 +115,7 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
           disabled={!open}
           placeholder={open ? (chat.working ? W.chat.placeholderWorking : W.chat.placeholder) : W.chat.closed}
           aria-label={W.chat.inputLabel}
-          title={W.buttons.hint.task}
+          title={L.buttons.hint.task}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKey}
         />
