@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from bap_browser.computer import driver, remote
+from bap_browser.computer import allowed, driver, remote
 from bap_browser.computer.hermes.bot_desktop import lease
 from bap_browser.computer.hermes.computer_use import cua_backend, permissions, tool
 from bap_browser.computer.hermes.computer_use.backend import CaptureResult
@@ -52,6 +52,12 @@ def base(
     home = home or home_of(config)
     elsewhere = config.computer.runs == "remote"
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
+    if allowed.held(settings) and backend is None:
+        # The driver itself holds the agent to the apps the person allowed (spec 22.7).
+        listed = str(allowed.write(home, settings))
+        settings = settings.model_copy(
+            update={"base": settings.base.model_copy(update={"capability_manifest": listed})}
+        )
     before = work_for(Working(computer=settings, home=home, backend=backend))
     # A session that ended while a person held the screen must not hold the next one.
     lease.release()

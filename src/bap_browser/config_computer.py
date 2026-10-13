@@ -56,6 +56,18 @@ class Base(Section):
         "",
         "The file that says what the driver may touch, when the mode is `bounded`. Written from the allowed apps",
     )
+    also_allowed: list[str] = setting(
+        [],
+        "More apps the agent may work in on a real machine, beside the ones switched on: a macOS bundle id, "
+        "or a program's full path",
+    )
+    allowed_for: str = setting(
+        "12h", "How long the driver keeps the list of allowed apps it was started with, such as `12h`"
+    )
+    allowed_idle: str = setting(
+        "2h",
+        "How long the driver may stand unused before that list ends, such as `2h`. A new session starts it again",
+    )
     no_overlay: Literal["auto", "on", "off"] = setting(
         "auto",
         "Whether the driver's pointer overlay is left out. `auto` decides by the system, as Hermes does",
