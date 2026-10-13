@@ -39,7 +39,7 @@ from bap_browser.config import Config
 from bap_browser.driver.hermes_driver import desktop_driver_for
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
-from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
+from bap_browser.evals import Rating, Recorder, overall, summarise, trace_among
 from bap_browser.evals.checks import run_checklist
 from bap_browser.evals.desktop_ground import Desk
 from bap_browser.evals.suite import (
@@ -286,7 +286,11 @@ class Studio:
         return overall(self._recorders.values(), self._config.evals)
 
     def trace(self, system: str, task: str) -> dict[str, Any] | None:
-        return trace_of(self._recorders[system], task)
+        room = self._room(system)
+        assert room is not None
+        log = self._configured(room).logging.event_log
+        of_its_runs = suite_recorder(self._config.evals, room.id, room.backend)
+        return trace_among([self._recorders[system], of_its_runs], task, Path(log) if log else None)
 
     def rate(self, system: str, task: str, rating: Rating | None) -> bool:
         return self._recorders[system].rate(task, rating)

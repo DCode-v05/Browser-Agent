@@ -2830,7 +2830,10 @@ it is on and keeps what it did.
 **What is kept.** One line for each run in `<evals.dir>/<system>/suite/runs.jsonl`: the set, who did
 it, the model, each task with each try (passed, why not, asked, followed, steps, tokens), and the
 totals. Each try of the agent also has a full record, as in 12.6, in
-`<evals.dir>/<system>/suite/tasks.jsonl`, apart from the records of a person's own tasks.
+`<evals.dir>/<system>/suite/tasks.jsonl`, apart from the records of a person's own tasks. A try is read
+afterwards at the address of a task's trace, like any task: its record, and with it what the
+browser's log kept between its start and its end, each call with what it was given (typed text left
+out) and the first line of what it answered.
 
 **In the window.** The Evaluations view of a browser has a part "Task sets": for each set what it
 measures, its newest result and the pass rates of the runs before it, "Run with the agent", "Run the
@@ -3863,6 +3866,7 @@ into.
 - A message box is a text area, an editable block, or a field whose name or label holds message, comment, reply, review, post, body, subject, to or recipient. A search box (a `search` field, or the one text field of its form) is not.
 - A word in Latin letters is matched whole and without regard to case. A word in another script is looked for anywhere in the name.
 - A phrase says more than a word: "Cancel order" deletes, though "order" alone pays. Between words of the same length the graver class wins, in the order of the table: "Confirm and pay" pays.
+- A box that is ticked says what is wanted. "Send me the newsletter" sends nothing when it is ticked: a checkbox, a switch or a radio button is not classed as sending, by the words of the class or by the deployment's own.
 - A link goes somewhere. It is classed only when it pays, deletes or grants: links that send are rare, and a link named "Blog post" sends nothing.
 - Reply, share, forward, invite, comment and apply are not in the list: such a control opens a form far more often than it sends one, and a person asked at every "Apply filters" stops reading the questions. What they lead to is caught where it is sent: by the form's own button, or by Enter in the message box.
 - The words are settings, one list for each class (`safeguards.actions`). `permissions.consequential_words` stays, as the deployment's own extra words.

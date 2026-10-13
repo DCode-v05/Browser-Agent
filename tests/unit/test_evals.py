@@ -14,8 +14,9 @@ from bap_browser.agent.models import Message, Reply, ToolCall, Usage
 from bap_browser.agent.timed import TimedModel, TimedTools
 from bap_browser.config import Config
 from bap_browser.errors import ModelError
-from bap_browser.evals import Recorder, summarise, trace_of
+from bap_browser.evals import Recorder, summarise, trace_among
 from bap_browser.evals.record import cost_of
+from bap_browser.evals.suite import suite_recorder
 from bap_browser.evals.summary import percentile
 from bap_browser.results import ToolResult
 from bap_browser.tools import ToolDefinition
@@ -246,13 +247,13 @@ async def test_the_records_add_up_to_latency_time_cost_and_how_tasks_ended(
 
     # The newest task first, each without its trace, which is asked for by itself.
     assert told["recent"][0]["id"] == last["id"] and "spans" not in told["recent"][0]
-    assert [span["name"] for span in (trace_of(recorder, first["id"]) or {})["spans"]] == [
+    assert [span["name"] for span in (trace_among([recorder], first["id"], None) or {})["spans"]] == [
         "model-a",
         "browser_navigate",
         "model-a",
         "browser_click",
     ]
-    assert trace_of(recorder, "no-such-task") is None
+    assert trace_among([recorder], "no-such-task", None) is None
 
 
 async def test_a_person_says_whether_an_answer_was_good(make_config: MakeConfig, tmp_path: Path) -> None:
@@ -263,7 +264,7 @@ async def test_a_person_says_whether_an_answer_was_good(make_config: MakeConfig,
     told = summarise(recorder, config.evals, "model-a")
     assert (told["tasks"]["rated_good"], told["tasks"]["rated_bad"]) == (1, 1)
     assert {row["id"]: row["rating"] for row in told["recent"]} == {good["id"]: "good", bad["id"]: "bad"}
-    assert (trace_of(recorder, bad["id"]) or {})["rating"] == "bad"
+    assert (trace_among([recorder], bad["id"], None) or {})["rating"] == "bad"
     # A person takes their word back.
     assert recorder.rate(bad["id"], None)
     assert summarise(recorder, config.evals, "model-a")["tasks"]["rated_bad"] == 0
@@ -292,3 +293,38 @@ async def test_the_checklist_as_it_was_last_run_is_kept(make_config: MakeConfig,
         "failed": 0,
         "checks": [],
     }
+
+
+async def test_a_task_is_read_afterwards_with_what_the_log_kept_of_its_own_time(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config, recorder = recorder_in(make_config, tmp_path)
+    done = await a_task(recorder, config)
+    log = tmp_path / "log.jsonl"
+    during = done["started"] + done["duration_ms"] / 2000
+    lines = [
+        {"ts": done["started"] - 60, "tool": "browser_click", "args": {"ref": "e1"}, "ok": True},
+        {"ts": during, "tool": "browser_navigate", "args": {"url": "https://example.com"}, "ok": True},
+        {"ts": done["started"] + 600, "tool": "browser_type", "args": {"text": "<5 characters>"}, "ok": True},
+    ]
+    log.write_text("".join(json.dumps(line) + "\n" for line in lines) + "not a line\n", encoding="utf-8")
+
+    read = trace_among([recorder], done["id"], log)
+
+    assert read is not None and read["id"] == done["id"]
+    # The calls of this task alone, with what the log keeps of each: never what was typed.
+    assert [line["tool"] for line in read["log"]] == ["browser_navigate"]
+    assert trace_among([recorder], done["id"], None)["log"] == []  # pyright: ignore[reportOptionalSubscript]
+    assert trace_among([recorder], "no-such-task", log) is None
+
+
+async def test_a_try_of_a_task_set_is_found_among_the_records_of_its_run(
+    make_config: MakeConfig, tmp_path: Path
+) -> None:
+    config, recorder = recorder_in(make_config, tmp_path)
+    of_the_run = suite_recorder(config.evals, "cloud", "remote_headless")
+    done = await a_task(of_the_run, config)
+
+    assert trace_among([recorder], done["id"], None) is None
+    found = trace_among([recorder, of_the_run], done["id"], None)
+    assert found is not None and found["outcome"] == "answered"
