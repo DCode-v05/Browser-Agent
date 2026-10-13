@@ -519,18 +519,34 @@ async def test_what_an_app_wrote_is_said_to_be_the_screens_and_not_a_sites(
 
 
 class WithAMenu(Desk):
-    """A window at 300, 200 of the screen: a Save button, a field, and an item of a menu that is not open."""
+    """A window at 300, 200 of the screen: a Save button, a field, and an item of a menu that is not
+    open. Its app gives each place on the screen, as most do: the field reaches past the window's size."""
+
+    places = ((310, 210, 80, 24), (310, 250, 620, 200))
 
     def capture(
         self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
     ) -> CaptureResult:
         self.done.append(("capture", {"mode": mode, "app": app}))
         elements = [
-            UIElement(index=1, role="push button", label="Save", bounds=(310, 210, 80, 24)),
-            UIElement(index=2, role="text", label="", bounds=(310, 250, 200, 100)),
+            UIElement(index=1, role="push button", label="Save", bounds=self.places[0]),
+            UIElement(index=2, role="text", label="", bounds=self.places[1]),
             UIElement(index=3, role="menu item", label="Save As...", bounds=(0, 0, 0, 0)),
         ]
         return CaptureResult(mode=mode, width=640, height=480, elements=elements, app="Notes")
+
+    def list_windows(self) -> list[dict[str, Any]]:
+        return [
+            {"app_name": "Other", "pid": 5, "window_id": 11, "title": "Another app"},
+            {"app_name": "Notes", "pid": 7, "window_id": 21, "title": "A box of Notes"},
+            {"app_name": "Notes", "pid": 7, "window_id": 22, "title": "My note"},
+        ]
+
+
+class PlacedInItsWindow(WithAMenu):
+    """The same window, of an app that gives each place inside its own window, as GTK 4 does."""
+
+    places = ((10, 10, 80, 24), (10, 50, 620, 200))
 
 
 class ItsOwnDesktop:
@@ -545,11 +561,20 @@ class ItsOwnDesktop:
     async def send(self, line: str) -> None:
         self.sent.append(line)
 
+    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
+        """`xwininfo` of a window: the note's own is 640 by 480 at 300, 200; the box is smaller."""
+        assert command[:2] == ("xwininfo", "-id")
+        at = {"21": (500, 400, 200, 100), "22": (300, 200, 640, 480)}[command[2]]
+        said = "Absolute upper-left X:  {}\n  Absolute upper-left Y:  {}\n  Width: {}\n  Height: {}\n"
+        return said.format(*at).encode()
 
-def where_nobody_sits(make_config, tmp_path: Path) -> tuple[ServiceSession, WithAMenu, ItsOwnDesktop]:
+
+def where_nobody_sits(
+    make_config, tmp_path: Path, desk: WithAMenu | None = None
+) -> tuple[ServiceSession, WithAMenu, ItsOwnDesktop]:
     computer = {"runs": "container", "base": {"home": str(tmp_path / "home")}}
     config = make_config(tmp_path, computer=computer)
-    desk = WithAMenu()
+    desk = desk or WithAMenu()
     driver = HermesDriver(config, backend=lambda: desk)
     own = ItsOwnDesktop()
     driver.desktop = own  # pyright: ignore[reportAttributeAccessIssue]
@@ -589,14 +614,29 @@ async def test_where_nobody_sits_a_click_by_number_is_a_click_of_the_pointer_at_
         await session.close()
 
     assert not clicked.is_error and "pointer pressed element 1" in clicked.text
-    # The middle of each, on the screen: 310 + 40, 210 + 12; then 310 + 100, 250 + 50, twice.
-    assert own.sent == ["mousemove 350 222 click --repeat 1 1", "mousemove 410 300 click --repeat 2 1"]
+    # The middle of each, on the screen: 310 + 40, 210 + 12; then 310 + 310, 250 + 100, twice.
+    assert own.sent == ["mousemove 350 222 click --repeat 1 1", "mousemove 620 350 click --repeat 2 1"]
     # The accessibility bus pressed nothing. What the second press changed was looked at after it.
     assert did(desk, "click") == []
     assert (
         "#1 push button 'Save'" in twice.text
         and [how["mode"] for how in did(desk, "capture")].count("ax") == 2
     )
+
+
+async def test_an_app_that_places_things_inside_its_window_is_pressed_at_the_same_spot_of_the_screen(
+    make_config, tmp_path: Path
+) -> None:
+    session, _, own = where_nobody_sits(make_config, tmp_path, PlacedInItsWindow())
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        await session.toolkit.call("computer_use", {"action": "click", "element": 1})
+    finally:
+        await session.close()
+
+    # The window of that app with the capture's own size is at 300, 200: 300 + 10 + 40, 200 + 10 + 12.
+    assert own.sent == ["mousemove 350 222 click --repeat 1 1"]
 
 
 async def test_where_nobody_sits_what_is_not_on_the_screen_is_not_pressed(

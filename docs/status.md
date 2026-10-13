@@ -1359,7 +1359,12 @@ Found, and not mended:
   window that was.** A first version turned an element's place on the screen into those pixels by
   asking where the window in front is. CI caught it on the machine's own virtual screen: the window
   in front was not the one captured, and the click missed. The pointer is now sent to the place on
-  the screen itself, by the desktop's own hand, with no window to reckon from.
+  the screen itself, by the desktop's own hand.
+- **Apps do not agree on where a place is counted from.** An app of GTK 3 (the editor) gives each
+  element's place on the screen; an app of GTK 4 (the dialog CI uses) gives it inside its own
+  window. A capture is taken to be of the second kind when nothing in it reaches past the window's
+  own size, and then the window's corner is added. A window of the first kind whose every element
+  sits in its top left corner would be misread; none has been seen.
 
 The rest of the model's run, tried and not got:
 

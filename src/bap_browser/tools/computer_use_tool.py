@@ -210,8 +210,8 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     shown = session.config.computer.base.elements_shown
     label = session.config.computer.window_title_chars
 
-    def said(summary: str, elements: list[dict[str, Any]]) -> str:
-        driver.saw(elements)
+    def said(summary: str, elements: list[dict[str, Any]], of: dict[str, Any]) -> str:
+        driver.saw(elements, str(of.get("app", "")), (int(of.get("width", 0)), int(of.get("height", 0))))
         return of_a_capture(summary, elements, shown, label, on_the_screen=in_front)
 
     shot = as_shot(result)
@@ -219,7 +219,11 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
         elements = await asyncio.to_thread(every_element, result)
         summary = str(result.get("text_summary", ""))
         # Up to a hundred elements the tool's own text stands; past that, ours names the page first.
-        text = said(summary, elements) if elements is not None else cleared(summary)
+        about = {
+            **result.get("meta", {}),
+            **{key: result[key] for key in ("app", "width", "height") if key in result},
+        }
+        text = said(summary, elements, about) if elements is not None else cleared(summary)
         return Shown(from_page(text), shot.picture)
     answer = json.loads(result) if isinstance(result, str) else result
     if not isinstance(answer, dict):
@@ -227,7 +231,7 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if "error" not in answer and isinstance(answer.get("summary"), str):
         elements = await asyncio.to_thread(every_element, answer)
         if elements is not None:
-            return from_page(said(answer["summary"], elements))
+            return from_page(said(answer["summary"], elements, answer))
     if "error" in answer:
         hint = f" {answer['hint']}" if answer.get("hint") else ""
         reason = REFUSALS.get(str(answer.get("code")), "the machine did not do it")
