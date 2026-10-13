@@ -88,8 +88,9 @@ class Desk:
         settings = self._session.config.computer
         looks = max(1, int(settings.app_close_wait_s * 1000 / settings.app_poll_ms))
         pause = settings.app_poll_ms / 1000
+        # A picture of a window that has gone is not waited for either: it holds the whole screen.
         gone = (
-            f"for app in {names}; do pkill -x $app; n=0; while pgrep -x $app >/dev/null; do "
+            f"pkill -9 -x import; for app in {names}; do pkill -x $app; n=0; while pgrep -x $app >/dev/null; do "
             f"n=$((n+1)); [ $n -ge {looks} ] && pkill -9 -x $app; sleep {pause}; done; done; true"
         )
         await self.driver().desktop.run("sh", "-c", gone)
