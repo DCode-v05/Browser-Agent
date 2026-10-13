@@ -22,7 +22,7 @@ from bap_browser import computer
 from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
-from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
+from bap_browser.driver.base import KeyAction, Located, MouseButton, PointerAction, QualityLevel, Shot
 from bap_browser.driver.contained_desktop import App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.screen_here import ScreenHere
@@ -52,12 +52,27 @@ THE_DRIVER = "cua-driver"
 ITS_PICTURES = "import"
 NOT_A_LETTER = re.compile(r"[^a-z]")
 ITS_OWN = "cuadriver"
+# A role of a page, and what a desktop's own name for it holds. A box that is ticked and a field that
+# is typed into are not judged as a button is (spec 18.4).
+ROLES = {
+    "checkbox": ("checkbox", "togglebutton", "switch"),
+    "radio": ("radio",),
+    "textbox": ("text", "entry", "edit", "document", "combobox", "searchfield"),
+    "link": ("link",),
+}
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
 # The states of a session in which a person is at the screen.
 A_PERSON_IS_AT_THE_SCREEN = ("person", "person_requested")
+
+
+def as_a_page_names(role: str) -> str:
+    """What an element of a desktop is, in the words the check knows from a page. Each system has
+    its own: `AXCheckBox`, `check box`, `CheckBox`. What is none of these is a button: it is pressed."""
+    plain = NOT_A_LETTER.sub("", role.lower()).removeprefix("ax")
+    return next((known for known, signs in ROLES.items() if any(sign in plain for sign in signs)), "button")
 
 
 def as_shot(result: Any) -> Shot | None:
@@ -95,6 +110,7 @@ class HermesDriver(DesktopDriver):
         self._last: Shot | None = None
         self._screen: ScreenHere | None = None
         self._placed: dict[int, tuple[int, int, int, int]] = {}
+        self._named: dict[int, tuple[str, str]] = {}
 
     # The session.
 
@@ -163,6 +179,18 @@ class HermesDriver(DesktopDriver):
             for one in elements
             for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
         }
+        self._named = {
+            int(one["index"]): (str(one.get("role", "")), str(one.get("label", ""))) for one in elements
+        }
+
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        """An element of the newest capture, by its number, as the check judges a press (spec 18.4):
+        by what it is and what it is called."""
+        named = self._named.get(int(ref)) if ref.isdigit() else None
+        if named is None:
+            self._no_page()
+        role, name = named
+        return Located(as_a_page_names(role), name, None)
 
     async def press(self, element: int, action: str) -> Literal["pressed", "nowhere"] | None:
         """Presses an element with the desktop's own pointer, at its middle on the screen. "nowhere"

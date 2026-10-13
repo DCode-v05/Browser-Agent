@@ -49,6 +49,10 @@ AutoState = Literal["off", "on", "paused", "waiting_for_task", "unavailable"]
 
 # The tools that press a control, whose name can say what pressing it does.
 PRESS = frozenset({"browser_click", "browser_set_checked", "browser_select_option"})
+# The same on a desktop: the tool, and its actions that press one element (spec 22.7).
+PRESS_ON_A_DESKTOP = frozenset(
+    ("computer_use", action) for action in ("click", "double_click", "right_click", "middle_click")
+)
 # The tools that put text into a field.
 TYPE = frozenset({"browser_type", "browser_fill_form", "browser_press_key"})
 # The keys that press the control that has the focus.
@@ -211,7 +215,7 @@ class Findings:
                 return "sends" if message_box and pressed in SENDING_KEYS else None
             if pressed not in PRESSING_KEYS:
                 return None
-        elif step.tool not in PRESS:
+        elif step.tool not in PRESS and (step.tool, step.arguments.get("action")) not in PRESS_ON_A_DESKTOP:
             return None
         named = control.name
         chosen = step.arguments.get("values")

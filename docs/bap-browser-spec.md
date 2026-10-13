@@ -5709,6 +5709,7 @@ Hermes' rules are taken as they are, and today's stricter ones are kept on top. 
 | --- | --- | --- |
 | Approval written into the tool | Hermes | Every action but `capture`, `wait` and the two lists needs a yes. With nobody to answer, it is refused |
 | The check on every step | Ours | Approvals, Auto Mode, limits and the step counter run as today (spec 18) |
+| A press that pays, sends, deletes or gives access | Ours | As in a browser (section 18.4): what a control does is told by its name. On a desktop a click on an element by its number is judged by that element's name in the newest capture, and one that pays, sends, deletes or grants waits for a person's yes. A field that is typed into and a box that is ticked are not judged as a button is. A click by a coordinate names no element and is not judged this way |
 | Hard-blocked keys | Hermes | Empty trash, force delete, lock screen, log out, force log out, `ctrl+alt+delete`, `alt+f4`: refused whatever was approved. Key names are made one form first, so another system's name for a key cannot slip past |
 | Hard-blocked typing | Hermes | A download piped to a shell, `sudo rm -r`, `rm -rf /`, a fork bomb: refused before the approval is even asked |
 | App allowlist, on by default | Ours | Hermes has none unless `bounded` mode is turned on. Ours stays on: the driver runs in `bounded` mode with a capability list written from the apps the admin allows, and `computer_open_app` opens nothing outside it |

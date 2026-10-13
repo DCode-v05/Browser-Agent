@@ -23,7 +23,7 @@ from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BadInput, BapError, PolicyBlocked
 from bap_browser.results import Picture, ToolResult
 from bap_browser.safeguards.check import NOT_APPROVED, Check
-from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, Step
+from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, PRESS_ON_A_DESKTOP, Step
 from bap_browser.safeguards.incoming import quoted_name
 from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
 from bap_browser.safeguards.reading import Reader, as_written, from_page
@@ -427,6 +427,9 @@ class Toolkit:
                     control = await driver.locate_point(target.box.x, target.box.y)
                 elif target is None and kind in GO_WHERE_THE_FOCUS_IS and arguments.get("ref") is None:
                     control = await driver.locate_focus()
+                elif (name, arguments.get("action")) in PRESS_ON_A_DESKTOP and "element" in arguments:
+                    # On a desktop an element is named by its number in the newest capture.
+                    control = await driver.locate(str(arguments["element"]))
                 asked = arguments.get("fields") if name == "browser_fill_form" else None
                 for entry in asked if isinstance(asked, list) else []:
                     ref = entry.get("ref") if isinstance(entry, Mapping) else None

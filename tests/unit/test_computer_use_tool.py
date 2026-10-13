@@ -770,3 +770,78 @@ async def test_a_capture_holds_the_mode_the_model_names_whatever_the_admin_chose
     make_config, tmp_path: Path
 ) -> None:
     assert (await captured(make_config, tmp_path, {"mode": "vision"}, capture_mode="ax"))["mode"] == "vision"
+
+
+class AMailApp(Desk):
+    """A window of a mail app: a field, a button that sends, one that deletes, and one that is harmless."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        self.done.append(("capture", {"mode": mode, "app": app}))
+        elements = [
+            UIElement(index=1, role="AXTextArea", label="Send a message to Ada", bounds=(10, 10, 300, 120)),
+            UIElement(index=2, role="AXButton", label="Send", bounds=(10, 140, 80, 24)),
+            UIElement(index=3, role="push button", label="Delete account", bounds=(100, 140, 120, 24)),
+            UIElement(index=4, role="AXButton", label="Show the sidebar", bounds=(230, 140, 120, 24)),
+            UIElement(index=5, role="AXCheckBox", label="Send me the newsletter", bounds=(10, 180, 200, 24)),
+        ]
+        return CaptureResult(mode=mode, width=800, height=600, elements=elements, app="Mail")
+
+
+async def presses(
+    make_config, tmp_path: Path, answer: str, *elements: int
+) -> tuple[list[Any], AMailApp, list[bool]]:
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    desk = AMailApp()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    asked: list[Any] = []
+
+    async def a_person(question: Any) -> Any:
+        asked.append(question)
+        return answer
+
+    await session.start()
+    session.browser.ask_approval = a_person
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        failed = [
+            (await session.toolkit.call("computer_use", {"action": "click", "element": one})).is_error
+            for one in elements
+        ]
+    finally:
+        await session.close()
+    return asked, desk, failed
+
+
+async def test_a_press_that_sends_or_deletes_on_a_desktop_asks_a_person_first(
+    make_config, tmp_path: Path
+) -> None:
+    """As in a browser (spec 18.4): what a button does is told by its name, and a button that sends
+    or deletes is pressed only after a person's yes."""
+    asked, desk, failed = await presses(make_config, tmp_path, "allowed", 2, 3)
+
+    assert [question.tool for question in asked] == ["computer_use", "computer_use"]
+    assert failed == [False, False]
+    assert [how["element"] for how in did(desk, "click")] == [2, 3]
+
+
+async def test_a_press_a_person_says_no_to_is_not_done(make_config, tmp_path: Path) -> None:
+    asked, desk, failed = await presses(make_config, tmp_path, "denied", 3)
+
+    assert len(asked) == 1 and failed == [True]
+    assert did(desk, "click") == []
+
+
+async def test_a_harmless_press_a_field_and_a_ticked_box_ask_nobody(make_config, tmp_path: Path) -> None:
+    """A field is typed into and is not judged by its name, and a box that is ticked sends nothing."""
+    asked, desk, failed = await presses(make_config, tmp_path, "denied", 4, 1, 5)
+
+    assert asked == [] and failed == [False, False, False]
+    assert [how["element"] for how in did(desk, "click")] == [4, 1, 5]
