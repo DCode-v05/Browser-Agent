@@ -44,7 +44,6 @@ export interface AppProps {
   /** Drawn as one page of the window of several browsers (spec 9.16). That window has the page's
    *  bar, its heading and its main part: the app is then none of them a second time. */
   inWindow?: boolean;
-  /** The chat alone, with no picture: kept beside a real machine's own screen (spec 22.3.1). */
   beside?: boolean;
 }
 
@@ -144,7 +143,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
   const driving = view.key === 'person';
-  // The browser is a window on the person's own screen: this page is the chat beside it.
+  // The person watches the screen itself, a browser of theirs or a real machine (spec 22.3.1): this page is the chat beside it.
   const beside = chatAlone || state.session?.onScreen === true;
   // A person who takes over gets the whole width to work in.
   const full = !beside && (driving || wantsFull);
