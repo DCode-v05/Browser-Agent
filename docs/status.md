@@ -1446,7 +1446,7 @@ Not built, and not checked:
   `screen status, start, stop, install`, its second model for pictures, and its stream of the
   desktop.
 
-### 1aq. Proven on 2026-10-13: macOS, and what the proof found
+### 1ar. Proven on 2026-10-13: macOS, and what the proof found
 
 You allowed CuaDriver under Accessibility and Screen Recording on this Mac. Everything below ran on
 it (macOS 15, arm64) with the real driver, and on GitHub's Windows and Linux runners.
