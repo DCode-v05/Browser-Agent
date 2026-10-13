@@ -610,6 +610,7 @@
         "src/bap_browser/computer/commands.py",
         "scripts/ladder.py",
         "src/bap_browser/driver/hermes_driver.py",
+        "src/bap_browser/driver/mac_hand.py",
         "src/bap_browser/tools/computer_use_tool.py",
         "src/bap_browser/service/machine_helper.py",
         "src/bap_browser/computer/link.py",

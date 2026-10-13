@@ -14061,7 +14061,7 @@ named and pressed as Hermes' tool does it.</p>
 <tr>
 <td>A press that pays, sends, deletes or gives access</td>
 <td>Ours</td>
-<td>As in a browser (section 18.4): what a control does is told by its name. On a desktop a click on an element by its number is judged by that element's name in the newest capture, and one that pays, sends, deletes or grants waits for a person's yes. A field that is typed into and a box that is ticked are not judged as a button is. A click by a coordinate names no element and is not judged this way</td>
+<td>As in a browser (section 18.4): what a control does is told by its name. On a desktop a click on an element by its number is judged by that element's name in the newest capture, and one that pays, sends, deletes or grants waits for a person's yes. A field that is typed into and a box that is ticked are not judged as a button is. A click by a coordinate names no element. Where the newest capture holds a control on the screen that pays, sends, deletes or grants, the click may be on it: it is judged as a press of that control and waits for a person's yes. Where the screen holds no such control it is not judged</td>
 </tr>
 <tr>
 <td>Hard-blocked keys</td>
@@ -14102,6 +14102,16 @@ named and pressed as Hermes' tool does it.</p>
 <td>Take over, Hand back, Pause, Stop</td>
 <td>Ours</td>
 <td>Unchanged in the viewer; Take over takes the lease</td>
+</tr>
+<tr>
+<td>Take over on a Mac's own screen</td>
+<td>Ours</td>
+<td>The driver presses inside a window it is told of and does not say where windows are, so it cannot press where a person points on a picture of the whole screen. What the person does on the picture is posted to macOS itself as the events of a mouse and a keyboard, through the system's own library and no added package. The page works in the points of the Mac's screen, so a place on the picture is that place on the screen. macOS takes the events only from a program the person allowed under Accessibility: where it is not allowed, nothing is sent and the page says to use the Mac's own mouse and keyboard, and how to allow it. Not built for a Mac reached through the helper: raw input there would pass the list of allowed apps the helper holds an engine to</td>
+</tr>
+<tr>
+<td>Typing on a desktop nobody sits at</td>
+<td>Ours</td>
+<td>Plain text on one line is typed with the desktop's own keyboard, as a press by number is made with its pointer: it takes the place of what is selected, as a person's typing does. The driver's own typing puts text in beside a selection. Text with other letters, or of several lines, is typed the driver's way, and so is any text that keyboard could not type. The text is the keyboard program's input and never a word of its command</td>
 </tr>
 <tr>
 <td>macOS permissions</td>

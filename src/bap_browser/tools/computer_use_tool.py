@@ -215,6 +215,8 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
             # What it changed is looked at the way the tool itself would after an action.
             await asyncio.sleep(session.config.computer.settle_ms / 1000)
             asked = {"action": "capture", "mode": "ax"}
+    if in_front and args.action == "type" and args.text and await driver.typed(args.text):
+        return f"type: done. The desktop's keyboard typed {len(args.text)} characters.{LOOK_AGAIN}"
     result = await driver.use(asked)
     shown = session.config.computer.base.elements_shown
     label = session.config.computer.window_title_chars

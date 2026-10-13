@@ -124,8 +124,8 @@
     },
     {
       "id": "free-select-all",
-      "title": "Erasing a word, selected from the menu",
-      "task": "In the text editor, write the word old. Select it with Select All in the editor's Edit menu, erase it with the Backspace key, and write the word new. Save it as new.txt in the folder Practice inside Files.",
+      "title": "Writing over a word, selected from the menu",
+      "task": "In the text editor, write the word old. Select it with Select All in the editor's Edit menu and write the word new over it. Save it as new.txt in the folder Practice inside Files.",
       "start": "desktop",
       "pass": [
         {
@@ -156,10 +156,6 @@
         [
           "press",
           "Select All"
-        ],
-        [
-          "key",
-          "BackSpace"
         ],
         [
           "type",

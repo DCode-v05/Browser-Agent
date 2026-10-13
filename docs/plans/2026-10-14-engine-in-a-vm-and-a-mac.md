@@ -156,4 +156,5 @@ Not proven:
   certificate of the helper's name as the link sees it through the proxy.
 - The speed of the live picture across the tailnet.
 - The Anthropic provider against the real service.
-- Take over from the viewer on a real Mac: the page says to use the Mac's own mouse and keyboard.
+- Take over from the viewer of a Mac reached through the helper. With the engine on the Mac itself
+  the picture can be driven; through the helper the page says to use the Mac's own mouse and keyboard.

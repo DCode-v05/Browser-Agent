@@ -574,12 +574,15 @@ class ItsOwnDesktop:
     def __init__(self) -> None:
         self.sent: list[str] = []
         self.ran: list[tuple[str, ...]] = []
+        self.given: list[bytes] = []
 
     async def send(self, line: str) -> None:
         self.sent.append(line)
 
     async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
         self.ran.append(command)
+        if stdin is not None:
+            self.given.append(stdin)
         return b""
 
 
@@ -891,3 +894,87 @@ def test_the_model_is_told_to_read_past_a_slip_of_typing(make_config, tmp_path: 
     for told in (instructions_for(make_config(tmp_path, computer={"runs": runs})), SYSTEM):
         assert "read past a slip of spelling" in told
         assert "ask only when two readings would do different things" in told
+
+
+async def by_a_place(make_config, tmp_path: Path, desk: Desk, answer: str) -> tuple[list[Any], bool]:
+    """A click by pixels on the desktop, after a capture of it. Who was asked, and whether it failed."""
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    asked: list[Any] = []
+
+    async def a_person(question: Any) -> Any:
+        asked.append(question)
+        return answer
+
+    await session.start()
+    session.browser.ask_approval = a_person
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        done = await session.toolkit.call("computer_use", {"action": "click", "coordinate": [40, 150]})
+    finally:
+        await session.close()
+    return asked, done.is_error
+
+
+async def test_a_click_by_a_place_waits_for_a_person_where_the_screen_holds_a_press_that_sends_or_deletes(
+    make_config, tmp_path: Path
+) -> None:
+    """A click by pixels names no element, so it cannot be told that it is not on "Send"."""
+    desk = AMailApp()
+    asked, failed = await by_a_place(make_config, tmp_path, desk, "denied")
+
+    assert len(asked) == 1 and failed
+    assert did(desk, "click") == []
+
+
+async def test_a_click_by_a_place_asks_nobody_where_the_screen_holds_no_such_press(
+    make_config, tmp_path: Path
+) -> None:
+    desk = Desk()
+    asked, failed = await by_a_place(make_config, tmp_path, desk, "denied")
+
+    assert asked == [] and not failed
+    assert len(did(desk, "click")) == 1
+
+
+async def test_where_nobody_sits_plain_text_is_typed_with_the_desktops_own_keyboard(
+    make_config, tmp_path: Path
+) -> None:
+    """As a person's typing does, it takes the place of what is selected. The driver's own typing
+    puts text in beside a selection: "old", Select All, "new" gave "newold" (seen in a container)."""
+    session, desk, own = where_nobody_sits(make_config, tmp_path)
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        typed = await session.toolkit.call("computer_use", {"action": "type", "text": "new ~/a.txt"})
+        other = await session.toolkit.call("computer_use", {"action": "type", "text": "caf\u00e9"})
+    finally:
+        await session.close()
+
+    assert not typed.is_error and "keyboard typed" in typed.text
+    assert "new ~/a.txt" not in typed.text
+    # The text goes to the keyboard's program as its input, never as a word of its command.
+    assert own.given == [b"new ~/a.txt"]
+    assert all("new" not in word for command in own.ran for word in command)
+    # Letters this keyboard does not have are typed the driver's own way.
+    assert not other.is_error and [how.get("text") for how in did(desk, "type")] == ["caf\u00e9"]
+
+
+async def test_on_a_persons_own_machine_the_drivers_typing_is_left_as_it_is(
+    make_config, tmp_path: Path
+) -> None:
+    session, desk = on_a_machine(make_config, tmp_path)
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        await session.toolkit.call("computer_use", {"action": "type", "text": "new"})
+    finally:
+        await session.close()
+
+    assert [how.get("text") for how in did(desk, "type")] == ["new"]

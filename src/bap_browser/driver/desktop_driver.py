@@ -274,6 +274,10 @@ class DesktopDriver:
     async def locate_focus(self) -> Located | None:
         return None
 
+    def on_screen(self) -> list[Located]:
+        """The controls the newest capture named that have a place on the screen."""
+        return []
+
     async def gist(self) -> list[str]:
         return []
 

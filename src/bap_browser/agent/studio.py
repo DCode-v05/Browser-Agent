@@ -36,7 +36,7 @@ from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.agent.models import Message, Model
 from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
-from bap_browser.driver.hermes_driver import desktop_driver_for
+from bap_browser.driver.hermes_driver import HermesDriver, desktop_driver_for
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_among
@@ -184,6 +184,9 @@ class Studio:
         for page, room in zip(told, self.rooms, strict=True):
             if room.backend == DESKTOP:
                 page["runs"] = self._configured(room).computer.runs
+                # Whether what a person does on the picture reaches the screen (spec 22.3.1).
+                driver = room.session.browser.started_driver if room.session is not None else None
+                page["hand"] = isinstance(driver, HermesDriver) and driver.takes_a_hand()
         return told
 
     def described(self) -> list[dict[str, Any]]:
