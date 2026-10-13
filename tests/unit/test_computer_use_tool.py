@@ -450,7 +450,6 @@ async def test_where_nobody_is_at_the_screen_input_goes_to_the_window_in_front(
     ("runs", "base", "how"),
     [
         ("machine", {}, None),
-        ("mac", {}, None),
         ("remote", {}, None),
         ("container", {}, "foreground"),
         ("here", {}, "foreground"),

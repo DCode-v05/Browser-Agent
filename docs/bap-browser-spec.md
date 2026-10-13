@@ -5263,7 +5263,7 @@ uv run bap-browser helper --allow text_editor,calculator
 ```
 
 - The helper prints a token, new each start. The engine is given it as `BAP_BROWSER_HELPER_TOKEN`
-  (in the environment or `.env`), with `computer.runs` set to `mac` and `computer.helper_url` to where
+  (in the environment or `.env`), with `computer.runs` set to `remote` and `computer.helper_url` to where
   the helper answers. The helper answers on the Mac's own address unless told otherwise with `--host`.
 - It sees the screen with macOS's `screencapture` and moves the mouse and keyboard through CoreGraphics.
   Nothing is installed. The Mac must allow the program that runs it under Screen Recording and

@@ -20,7 +20,7 @@ def a_config(tmp_path: Path, runs: str, **base: object) -> Config:
     return Config.model_validate({"computer": {"runs": runs, "base": {"home": str(tmp_path), **base}}})
 
 
-@pytest.mark.parametrize("runs", ["container", "here", "mac", "machine", "remote"])
+@pytest.mark.parametrize("runs", ["container", "here", "machine", "remote"])
 def test_every_desktop_is_driven_through_hermes_driver(runs: str, tmp_path: Path) -> None:
     config = a_config(tmp_path, runs)
 
@@ -28,6 +28,11 @@ def test_every_desktop_is_driven_through_hermes_driver(runs: str, tmp_path: Path
     assert isinstance(desktop_driver_for(config), HermesDriver)
     assert "computer_use" in [tool.name for tool in computer_tools_for(config)]
     assert "computer_use" in instructions_for(config)
+
+
+def test_a_mac_is_named_as_a_machine_or_as_one_elsewhere_and_by_no_word_of_its_own(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="'container', 'here', 'machine' or 'remote'"):
+        a_config(tmp_path, "mac")
 
 
 def test_for_the_contained_desktop_the_engine_starts_the_dock_in_the_drivers_place(tmp_path: Path) -> None:
