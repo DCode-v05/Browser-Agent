@@ -72,6 +72,8 @@ def test_the_file_is_in_the_form_the_driver_takes_in_its_bounded_mode(tmp_path: 
     # The driver refuses a file that names a mode, and one for bounded mode with no lifetimes.
     assert listed["version"] == 3 and "mode" not in listed
     assert listed["expires_after"] and listed["idle_timeout"]
+    # The whole screen may be looked at; a window is the app's, and is in the list or is not.
+    assert listed["resources"]["desktop"] == {"display": True}
     assert {"get_window_state", "click", "type_text", "launch_app"} <= set(listed["allow"]["tools"])
     # Nothing that updates the driver or changes its settings is among them.
     assert not {"check_for_update", "set_telemetry"} & set(listed["allow"]["tools"])

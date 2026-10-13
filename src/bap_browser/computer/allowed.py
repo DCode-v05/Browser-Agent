@@ -1,8 +1,9 @@
 """The apps an agent may work in on a real machine, as the driver itself enforces them (spec 22.7).
 
 The settings name the apps a person allows. Here that list becomes the file the driver is started
-with in its `bounded` mode: its capability manifest. The driver then refuses, by itself, a capture
-or a click in any other app, whatever the agent asks. An app is named as its system names it: by its
+with in its `bounded` mode: its capability manifest. The driver then refuses, by itself, to read
+the elements of any other app's window or to act in it, whatever the agent asks. It may still see
+the screen as a whole and the names of its windows. An app is named as its system names it: by its
 bundle on macOS, by its program's full path on Windows and Linux.
 """
 
@@ -95,7 +96,10 @@ def manifest(
         "version": 3,
         "expires_after": computer.base.allowed_for,
         "idle_timeout": computer.base.allowed_idle,
-        "resources": {"apps": apps},
+        # The display may be looked at as a whole: the driver lists the windows before every capture,
+        # and the person's live picture is of the whole screen. A window is read, and acted in, only
+        # when its app is among `apps`.
+        "resources": {"apps": apps, "desktop": {"display": True}},
         "allow": {"tools": list(TOOLS)},
     }
 
