@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from bap_browser.computer.contained import INSIDE as DRIVER_INSIDE
 from bap_browser.config_computer import Computer
 from bap_browser.errors import BrowserError
 
@@ -93,7 +94,9 @@ class ContainedDesktop:
         """The folder of this machine that the desktop shows as `Files`. None when none is shared."""
         return self._folder if self._settings.share_folder else None
 
-    async def start(self) -> None:
+    async def image_ready(self) -> None:
+        """Checked before anything is fetched or started: that there is a container program, that
+        it is running, and that the desktop's image is on this machine."""
         settings = self._settings
         program = settings.container_command
         if shutil.which(program) is None:
@@ -104,7 +107,7 @@ class ContainedDesktop:
             )
         # `image ls` answers for an image that is there and for one that is not; `image inspect`
         # does not find every image some container programs list.
-        code, out, said = await self._call(program, "image", "ls", "-q", settings.image)
+        code, out, _said = await self._call(program, "image", "ls", "-q", settings.image)
         if code != 0:
             raise BrowserError(
                 "The container program is installed but not running. Start Docker and try again.",
@@ -116,6 +119,13 @@ class ContainedDesktop:
                 f"{program} build -t {settings.image} -f deploy/desktop.Dockerfile deploy",
                 reason="the desktop's image is not built",
             )
+
+    async def start(self, driver: Path | None = None) -> None:
+        """Starts the desktop's container. `driver` is the pinned driver's program on this machine,
+        mounted into the container at its own place (spec 22.6): nothing is copied in once it runs,
+        since a rootless container program cannot remount a read-only bind to do that."""
+        settings = self._settings
+        program = settings.container_command
         await self._call(program, "rm", "-f", self.container)
         # Not detached: this process holds the container's input open, and the desktop ends when
         # that input closes. However this process ends, its desktop does not outlive it.
@@ -129,6 +139,8 @@ class ContainedDesktop:
         for app in APPS:
             if app not in allowed:
                 command += ["-v", f"/dev/null:{app.program}:ro"]
+        if driver is not None:
+            command += ["-v", f"{driver}:{DRIVER_INSIDE}:ro"]
         if settings.share_folder:
             self._folder.mkdir(parents=True, exist_ok=True)
             command += ["-v", f"{self._folder}:{FILES_INSIDE}"]

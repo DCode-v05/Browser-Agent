@@ -1862,6 +1862,23 @@ Added on 2026-10-05, on branch `feature/agent-cursor`. The table at the top was 
   picture to load). The 17 tool definitions come to 1,511 tokens, counted as characters / 4, against a
   budget of 125 a tool.
 
+## The contained desktop under a rootless container program
+
+Found 2026-10-13, running the contained desktop on a box with no root: the driver used to be copied
+into the running container with `docker cp`, once the container was up. Under a rootless container
+program this failed on any desktop with an app a person had not allowed (the default: the terminal
+is off), with `remount-ro ... operation not permitted` — writing one file needed the program to
+briefly remount a read-only bind of another, which it has no right to do outside real root. Tried
+and ruled out: a different storage driver (`overlayfs`, then `vfs`) made no difference, since the
+cause is the bind mount, not the layer format.
+
+Fixed by never writing into the running container at all: the driver is now mounted in at the
+container's start, alongside the binds that hold an app's program away from it (`contained.py`'s
+`fetch_the_driver`, called before `ContainedDesktop.start`, which takes it as a mount). Proven on
+the team's Linux box with rootless Docker (no sudo, `get.docker.com/rootless`, `SKIP_IPTABLES=1`):
+the desktop's `computer` room reaches `agent` with the terminal off, the default. The existing e2e
+test (`tests/e2e/test_computer.py`) and the unit tests pass unchanged on a real, rootful Docker too.
+
 ## Documents
 
 | File | What it is |

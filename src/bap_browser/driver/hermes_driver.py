@@ -107,12 +107,13 @@ class HermesDriver(DesktopDriver):
             self._screen = await own_screen(self._settings)
         container = None
         if isinstance(self.desktop, ContainedDesktop) and self._settings.runs == "container":
-            # The desktop is started as before; its driver is then put inside it.
-            await self.desktop.start()
-            container = self.desktop.container
+            driver_path = None
             if self._stand_in is None:
+                await self.desktop.image_ready()
                 home = computer.home_of(self._config)
-                await asyncio.to_thread(contained.put_the_driver_in, self._settings, home, container)
+                driver_path = await asyncio.to_thread(contained.fetch_the_driver, self._settings, home)
+            await self.desktop.start(driver_path)
+            container = self.desktop.container
         self._base = computer.base(self._config, backend=self._stand_in, container=container)
         self._base.__enter__()
         # The engine's own check has judged a call, and asked a person where the settings say so,
