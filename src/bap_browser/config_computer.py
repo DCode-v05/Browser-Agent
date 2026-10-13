@@ -160,9 +160,10 @@ class Computer(Section):
         "1280x800", "The desktop's screen, width by height in pixels. Sizes the vendors recommend for a model"
     )
     ask_before_apps: bool = setting(False, "Whether a person is asked before the agent opens an app")
-    mac_any_app: bool = setting(
+    any_app: bool = setting(
         False,
-        "On the person's own Mac: whether the agent may open any app by its name. Each opening asks them first",
+        "On a person's own machine, Windows, macOS or Linux: whether the agent may work in any app, and "
+        "open one by its name. It is then not held to the allowed apps. Each opening asks them first",
     )
     apps: AllowedApps = AllowedApps()
     base: Base = Base()

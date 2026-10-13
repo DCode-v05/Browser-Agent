@@ -93,7 +93,7 @@ def test_on_a_machine_the_driver_is_started_held_to_the_file(tmp_path: Path) -> 
 
 
 def test_where_the_person_allows_any_app_the_driver_is_not_held(tmp_path: Path) -> None:
-    with computer.base(a_machine(tmp_path, mac_any_app=True)):
+    with computer.base(a_machine(tmp_path, any_app=True)):
         seen = computer.settings_seen()["computer_use"]
 
     assert seen["permission_mode"] == "standard"

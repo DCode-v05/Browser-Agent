@@ -120,3 +120,38 @@ def test_a_person_turns_an_app_on_for_the_desktop_alone(make_config, tmp_path: P
     store.change("web", {"computer_terminal": True}, "computer")
     config = store.apply_to(make_config(tmp_path), "contained_desktop", "computer")
     assert config.computer.apps.terminal
+
+
+async def test_where_a_person_allows_any_app_one_outside_the_list_is_opened_by_its_name_after_their_yes(
+    make_config, tmp_path: Path
+) -> None:
+    """On Windows, macOS or Linux alike: with the switch on, the agent is not held to the four apps."""
+    session, desk = a_desktop_session(make_config, tmp_path, any_app=True)
+    asked: list[str] = []
+
+    async def yes(question: Any) -> Any:
+        asked.append(question.tool)
+        return "allowed"
+
+    await session.start()
+    session.browser.ask_approval = yes
+    try:
+        listed = await session.toolkit.call("computer_list_apps", {})
+        opened = await session.toolkit.call("computer_open_app", {"app": "File Explorer"})
+    finally:
+        await session.close()
+
+    assert "any app on this machine, by its name" in listed.text
+    assert not opened.is_error and desk.opened == ["File Explorer"]
+    assert asked == ["computer_open_app"]
+
+
+def test_the_switch_for_any_app_is_named_for_every_system(make_config, tmp_path: Path) -> None:
+    store = SettingsStore(make_config(tmp_path))
+    store.systems = ("cloud", "computer")
+    store.backends = {"cloud": "remote_headless", "computer": "contained_desktop"}
+    groups = store.answer("web", "computer")["groups"]
+    one = next(s for g in groups for s in g["settings"] if s["id"] == "computer_any_app")
+
+    assert one["title"] == "Let the agent work in any app on the machine"
+    assert "Mac" not in one["title"] + one["description"]
