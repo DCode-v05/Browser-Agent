@@ -1360,11 +1360,11 @@ Found, and not mended:
   asking where the window in front is. CI caught it on the machine's own virtual screen: the window
   in front was not the one captured, and the click missed. The pointer is now sent to the place on
   the screen itself, by the desktop's own hand.
-- **Apps do not agree on where a place is counted from.** An app of GTK 3 (the editor) gives each
-  element's place on the screen; an app of GTK 4 (the dialog CI uses) gives it inside its own
-  window. A capture is taken to be of the second kind when nothing in it reaches past the window's
-  own size, and then the window's corner is added. A window of the first kind whose every element
-  sits in its top left corner would be misread; none has been seen.
+- **Some apps do not say where their elements are.** An app of GTK 3 (the editor) gives each
+  element's place on the screen. An app of GTK 4 (the dialog CI uses) gives every element the corner
+  of its window: four elements, one corner. The pointer presses only an element whose corner is its
+  own; any other is pressed the driver's own way, as before. So an app of GTK 4 can still be left not
+  answering by a press that opens a box.
 
 The rest of the model's run, tried and not got:
 

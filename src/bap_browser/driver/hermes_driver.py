@@ -12,7 +12,6 @@ import base64
 import contextlib
 import json
 import os
-import re
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -23,7 +22,7 @@ from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
-from bap_browser.driver.contained_desktop import App, ContainedDesktop, Desktop
+from bap_browser.driver.contained_desktop import App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
@@ -45,8 +44,6 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
-# What `xwininfo` says of a window: its corner on the screen and its size.
-ITS_PLACE = re.compile(r"(Absolute upper-left [XY]|Width|Height):\s+(-?\d+)")
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
@@ -90,8 +87,6 @@ class HermesDriver(DesktopDriver):
         self._last: Shot | None = None
         self._screen: ScreenHere | None = None
         self._placed: dict[int, tuple[int, int, int, int]] = {}
-        self._inside = False
-        self._captured = ("", 0, 0)
 
     # The session.
 
@@ -151,54 +146,35 @@ class HermesDriver(DesktopDriver):
 
     # Where things are, on a desktop this engine itself started (spec 22.5).
 
-    def saw(self, elements: list[dict[str, Any]], app: str, size: tuple[int, int]) -> None:
-        """Keeps where each element of the newest capture is, by its number, and whether the app gave
-        the places on the screen or inside its own window. An app of GTK 4 gives them inside its
-        window, and then nothing reaches past the window's own size; others give them on the screen."""
+    def saw(self, elements: list[dict[str, Any]]) -> None:
+        """Keeps where each element of the newest capture is on the screen, by its number."""
         self._placed = {
             int(one["index"]): (int(x), int(y), int(wide), int(high))
             for one in elements
             for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
         }
-        sized = [place for place in self._placed.values() if place[2] and place[3]]
-        wide, high = size
-        self._inside = bool(sized and wide and high) and all(
-            x >= 0 and y >= 0 and x + its_width <= wide and y + its_height <= high
-            for x, y, its_width, its_height in sized
-        )
-        self._captured = (app, wide, high)
-
-    async def _corner(self, own: Desktop) -> tuple[int, int]:
-        """Where the captured window is on the screen: the window of that app that has that size."""
-        app, wide, high = self._captured
-        listed = await self.use({"action": "list_windows"})
-        rows = json.loads(listed).get("windows", []) if isinstance(listed, str) else []
-        of_the_app = [row for row in rows if str(row.get("app_name", "")).lower() == app.lower()] or rows
-        first: tuple[int, int] | None = None
-        for row in of_the_app:
-            said = (await own.run("xwininfo", "-id", str(int(row["window_id"])))).decode()
-            at = {name: int(number) for name, number in ITS_PLACE.findall(said)}
-            corner = at.get("Absolute upper-left X", 0), at.get("Absolute upper-left Y", 0)
-            first = first or corner
-            if (at.get("Width"), at.get("Height")) == (wide, high):
-                return corner
-        return first or (0, 0)
 
     async def press(self, element: int, action: str) -> Literal["pressed", "nowhere"] | None:
         """Presses an element with the desktop's own pointer, at its middle on the screen. "nowhere"
         for one with no size: an item of a menu that is not open, or a hidden button. None where the
-        element is not known, or the desktop is not this engine's own: then nothing was done."""
+        press is left to the driver: the element is not known, the desktop is not this engine's own,
+        or the app does not say where the element is. An app of GTK 4 gives every element the corner
+        of its window, so a corner that another element has too is nobody's place."""
         own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
         if own is None or element not in self._placed:
             return None
         x, y, wide, high = self._placed[element]
         if not wide or not high:
             return "nowhere"
-        left, top = await self._corner(own) if self._inside else (0, 0)
+        shared = [
+            other
+            for number, other in self._placed.items()
+            if number != element and other[:2] == (x, y) and other[2] and other[3]
+        ]
+        if shared:
+            return None
         button, times = PRESSED[action]
-        await own.send(
-            f"mousemove {left + x + wide // 2} {top + y + high // 2} click --repeat {times} {button}"
-        )
+        await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
         return "pressed"
 
     # What the two tools kept from before ask.

@@ -13821,9 +13821,9 @@ from Hermes' own tool, because input there goes in front:</p>
   the items of every menu that is not open, and hidden buttons (248 of a text editor's 255). Those are
   counted in one line, and named once their menu is open.</li>
 <li>A click on an element by its number is delivered as a click of the desktop's own pointer at the
-  element's middle on the screen. Apps do not agree on where a place is counted from: some give it on
-  the screen and some inside their own window. A capture in which nothing reaches past the window's
-  own size is taken to be of the second kind, and the corner of the captured window is added.
+  element's middle on the screen, where the app says where the element is. Some do not: an app of
+  GTK 4 gives every element the corner of its window. An element whose corner another element has
+  too is pressed the driver's own way.
   Pressed through the accessibility bus, a button or menu item that opens a box leaves its app not
   answering until the box is closed, about 25 seconds a step (seen on Linux). An element with no place
   on the screen is not pressed: the result says to open its menu and capture again.</li>

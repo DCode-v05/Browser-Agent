@@ -395,12 +395,7 @@ async def read_back(
             printed = (await asyncio.to_thread(process.communicate, None, WAIT_FOR_THE_APP_S))[0]
         except subprocess.TimeoutExpired:
             said_of_it = " | ".join(clicked.text.splitlines())[:300]
-            driver = session.browser.started_driver
-            worked_from = {key: getattr(driver, key, None) for key in ("_placed", "_inside", "_captured")}
-            windows = await asyncio.to_thread(computer.computer_use, {"action": "list_windows"}, "ladder")
-            tree = subprocess.run(["xwininfo", "-root", "-tree"], capture_output=True, text=True, check=False)
-            seen = f"{said_of_it} | {worked_from} | {str(windows)[:500]} | {tree.stdout[-900:]}"
-            return name, False, f"OK was clicked by its number, and the dialog did not close: {seen}"
+            return name, False, f"OK was clicked by its number, and the dialog did not close: {said_of_it}"
         said_back = printed.decode("utf-8", errors="replace").strip()
         return (
             name,

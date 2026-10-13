@@ -519,8 +519,7 @@ async def test_what_an_app_wrote_is_said_to_be_the_screens_and_not_a_sites(
 
 
 class WithAMenu(Desk):
-    """A window at 300, 200 of the screen: a Save button, a field, and an item of a menu that is not
-    open. Its app gives each place on the screen, as most do: the field reaches past the window's size."""
+    """A window at 300, 200 of the screen: a Save button, a field, and an item of a menu that is not open."""
 
     places = ((310, 210, 80, 24), (310, 250, 620, 200))
 
@@ -535,18 +534,11 @@ class WithAMenu(Desk):
         ]
         return CaptureResult(mode=mode, width=640, height=480, elements=elements, app="Notes")
 
-    def list_windows(self) -> list[dict[str, Any]]:
-        return [
-            {"app_name": "Other", "pid": 5, "window_id": 11, "title": "Another app"},
-            {"app_name": "Notes", "pid": 7, "window_id": 21, "title": "A box of Notes"},
-            {"app_name": "Notes", "pid": 7, "window_id": 22, "title": "My note"},
-        ]
 
+class WithNoPlaces(WithAMenu):
+    """The same window, of an app that gives every element the corner of its window, as GTK 4 does."""
 
-class PlacedInItsWindow(WithAMenu):
-    """The same window, of an app that gives each place inside its own window, as GTK 4 does."""
-
-    places = ((10, 10, 80, 24), (10, 50, 620, 200))
+    places = ((300, 200, 80, 24), (300, 200, 620, 200))
 
 
 class ItsOwnDesktop:
@@ -560,13 +552,6 @@ class ItsOwnDesktop:
 
     async def send(self, line: str) -> None:
         self.sent.append(line)
-
-    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
-        """`xwininfo` of a window: the note's own is 640 by 480 at 300, 200; the box is smaller."""
-        assert command[:2] == ("xwininfo", "-id")
-        at = {"21": (500, 400, 200, 100), "22": (300, 200, 640, 480)}[command[2]]
-        said = "Absolute upper-left X:  {}\n  Absolute upper-left Y:  {}\n  Width: {}\n  Height: {}\n"
-        return said.format(*at).encode()
 
 
 def where_nobody_sits(
@@ -624,19 +609,20 @@ async def test_where_nobody_sits_a_click_by_number_is_a_click_of_the_pointer_at_
     )
 
 
-async def test_an_app_that_places_things_inside_its_window_is_pressed_at_the_same_spot_of_the_screen(
+async def test_an_app_that_does_not_say_where_its_elements_are_is_pressed_the_drivers_own_way(
     make_config, tmp_path: Path
 ) -> None:
-    session, _, own = where_nobody_sits(make_config, tmp_path, PlacedInItsWindow())
+    session, desk, own = where_nobody_sits(make_config, tmp_path, WithNoPlaces())
     await session.start()
     try:
         await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
-        await session.toolkit.call("computer_use", {"action": "click", "element": 1})
+        clicked = await session.toolkit.call("computer_use", {"action": "click", "element": 1})
     finally:
         await session.close()
 
-    # The window of that app with the capture's own size is at 300, 200: 300 + 10 + 40, 200 + 10 + 12.
-    assert own.sent == ["mousemove 350 222 click --repeat 1 1"]
+    # A corner two elements share is nobody's place: the pointer is not sent anywhere on a guess.
+    assert not clicked.is_error and own.sent == []
+    assert [how.get("element") for how in did(desk, "click")] == [1]
 
 
 async def test_where_nobody_sits_what_is_not_on_the_screen_is_not_pressed(
