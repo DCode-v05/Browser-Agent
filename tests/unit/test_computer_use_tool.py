@@ -689,10 +689,11 @@ async def test_a_driver_that_stops_answering_on_the_engines_own_desktop_is_start
     finally:
         await session.close()
 
-    assert seen.is_error and "stopped answering and was started again" in seen.text
+    assert seen.is_error and "The desktop stopped answering" in seen.text
     # The model is told what it can do next, not the driver's own words about a session.
-    assert "MCP" not in seen.text and "Capture again" in seen.text
-    assert ("pkill", "-9", "-x", "cua-driver") in own.ran
+    assert "MCP" not in seen.text and "Open the app again" in seen.text
+    # The driver is ended, and the apps with it: one that no longer answers holds every driver up.
+    assert {command[-1] for command in own.ran} >= {"cua-driver", "mousepad", "pcmanfm"}
 
 
 async def test_on_a_persons_machine_a_driver_that_stops_answering_is_left_alone(
@@ -712,4 +713,4 @@ async def test_on_a_persons_machine_a_driver_that_stops_answering_is_left_alone(
     finally:
         await session.close()
 
-    assert seen.is_error and "started again" not in seen.text
+    assert seen.is_error and "stopped answering" not in seen.text

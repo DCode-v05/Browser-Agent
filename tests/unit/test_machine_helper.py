@@ -223,6 +223,37 @@ def test_an_engine_that_is_not_held_reaches_the_driver_as_it_is(tmp_path: Path, 
     assert started == "started with:"
 
 
+def test_the_driver_that_holds_the_engine_is_started_afresh_for_each_session_and_not_under_one(
+    tmp_path: Path, said: list[str]
+) -> None:
+    """A driver that has run a while refuses an app that was closed and opened again (seen on macOS).
+    Each session of an engine gets a fresh one; a second conversation of the same session, the
+    viewer's beside the agent's, shares it."""
+    helper = a_helper(tmp_path, said, tailnet=True)
+    started: list[str] = []
+
+    def afresh() -> str:
+        started.append(f"/somewhere/held-{len(started) + 1}.sock")
+        return started[-1]
+
+    helper.renew = afresh
+    client = TestClient(helper_app(helper))
+
+    def asked(link: Any) -> str:
+        link.send_text("started with?")
+        return link.receive_text().strip()
+
+    with client.websocket_connect("/mcp", headers=asking(forwarded=FROM_THE_VM)) as agents:
+        first = asked(agents)
+        with client.websocket_connect("/mcp", headers=asking(forwarded=FROM_THE_VM)) as viewers:
+            beside = asked(viewers)
+    with client.websocket_connect("/mcp", headers=asking(forwarded=FROM_THE_VM)) as next_session:
+        second = asked(next_session)
+
+    assert first == beside == "started with: --embedded --socket /somewhere/held-1.sock"
+    assert second == "started with: --embedded --socket /somewhere/held-2.sock"
+
+
 # The link: the program the engine starts in the driver's place.
 
 

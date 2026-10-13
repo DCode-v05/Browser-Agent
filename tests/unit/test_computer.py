@@ -164,6 +164,7 @@ async def test_the_drivers_own_windows_are_not_among_the_open_windows(make_confi
         def list_windows(self) -> list[dict[str, Any]]:
             return [
                 {"title": "Cua.AgentCursorOverlay.default", "app_name": "cua-driver.exe", "pid": 3},
+                {"title": "Cua Driver", "app_name": "Cua Driver", "pid": 4},
                 {"title": "Untitled - Notepad", "app_name": "notepad.exe", "pid": 7},
             ]
 
@@ -181,4 +182,4 @@ async def test_the_drivers_own_windows_are_not_among_the_open_windows(make_confi
     finally:
         await session.close()
 
-    assert "Untitled - Notepad" in listed.text and "Cua." not in listed.text
+    assert "Untitled - Notepad" in listed.text and "Cua" not in listed.text

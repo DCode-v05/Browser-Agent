@@ -48,14 +48,17 @@ MODES = ("som", "vision", "ax")
 KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["notepad.exe"], "Notepad", []),
     "linux": (["zenity", "--entry", "--title=Ladder", "--text=A window the ladder knows"], "zenity", []),
-    "darwin": (["open", "-a", "TextEdit"], "TextEdit", ["osascript", "-e", 'quit app "TextEdit"']),
+    # `-F` opens it afresh: macOS would bring back the windows of its last run, and the driver does
+    # not type in the background into an app that has several windows. It is ended by its process:
+    # asking it to quit goes through AppleScript, which macOS lets through only after a consent.
+    "darwin": (["open", "-F", "-a", "TextEdit"], "TextEdit", ["pkill", "-x", "TextEdit"]),
 }
 # An app each system has that the settings do not allow: how it is started, the name a capture would
 # find it by, and how it is closed.
 NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["charmap.exe"], "Character Map", []),
     "linux": (["xmessage", "-name", "Other", "A window that is not allowed"], "xmessage", []),
-    "darwin": (["open", "-a", "Stickies"], "Stickies", ["osascript", "-e", 'quit app "Stickies"']),
+    "darwin": (["open", "-a", "Stickies"], "Stickies", ["pkill", "-x", "Stickies"]),
 }
 # An app each system has that is none of the four the settings name: the name it is opened by, and
 # what its window is found by.
@@ -101,14 +104,20 @@ def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
     and its process come out: on Linux the app prints what was typed into it when it is closed."""
     system = next(name for name in KNOWN if sys.platform.startswith(name))
     command, name, closing = KNOWN[system]
-    started = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    try:
-        yield name, started
-    finally:
-        if started.poll() is None:
-            started.terminate()
-        if closing:
-            subprocess.run(closing, capture_output=True, check=False)
+    with tempfile.TemporaryDirectory() as folder:
+        if system == "darwin":
+            # TextEdit begins with its box for opening a file, and no document. It is given one.
+            page = Path(folder) / "ladder.txt"
+            page.write_text("", encoding="utf-8")
+            command = [*command, str(page)]
+        started = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        try:
+            yield name, started
+        finally:
+            if started.poll() is None:
+                started.terminate()
+            if closing:
+                subprocess.run(closing, capture_output=True, check=False)
 
 
 async def the_windows() -> list[dict[str, Any]]:
