@@ -57,6 +57,13 @@ NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
     "linux": (["xmessage", "-name", "Other", "A window that is not allowed"], "xmessage", []),
     "darwin": (["open", "-a", "Stickies"], "Stickies", ["osascript", "-e", 'quit app "Stickies"']),
 }
+# An app each system has that is none of the four the settings name: the name it is opened by, and
+# what its window is found by.
+BY_NAME: dict[str, tuple[str, str]] = {
+    "win32": ("Character Map", "Character Map"),
+    "linux": ("xclock", "xclock"),
+    "darwin": ("Stickies", "Stickies"),
+}
 # What the driver says when it refuses for the list of allowed apps.
 REFUSED_FOR_THE_LIST = re.compile(r"manifest|authoriz|not allowed|denied|outside", re.IGNORECASE)
 # A line of a capture that names a field text goes into: its number and its role.
@@ -252,6 +259,17 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
     return rungs
 
 
+async def a_window_of(name: str) -> bool:
+    """Whether the driver lists a window that names something, once it has had time to open."""
+    ends = time.monotonic() + WAIT_FOR_THE_APP_S
+    while True:
+        if any(name.lower() in json.dumps(row).lower() for row in await the_windows()):
+            return True
+        if time.monotonic() > ends:
+            return False
+        await asyncio.sleep(LOOK_AGAIN_S)
+
+
 def started(program: str) -> int:
     """Starts a program of the system and leaves it open. Its process."""
     return subprocess.Popen([program], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid
@@ -352,6 +370,26 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                             seen_there,
                         )
                     )
+            if here.any_app:
+                # An app outside the four the settings name is opened by its name, after a yes.
+                system = next(name for name in BY_NAME if sys.platform.startswith(name))
+                named, shown_as = BY_NAME[system]
+                asked_of_a_person: list[str] = []
+
+                async def yes(question: Any) -> Any:
+                    asked_of_a_person.append(question.tool)
+                    return "allowed"
+
+                session.browser.ask_approval = yes
+                opened = await session.toolkit.call("computer_open_app", {"app": named})
+                is_open = await a_window_of(shown_as)
+                rungs.append(
+                    (
+                        f"4, any app is allowed, and {named} is opened by its name after a person's yes",
+                        not opened.is_error and is_open and asked_of_a_person == ["computer_open_app"],
+                        f"{' | '.join(opened.text.splitlines())[:200]} | asked: {asked_of_a_person} | {(await windows_like(shown_as))[:200]}",
+                    )
+                )
             if here.any_app and sys.platform == "win32":
                 # The two apps of Windows that the list of allowed apps cannot name.
                 for program, title in (("explorer.exe", "File Explorer"), ("wt.exe", "")):

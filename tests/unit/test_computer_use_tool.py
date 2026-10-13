@@ -549,9 +549,14 @@ class ItsOwnDesktop:
 
     def __init__(self) -> None:
         self.sent: list[str] = []
+        self.ran: list[tuple[str, ...]] = []
 
     async def send(self, line: str) -> None:
         self.sent.append(line)
+
+    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
+        self.ran.append(command)
+        return b""
 
 
 def where_nobody_sits(
@@ -661,3 +666,50 @@ async def test_on_a_persons_machine_an_item_of_a_closed_menu_is_still_named_and_
 
     assert "Save As" in seen.text
     assert [how.get("element") for how in did(desk, "click")] == [3]
+
+
+class Stalled(WithAMenu):
+    """A desktop whose driver has stopped answering, as it did under a model: every call times out."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        if app == "screen":
+            return super().capture(mode, app, pid, window_id)
+        raise RuntimeError("cua-driver MCP call list_windows timed out; the action outcome is unknown")
+
+
+async def test_a_driver_that_stops_answering_on_the_engines_own_desktop_is_started_again(
+    make_config, tmp_path: Path
+) -> None:
+    session, _, own = where_nobody_sits(make_config, tmp_path, Stalled())
+    await session.start()
+    try:
+        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    finally:
+        await session.close()
+
+    assert seen.is_error and "stopped answering and was started again" in seen.text
+    # The model is told what it can do next, not the driver's own words about a session.
+    assert "MCP" not in seen.text and "Capture again" in seen.text
+    assert ("pkill", "-9", "-x", "cua-driver") in own.ran
+
+
+async def test_on_a_persons_machine_a_driver_that_stops_answering_is_left_alone(
+    make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=Stalled),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+    finally:
+        await session.close()
+
+    assert seen.is_error and "started again" not in seen.text

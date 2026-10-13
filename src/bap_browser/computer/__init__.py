@@ -21,6 +21,7 @@ from bap_browser.computer.hermes.computer_use.backend import CaptureResult
 from bap_browser.computer.seams import settings
 from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
+from bap_browser.errors import BrowserError
 
 # The whole screen, as Hermes' tool names it, and who holds it when a person takes over in the viewer.
 THE_SCREEN = "screen"
@@ -161,8 +162,17 @@ def person_holds(holds: bool) -> None:
 def screen(session: str) -> CaptureResult:
     """The whole screen, for the person who watches. It is theirs to see whoever holds the screen,
     so it does not pass the gate the agent's own captures pass."""
-    with tool._backend_for_call(session) as backend:
-        return backend.capture(mode="vision", app=THE_SCREEN)
+    # Named here and not at the top: the library of the driver's protocol is loaded only where a
+    # driver is spoken to, as the copied code itself does.
+    from mcp.shared.exceptions import MCPError
+
+    try:
+        with tool._backend_for_call(session) as backend:
+            return backend.capture(mode="vision", app=THE_SCREEN)
+    except (MCPError, RuntimeError, OSError) as cut:
+        # The driver went away under it: it was ended, or it stopped answering. The next look starts
+        # a conversation with it afresh.
+        raise BrowserError("The machine gave no picture of its screen.", reason="no picture") from cut
 
 
 def settings_seen() -> dict[str, Any]:

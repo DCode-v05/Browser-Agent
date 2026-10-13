@@ -180,6 +180,39 @@ async def test_a_menu_item_that_opens_a_box_is_pressed_by_its_number_and_the_app
         await session.close()
 
 
+async def test_a_driver_that_stops_answering_is_started_again_and_the_desktop_is_worked_on_after(
+    make_config, tmp_path: Path
+) -> None:
+    """Under a model the driver in the container once stopped answering, and every call after it
+    failed until the session ended. Here its processes are frozen, as a driver that hangs is."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, "e2e-stall"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    call = session.toolkit.call
+    try:
+        assert not (await call("computer_open_app", {"app": "Text editor"})).is_error
+        assert not (
+            await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        ).is_error
+        desktop = session.browser.started_driver.desktop  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+        await desktop.run("pkill", "-STOP", "-x", "cua-driver")
+
+        stalled = await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        assert stalled.is_error and "stopped answering and was started again" in stalled.text
+
+        again = await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
+        assert not again.is_error, again.text
+        assert A_PAGE.search(again.text) is not None
+    finally:
+        await session.close()
+
+
 async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_config, tmp_path: Path) -> None:
     """A task set makes the desktop ready before each task. An app left stuck by the task before is
     ended by force, so the run goes on."""

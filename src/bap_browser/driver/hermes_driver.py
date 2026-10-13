@@ -177,6 +177,18 @@ class HermesDriver(DesktopDriver):
         await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
         return "pressed"
 
+    async def started_again(self) -> bool:
+        """Ends a driver that has stopped answering, on a desktop this engine itself started, so
+        that the next call starts a fresh one. False on a person's own machine: their driver is
+        theirs, and is left as it is."""
+        own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
+        if own is None:
+            return False
+        with contextlib.suppress(BapError):
+            # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
+            await own.run("pkill", "-9", "-x", "cua-driver")
+        return True
+
     # What the two tools kept from before ask.
 
     async def windows(self) -> list[str]:
