@@ -346,8 +346,14 @@ async def a_site_is_read(
         f"4, any app is allowed, and {address} is opened in {browser} and read",
         wrong is None and expects.lower() in read.text.lower(),
         wrong
-        or how + " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
-        or how + "the page read: " + " | ".join(read.text.splitlines())[:600],
+        or how
+        + (
+            " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
+            or "each step said: "
+            + " || ".join(" ".join(one.text.split())[:110] for one in done[2:])
+            + " || the page read: "
+            + " | ".join(read.text.splitlines())[:900]
+        ),
     )
 
 
