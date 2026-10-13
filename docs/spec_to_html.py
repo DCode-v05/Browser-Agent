@@ -5,7 +5,8 @@ Run it from the repository's folder, with nothing added to the project:
     uv run --no-project --with markdown python docs/spec_to_html.py
 
 The page that is there gives the frame: its styles, its contents list and its script are kept, and
-the contents list and the text are written again from the Markdown.
+the contents list and the text are written again from the Markdown. Another page is made the same
+way when its Markdown and its page are named: `docs/spec_to_html.py <markdown> <page>`.
 """
 
 from __future__ import annotations
@@ -18,7 +19,8 @@ from pathlib import Path
 import markdown
 
 HERE = Path(__file__).parent
-CONTENTS_OPEN = '<span class="name">bap-browser spec</span>\n'
+# The page's name above its contents list, whatever the name is.
+CONTENTS_OPEN = re.compile(r'<span class="name">[^<]*</span>\n')
 CONTENTS_CLOSE = "</nav>\n</details>\n<main>\n"
 TEXT_CLOSE = "</main>"
 
@@ -26,7 +28,10 @@ TEXT_CLOSE = "</main>"
 def main(source: Path, page: Path) -> None:
     text = source.read_text(encoding="utf-8")
     frame = page.read_text(encoding="utf-8")
-    head, rest = frame.split(CONTENTS_OPEN, 1)
+    found = CONTENTS_OPEN.search(frame)
+    if found is None:
+        raise SystemExit(f"{page} has no name above a contents list")
+    head, opening, rest = frame[: found.start()], found.group(0), frame[found.end() :]
     tail = TEXT_CLOSE + rest.split(TEXT_CLOSE, 1)[1]
 
     title, meta, intro, body = _parts(text)
@@ -51,7 +56,7 @@ def main(source: Path, page: Path) -> None:
     )
     contents = _contents(converter.toc_tokens)  # type: ignore[attr-defined]
     page.write_text(
-        head + CONTENTS_OPEN + contents + CONTENTS_CLOSE + header + written + "\n" + tail,
+        head + opening + contents + CONTENTS_CLOSE + header + written + "\n" + tail,
         encoding="utf-8",
         newline="\n",
     )
