@@ -64,6 +64,8 @@ jobs:
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --through-helper
           # With the person's switch on, the agent is not held to the allowed apps.
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --any-app
+          # And a website is reached through the machine's own browser, opened by its name.
+          dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --any-app --site firefox https://example.com "Example Domain"
           # As in the micro VM: no screen is given, and the engine starts the machine's own.
           dbus-run-session -- uv run python scripts/ladder.py --virtual-screen
           # The contained desktop: its image is built, the driver is put inside its container, and the
@@ -78,6 +80,8 @@ jobs:
       # which the list of allowed apps cannot name.
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py --any-app
+      - if: runner.os == 'Windows'
+        run: uv run python scripts/ladder.py --any-app --site "Microsoft Edge" https://example.com "Example Domain"
       # With the setting on, the installer has the driver register its own logon task (spec 22.10).
       - if: runner.os == 'Windows'
         name: The driver's logon task is registered when the settings ask for it
