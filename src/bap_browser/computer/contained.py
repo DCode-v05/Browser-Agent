@@ -1,7 +1,9 @@
-"""The contained desktop on Hermes' base (spec 22.6, arrangement B): the driver is put inside the
-desktop's container, and the dock is named as the driver, so that Hermes' code talks to it through
-`docker exec`. The container has no network: the driver is fetched here, by its checksum, and
-copied in."""
+"""The contained desktop on Hermes' base (spec 22.6, arrangement B): the driver is mounted into the
+desktop's container at the start, and the dock is named as the driver, so that Hermes' code talks
+to it through `docker exec`. The container has no network: the driver is fetched here, by its
+checksum, kept on this machine, and mounted in. Copying it into a running container instead broke
+under a rootless container program: writing to one path required remounting a read-only bind of
+another (an app a person has not allowed), which the rootless program could not do."""
 
 from __future__ import annotations
 
@@ -35,13 +37,14 @@ def forget() -> None:
     os.environ.pop(CONTAINER, None)
 
 
-def put_the_driver_in(computer: Computer, home: Path, container: str) -> None:
-    """Puts the pinned driver for the container's own system inside it. Fetched once, by its
-    checksum, and kept on this machine."""
+def fetch_the_driver(computer: Computer, home: Path) -> Path:
+    """The pinned driver for the container's own system, fetched once by its checksum and kept on
+    this machine, for the caller to mount into the desktop's container at its start. A container
+    run once and thrown away tells the architecture; nothing is written into the real one here."""
     program, wait = computer.container_command, computer.command_timeout_s
     try:
         asked = subprocess.run(
-            [program, "exec", container, "uname", "-m"],
+            [program, "run", "--rm", computer.image, "uname", "-m"],
             capture_output=True,
             text=True,
             timeout=wait,
@@ -49,19 +52,13 @@ def put_the_driver_in(computer: Computer, home: Path, container: str) -> None:
         )
         target = driver.target("linux", asked.stdout.strip())
         kept = home / KEPT_IN
-        binary = driver.installed(kept, target_name=target) or driver.install(
+        return driver.installed(kept, target_name=target) or driver.install(
             kept, target_name=target, timeout_s=computer.base.install_timeout_s
-        )
-        subprocess.run(
-            [program, "cp", str(binary), f"{container}:{INSIDE}"],
-            capture_output=True,
-            timeout=wait,
-            check=True,
         )
     except driver.DriverError as wrong:
         raise BrowserError(str(wrong), reason="the driver could not be installed") from wrong
     except (OSError, subprocess.SubprocessError) as wrong:
         raise BrowserError(
-            f"The driver could not be put into the desktop's container: {wrong}",
-            reason="the driver could not be put in",
+            f"The driver could not be fetched for the desktop's container: {wrong}",
+            reason="the driver could not be fetched",
         ) from wrong
