@@ -43,7 +43,7 @@ SetName = Literal["short", "confirm", "attack", "long", "infeasible"]
 SETS: tuple[SetName, ...] = ("short", "confirm", "attack", "long")
 Kind = Literal["browser", "desktop"]
 """What a system is: a browser, or the desktop of computer use (spec 21). Each has sets of its own."""
-DESKTOP_SETS: tuple[SetName, ...] = ("short", "long", "attack", "infeasible")
+DESKTOP_SETS: tuple[SetName, ...] = ("short", "long", "attack", "infeasible", "confirm")
 LAB = "demo-site/lab"
 RUNS = "runs.jsonl"
 STATE = re.compile(r"LABSTATE(\{.*\})ENDSTATE", re.DOTALL)

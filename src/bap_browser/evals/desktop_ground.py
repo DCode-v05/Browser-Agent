@@ -21,10 +21,13 @@ from bap_browser.service.session import ServiceSession
 
 PRACTICE = "Practice"
 # The steps a reference solution of the desktop is written in.
-STEPS = frozenset({"app", "page", "type", "submit", "key", "wait"})
+STEPS = frozenset({"app", "page", "press", "type", "submit", "key", "wait"})
 THE_TOOL = "computer_use"
 # A line of a capture that names a place text goes into: its number.
 A_PAGE = re.compile(r"#(\d+) \S*(?:text|Edit|edit|entry|Document|document|AXTextArea)\S*")
+# A line of a capture that names a control: its number, what it is, and its name in quotes. A menu
+# pads the names of its items with spaces.
+A_CONTROL = r"#(\d+) [a-z ]+ '{name} *'"
 # The keys a solution names, as Hermes' tool names them.
 THEIR_KEYS = {"control": "ctrl", "enter": "return"}
 
@@ -119,6 +122,18 @@ class Desk:
             await self._do(THE_TOOL, {"action": "wait", "seconds": settings.app_poll_ms / 1000})
         raise LostStep(f"{app} shows no place to type into")
 
+    async def _the_control(self, app: str, name: str) -> int:
+        """The number of the control so named in the app's window. A menu that has just been opened
+        takes a moment to show its items, so it is looked for as the place to type is."""
+        settings = self._session.config.computer
+        looks = max(1, int(settings.app_open_wait_s * 1000 / settings.app_poll_ms))
+        for _ in range(looks):
+            found = re.search(A_CONTROL.format(name=re.escape(name)), await self._look(app))
+            if found is not None:
+                return int(found.group(1))
+            await self._do(THE_TOOL, {"action": "wait", "seconds": settings.app_poll_ms / 1000})
+        raise LostStep(f'{app} shows no control named "{name}"')
+
     async def solve(self, steps: Sequence[Sequence[Any]]) -> tuple[str, int]:
         """Does the steps of a reference solution with the tools an agent has: Hermes' one tool, and
         ours that opens an app. What it answers, and how many steps it took."""
@@ -139,6 +154,11 @@ class Desk:
                     # The place the text goes: found among the app's elements, and clicked by its number.
                     found = await self._the_page(app)
                     await self._do(THE_TOOL, {"action": "click", "element": int(found.group(1))})
+                case "press":
+                    # As an agent presses it: by the number its name has in the newest capture.
+                    await self._do(
+                        THE_TOOL, {"action": "click", "element": await self._the_control(app, rest[0])}
+                    )
                 case "type" | "submit":
                     await self._look(app)
                     await self._do(THE_TOOL, {"action": "type", "text": rest[0]})
