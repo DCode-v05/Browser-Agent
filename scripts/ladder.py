@@ -60,6 +60,7 @@ NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
 REFUSED_FOR_THE_LIST = re.compile(r"manifest|authoriz|not allowed|denied|outside", re.IGNORECASE)
 # A line of a capture that names a field text goes into: its number and its role.
 A_FIELD = re.compile(r"#(\d+) (\S*(?:[Tt]ext|[Ee]dit|[Ee]ntry|[Dd]ocument)\S*) ")
+A_ROLE_OF_A_FIELD = re.compile(r"text|edit|entry|document", re.IGNORECASE)
 OK_BUTTON = re.compile(r"#(\d+) \S*button\S* 'OK'")
 TYPED = "ladder 4711"
 WAIT_FOR_THE_APP_S = 20.0
@@ -173,6 +174,84 @@ def capture(mode: str, app: str) -> tuple[bool, str]:
     passed = passed and (not wants_picture or bool(answer.get("picture")))
     passed = passed and (not wants_elements or elements > 0)
     return passed, seen
+
+
+async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
+    """The ladder on the contained desktop. The engine starts the container, puts the driver in it,
+    and through the session opens the text editor, finds its field by number and types into it. The
+    editor then marks its own window as changed."""
+    # The editor's menus alone are 169 elements, and the driver stops reading a window at
+    # `ax_max_elements`: at Hermes' 200 it never reaches the page. Here it reads on.
+    base = config.computer.base.model_copy(update={"contained": True, "ax_max_elements": 800})
+    inside = config.computer.model_copy(update={"runs": "container", "base": base, "share_folder": False})
+    machine = config.model_copy(update={"computer": inside})
+    inside_it = HermesDriver(machine)
+    session = ServiceSession(
+        machine, inside_it, name="ladder", backend="contained_desktop", tools=computer_tools_for
+    )
+    rungs: list[tuple[str, bool, str]] = []
+    try:
+        await session.start()
+        opened = await session.toolkit.call("computer_open_app", {"app": "Text editor"})
+        rungs.append(
+            (
+                "1, the desktop is up with the driver inside, and the editor is opened",
+                not opened.is_error,
+                " | ".join(opened.text.splitlines())[:200],
+            )
+        )
+        look = {"action": "capture", "mode": "ax", "app": "mousepad"}
+        ends = time.monotonic() + WAIT_FOR_THE_APP_S
+        seen = await session.toolkit.call("computer_use", look)
+        while "#" not in seen.text and time.monotonic() < ends:
+            await asyncio.sleep(LOOK_AGAIN_S)
+            seen = await session.toolkit.call("computer_use", look)
+        # An editor has many elements, and a capture's text names only the first of them. The field
+        # is looked for among all of them, as the tool itself gives them.
+        whole = said(await asyncio.to_thread(computer.computer_use, look, "ladder"))
+        every = whole.get("elements", [])
+        if whole.get("elements_file"):
+            # Past a hundred, the tool keeps the rest in a file and names it.
+            kept = await asyncio.to_thread(Path(whole["elements_file"]).read_text, encoding="utf-8")
+            every = json.loads(kept)["elements"]
+        fields = [one for one in every if A_ROLE_OF_A_FIELD.search(str(one.get("role", "")))]
+        rungs.append(
+            (
+                "2, a capture of the editor numbers its elements",
+                bool(fields),
+                f"{len(every)} elements; the field is {fields[0] if fields else 'not among them'}; "
+                f"roles: {sorted({str(one.get('role')) for one in every})}"[:500],
+            )
+        )
+        if not fields:
+            return rungs
+        await session.toolkit.call("computer_use", {"action": "click", "element": fields[0]["index"]})
+        typed = await session.toolkit.call("computer_use", {"action": "type", "text": TYPED})
+        rungs.append(
+            (
+                "3, typing into its field by number is done",
+                not typed.is_error and TYPED not in typed.text,
+                " | ".join(typed.text.splitlines())[:300],
+            )
+        )
+        # The editor puts a star before its document's name once the document is changed.
+        titles = await inside_it.windows()
+        rungs.append(
+            ("3, the editor marks its window as changed", any("*" in title for title in titles), str(titles))
+        )
+        picture = await session.toolkit.call(
+            "computer_use", {"action": "capture", "mode": "vision", "app": "mousepad"}
+        )
+        rungs.append(
+            (
+                "2, a picture of the editor comes back",
+                picture.picture is not None,
+                f"{len(picture.picture.data) if picture.picture else 0} bytes",
+            )
+        )
+    finally:
+        await session.close()
+    return rungs
 
 
 async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
@@ -329,6 +408,11 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path of config.json")
     parser.add_argument("--rungs", type=int, default=3, help="the highest rung to climb: 2 or 3")
     parser.add_argument(
+        "--contained",
+        action="store_true",
+        help="climb on the contained desktop: the driver is put inside its container and reached through the dock",
+    )
+    parser.add_argument(
         "--virtual-screen",
         action="store_true",
         help="climb as the engine in the micro VM does: it starts this machine's own virtual screen first",
@@ -352,6 +436,17 @@ def main(arguments: list[str] | None = None) -> int:
     )
     rungs: list[tuple[str, bool, str]] = []
 
+    if asked.contained:
+        rungs = asyncio.run(in_the_container(config))
+        for name, passed, seen in rungs:
+            print(f"Rung {name}: {'passed' if passed else 'FAILED'}. {seen}")
+        failed = [name for name, passed, _ in rungs if not passed]
+        print(
+            "The ladder is passed as far as it goes."
+            if not failed
+            else f"The ladder stopped: {len(failed)} failed."
+        )
+        return 1 if failed else 0
     binary = driver.installed(computer.home_of(config))
     problem = "it is not installed" if binary is None else commands.not_ready(config, binary)
     rungs.append(("1, the pinned driver is installed and answers", problem is None, problem or str(binary)))

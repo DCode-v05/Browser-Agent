@@ -38,6 +38,15 @@ def refusal(status: int) -> str:
     return REFUSALS.get(status, f"The helper answered {status}.")
 
 
+def reached_from_here(manifest: str) -> str:
+    """What the driver says of itself, with its own path taken out. It names where it is on its own
+    machine, or inside its own container. From the engine the way to it is the program the engine
+    started in its place: the link, or the dock."""
+    said = json.loads(manifest)
+    said["mcp_invocation"] = {"command": "cua-driver", "args": ["mcp"]}
+    return json.dumps(said) + "\n"
+
+
 def ask(url: str, code: str, argv: list[str]) -> int:
     """Has the driver on the other machine run one command, and prints what it printed."""
     asked = urllib.request.Request(
@@ -56,10 +65,7 @@ def ask(url: str, code: str, argv: list[str]) -> int:
         return 2
     said = str(done.get("stdout", ""))
     if argv == ["manifest"] and done.get("returncode") == 0:
-        # The driver names its own path on its own machine. From here the way to it is this link.
-        manifest = json.loads(said)
-        manifest["mcp_invocation"] = {"command": "cua-driver", "args": ["mcp"]}
-        said = json.dumps(manifest) + "\n"
+        said = reached_from_here(said)
     sys.stdout.write(said)
     sys.stderr.write(str(done.get("stderr", "")))
     return int(done.get("returncode", 1))

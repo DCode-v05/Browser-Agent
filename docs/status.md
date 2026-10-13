@@ -1110,6 +1110,49 @@ DCode-v05 pushed three branches. Two are in `main` now; the third is not, and is
 - Not checked by me: the teammate's dock (`computer/dock.py`, `dock_entry.py`) against a real
   container. Docker is not running on this Mac. Their unit tests pass.
 
+
+### 1aj. Built on 2026-10-13: the contained desktop on Hermes' driver, in a real container, and the VM's image built
+
+Docker was started on this Mac, so the pieces that had only ever been tested as text ran for real.
+
+| | |
+|---|---|
+| The contained desktop on Hermes' driver | With `computer.base.contained: true`, the engine starts the desktop's container as before, puts the pinned Linux driver inside it (fetched here by its checksum, since the container has no network), and reaches it through the dock |
+| One rule | `Computer.on_the_base` says whether a desktop is driven through Hermes' driver. The driver chosen, the tools offered and what the model is told all follow it |
+| The desktop's image | Has AT-SPI, and a session bus at one known place, so that an app there tells the driver what it holds |
+| The micro VM's image | Built for the first time, with its desktop, Tailscale and the pinned driver |
+
+Seen, each with Docker on this Mac (arm64):
+
+- `uv run python scripts/ladder.py --contained`: the desktop came up with the driver inside; the text
+  editor was opened; a capture numbered 255 elements, the page being element 252, `text`; typing into
+  it by number answered "Typed 11 character(s) (via AT-SPI)"; the editor's window became
+  `*Untitled 1 - Mousepad`; a picture of 12,693 bytes came back.
+- `uv run pytest tests/e2e/test_computer.py tests/e2e/test_computer_vm.py`: 10 passed. These had always
+  been skipped here. One starts the VM with a made-up Tailscale key and sees Tailscale itself refuse it.
+- `docker build --build-arg DESKTOP=true --build-arg TAILSCALE=true -f deploy/Dockerfile .`: built,
+  4.28 GB. Inside it, `bap-browser computer doctor` answered "cua-driver 0.21.0 on linux: ok".
+
+Found by running it:
+
+- **The dock handed the engine the driver's path inside the container**, and the engine tried to run
+  that path on the Mac. The dock now answers as the link does, and the two share that code.
+- **After the merge, "This Mac" had Hermes' driver but the older tools**, which that driver cannot
+  serve. The one rule fixed it.
+- **At Hermes' default the driver never reaches an editor's page.** The text editor's menus are 169
+  elements, the driver stops reading a window at 200 (`ax_max_elements`), and a capture's text names
+  the first 40. The ladder raises the bound to 800 to find the page. With the default, a model would
+  see menus only, and would have to act by a picture. This is not fixed.
+
+Not built, and not checked:
+
+- The contained desktop still runs on the older driver unless `base.contained` is switched on. The
+  13 tasks' reference solutions are written for the older tools, so the default is not changed yet.
+- Hermes' own desktop inside the container (`dock_entry.py`, TigerVNC and Xfce) is not used: the
+  desktop's own screen and window manager are.
+- The handoff's plan is mapped, step by step, at the top of
+  `docs/plans/2026-10-10-helpers-and-tailnet.md`.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

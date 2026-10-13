@@ -5,7 +5,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      xvfb openbox xdotool imagemagick x11-xserver-utils x11-utils xauth dbus-x11 \
+      xvfb openbox xdotool imagemagick x11-xserver-utils x11-utils xauth dbus-x11 at-spi2-core \
       fonts-dejavu-core xterm mousepad pcmanfm galculator \
  && rm -rf /var/lib/apt/lists/*
 
@@ -19,5 +19,7 @@ RUN chmod 755 /usr/local/bin/desktop-start
 
 USER agent
 WORKDIR /home/agent
-ENV DISPLAY=:1 HOME=/home/agent
+# The session's bus is at one known place, so that every program started in the desktop finds it:
+# an app tells the driver of computer use what it holds over that bus (spec 22.2.2).
+ENV DISPLAY=:1 HOME=/home/agent DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/desktop-bus
 CMD ["/usr/local/bin/desktop-start"]

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from bap_browser.computer import allowed, driver, remote
+from bap_browser.computer import allowed, contained, driver, remote
 from bap_browser.computer.hermes.bot_desktop import lease
 from bap_browser.computer.hermes.computer_use import cua_backend, permissions, tool
 from bap_browser.computer.hermes.computer_use.backend import CaptureResult
@@ -44,7 +44,10 @@ def home_of(config: Config) -> Path:
 
 @contextmanager
 def base(
-    config: Config, home: Path | None = None, backend: Callable[[], Any] | None = None
+    config: Config,
+    home: Path | None = None,
+    backend: Callable[[], Any] | None = None,
+    container: str | None = None,
 ) -> Iterator[None]:
     """Computer use for one configuration, with its files in `home` (the configuration's, unless
     another is given). On the way out every driver it started is stopped. `backend` names a backend
@@ -52,6 +55,9 @@ def base(
     home = home or home_of(config)
     elsewhere = config.computer.runs in ("mac", "remote")
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
+    if container is not None:
+        # The desktop is in a container, and so is its driver: the dock reaches it (spec 22.6).
+        settings = contained.through_the_dock(settings, container)
     if allowed.held(settings) and backend is None:
         # The driver itself holds the agent to the apps the person allowed (spec 22.7).
         listed = str(allowed.write(home, settings))
@@ -68,6 +74,8 @@ def base(
         work_for(before)
         if elsewhere:
             remote.forget(home)
+        if container is not None:
+            contained.forget()
 
 
 def ask_with(ask: Asker | None) -> None:
@@ -111,6 +119,9 @@ def lacks(config: Config) -> Lacks | None:
     """What stands between this configuration and a session on the machine. None when nothing does.
     It is asked before a session begins, never during one."""
     settings = config.computer
+    if settings.runs == "container":
+        # The driver is put into the desktop's container when it starts. Nothing here is needed.
+        return None
     if settings.runs == "remote":
         if os.environ.get(settings.helper_token_env):
             return None

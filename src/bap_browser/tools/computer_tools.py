@@ -90,7 +90,7 @@ class OpenAppArgs(Args):
 
 def any_app(config: Config) -> bool:
     """Whether the agent may open any app by its name: on the person's own Mac, where they allow it."""
-    return config.computer.runs in ("mac", "machine", "remote") and config.computer.mac_any_app
+    return config.computer.on_the_base and config.computer.runs != "container" and config.computer.mac_any_app
 
 
 async def _desktop(session: BrowserSession) -> DesktopDriver:
@@ -319,7 +319,7 @@ KEPT_ON_A_MACHINE = frozenset({"computer_open_app", "computer_request_human"})
 def computer_tools_for(config: Config) -> tuple[ToolDefinition, ...]:
     """The desktop's tools as the configuration offers them: zoom only where it is turned on. On a
     machine driven through Hermes' driver it is Hermes' one tool, and the two of ours it has none of."""
-    if config.computer.runs in ("machine", "remote"):
+    if config.computer.on_the_base:
         kept = tuple(tool for tool in COMPUTER_TOOLS if tool.name in KEPT_ON_A_MACHINE)
         return (COMPUTER_USE, *kept)
     return tuple(tool for tool in COMPUTER_TOOLS if tool.name != "computer_zoom" or config.computer.zoom)

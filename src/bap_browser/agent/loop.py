@@ -103,7 +103,7 @@ THEIR_MANUAL = (
 def instructions_for(config: Config) -> str:
     """What the model is told of its work on the desktop of computer use: the contained desktop, or
     the person's own Mac."""
-    if config.computer.runs in ("machine", "remote"):
+    if config.computer.on_the_base:
         rules = MACHINE_SYSTEM.format(system=THIS_SYSTEM.get(sys.platform, "Linux"))
         return rules + THEIR_MANUAL + computer.manual() if config.computer.base.manual else rules
     return MAC_SYSTEM if config.computer.runs == "mac" else COMPUTER_SYSTEM

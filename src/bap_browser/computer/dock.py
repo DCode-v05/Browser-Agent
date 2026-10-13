@@ -11,6 +11,8 @@ import os
 import subprocess
 import sys
 
+from bap_browser.computer.link import reached_from_here
+
 CONTAINER = "BAP_BROWSER_DOCK_CONTAINER"
 DRIVER = "cua-driver"
 
@@ -21,11 +23,18 @@ def main(arguments: list[str] | None = None) -> int:
     if not container:
         print(f"The dock was not told its container: {CONTAINER} names none.", file=sys.stderr)
         return 2
+    asks_what_it_is = argv == ["manifest"]
     try:
-        run = subprocess.run(["docker", "exec", "-i", container, DRIVER, *argv])
+        run = subprocess.run(
+            ["docker", "exec", "-i", container, DRIVER, *argv],
+            capture_output=asks_what_it_is,
+            text=asks_what_it_is,
+        )
     except OSError as wrong:
         print(f"docker could not be run: {wrong}", file=sys.stderr)
         return 2
+    if asks_what_it_is and run.returncode == 0:
+        sys.stdout.write(reached_from_here(run.stdout))
     return run.returncode
 
 
