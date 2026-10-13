@@ -8,7 +8,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
+from bap_browser.config import Agent
 from bap_browser.results import Picture
+from bap_browser.safeguards.model import ModelClient
 from bap_browser.tools import ToolDefinition
 
 
@@ -60,6 +62,23 @@ class Model(Protocol):
     async def complete(
         self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
     ) -> Reply: ...
+
+
+class HostedModel:
+    """What a hosted model keeps, apart from how it shapes one call to its own provider: the
+    client that reaches it, and the turns it returned, kept to be sent back exactly as they came."""
+
+    def __init__(self, settings: Agent, client: ModelClient) -> None:
+        self._settings = settings
+        self._client = client
+        """How a request reaches the provider: its time limit, its further tries, its breaker (spec 18.8)."""
+        self._turns: list[list[dict[str, Any]]] = []
+        """What the provider returned for each of the model's turns, in order."""
+
+    def use(self, settings: Agent) -> None:
+        """Takes the settings as they are now: a person may have chosen another model (spec 10.2)."""
+        self._settings = settings
+        self._client.use(settings)
 
 
 Step = Callable[[str], Reply]

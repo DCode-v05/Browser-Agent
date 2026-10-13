@@ -53,6 +53,29 @@ def spent(sent: int, written: int) -> dict[str, Any]:
     return {"input_tokens": sent, "output_tokens": written, "total_tokens": sent + written}
 
 
+def claude_text(text: str) -> dict[str, Any]:
+    return {"type": "text", "text": text}
+
+
+def claude_tool_use(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "tool_use", "id": call_id, "name": name, "input": arguments}
+
+
+def claude_thought(item_id: str) -> dict[str, Any]:
+    return {"type": "thinking", "thinking": f"sealed-{item_id}", "signature": f"sig-{item_id}"}
+
+
+def claude_message(*content: dict[str, Any], stop_reason: str = "end_turn", **extra: Any) -> dict[str, Any]:
+    return {
+        "id": "msg_1",
+        "type": "message",
+        "role": "assistant",
+        "content": list(content),
+        "stop_reason": stop_reason,
+        "stop_sequence": None,
+    } | extra
+
+
 @dataclass(frozen=True)
 class Slow:
     """A reply that is held back for so many seconds, as a provider under load does."""
@@ -82,6 +105,8 @@ class ModelStandIn:
                     {
                         "path": self.path,
                         "authorization": self.headers.get("Authorization"),
+                        "api_key": self.headers.get("x-api-key"),
+                        "anthropic_version": self.headers.get("anthropic-version"),
                         "body": json.loads(self.rfile.read(length)),
                     }
                 )

@@ -351,17 +351,22 @@ def _key_for_the_model(config: Config) -> str:
 def _sets(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     key = "" if args.reference else _key_for_the_model(config)
+    from bap_browser.agent.anthropic_model import AnthropicModel
     from bap_browser.agent.openai_model import OpenAIModel
     from bap_browser.agent.sets_command import run_sets
     from bap_browser.safeguards.model import ModelClient
+
+    def hosted(service):
+        client = ModelClient(config.agent, config.safeguards.model, key, "loop")
+        if config.agent.provider == "anthropic":
+            return AnthropicModel(config.agent, client)
+        return OpenAIModel(config.agent, client)
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     asyncio.run(
         run_sets(
             config,
-            lambda service: OpenAIModel(
-                config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
-            ),
+            hosted,
             args.names,
             trials=args.trials,
             mode="reference" if args.reference else "agent",
@@ -376,10 +381,17 @@ def _studio(args: argparse.Namespace) -> int:
     key = _key_for_the_model(config)
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser import browser_extension
+    from bap_browser.agent.anthropic_model import AnthropicModel
     from bap_browser.agent.command import Interrupted
     from bap_browser.agent.openai_model import OpenAIModel
     from bap_browser.agent.window import run_studio
     from bap_browser.safeguards.model import ModelClient
+
+    def hosted(service):
+        client = ModelClient(config.agent, config.safeguards.model, key, "loop")
+        if config.agent.provider == "anthropic":
+            return AnthropicModel(config.agent, client)
+        return OpenAIModel(config.agent, client)
 
     extension = browser_extension.install(extension_folder(config))
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
@@ -387,9 +399,7 @@ def _studio(args: argparse.Namespace) -> int:
         asyncio.run(
             run_studio(
                 config,
-                lambda service: OpenAIModel(
-                    config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop")
-                ),
+                hosted,
                 open_viewer=args.open,
                 extension=extension,
             )
@@ -454,13 +464,17 @@ def _agent(args: argparse.Namespace) -> int:
                 f"{name} is not set. Put a line {name}=... in a file named .env in this folder, or set it "
                 "in the environment. To try without a model: bap-browser agent --demo"
             )
+        from bap_browser.agent.anthropic_model import AnthropicModel
         from bap_browser.agent.openai_model import OpenAIModel
         from bap_browser.safeguards.model import ModelClient
 
         task = args.task
 
-        def hosted(service: Service) -> Model:
-            return OpenAIModel(config.agent, ModelClient(config.agent, config.safeguards.model, key, "loop"))
+        def hosted(service):
+            client = ModelClient(config.agent, config.safeguards.model, key, "loop")
+            if config.agent.provider == "anthropic":
+                return AnthropicModel(config.agent, client)
+            return OpenAIModel(config.agent, client)
 
         model_for = hosted
 

@@ -403,8 +403,10 @@ class Viewer(Section):
 
 
 class Agent(Section):
-    provider: Literal["openai", "scripted"] = setting(
-        "openai", "Whose model the loop calls. `scripted` replays fixed replies and needs no key"
+    provider: Literal["openai", "anthropic", "scripted"] = setting(
+        "openai",
+        "Whose model the loop calls, OpenAI's Responses API or Anthropic's Messages API. "
+        "`scripted` replays fixed replies and needs no key",
     )
     model: str = setting("gpt-5.6-luna", "The model's name at that provider")
     offered_models: list[str] = setting(

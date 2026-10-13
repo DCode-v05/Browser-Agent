@@ -120,18 +120,31 @@ class ModelClient:
     ) -> dict[str, Any]:
         """One question of the reviewer or the scan, answered as JSON of the shape `schema`."""
         checks = self._checks
-        body: dict[str, Any] = {
-            "model": self.model,
-            "instructions": instructions,
-            "input": given,
-            "max_output_tokens": checks.max_tokens,
-            "store": False,
-        }
-        if checks.reasoning_effort:
-            body["reasoning"] = {"effort": checks.reasoning_effort}
-        body["text"] = {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}}
+        if self._agent.provider == "anthropic":
+            body = {
+                "model": self.model,
+                "system": instructions,
+                "messages": [{"role": "user", "content": given}],
+                "max_tokens": checks.max_tokens,
+                "output_config": {"format": {"type": "json_schema", "schema": schema}},
+            }
+            if checks.reasoning_effort:
+                body["output_config"]["effort"] = checks.reasoning_effort
+            read = anthropic_output_text
+        else:
+            body = {
+                "model": self.model,
+                "instructions": instructions,
+                "input": given,
+                "max_output_tokens": checks.max_tokens,
+                "store": False,
+            }
+            if checks.reasoning_effort:
+                body["reasoning"] = {"effort": checks.reasoning_effort}
+            body["text"] = {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}}
+            read = output_text
         try:
-            answer = json.loads(output_text(await self.post(body)))
+            answer = json.loads(read(await self.post(body)))
         except ValueError:
             raise ModelError(NOT_THE_JSON) from None
         if not isinstance(answer, dict):
@@ -172,10 +185,27 @@ class ModelClient:
             raise _Failed(f"The model provider did not answer within {limit} seconds.", True) from None
 
     def _send(self, body: dict[str, Any], limit: float) -> dict[str, Any]:
+        if self._agent.provider == "anthropic":
+            endpoint, headers = (
+                "messages",
+                {
+                    "x-api-key": self._key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+            )
+        else:
+            endpoint, headers = (
+                "responses",
+                {
+                    "Authorization": f"Bearer {self._key}",
+                    "Content-Type": "application/json",
+                },
+            )
         request = urllib.request.Request(
-            f"{self._agent.base_url.rstrip('/')}/responses",
+            f"{self._agent.base_url.rstrip('/')}/{endpoint}",
             data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         try:
@@ -228,6 +258,15 @@ def output_text(answer: dict[str, Any]) -> str:
         if isinstance(item, dict) and item.get("type") == "message"
         for part in item.get("content") or []
         if isinstance(part, dict) and part.get("type") == "output_text"
+    )
+
+
+def anthropic_output_text(answer: dict[str, Any]) -> str:
+    """What the model wrote, from an answer of the Messages API. Empty when it wrote nothing."""
+    return "".join(
+        part.get("text", "")
+        for part in answer.get("content") or []
+        if isinstance(part, dict) and part.get("type") == "text"
     )
 
 
