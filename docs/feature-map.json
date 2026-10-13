@@ -439,16 +439,18 @@
         "src/bap_browser/agent/command.py",
         "src/bap_browser/agent/models.py",
         "src/bap_browser/agent/openai_model.py",
+        "src/bap_browser/agent/anthropic_model.py",
         "src/bap_browser/agent/demo.py"
       ],
       "tests": [
         "tests/unit/test_agent_loop.py",
         "tests/unit/test_chat.py",
         "tests/unit/test_openai_model.py",
+        "tests/unit/test_anthropic_model.py",
         "tests/e2e/test_agent_demo.py",
         "tests/service/test_agent_command.py"
       ],
-      "reach": "`uv run bap-browser agent --demo --open` with no key; a real task with `uv run bap-browser agent \"...\" --open`. In the window, the field \"Your task\".",
+      "reach": "`uv run bap-browser agent --demo --open` with no key; a real task with `uv run bap-browser agent \"...\" --open`. Set `agent.provider` to `openai` or `anthropic` (env: `BAP_BROWSER__AGENT__PROVIDER`). In the window, the field \"Your task\".",
       "addresses": [],
       "tools": []
     },

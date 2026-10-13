@@ -12,26 +12,13 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from bap_browser.agent.models import Message, Reply, ToolCall, ToolOutput, Usage
-from bap_browser.config import Agent
+from bap_browser.agent.models import HostedModel, Message, Reply, ToolCall, ToolOutput, Usage
 from bap_browser.errors import ModelError
-from bap_browser.safeguards.model import ModelClient, output_text, tokens_of
+from bap_browser.safeguards.model import output_text, tokens_of
 from bap_browser.tools import ToolDefinition
 
 
-class OpenAIModel:
-    def __init__(self, settings: Agent, client: ModelClient) -> None:
-        self._settings = settings
-        self._client = client
-        """How a request reaches the provider: its time limit, its further tries, its breaker (spec 18.8)."""
-        self._turns: list[list[dict[str, Any]]] = []
-        """What the provider returned for each of the model's turns, in order."""
-
-    def use(self, settings: Agent) -> None:
-        """Takes the settings as they are now: a person may have chosen another model (spec 10.2)."""
-        self._settings = settings
-        self._client.use(settings)
-
+class OpenAIModel(HostedModel):
     async def complete(
         self, system: str, messages: Sequence[Message], tools: Sequence[ToolDefinition]
     ) -> Reply:

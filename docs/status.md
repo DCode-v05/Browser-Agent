@@ -1575,15 +1575,24 @@ were. Where they speak of what is next or of what has not been run, the sections
 
 ## The hosted model
 
-| Point | How it is |
-|---|---|
-| Provider and model | OpenAI, `gpt-5.6-luna`. Change it with `agent.model` in `config.json` |
-| Key | `OPENAI_API_KEY`, from the environment or from `.env` in the folder the command is run from. Never in `config.json`, never logged |
-| How it is called | OpenAI's Responses API over plain HTTPS, with no extra library. `agent.base_url` points it at a proxy or a compatible service |
-| What is kept at OpenAI | Nothing: `store` is off. The model's own reasoning is passed back to it encrypted on each turn |
-| Limits | `agent.max_steps` (40 tool calls), `agent.max_tokens` (4096 per reply), `agent.request_timeout_s` (120) |
-| When it fails | A refused key says "The model provider did not accept the key (HTTP 401). Check OPENAI_API_KEY in your .env file." Other failures name the HTTP code and the provider's message. The session ends as "failed" and the viewer says why |
-| Not verified | Whether the name `gpt-5.6-luna` and the request shape are accepted by the real service. If the first run fails, the message will say what the service answered |
+Two providers, chosen with `agent.provider`. Each has its own model name, key and base URL; a
+deployment uses one at a time.
+
+| Point | OpenAI (`openai`, the default) | Anthropic (`anthropic`) |
+|---|---|---|
+| Model | `gpt-5.6-luna`. Change it with `agent.model` | Set `agent.model` yourself, e.g. `claude-opus-5-5` |
+| Key | `OPENAI_API_KEY` | Set `agent.api_key_env` to `CLAUDE_API_KEY` (or whatever name you give it) |
+| Base URL | `https://api.openai.com/v1` (the default) | Set `agent.base_url` to `https://api.anthropic.com/v1` |
+| How it is called | The Responses API over plain HTTPS, no extra library | The Messages API over plain HTTPS, no extra library |
+| What is kept at the provider | Nothing: `store` is off; the model's own reasoning is passed back to it encrypted on each turn | Nothing: every content block of the model's own turn, thinking included, is sent back exactly as it came |
+| Reviewer and scan | Same provider and base URL as the loop; `safeguards.model.name` picks another model there, by name | Answered with `output_config.format` (a JSON schema), since Claude Opus 5.5 refuses a forced tool choice |
+
+The key, from the environment or from `.env` in the folder the command is run from, is never in
+`config.json` and never logged. Limits (`agent.max_steps`, `agent.max_tokens`,
+`agent.request_timeout_s`) and the refusal wording ("The model provider did not accept the key
+(HTTP 401). Check `<api_key_env>` in your .env file.") are the same for both. **Not verified**:
+whether Anthropic's real service accepts the request shape built here. If the first run fails, the
+message will say what the service answered.
 
 ## The look
 

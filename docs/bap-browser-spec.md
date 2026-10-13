@@ -3611,11 +3611,15 @@ reached, or a person stops the session. The answer is the only thing written to 
 | `--extension` | With `--chat`: as `--show-browser`, and the browser has the BAP extension in it, with the chat in its side panel (section 9.15). The browser opens on a page that says how to open the chat |
 | `--show-browser` | Runs the browser in a window on this screen (`browser.headless` off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |
 
-Without `--demo` the loop calls the hosted model: OpenAI's `gpt-5.6-luna`, over the Responses API,
-with the key read from `OPENAI_API_KEY`. Put `OPENAI_API_KEY=...` in a file named `.env` in the
-folder the command is run from. With no key, the command says so and says how to set one. The
-conversation is not stored at the provider (`store` is off); the model's own reasoning is passed
-back to it encrypted on each turn.
+Without `--demo` the loop calls the hosted model named by `agent.provider`: OpenAI's over the
+Responses API (`openai`, the default, `gpt-5.6-luna`), or Anthropic's over the Messages API
+(`anthropic`), with the key read from `agent.api_key_env` (`OPENAI_API_KEY` or `CLAUDE_API_KEY`).
+Put a line `OPENAI_API_KEY=...` or `CLAUDE_API_KEY=...` in a file named `.env` in the folder the
+command is run from. With no key, the command says so and says how to set one. Nothing of the
+conversation is stored at either provider: OpenAI's calls go with `store: false` and the model's own
+reasoning comes back to it encrypted on each turn; Anthropic's calls send back every content block
+of the model's own turn, a thinking block included, exactly as it came, since Claude's own turn is
+bound to the conversation that produced it.
 
 The command ends with 0 when the task was answered, 1 when the model failed or the task was not
 finished (the step limit was reached, or a person stopped the session), 2 when the command or the
@@ -3629,7 +3633,7 @@ The loop:
 
 | Part | Detail |
 |---|---|
-| Model | Behind one small interface: the conversation and the tool definitions go in, text and tool calls come out. Two implementations: a hosted model, with its key read from the environment; and a scripted model that replays fixed replies, so tests and demonstrations need no key |
+| Model | Behind one small interface: the conversation and the tool definitions go in, text and tool calls come out. Three implementations: two hosted models, OpenAI's and Anthropic's, each with its key read from the environment; and a scripted model that replays fixed replies, so tests and demonstrations need no key |
 | Tools | The same definitions and the same tool layer an outside agent gets. The loop has no way around the policy, the control states or the event log |
 | What a person sees | Every step in the viewer, live, with the same controls: pause, take over, stop, approvals |
 | Limits | `agent.max_steps`; `agent.max_tokens` per reply. A stopped session ends the loop |

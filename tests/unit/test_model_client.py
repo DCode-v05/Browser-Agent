@@ -271,6 +271,23 @@ async def test_a_question_asks_for_json_of_a_shape_with_little_thought(provider)
     }
 
 
+async def test_anthropics_question_asks_for_json_of_a_shape_too(provider) -> None:
+    stand_in = provider({"content": [{"type": "text", "text": '{"risk": "low"}'}]})
+    reviewer = client(stand_in, Waits(), "reviewer", agent={"provider": "anthropic"})
+    answer = await reviewer.ask("Judge this step.", '{"step": 1}', name="verdict", schema=VERDICT)
+    assert answer == {"risk": "low"}
+    (request,) = stand_in.requests
+    assert request["path"] == "/v1/messages"
+    assert request["api_key"] == KEY
+    assert request["body"] == {
+        "model": "gpt-5.6-luna",
+        "system": "Judge this step.",
+        "messages": [{"role": "user", "content": '{"step": 1}'}],
+        "max_tokens": 1500,
+        "output_config": {"format": {"type": "json_schema", "schema": VERDICT}, "effort": "low"},
+    }
+
+
 async def test_a_model_without_such_a_setting_is_sent_none(provider) -> None:
     stand_in = provider(response(said('{"risk": "low"}')))
     plain = client(stand_in, Waits(), "scan", checks={"reasoning_effort": "", "max_tokens": 300})
