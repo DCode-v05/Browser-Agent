@@ -1446,6 +1446,55 @@ Not built, and not checked:
   `screen status, start, stop, install`, its second model for pictures, and its stream of the
   desktop.
 
+### 1aq. Proven on 2026-10-13: macOS, and what the proof found
+
+You allowed CuaDriver under Accessibility and Screen Recording on this Mac. Everything below ran on
+it (macOS 15, arm64) with the real driver, and on GitHub's Windows and Linux runners.
+
+| System | Directly | Through the helper | Any app allowed |
+|---|---|---|---|
+| macOS (this Mac) | Passed | Passed | Passed |
+| Windows (runner) | Passed | Passed | Passed, with File Explorer and Windows Terminal read |
+| Linux (runner) | Passed, and on its own virtual screen, and in the container | Passed | Passed |
+
+"Passed" is every rung of `scripts/ladder.py`: the driver installed; a capture in each of the three
+modes; a text field found by its number and typed into, and the app itself holding what was typed;
+an app outside the list refused (or, with any app allowed, read, and one opened by its name after a
+person's yes); nothing done for the agent while a person has taken over; the screen streamed.
+
+On macOS: "a capture of TextEdit in the mode som: passed. 1346 by 878, 276 elements, a picture";
+"a field of TextEdit is found by its number: passed. element 1, AXTextArea"; "Stickies, which is not
+allowed, cannot be looked at or worked in: passed".
+
+The window, in a real browser, with this Mac as the desktop: the live picture is drawn, Pause, Take
+over and Hand back work, and the configuration and the evaluations open, with no error in the console.
+
+Found by running it, and mended:
+
+- **A helper's driver that had run a while refused an app that was closed and opened again** (macOS).
+  The helper now starts the driver that holds the engine afresh for each session of an engine; a
+  second conversation of the same session shares it.
+- **The ladder never closed TextEdit on macOS.** It asked it to quit through AppleScript, which
+  macOS lets through only after a consent of its own. The app gained a window with every run, and
+  the driver does not type in the background into an app with several windows. It is ended by its
+  process now, and opened afresh with a document of its own.
+- **A driver that stops answering is started again**, on a desktop the engine itself started, and
+  the desktop's apps are closed with it. Proven in a real container by freezing the driver. On a
+  person's own machine nothing of theirs is ended.
+- **The page named the contained desktop "This machine's own screen"**, and the chat said "in the
+  browser" on a desktop. The driver's own windows were listed among the open windows on Windows
+  and macOS.
+
+Not done:
+
+- **The computer's sets were still not got through with the model on Linux.** A third try ran into
+  the same stall: every call timed out, a fresh driver's too, and starting the driver again alone
+  did not end it. Closing the desktop's apps as well was added after that try and has not been run
+  with a model. Two frozen apps did not reproduce the stall, so its cause is still not known.
+- The driver says on its error stream that a newer version of it exists (0.34.1; 0.21.0 is pinned).
+  It installs nothing. Moving to a newer driver is a choice of yours.
+- Nothing has run over a real tailnet.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

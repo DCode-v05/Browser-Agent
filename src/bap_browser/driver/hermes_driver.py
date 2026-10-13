@@ -12,6 +12,7 @@ import base64
 import contextlib
 import json
 import os
+import re
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -22,7 +23,7 @@ from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
-from bap_browser.driver.contained_desktop import App, ContainedDesktop
+from bap_browser.driver.contained_desktop import APPS, App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
@@ -44,8 +45,11 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
-# How the driver's own program is named among the windows, on every system.
+# The driver's own program. Among the windows it is named `cua-driver.exe` on Windows and
+# `Cua Driver` on macOS: with what is no letter taken out, both begin alike.
 THE_DRIVER = "cua-driver"
+NOT_A_LETTER = re.compile(r"[^a-z]")
+ITS_OWN = "cuadriver"
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
@@ -182,15 +186,18 @@ class HermesDriver(DesktopDriver):
         return "pressed"
 
     async def started_again(self) -> bool:
-        """Ends a driver that has stopped answering, on a desktop this engine itself started, so
-        that the next call starts a fresh one. False on a person's own machine: their driver is
-        theirs, and is left as it is."""
+        """Puts right a desktop whose driver has stopped answering, where this engine itself started
+        the desktop: the driver is ended, so that the next call starts a fresh one, and so are the
+        desktop's apps. An app that no longer answers makes every driver wait for it, a fresh one
+        too, and it cannot be told which app it is. False on a person's own machine: their driver
+        and their apps are theirs, and are left as they are."""
         own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
         if own is None:
             return False
-        with contextlib.suppress(BapError):
-            # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
-            await own.run("pkill", "-9", "-x", "cua-driver")
+        for program in (THE_DRIVER, *(app.command for app in APPS)):
+            with contextlib.suppress(BapError):
+                # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
+                await own.run("pkill", "-9", "-x", program)
         return True
 
     # What the two tools kept from before ask.
@@ -203,7 +210,7 @@ class HermesDriver(DesktopDriver):
             str(window.get("title") or window.get("app_name") or "")
             for window in answer.get("windows", [])
             # The driver draws the agent's pointer in windows of its own: nothing to work in.
-            if not str(window.get("app_name", "")).lower().startswith(THE_DRIVER)
+            if not NOT_A_LETTER.sub("", str(window.get("app_name", "")).lower()).startswith(ITS_OWN)
         ]
         kept = [title[: self._settings.window_title_chars] for title in titles if title.strip()]
         return kept[: self._settings.windows_listed]
