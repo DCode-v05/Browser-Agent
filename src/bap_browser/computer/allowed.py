@@ -20,12 +20,19 @@ from bap_browser import private_file
 from bap_browser.config_computer import Computer
 
 FILE = "allowed.json"
-# What each app the settings can allow is on each system: a bundle on macOS, a program elsewhere.
-APPS = {
-    "text_editor": {"darwin": "com.apple.TextEdit", "win32": "notepad.exe", "linux": "mousepad"},
-    "files": {"darwin": "com.apple.finder", "win32": "explorer.exe", "linux": "pcmanfm"},
-    "calculator": {"darwin": "com.apple.calculator", "win32": "calc.exe", "linux": "galculator"},
-    "terminal": {"darwin": "com.apple.Terminal", "win32": "cmd.exe", "linux": "xterm"},
+# What each app the settings can allow is on each system, as the driver itself names it: a bundle on
+# macOS, the identity the driver lists on Windows, a program on Linux. On Windows only the text
+# editor's identity has been seen from the driver (`cua-driver list_apps`, on Windows Server 2025);
+# the other three are added there with `computer.base.also_allowed` once theirs are read the same way.
+APPS: dict[str, dict[str, str]] = {
+    "text_editor": {
+        "darwin": "com.apple.TextEdit",
+        "win32": "%windir%\\system32\\notepad.exe",
+        "linux": "mousepad",
+    },
+    "files": {"darwin": "com.apple.finder", "linux": "pcmanfm"},
+    "calculator": {"darwin": "com.apple.calculator", "linux": "galculator"},
+    "terminal": {"darwin": "com.apple.Terminal", "linux": "xterm"},
 }
 # The driver's own tools that Hermes' backend calls. None of them updates the driver, changes its
 # settings for good, runs a command or reads the clipboard.
@@ -86,9 +93,9 @@ def manifest(
     for name, on in computer.apps.model_dump().items():
         if not on:
             continue
-        named = APPS[name][system]
-        # A bundle is its own name. A program is named by where it is, with every link followed.
-        full = named if system == "darwin" else find(named)
+        named = APPS[name].get(system)
+        # An identity is its own name. A program is named by where it is, with every link followed.
+        full = find(named) if named and system == "linux" else named
         if full:
             apps.append(an_app(os.path.realpath(full) if os.path.exists(full) else full))
     apps += [an_app(more) for more in computer.base.also_allowed]

@@ -35,13 +35,16 @@ def test_on_macos_each_allowed_app_is_named_by_its_bundle_and_the_terminal_is_le
     assert all(app["launch"] is True and "executable" not in app for app in apps)
 
 
-def test_on_windows_and_linux_each_allowed_app_is_named_by_its_program_in_full(tmp_path: Path) -> None:
+def test_on_windows_and_linux_each_allowed_app_is_named_as_the_driver_names_it(tmp_path: Path) -> None:
     settings = a_machine(tmp_path, apps={"terminal": True}).computer
 
     on_windows = allowed.manifest(settings, "win32", found_in("C:/Windows/System32"))
     on_linux = allowed.manifest(settings, "linux", found_in("/usr/bin"))
 
-    assert "C:/Windows/System32/notepad.exe" in [app["executable"] for app in on_windows["resources"]["apps"]]
+    # On Windows an app is named by the identity the driver itself lists for it, not by a path.
+    assert on_windows["resources"]["apps"] == [
+        {"bundle_id": "%windir%\\system32\\notepad.exe", "launch": True}
+    ]
     assert [app["executable"] for app in on_linux["resources"]["apps"]] == [
         "/usr/bin/mousepad",
         "/usr/bin/pcmanfm",
