@@ -4,6 +4,8 @@ a new session on a page whose session was stopped."""
 
 import asyncio
 import json
+import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from collections.abc import AsyncIterator, Callable
@@ -19,7 +21,7 @@ from bap_browser import browser_extension
 from bap_browser.agent.models import Reply, ScriptedModel, ToolCall
 from bap_browser.agent.window import run_studio
 from bap_browser.computer import commands, driver
-from bap_browser.config import Config
+from bap_browser.config import Computer, Config
 
 ASK = ToolCall("a", "browser_request_human", {"reason": "Sign in to Northfield for me", "kind": "login"})
 
@@ -604,6 +606,72 @@ async def test_the_helpers_address_is_typed_on_the_computers_own_configuration(
         assert await field.input_value() == "desk on my tailnet"
         await saved(opened, "computer", "computer_helper_url", "https://desk.tail1234.ts.net:8796")
         await page.screenshot(path=SHOTS / "computer-helper-address.png")
+
+
+def the_desktop_is_here() -> bool:
+    """Whether this machine can run the contained desktop: Docker, and the desktop's image."""
+    if shutil.which("docker") is None:
+        return False
+    listed = subprocess.run(
+        ["docker", "image", "ls", "-q", Computer().image], capture_output=True, check=False
+    )
+    return bool(listed.stdout.strip())
+
+
+@pytest.mark.skipif(not the_desktop_is_here(), reason="needs Docker and the desktop's image")
+async def test_a_task_typed_on_the_computers_page_is_done_on_the_desktop_and_answered(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    def answers() -> ScriptedModel:
+        opens = ToolCall("a", "computer_open_app", {"app": "text_editor"})
+        looks = ToolCall("b", "computer_use", {"action": "capture", "mode": "ax"})
+        return ScriptedModel(
+            [
+                lambda page: Reply("", (opens,)),
+                lambda page: Reply("", (looks,)),
+                lambda page: Reply("The text editor is open."),
+            ]
+        )
+
+    in_docker = {"container_command": "docker"}
+    async with window(make_config, tmp_path, browser, answers, computer=in_docker) as opened:
+        page = opened.page
+        await opened.open("Computer")
+        task = page.get_by_label("Your task")
+        await task.wait_for(timeout=60_000)
+        await task.fill("Open the text editor")
+        await task.press("Enter")
+        await page.get_by_text("The text editor is open.").wait_for(timeout=60_000)
+        assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        await page.screenshot(path=SHOTS / "computer-a-task-on-the-desktop.png")
+
+
+async def test_what_the_agent_sees_and_its_pointer_are_chosen_on_the_computers_own_configuration(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
+        page = opened.page
+        await opened.open("Computer")
+        await page.get_by_role("tab", name="Configuration").click()
+        computer = page.get_by_role("article", name="Computer")
+        sees = computer.get_by_role("group", name="What the agent sees")
+        pointer = computer.get_by_role("group", name="Show where the agent acts")
+        await sees.wait_for()
+        assert await sees.locator("input:checked").get_attribute("value") == "som"
+        assert await pointer.locator("input:checked").get_attribute("value") == "auto"
+
+        # Every choice of the two is pressed, and each is what the service then holds.
+        for group, setting, values in (
+            (sees, "computer_capture_mode", ("vision", "ax", "som", "ax")),
+            (pointer, "computer_no_overlay", ("off", "on", "auto", "on")),
+        ):
+            for value in values:
+                # A choice shows as taken once the service has saved it.
+                await group.locator(f'input[value="{value}"]').click()
+                await saved(opened, "computer", setting, value)
+                await group.locator(f'input[value="{value}"]:checked').wait_for()
+        await sees.scroll_into_view_if_needed()
+        await page.screenshot(path=SHOTS / "computer-what-the-agent-sees.png")
 
 
 async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(

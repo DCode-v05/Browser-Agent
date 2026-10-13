@@ -39,6 +39,10 @@ class DesktopOfTheBase(Section):
 class Base(Section):
     """What Hermes' computer use is set to (spec 22.8). The names on the right of each are Hermes' own."""
 
+    capture_mode: Literal["som", "vision", "ax"] = setting(
+        "som",
+        "What a capture holds when the model names no mode: numbered picture, picture alone, or elements alone",
+    )
     capture_after_mode: Literal["som", "vision", "ax"] = setting(
         "som",
         "What a capture that follows an action holds: numbered picture, picture alone, or elements alone",

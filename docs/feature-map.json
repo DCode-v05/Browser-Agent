@@ -619,6 +619,7 @@
         "tests/hermes/test_computer_use.py",
         "tests/unit/test_driver_install.py",
         "tests/unit/test_computer_use_tool.py",
+        "tests/unit/test_computer_settings.py",
         "tests/unit/test_machine_helper.py",
         "tests/unit/test_remote_machine.py",
         "tests/unit/test_deploy.py",

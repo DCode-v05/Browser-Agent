@@ -190,6 +190,8 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if not isinstance(driver, HermesDriver):
         raise BrowserError("This session drives no machine.", reason="this is not a machine")
     asked = args.model_dump(exclude_none=True)
+    if args.action == "capture":
+        asked.setdefault("mode", session.config.computer.base.capture_mode)
     how = delivery_for(session.config.computer)
     in_front = how == "foreground"
     if how and args.action in DELIVERED and "delivery_mode" not in asked:
