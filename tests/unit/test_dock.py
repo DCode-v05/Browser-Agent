@@ -3,6 +3,7 @@ container (spec 22.2). Piece 5 of "Computer use on Hermes: built and remaining".
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -23,10 +24,10 @@ def test_it_runs_the_driver_inside_the_named_container(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(dock.subprocess, "run", run)
 
-    code = dock.main(["manifest"])
+    code = dock.main(["mcp"])
 
     assert code == 0
-    assert asked == [["docker", "exec", "-i", "the-desktop-7", "cua-driver", "manifest"]]
+    assert asked == [["docker", "exec", "-i", "the-desktop-7", "cua-driver", "mcp"]]
 
 
 def test_without_a_container_it_says_so_and_does_not_call_docker(
@@ -73,3 +74,26 @@ def test_docker_not_being_installed_is_said_plainly(
 
     assert code == 2
     assert "docker" in capsys.readouterr().err
+
+
+def test_the_drivers_own_path_inside_the_container_is_not_handed_to_the_engine(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The driver names where it is, inside its container. From the engine the way to it is the dock."""
+    monkeypatch.setenv(dock.CONTAINER, "the-desktop-7")
+    said = {
+        "binary_version": "0.21.0",
+        "mcp_invocation": {"command": "/usr/local/bin/cua-driver", "args": ["mcp"]},
+    }
+
+    class Ran:
+        returncode = 0
+        stdout = json.dumps(said)
+
+    monkeypatch.setattr(dock.subprocess, "run", lambda *a, **k: Ran())
+
+    assert dock.main(["manifest"]) == 0
+
+    told = json.loads(capsys.readouterr().out)
+    assert told["binary_version"] == "0.21.0"
+    assert told["mcp_invocation"] == {"command": "cua-driver", "args": ["mcp"]}

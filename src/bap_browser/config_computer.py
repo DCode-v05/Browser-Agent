@@ -110,6 +110,11 @@ class Base(Section):
     ready_poll_s: float = setting(
         5.0, "How often the window looks whether a machine that lacked something is ready now"
     )
+    contained: bool = setting(
+        False,
+        "Whether the contained desktop is driven through Hermes' driver, put inside its container. "
+        "Off: by the older driver of spec 21",
+    )
     virtual_screen: bool = setting(
         False,
         "Whether the engine starts this machine's own virtual screen before it drives it. For a machine "
@@ -191,6 +196,12 @@ class Computer(Section):
     )
     window_title_chars: int = setting(80, "How much of a window's title a result holds")
     windows_listed: int = setting(12, "How many open windows a result names at most")
+
+    @property
+    def on_the_base(self) -> bool:
+        """Whether this desktop is driven through Hermes' driver (spec 22): a real machine always,
+        the contained desktop where that is switched on."""
+        return self.runs in ("machine", "mac", "remote") or (self.runs == "container" and self.base.contained)
 
     @property
     def screen_width(self) -> int:

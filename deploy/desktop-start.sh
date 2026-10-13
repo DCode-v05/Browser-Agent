@@ -9,6 +9,8 @@ until xdpyinfo >/dev/null 2>&1; do
   [ "$tries" -gt 100 ] && exit 1
   sleep 0.1
 done
+# The session's bus, at the place the image names, before any app is started.
+dbus-daemon --session --address="$DBUS_SESSION_BUS_ADDRESS" --fork --nopidfile
 openbox &
 # The window manager paints the background when it starts: the colour is set after it.
 sleep 0.5

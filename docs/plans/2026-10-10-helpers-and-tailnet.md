@@ -1,5 +1,22 @@
 # Windows and Linux helpers, and a helper reached over the tailnet: plan
 
+> **Where this plan stands, 13 October 2026.** After it was written, spec section 22 replaced its
+> design: Windows, macOS and Linux are driven by Hermes' driver, and no input code of our own is
+> written for any of them. The plan's goals are met by that route, but for the live proofs.
+>
+> | Part of this plan | Steps | What became of it |
+> |---|---|---|
+> | Prove arrangement 3 on a real tailnet | 0 to 5 | Not done. It needs your cloud host and a Tailscale key, as the plan says. The VM's image is now built, and its start with a refused key is tested in a real container |
+> | The shared refactor of the Mac helper | 6 to 9 | Dropped. The Mac helper is removed: "This Mac" goes through Hermes' driver (status 1ai) |
+> | Add Pillow | 10 | Dropped. The driver makes and sizes the pictures |
+> | The Windows helper | 11 to 15 | Met another way. `bap-browser computer helper` is one program for all three systems, and on Windows it was proven with the real driver: field found by number, typed into, confirmed by Notepad (status 1af) |
+> | The Linux (X11) helper | 16 to 20 | Met another way, the same: proven on Ubuntu, and in the contained desktop's container (status 1af, 1aj) |
+> | Settings and the viewer | 21 to 23 | Met. "This machine" and "A machine elsewhere" are in the settings, and the Computer tab has a setup page (status 1ag). One choice covers all three systems, in place of "This PC" and "This Linux machine" |
+> | Reach a helper over the tailnet | 24 to 26 | Built differently, and not proven live. The helper listens on its own machine only and `tailscale serve` shows it to the tailnet, in place of binding to the tailnet's address with `--host`. It checks a pairing code and who Tailscale says the caller is |
+>
+> The branch `worktree-computer-use-helpers` holds steps 6 to 13 as they were first built. It is not
+> merged and cannot be: it extends the helper that was removed.
+
 Written on 2026-10-10. Spec sections 21.1, 21.10, 21.12, 21.14, 21.15 and 21.16 already say what
 this builds; this is the order to build it in. Three things, asked for together:
 

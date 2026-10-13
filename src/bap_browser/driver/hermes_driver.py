@@ -18,10 +18,11 @@ from contextlib import AbstractContextManager
 from typing import Any
 
 from bap_browser import computer
+from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
-from bap_browser.driver.contained_desktop import App
+from bap_browser.driver.contained_desktop import App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
@@ -93,7 +94,15 @@ class HermesDriver(DesktopDriver):
             raise BrowserError(lacking.said, reason=f"the machine lacks: {lacking.what}")
         if self._settings.base.virtual_screen:
             self._screen = await own_screen(self._settings)
-        self._base = computer.base(self._config, backend=self._stand_in)
+        container = None
+        if isinstance(self.desktop, ContainedDesktop) and self._settings.runs == "container":
+            # The desktop is started as before; its driver is then put inside it.
+            await self.desktop.start()
+            container = self.desktop.container
+            if self._stand_in is None:
+                home = computer.home_of(self._config)
+                await asyncio.to_thread(contained.put_the_driver_in, self._settings, home, container)
+        self._base = computer.base(self._config, backend=self._stand_in, container=container)
         self._base.__enter__()
         # The engine's own check has judged a call, and asked a person where the settings say so,
         # before it reaches the tool (spec 22.3.1). The tool's own question is answered by that.
@@ -108,6 +117,8 @@ class HermesDriver(DesktopDriver):
         screen, self._screen = self._screen, None
         if screen is not None:
             await screen.close()
+        if isinstance(self.desktop, ContainedDesktop) and self.desktop.alive:
+            await self.desktop.close()
 
     def is_alive(self) -> bool:
         return self._base is not None
@@ -143,6 +154,10 @@ class HermesDriver(DesktopDriver):
         return kept[: self._settings.windows_listed]
 
     async def open_app(self, app: App) -> bool:
+        if isinstance(self.desktop, ContainedDesktop) and self._settings.runs == "container":
+            # In its container the desktop starts its own apps, and only those a person allowed.
+            await self.desktop.start_app(app)
+            return True
         named = NAMED.get(sys.platform, {}).get(app.id, app.command)
         return await self.open_named_app(named)
 
@@ -198,6 +213,6 @@ class HermesDriver(DesktopDriver):
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
     """The driver of the desktop the configuration names: a container's, or a real machine's, driven
     here, on a person's own Mac, or on a machine elsewhere, all through Hermes' base (spec 22.3)."""
-    if config.computer.runs in ("machine", "mac", "remote"):
+    if config.computer.on_the_base:
         return HermesDriver(config, name)
     return DesktopDriver(config, name)
