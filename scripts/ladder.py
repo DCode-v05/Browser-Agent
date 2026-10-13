@@ -260,8 +260,14 @@ def started(program: str) -> int:
 async def looked_at(session: ServiceSession, pid: int, name: str) -> ToolResult:
     """A capture of one app's window, asked for exactly, by what the driver itself lists: a name
     that matched nothing would prove nothing."""
-    rows = [row for row in await the_windows() if row.get("pid") == pid]
-    rows = rows or [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
+    ends = time.monotonic() + WAIT_FOR_THE_APP_S
+    while True:
+        rows = [row for row in await the_windows() if row.get("pid") == pid]
+        rows = rows or [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
+        # A window takes a moment to open, and longer on a machine that is busy.
+        if rows or time.monotonic() > ends:
+            break
+        await asyncio.sleep(LOOK_AGAIN_S)
     if not rows:
         return ToolResult(f"its window was not among the driver's: {await windows_like('')}", is_error=True)
     exactly = {"pid": rows[0].get("pid"), "window_id": rows[0].get("window_id")}
