@@ -333,7 +333,9 @@ async def a_site_is_read(
     return (
         f"4, any app is allowed, and {address} is opened in {browser} and read",
         wrong is None and expects.lower() in read.text.lower(),
-        wrong or " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300],
+        wrong
+        or " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
+        or "the page read: " + " | ".join(read.text.splitlines())[:600],
     )
 
 
