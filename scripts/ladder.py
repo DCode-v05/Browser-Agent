@@ -317,10 +317,17 @@ async def a_site_is_read(
         {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S},
     ]
     opened = await session.toolkit.call("computer_open_app", {"app": browser})
+    # A browser takes a while to show its first window.
+    await a_window_of(browser)
     look = {"action": "capture", "mode": "ax", "app": browser}
     done = [opened, await session.toolkit.call("computer_use", look)]
     for step in steps:
-        done.append(await session.toolkit.call("computer_use", step))
+        did = await session.toolkit.call("computer_use", step)
+        if did.is_error and "foreground" in did.text:
+            # The tool says where background delivery is not to be had, and what to do: the agent
+            # is told to follow it.
+            did = await session.toolkit.call("computer_use", {**step, "delivery_mode": "foreground"})
+        done.append(did)
     read = await session.toolkit.call("computer_use", look)
     wrong = next((" | ".join(one.text.splitlines())[:200] for one in [*done, read] if one.is_error), None)
     return (
