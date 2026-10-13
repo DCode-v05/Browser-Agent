@@ -173,6 +173,9 @@ if (theme === 'light' || theme === 'dark') preferences.colourMode = theme;
 const loadRooms = live && !query.has('session') ? roomsFrom(location.href, live, signsIn && live === visit ? visitEnded : undefined) : null;
 const rooms = loadRooms ? facts.rooms : null;
 const openDesktop = rooms && live && facts.desktop ? desktopOpener(location.href, live) : undefined;
+/** The chat of one page alone, in a narrow window to keep beside the machine's own screen. */
+const openBeside = (room: string) =>
+  void window.open(`?session=${encodeURIComponent(room)}&beside`, `bap-browser-chat-${room}`, `popup,width=${PAGE.besideWidth},height=${PAGE.besideHeight}`);
 const systems = rooms && live && facts.systems ? systemsFrom(location.href, live, W.systems.unreachable) : undefined;
 // Who is signed in, and what they may use and see.
 const me: Me | null = systems && signsIn ? await systems.me() : null;
@@ -190,6 +193,7 @@ createRoot(document.getElementById('root')!).render(
         opensOn={tabStorage.getItem(PAGE_KEY) ?? undefined}
         onPage={(room) => tabStorage.setItem(PAGE_KEY, room)}
         openDesktop={openDesktop}
+        openBeside={openBeside}
         systems={systems}
         role={role}
         me={me}
@@ -200,7 +204,7 @@ createRoot(document.getElementById('root')!).render(
         preferences={preferences}
       />
     ) : (
-      <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} />
+      <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} beside={query.has('beside')} />
     )}
   </StrictMode>,
 );

@@ -35,6 +35,9 @@ function viewsFor(role: Role, me: Me | null | undefined): RoomView[] {
   return me?.sees.evaluations ? ['agent', 'settings', 'evaluations'] : ['agent', 'settings'];
 }
 
+/** The agent works on a real machine, whose screen the person watches themselves: theirs, or one elsewhere. */
+const onAMachine = (room: Room): boolean => hasSession(room) && (room.runs === 'machine' || room.runs === 'remote');
+
 export type RoomMood = 'attention' | 'working' | 'ready' | 'person' | 'paused' | 'stopped' | 'off';
 
 /** Where a page stands, in one word and one colour. */
@@ -84,6 +87,8 @@ export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedd
   onPage?(room: string): void;
   /** Opens the desktop app, where the service has one to open. */
   openDesktop?: OpenDesktop;
+  /** Opens a page's chat alone in a window of its own, where the page can open one. */
+  openBeside?(room: string): void;
   /** The browsers as systems to set up, manage and evaluate (spec 9.17), where the service has them so. */
   systems?: SystemsApi;
   /** Who is signed in (spec 4.11). Without it, whoever holds the service's own link: the admin. */
@@ -96,7 +101,7 @@ export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedd
   passwords?: Passwords;
 }
 
-export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, systems, role = 'admin', me: givenMe, onSignOut, passwords, ...app }: StudioProps) {
+export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, openBeside, systems, role = 'admin', me: givenMe, onSignOut, passwords, ...app }: StudioProps) {
   const [rooms, setRooms] = useState(given);
   const [me, setMe] = useState(givenMe);
   // A user's window opens on the browser they prefer.
@@ -177,6 +182,11 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           }}
         >
           {W.studio.systems}
+        </Button>
+      )}
+      {openBeside && room && onAMachine(room) && (
+        <Button icon="computer" hint={W.studio.hint.beside} onClick={() => openBeside(room.id)}>
+          {W.studio.beside.open}
         </Button>
       )}
       {openDesktop && <DesktopButton open={openDesktop} />}

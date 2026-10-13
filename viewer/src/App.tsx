@@ -44,6 +44,7 @@ export interface AppProps {
   /** Drawn as one page of the window of several browsers (spec 9.16). That window has the page's
    *  bar, its heading and its main part: the app is then none of them a second time. */
   inWindow?: boolean;
+  beside?: boolean;
 }
 
 interface Toast {
@@ -64,7 +65,7 @@ function toastFor(notice: Notice): Toast | null {
   }
 }
 
-export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false }: AppProps) {
+export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false, beside: chatAlone = false }: AppProps) {
   const hosted = onOpenSettings !== undefined;
   // A page has one bar that is its banner and one main part. In the window, those are the window's.
   const Bar = inWindow ? 'div' : 'header';
@@ -142,8 +143,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
   const driving = view.key === 'person';
-  // The browser is a window on the person's own screen: this page is the chat beside it.
-  const beside = state.session?.onScreen === true;
+  // The person watches the screen itself, a browser of theirs or a real machine (spec 22.3.1): this page is the chat beside it.
+  const beside = chatAlone || state.session?.onScreen === true;
   // A person who takes over gets the whole width to work in.
   const full = !beside && (driving || wantsFull);
   // Beside the browser, a session with a chat is one conversation and nothing else.

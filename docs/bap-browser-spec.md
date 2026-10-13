@@ -5565,6 +5565,7 @@ Hermes is the base and is changed as little as possible. Each requirement of our
 | Opening an app | `launch_app` in the backend, not offered to the model | `computer_open_app`, held to the allowlist |
 | Asking before an action | Approval written into the tool | Our settings decide who is asked; the question appears in the viewer |
 | Pause, Take over, Stop | A lease: while a person holds the screen, no action and no capture | The three controls in the viewer take and give back that lease |
+| The chat beside the machine's own screen | Nothing: Hermes' chat is its own app | On a real machine, here or elsewhere, the Computer page has the button "Chat beside your screen". It opens that page's chat alone, with no picture, in a narrow window of its own (`?session=<page>&beside`), let in as the page that opened it. The person keeps it at the side and watches the agent on the screen itself. It is not offered for the contained desktop, whose only picture is the one on the page |
 | The check on every step (safeguards, attack tests) | Hard blocks on some keys and typed commands | Our check runs before every action, as it does for the browser |
 | Typed text never in a log, an event or a result | Not a rule in Hermes | Our tool layer says "typed 12 characters", never the text |
 | Every tunable value in one place | Its own config file | Every Hermes setting is mapped into `config_computer.py` (section 8) |

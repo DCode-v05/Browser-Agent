@@ -1563,6 +1563,31 @@ Not done, and not checked:
   the agent work in any app on the machine" on, then a task in the chat.
 - YouTube and Google themselves were not opened anywhere: the runner's proof is example.com.
 
+### 1au. Built on 2026-10-13: the chat in a narrow window, beside a real machine's screen
+
+Asked for: with the agent on the Mac's own screen, the chat was in a tab that covered the screen it
+worked on. You chose a narrow window with the chat alone.
+
+| | |
+|---|---|
+| The button | "Chat beside your screen", in the window's bar, on the Computer page when the agent works on this machine or on one elsewhere and has a session. Not for the contained desktop |
+| The window | That page's chat alone: the task box, the conversation with its steps, Pause, Take over, the settings and the end of the session. No picture. 400 by 760, and let in as the page that opened it |
+| Its address | `?session=<page>&beside`. A link that names a session already showed that session alone; `beside` leaves the picture out |
+
+Seen, in a real browser: on a Computer page set to this machine the button opens the window; it
+shows the chat and no tabs of the window; "Open Calendar" typed there is taken as the task; nothing
+scrolls sideways (`.bap-browser/viewer-shots/computer-chat-beside.png`).
+
+Found by looking at it, and mended: at that width the word that says how the agent stands broke
+into a letter a line ("Re / ad / y"). It keeps to one line now, in the extension's side panel too.
+
+Not done, and not checked:
+
+- The window does not stay above other windows: a browser's page cannot ask for that. It is placed
+  beside the work by hand.
+- Not seen with the real Mac as the desktop, only with a stand-in for its driver.
+- The window's bar still says the product's name where a desktop is meant.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

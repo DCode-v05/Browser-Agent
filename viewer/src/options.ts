@@ -43,6 +43,9 @@ export const PAGE = {
   logLinesShown: 20,
   /** How long after the pointer has left the live picture a held key is let go, in milliseconds. */
   releaseAfterMs: 1000,
+  /** The size of the window that holds the chat alone, beside a real machine's screen, in pixels. */
+  besideWidth: 400,
+  besideHeight: 760,
   /** The panes of the Mac's System Settings where a person allows the helper. */
   screenRecordingPane: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
   accessibilityPane: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',

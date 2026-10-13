@@ -1042,3 +1042,16 @@ describe('Auto Mode and safeguards (spec 18.10)', () => {
     expect(within(popup).getByText('The task does not mention a payment, but the page shows one before the file is sent.')).toBeInTheDocument();
   });
 });
+
+describe('opened as the chat alone, to keep beside a screen the person watches themselves', () => {
+  it('draws no picture, whatever the session says of its screen', () => {
+    show('agent', { beside: true });
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
+    noButton('Show the browser full width');
+  });
+
+  it('shows the picture when it is not asked for the chat alone', () => {
+    show('agent');
+    expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
+  });
+});

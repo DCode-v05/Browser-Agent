@@ -205,6 +205,48 @@ async def test_the_computer_page_set_to_this_machine_says_what_it_lacks_and_offe
         assert (await opened.room("computer", "agent"))["state"] == "agent"
 
 
+async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep_beside_the_screen(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec 22.3.1: the agent works on the machine's own screen, which the person watches itself. The
+    chat is then wanted beside that screen, not in a tab that covers it."""
+    home = tmp_path / "a-driver-here"
+    binary = driver.folder(home, driver.pinned()) / driver.binary_in(driver.target())
+    binary.parent.mkdir(parents=True)
+    binary.write_text("", encoding="utf-8")
+    monkeypatch.setattr(commands, "not_ready", lambda config, binary: None)
+    this_machine = {"runs": "machine", "base": {"home": str(home), "ready_poll_s": 0.1}}
+    async with window(make_config, tmp_path, browser, asks_then_answers, computer=this_machine) as opened:
+        page = opened.page
+        await opened.open("Computer")
+        await page.get_by_label("Your task").wait_for()
+        async with page.expect_popup() as opening:
+            await page.get_by_role("button", name="Chat beside your screen").click()
+        chat = await opening.value
+        try:
+            # The window is let in as the page that opened it was, and shows that page's chat alone.
+            task = chat.get_by_label("Your task")
+            await task.wait_for()
+            assert await chat.get_by_role("region", name="Chat").count() == 1
+            assert await chat.get_by_role("tablist", name="Where the agent works").count() == 0
+            assert await chat.locator("canvas, .live-view img").count() == 0
+            assert await chat.evaluate("innerWidth") <= 420
+            # At this width the word that says how the agent stands is still one line.
+            stands = await chat.get_by_test_id("agent-status").bounding_box()
+            assert stands is not None and stands["width"] > stands["height"]
+            assert await chat.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            await task.fill("Open Calendar")
+            await task.press("Enter")
+            await chat.get_by_text("Open Calendar").first.wait_for()
+            await chat.screenshot(path=SHOTS / "computer-chat-beside.png")
+        finally:
+            await chat.close()
+
+        # The contained desktop has its picture on the page alone: no such window is offered for it.
+        await opened.open("Cloud browser")
+        assert await page.get_by_role("button", name="Chat beside your screen").count() == 0
+
+
 async def test_a_page_that_needs_a_person_pops_up_and_says_so_on_its_tab(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
