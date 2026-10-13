@@ -39,6 +39,7 @@ ENABLED = Enabled(
     surfaces=EVERYWHERE,
     title="Use this browser",
     description="Turns this browser on or off in the window. Turning it off ends its session.",
+    on_the_desktop="Turns the desktop on or off in the window. Turning it off ends its session.",
     per_system=True,
     only_per_system=True,
 )
@@ -252,6 +253,7 @@ CATALOGUE: tuple[Entry, ...] = (
         surfaces=EVERYWHERE,
         title="Picture quality",
         description="How sharp the live picture of the browser is. A sharper picture uses more data.",
+        on_the_desktop="How sharp the live picture of the desktop is. A sharper picture uses more data.",
         key="viewer.quality",
         options=(
             Option("standard", "Standard"),
@@ -513,6 +515,7 @@ CATALOGUE: tuple[Entry, ...] = (
         surfaces=NOT_ON_MOBILE,
         title="About this deployment",
         description="The version, the browser in use and the configuration that differs from the defaults.",
+        on_the_desktop="The version, the system in use and the configuration that differs from the defaults.",
     ),
 )
 

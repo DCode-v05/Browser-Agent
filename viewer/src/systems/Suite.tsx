@@ -10,6 +10,7 @@ import { W } from '../wording';
 import type { SetName, SuiteAnswer, SuiteMode, SuiteOverall, SuiteRun, SuiteSet, SuiteTotals, SystemsApi } from './api';
 import { count, dollars, percent, spanOf } from './format';
 import { TableScroll } from './parts';
+import { useWords } from '../words';
 
 const S = W.systems.suite;
 
@@ -152,6 +153,7 @@ interface SetProps {
 }
 
 function SetBlock({ set, running, busy, asking, open, onToggle, onRun, onStop }: SetProps) {
+  const L = useWords();
   const last = set.last;
   const told = last ? headline(set.id, last.totals) : null;
   return (
@@ -194,7 +196,7 @@ function SetBlock({ set, running, busy, asking, open, onToggle, onRun, onStop }:
             <Button kind="primary" icon="play" hint={S.runAgentHint} busy={asking} disabled={busy && !asking} onClick={() => onRun('agent')}>
               {S.runAgent}
             </Button>
-            <Button icon="check" hint={S.runReferenceHint} disabled={busy} onClick={() => onRun('reference')}>
+            <Button icon="check" hint={L.systems.suite.runReferenceHint} disabled={busy} onClick={() => onRun('reference')}>
               {S.runReference}
             </Button>
           </>

@@ -11,6 +11,7 @@ import { timeLeft } from './Cards';
 import { Icon, type IconName } from './Icon';
 import { Button } from './StatusPanel';
 import { trapTab } from './focus';
+import { useWords } from '../words';
 
 const KIND_ICON: Record<HelpKind, IconName> = {
   login: 'lock',
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export function HelpPopup({ help, now, ownBrowser, onTakeOver, onCouldNot, onLater }: Props) {
+  const L = useWords();
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus(), [help.id]);
   return (
@@ -71,7 +73,7 @@ export function HelpPopup({ help, now, ownBrowser, onTakeOver, onCouldNot, onLat
           <Button hint={W.buttons.hint.couldNot} onClick={onCouldNot}>
             {W.buttons.couldNot}
           </Button>
-          <Button kind="person" icon="hand" hint={W.buttons.hint.takeOver} onClick={onTakeOver} ref={first}>
+          <Button kind="person" icon="hand" hint={L.buttons.hint.takeOver} onClick={onTakeOver} ref={first}>
             {ownBrowser ? W.help.popup.doIt : W.buttons.takeOver}
           </Button>
         </div>

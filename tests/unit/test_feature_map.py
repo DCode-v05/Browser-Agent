@@ -42,8 +42,9 @@ def test_every_tool_is_in_the_map_and_the_map_names_no_tool_that_is_gone() -> No
 
 
 def test_every_address_of_the_service_is_in_the_map() -> None:
-    app = (REPOSITORY / "src" / "bap_browser" / "service" / "app.py").read_text(encoding="utf-8")
-    served = {*AN_ADDRESS.findall(app), Config().mcp.http_path}
+    service = REPOSITORY / "src" / "bap_browser" / "service"
+    routes = "".join((service / file).read_text(encoding="utf-8") for file in ("app.py", "desktop_door.py"))
+    served = {*AN_ADDRESS.findall(routes), Config().mcp.http_path}
     mapped = {address for feature in features() for address in feature["addresses"]}
     assert served - mapped == set(), "addresses of the service that no feature of the map names"
     assert mapped - served == set(), "the map names addresses the service does not have"

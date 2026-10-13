@@ -97,7 +97,8 @@ async def window(
     folder = browser_extension.install(tmp_path / "state" / "extension")
     # The file that says where the service is stays in the test's own folder, apart from a service
     # the developer may have running.
-    config = make_config(tmp_path, server={"state_file": str(tmp_path / "service.json")}, **sections)
+    server = {"state_file": str(tmp_path / "service.json"), **sections.pop("server", {})}
+    config = make_config(tmp_path, server=server, **sections)
     running = asyncio.create_task(
         run_studio(config, lambda service: model(), open_viewer=False, extension=folder)
     )
@@ -216,7 +217,12 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
     binary.write_text("", encoding="utf-8")
     monkeypatch.setattr(commands, "not_ready", lambda config, binary: None)
     this_machine = {"runs": "machine", "base": {"home": str(home), "ready_poll_s": 0.1}}
-    async with window(make_config, tmp_path, browser, asks_then_answers, computer=this_machine) as opened:
+    # No desktop app is installed for this service: it cannot give a window above every app, and
+    # the chat opens in a window of the browser.
+    no_app = {"desktop_dir": str(tmp_path / "no-desktop-app")}
+    async with window(
+        make_config, tmp_path, browser, asks_then_answers, computer=this_machine, server=no_app
+    ) as opened:
         page = opened.page
         await opened.open("Computer")
         await page.get_by_label("Your task").wait_for()

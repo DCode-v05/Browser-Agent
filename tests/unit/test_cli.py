@@ -150,3 +150,20 @@ def test_serve_is_a_command_with_the_browser_shown_or_not() -> None:
     args = build_parser().parse_args(["serve", "--show-browser", "--open"])
     assert (args.command, args.show_browser, args.open) == ("serve", True, True)
     assert build_parser().parse_args(["serve"]).show_browser is False
+
+
+def test_the_chat_above_every_app_is_a_command_and_a_wrong_address_is_said(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from bap_browser.cli import build_parser, main
+
+    args = build_parser().parse_args(["computer", "chat", "https://vm.tail1234.ts.net"])
+    assert (args.computer_command, args.service, args.page) == (
+        "chat",
+        "https://vm.tail1234.ts.net",
+        "computer",
+    )
+
+    os.chdir(tmp_path)
+    assert main(["computer", "chat", "vm.tail1234.ts.net"]) == 2
+    assert "http:// or https://" in capsys.readouterr().err

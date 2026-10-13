@@ -221,6 +221,66 @@ async def test_a_desktop_that_stops_answering_is_put_right_and_worked_on_after(
         await session.close()
 
 
+async def test_a_press_that_deletes_waits_for_a_person_on_a_real_desktop(make_config, tmp_path: Path) -> None:
+    """The editor's own "Delete", in its Edit menu, takes away what is selected. As in a browser, a
+    control named so is pressed only after a person's yes (spec 18.4, 22.7)."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, "e2e-ask"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    answers = ["denied", "allowed"]
+    asked: list[str] = []
+
+    async def a_person(question: Any) -> Any:
+        asked.append(question.summary)
+        return answers.pop(0)
+
+    session.browser.ask_approval = a_person
+
+    async def use(**arguments: Any) -> str:
+        done = await session.toolkit.call("computer_use", arguments)
+        assert not done.is_error, done.text
+        return done.text
+
+    def numbered(text: str, words: str) -> int:
+        found = re.search(rf"#(\d+) [a-z ]+ '{re.escape(words)}", text)
+        assert found is not None, text
+        return int(found.group(1))
+
+    async def the_delete_item() -> int:
+        closed = await use(action="capture", mode="ax", app="mousepad")
+        await use(action="click", element=numbered(closed, "Edit"))
+        return numbered(await use(action="capture", mode="ax", app="mousepad"), "Delete")
+
+    try:
+        assert not (await session.toolkit.call("computer_open_app", {"app": "Text editor"})).is_error
+        async with asyncio.timeout(config.computer.app_open_wait_s):
+            while (page := A_PAGE.search(await use(action="capture", mode="ax", app="mousepad"))) is None:
+                await asyncio.sleep(0.2)
+        await use(action="click", element=int(page.group(1)))
+        await use(action="type", text="kept")
+        await use(action="key", keys="ctrl+a")
+
+        refused = await session.toolkit.call(
+            "computer_use", {"action": "click", "element": await the_delete_item()}
+        )
+        assert refused.is_error and len(asked) == 1
+        await use(action="key", keys="escape")
+        assert "'kept'" in await use(action="capture", mode="ax", app="mousepad")
+
+        await use(action="key", keys="ctrl+a")
+        await use(action="click", element=await the_delete_item())
+        assert len(asked) == 2
+        assert "'kept'" not in await use(action="capture", mode="ax", app="mousepad")
+    finally:
+        await session.close()
+
+
 async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_config, tmp_path: Path) -> None:
     """A task set makes the desktop ready before each task. An app left stuck by the task before is
     ended by force, so the run goes on."""

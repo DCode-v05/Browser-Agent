@@ -10,6 +10,7 @@ import { W } from '../wording';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 import { trapTab } from './focus';
+import { useWords } from '../words';
 
 interface Props {
   state: ViewerState;
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function Timeline({ state, now, options, selected, onOpen }: Props) {
+  const L = useWords();
   const rows = buildRows(state.steps, options.idleDividerS, state.unanswered);
   const stepRows = rows.filter((row): row is Extract<Row, { kind: 'step' }> => row.kind === 'step');
   const newest = stepRows.at(-1)?.step.n;
@@ -56,7 +58,7 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
               type="button"
               className="row"
               data-status={row.status}
-              title={W.buttons.hint.step}
+              title={L.buttons.hint.step}
               aria-haspopup="dialog"
               aria-expanded={selected === row.step.n}
               // One stop in the tab order; the arrow keys move between rows.

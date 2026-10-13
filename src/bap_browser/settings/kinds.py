@@ -74,6 +74,12 @@ class Entry:
     """The backends whose sessions the setting changes. None means every one."""
     per_system: bool = False
     """Where a service has several browsers (spec 9.17), a person sets it for each one by itself."""
+    on_the_desktop: str | None = None
+    """The description on the page of computer use, where it differs: a desktop is no browser."""
+
+    def described_for(self, backend: str | None) -> str:
+        return self.on_the_desktop if backend == COMPUTER and self.on_the_desktop else self.description
+
     only_per_system: bool = False
     """It is a setting of one browser among several, and of nothing else: it is not there for a
     service with one session."""

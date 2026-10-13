@@ -257,6 +257,7 @@ export const W = {
     /** The chat alone, in a window to keep beside a real machine's screen (spec 22.3.1). */
     beside: {
       open: 'Chat beside your screen',
+      yourOwnHands: "You're in control of this machine. Use its own mouse and keyboard: the picture here only shows the screen. Press Hand back when you have finished.",
     },
     desktop: {
       open: 'Open desktop app',
@@ -767,3 +768,85 @@ export const W = {
     unanswered: (count: number) => `${count} ${count === 1 ? 'question' : 'questions'} ran out unanswered. Further ones are refused until you are back.`,
   },
 } as const;
+
+/** Every word of `W`, as text: what a page is drawn from, whichever system it is of. */
+export type Words = Worded<typeof W>;
+type Worded<T> = T extends string ? string : T extends (...given: infer A) => unknown ? (...given: A) => string : { readonly [K in keyof T]: Worded<T[K]> };
+type Some<T> = T extends string ? string : T extends (...given: infer A) => unknown ? (...given: A) => string : { readonly [K in keyof T]?: Some<T[K]> };
+
+/**
+ * What the page of computer use says where a browser's page says "browser" (spec 22.3): it shows a
+ * desktop. Only the words that differ are here; every other word is `W`'s.
+ */
+export const ON_A_DESKTOP: Some<typeof W> = {
+  buttons: {
+    showFull: 'Show the desktop full width',
+    showSplit: 'Show the desktop beside the activity',
+    hint: {
+      takeOver: 'You drive the desktop yourself, with your mouse and keyboard. The agent waits until you hand back.',
+      handBack: 'Gives the desktop back to the agent, which goes on with its task.',
+      stop: "Ends this session and the agent's work on the desktop. A new session can be started afterwards.",
+      stopTask: 'Stops the task the agent is on. The session stays, and the desktop is left as it is.',
+      task: 'Type what the agent should do on this desktop, then press Enter. A new task carries on from where the last one ended.',
+      step: 'Shows what this step did, and the desktop as it was then.',
+      tab: 'A window open on the desktop.',
+      newSession: 'Starts a new session and a new conversation on this page.',
+      copyConfig: 'Copies the version, the system in use and the changed configuration, as text.',
+    },
+  },
+  takeover: {
+    release: (chord: string) => `Press ${chord} to leave the desktop`,
+  },
+  stop: {
+    consequence: "The agent's work on the desktop will end, and the agent will be told.",
+  },
+  frame: {
+    alt: (title: string) => `Live view of the desktop: ${title || 'no window in front'}`,
+  },
+  studio: {
+    hint: {
+      view: {
+        agent: 'The desktop itself, live, and the chat with the agent.',
+        configuration: 'For the admin: how the desktop is set up.',
+        settings: 'Your own settings for this desktop.',
+        evaluations: 'What the tasks done on this desktop took.',
+      },
+    },
+  },
+  systems: {
+    panel: {
+      lead: {
+        configuration: "For the admin. How the desktop is set up: whether it runs, whether users may use it, and what the agent may do on it. A change is saved as you make it, and holds from the agent's next step.",
+        settings: 'Your own settings for this desktop, inside what your admin allows. A change is saved as you make it.',
+        evaluations: {
+          admin: 'What the tasks done on this desktop took: how they ended, how long they took and what they cost. All of them compared are under Systems, All systems.',
+          user: 'What the tasks done on this desktop took. Your admin decides how much of it users see.',
+        },
+      },
+    },
+    logLead: 'One line for each step the agent takes on this desktop. Turn it on or off with "Keep a log of the agent\'s steps", above.',
+    recordsLead: 'One line for each task done on this desktop. The Evaluations are made from them.',
+    logOff: 'The log is turned off for this desktop.',
+    suite: {
+      runReferenceHint: 'Does every task by its written solution, with no model. It shows that this desktop and the checks work, at no cost.',
+    },
+    evals: {
+      none: 'No task has been done on this desktop yet. Give the agent a task on its page.',
+      step: (typical: string, slow: string) => `A step on the desktop: ${typical} typical, ${slow} slow`,
+      shares: (model: string, desktop: string, waiting: string) => `${model} the model, ${desktop} the desktop, ${waiting} waiting for you`,
+    },
+  },
+  settings: {
+    about: {
+      browser: 'System in use',
+    },
+  },
+  parts: {
+    browser: 'Desktop',
+    tabs: 'Windows on the desktop',
+  },
+  topBar: {
+    browser: 'Desktop',
+    embeddedTitle: 'Desktop session',
+  },
+};

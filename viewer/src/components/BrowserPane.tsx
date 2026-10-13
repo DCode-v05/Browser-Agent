@@ -8,6 +8,7 @@ import type { Step, ViewerState } from '../state/reducer';
 import type { StateView, Tone } from '../state/view';
 import { W } from '../wording';
 import { Icon, type IconName } from './Icon';
+import { useWords } from '../words';
 
 const TONE_ICON: Record<Tone, IconName> = {
   none: 'monitor',
@@ -30,17 +31,18 @@ interface Props {
 }
 
 export function BrowserPane({ state, view, now, showPointer, options, onCommand, onRelease }: Props) {
+  const L = useWords();
   return (
-    <section className="browser" aria-label={W.parts.browser}>
+    <section className="browser" aria-label={L.parts.browser}>
       {state.session && state.tabs.length > 0 && (
-        <div className="tabs" role="tablist" aria-label={W.parts.tabs}>
+        <div className="tabs" role="tablist" aria-label={L.parts.tabs}>
           {state.tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               role="tab"
               className="tab"
-              title={W.buttons.hint.tab}
+              title={L.buttons.hint.tab}
               aria-selected={tab.active}
               onClick={() => onCommand({ type: 'select_tab', id: tab.id })}
             >
@@ -125,6 +127,7 @@ function centre(box: Box | undefined): { x: number; y: number } | undefined {
 type FrameProps = Omit<Props, 'now'>;
 
 function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: FrameProps) {
+  const L = useWords();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** The keys the person is holding down in the page: where each is on the keyboard, and its name. */
   const held = useRef(new Map<string, string>());
@@ -214,7 +217,7 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
         width={size.width}
         height={size.height}
         role="img"
-        aria-label={W.frame.alt(active?.title ?? '', state.url)}
+        aria-label={L.frame.alt(active?.title ?? '', state.url)}
         tabIndex={driving ? 0 : -1}
         data-takes-keys={driving}
         {...(driving
@@ -265,7 +268,7 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
       {dimmed && <div className="frame-veil">{view.frame === 'connecting' && <span>{W.frame.connecting}</span>}</div>}
       {/* An agent that waits for a task is not paused: it keeps its own mark. */}
       {view.label && <FrameLabel tone={view.tone} label={view.label} icon={view.key === 'agent' ? 'agent' : undefined} />}
-      {driving && <p className="frame-hint">{W.takeover.release(options.releaseChord)}</p>}
+      {driving && <p className="frame-hint">{L.takeover.release(options.releaseChord)}</p>}
     </div>
   );
 }

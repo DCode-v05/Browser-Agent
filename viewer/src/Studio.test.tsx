@@ -593,6 +593,16 @@ describe('the chat in a window of its own, beside a real machine the agent works
     expect(openBeside).toHaveBeenCalledWith('computer');
   });
 
+  it('says to use the machine itself, once a person has taken over a real machine', () => {
+    withComputer({ ...computer, runs: 'machine', state: 'person' }, vi.fn());
+    expect(screen.getByText(W.studio.beside.yourOwnHands)).toBeInTheDocument();
+  });
+
+  it('says no such thing while the agent has the machine, or on the contained desktop', () => {
+    withComputer({ ...computer, runs: 'machine', state: 'agent' }, vi.fn());
+    expect(screen.queryByText(W.studio.beside.yourOwnHands)).not.toBeInTheDocument();
+  });
+
   it('is not offered for the contained desktop, whose only picture is the one on the page', () => {
     withComputer({ ...computer, runs: 'container' }, vi.fn());
     expect(screen.queryByRole('button', { name: W.studio.beside.open })).not.toBeInTheDocument();

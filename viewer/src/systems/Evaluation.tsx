@@ -10,6 +10,7 @@ import type { Check, Evals, Me, SystemInfo, SystemsApi, TaskRow, TaskTrace } fro
 import { SuiteCard } from './Suite';
 import { clock, count, dollars, percent, spanOf } from './format';
 import { CardHead, TableScroll } from './parts';
+import { useWords } from '../words';
 
 /** One line of what a system's tasks took, with what the line is. */
 function Fact({ name, hint, children }: { name: string; hint: string; children: ReactNode }) {
@@ -25,6 +26,7 @@ function Fact({ name, hint, children }: { name: string; hint: string; children: 
 }
 
 export function Evaluation({ system, api, word, sees }: { system: SystemInfo; api: SystemsApi; word: string; sees?: Me['sees'] }) {
+  const L = useWords();
   const [evals, setEvals] = useState<Evals | null>(null);
   const [failed, setFailed] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -67,7 +69,7 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
   }
 
   const name = W.backend[system.backend];
-  const E = W.systems.evals;
+  const E = L.systems.evals;
   // What this person may be shown. The admin is shown all of it.
   const may = evals?.may ?? { cost: true, traces: true, checklist: true };
   return (
@@ -231,7 +233,8 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
 }
 
 function CheckLine({ check }: { check: Check }) {
-  const E = W.systems.evals;
+  const L = useWords();
+  const E = L.systems.evals;
   return (
     <li className="system-check" data-state={check.state}>
       <Icon name={check.state === 'ok' ? 'check' : check.state === 'failed' ? 'alert' : 'pause'} />
@@ -247,7 +250,8 @@ function CheckLine({ check }: { check: Check }) {
 
 /** Every reply of the model and every step of one task, each as a bar where and as long as it was. */
 function Trace({ trace }: { trace: TaskTrace }) {
-  const E = W.systems.evals;
+  const L = useWords();
+  const E = L.systems.evals;
   const whole = Math.max(trace.duration_ms, 1);
   return (
     <ol className="system-trace" aria-label={E.trace}>

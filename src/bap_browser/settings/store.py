@@ -208,7 +208,7 @@ class SettingsStore:
                 setting: dict[str, Any] = {
                     "id": entry.id,
                     "title": entry.title,
-                    "description": entry.description,
+                    "description": entry.described_for(self.backends.get(system or "")),
                     "control": entry.control,
                     **drawn.described(above),
                     "value": drawn.shown(value, above),
