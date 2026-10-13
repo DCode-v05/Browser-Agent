@@ -5264,6 +5264,10 @@ internet.
 
 ### 21.13 A person's real Mac
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4. The agent works on the person's own Mac, through a helper the person starts there:
 
 ```bash
@@ -5318,6 +5322,10 @@ the token, the missing permission, the stop in the corner, and the apps.
 
 ### 21.14 A person's real Windows machine
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4, extended to a second platform. Designed; not yet built. As section 21.13, except:
 
 - The helper sees the screen through Windows's own `user32.dll` and `gdi32.dll` (reached through
@@ -5340,6 +5348,10 @@ Arrangement 4, extended to a second platform. Designed; not yet built. As sectio
 
 ### 21.15 A person's real Linux machine (X11)
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Arrangement 4, extended to a third platform. Designed; not yet built, and for X11 only: a desktop on
 Wayland is not reached by it (section 21.10). As section 21.13, except:
 
@@ -5359,6 +5371,10 @@ Wayland is not reached by it (section 21.10). As section 21.13, except:
 
 ### 21.16 A helper reached over the tailnet
 
+> **Replaced by section 22, and kept as the record of the earlier design.** Nothing of this section
+> is in the system: every machine is driven through Hermes' driver, and a machine elsewhere through
+> `bap-browser computer helper` (section 22.6). The commands and settings named below no longer exist.
+
 Designed; not yet built. Arrangement 4 joins arrangement 3: the engine, wherever it runs (including a
 micro VM that has joined the person's tailnet, section 21.12), reaches a helper of sections 21.13 to
 21.15 by the helper's Tailscale address, so that the person's own machine need not share a network
@@ -5377,9 +5393,6 @@ with the engine, and nothing of the helper is open to the internet.
   same tailnet, the engine given the helper's Tailscale address, a task done on the person's machine,
   and the live picture watched through the VM's own viewer.
 
-> Sections 21.14 to 21.16 are the earlier design for Windows, Linux and a helper over a tailnet: input of our own
-> on each system. Section 22 replaced it with Hermes' driver, and is what is built. They are kept as the record of
-> that design.
 
 ## 22. Computer use on Hermes
 

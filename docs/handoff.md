@@ -1,5 +1,10 @@
 # Handoff: bap-browser
 
+> **Read this as a record of 10 October 2026, not as the state of the system.** Its four next steps
+> were closed or replaced: see `docs/status.md`, entries 1ai and 1am. The worktree and the branch
+> `worktree-computer-use-helpers` are gone, and so is the command `bap-browser helper --allow ...`.
+> The helper of today is `uv run bap-browser computer helper`.
+
 ## Task
 
 This session only ran the handoff skill to checkpoint state; no new work was asked for or done here.
