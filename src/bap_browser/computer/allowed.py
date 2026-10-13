@@ -40,7 +40,6 @@ TOOLS = (
     "list_windows",
     "get_window_state",
     "get_desktop_state",
-    "screenshot",
     "click",
     "double_click",
     "drag",
