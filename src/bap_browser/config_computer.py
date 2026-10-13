@@ -47,7 +47,18 @@ class Base(Section):
         1456, "The longest edge of a picture the driver returns, in pixels. 0 leaves it as it is"
     )
     ax_max_elements: int = setting(
-        200, "How many elements the driver reads of one window at most. 0 sets no bound"
+        800,
+        "How many elements the driver reads of one window at most. 0 sets no bound. Hermes' own is 200, "
+        "which in an app with large menus ends before its page is reached",
+    )
+    delivery: Literal["auto", "background", "foreground"] = setting(
+        "auto",
+        "Whether the agent's input goes to a window in the background, leaving the person's pointer and "
+        "window alone, or to the window in front. `auto`: in the background on a person's machine, and "
+        "in front on a desktop nobody is at, the contained one and the micro VM's",
+    )
+    elements_shown: int = setting(
+        60, "How many elements of a window a capture names in its text. The page comes before the menus"
     )
     permission_mode: Literal["standard", "bounded"] = setting(
         "bounded", "Whether the driver itself holds the agent to the allowed apps (`bounded`) or not"
