@@ -215,6 +215,7 @@ export const W = {
     hint: {
       systems: 'For the admin: what users are allowed, and the browsers and the desktop compared.',
       desktop: 'Opens the desktop app in a window of its own, with its own browser and its own chat.',
+      beside: 'Opens this chat in a narrow window of its own. Keep it at the side of your screen and watch the agent work on the machine itself.',
       signOut: 'Ends your visit on this page. You sign in again to come back.',
       view: {
         agent: 'The browser itself, live, and the chat with the agent.',
@@ -252,6 +253,10 @@ export const W = {
       failed: 'The desktop could not be started',
       turnedOff: 'The desktop is turned off',
       view: 'Desktop and chat',
+    },
+    /** The chat alone, in a window to keep beside a real machine's screen (spec 22.3.1). */
+    beside: {
+      open: 'Chat beside your screen',
     },
     desktop: {
       open: 'Open desktop app',

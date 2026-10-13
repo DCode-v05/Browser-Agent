@@ -578,3 +578,28 @@ describe('the pop-up that asks a person to do a step (spec 9.16)', () => {
     expect(screen.getByRole('button', { name: W.buttons.couldNot })).toBeInTheDocument();
   });
 });
+
+describe('the chat in a window of its own, beside a real machine the agent works on', () => {
+  function withComputer(room: Room, openBeside?: (room: string) => void) {
+    const user = userEvent.setup();
+    render(<Studio rooms={[cloud, room]} loadRooms={async () => null} pollMs={0} opensOn="computer" openBeside={openBeside} connectionFor={() => new DemoConnection(STATES.agent, { pace: 0, startAt: 1000 })} settings={createDemoSettings()} options={options} />);
+    return user;
+  }
+
+  it('opens the chat of that page, on a machine whose screen the person watches themselves', async () => {
+    const openBeside = vi.fn();
+    const user = withComputer({ ...computer, runs: 'machine' }, openBeside);
+    await user.click(screen.getByRole('button', { name: W.studio.beside.open }));
+    expect(openBeside).toHaveBeenCalledWith('computer');
+  });
+
+  it('is not offered for the contained desktop, whose only picture is the one on the page', () => {
+    withComputer({ ...computer, runs: 'container' }, vi.fn());
+    expect(screen.queryByRole('button', { name: W.studio.beside.open })).not.toBeInTheDocument();
+  });
+
+  it('is not offered where the page cannot open a window', () => {
+    withComputer({ ...computer, runs: 'machine' });
+    expect(screen.queryByRole('button', { name: W.studio.beside.open })).not.toBeInTheDocument();
+  });
+});
