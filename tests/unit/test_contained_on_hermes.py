@@ -65,3 +65,16 @@ def test_the_contained_desktop_is_not_held_by_a_file_on_this_machine(tmp_path: P
 
 def test_nothing_of_this_machine_is_lacking_for_a_desktop_in_a_container(tmp_path: Path) -> None:
     assert computer.lacks(a_config(tmp_path / "empty", "container")) is None
+
+
+@pytest.mark.parametrize(
+    ("runs", "said"),
+    [
+        ("container", "Contained desktop, 1280 by 800"),
+        ("here", "This machine's own screen"),
+        ("machine", "This machine's own screen"),
+        ("remote", "A machine elsewhere"),
+    ],
+)
+def test_the_page_says_which_desktop_the_agent_works_on(runs: str, said: str, tmp_path: Path) -> None:
+    assert desktop_driver_for(a_config(tmp_path, runs)).description() == said
