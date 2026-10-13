@@ -119,3 +119,25 @@ def test_an_address_that_is_no_web_address_is_refused(make_config, tmp_path: Pat
         store.change("web", {"computer_helper_url": address}, "computer")
 
     assert no.value.reason in ("bad_address", "not_a_choice")
+
+
+def test_the_admin_says_what_a_capture_holds_and_whether_the_drivers_pointer_shows(
+    make_config, tmp_path: Path
+) -> None:
+    store = a_store(make_config, tmp_path)
+    settings = drawn(store)
+
+    assert [option["value"] for option in settings["computer_capture_mode"]["choices"]] == [
+        "som",
+        "vision",
+        "ax",
+    ]
+    assert settings["computer_capture_mode"]["value"] == "som"
+    assert [option["value"] for option in settings["computer_no_overlay"]["choices"]] == ["auto", "off", "on"]
+    assert settings["computer_no_overlay"]["value"] == "auto"
+
+    store.change("web", {"computer_capture_mode": "ax", "computer_no_overlay": "on"}, "computer")
+    base = store.apply_to(make_config(tmp_path), "contained_desktop", "computer").computer.base
+
+    assert (base.capture_mode, base.no_overlay) == ("ax", "on")
+    assert not {"computer_capture_mode", "computer_no_overlay"} & set(drawn(store, "user"))
