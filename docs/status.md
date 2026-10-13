@@ -963,6 +963,53 @@ Not built, and not checked:
 - A user (not the admin) sees "Your admin sets this machine up for the agent." That is tested in the
   viewer's own tests, not walked in a real browser.
 
+
+### 1ah. Built on 2026-10-13: on a real machine the driver itself holds the agent to the allowed apps (spec 22.7)
+
+Until now `computer_open_app` opened only allowed apps, but a click could reach any window. Now the
+list of allowed apps becomes the file the driver is started with in its `bounded` mode (its
+capability manifest), and the driver refuses, by itself, to read or act in a window of any other app.
+
+| | |
+|---|---|
+| The file | `computer/allowed.py` writes it from the apps switched on in the settings, in the driver's own format, for the engine's user alone to read |
+| How an app is named | As the driver names it: a bundle id on macOS, a program's full path on Linux, the identity the driver lists on Windows |
+| What is allowed besides | The 21 tools of the driver that Hermes' backend calls, and looking at the display as a whole. Nothing that ends a process, reads the clipboard, records, or updates the driver |
+| When it holds | `computer.runs: machine`, with `base.permission_mode: bounded` (the default). Not where the person lets the agent open any app |
+| More apps | `computer.base.also_allowed`: a bundle id, or a program's full path |
+
+Proven with the real driver on CI's machines, as rung 4 of the ladder:
+
+| System | The allowed app | The app that is not allowed |
+|---|---|---|
+| Linux (Ubuntu 24.04) | A dialog, allowed by its path: every other rung still passed | A copy of the same dialog under another name: "desktop pid 4184 window 14680068 is outside the capability manifest" |
+| Windows (Server 2025) | Notepad: every other rung still passed | Character Map: "desktop pid 8976 window 459010 is outside the capability manifest" |
+
+Found on the way, each by the driver's own refusal and none from reading:
+
+- The driver refuses to start with a file that allows a tool it does not have. Hermes' code calls a
+  `screenshot` tool that 0.21.0 lacks. A test now holds our list to the driver's own tools.
+- Listing the windows counts as looking at the display, and needs its own grant. It is given; reading
+  a window does not follow from it.
+- On Windows the driver knows an app by an identity of its own, such as
+  `%windir%\system32\notepad.exe`, and never by a canonical path. With the path, the driver refused
+  Notepad itself. I found the identity by printing what the driver lists.
+- The driver's source was read for the file's format (`session_manifest.rs` at the pinned version). Its
+  help does not give it.
+
+Not built, and not checked:
+
+- **Windows has only the text editor.** The identities of File Explorer, Calculator and Terminal there
+  have not been read from the driver, so those three are not in the list on Windows. They can be added
+  with `also_allowed`.
+- **macOS is unproven.** The bundle ids are written; the driver has not run there.
+- **A machine elsewhere is not held.** The driver there is started by the helper, which does not start
+  it in `bounded` mode yet.
+- The agent can still see the whole screen and the names of its windows, in an app that is not
+  allowed too. It cannot read that window's elements or act in it.
+- The list ends after `allowed_for` (12 hours) or `allowed_idle` (2 hours) unused, and the driver then
+  refuses everything until a new session. What a person sees when that happens has not been looked at.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

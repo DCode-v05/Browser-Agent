@@ -5,8 +5,8 @@
 It runs on the machine it is started on, against that machine's own screen, and says of each rung
 whether it passed and what it saw. Rungs 1 to 3 are here: the driver is installed and answers; a capture in each of the three modes
 returns something; and through the engine's own session the tool finds a field by its number, types
-into it and reads it back. Rung 5 is here too: while a person has taken over, the agent can neither act nor look. Rung 4 is added
-with the allowed apps.
+into it and reads it back. Rung 4: an app that is not allowed cannot be looked at. Rung 5: while a person has taken over, the
+agent can neither act nor look.
 
 It ends with 0 when every rung it ran passed.
 """
@@ -22,16 +22,19 @@ import os
 import platform
 import re
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 from bap_browser import computer
-from bap_browser.computer import commands, driver
+from bap_browser.computer import allowed, commands, driver
 from bap_browser.computer.hermes.computer_use import permissions
 from bap_browser.config import Config, load_config
 from bap_browser.driver.hermes_driver import HermesDriver
@@ -46,11 +49,21 @@ KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
     "linux": (["zenity", "--entry", "--title=Ladder", "--text=A window the ladder knows"], "zenity", []),
     "darwin": (["open", "-a", "TextEdit"], "TextEdit", ["osascript", "-e", 'quit app "TextEdit"']),
 }
+# An app each system has that the settings do not allow: how it is started, the name a capture would
+# find it by, and how it is closed.
+NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
+    "win32": (["charmap.exe"], "Character Map", []),
+    "linux": (["xmessage", "-name", "Other", "A window that is not allowed"], "xmessage", []),
+    "darwin": (["open", "-a", "Stickies"], "Stickies", ["osascript", "-e", 'quit app "Stickies"']),
+}
+# What the driver says when it refuses for the list of allowed apps.
+REFUSED_FOR_THE_LIST = re.compile(r"manifest|authoriz|not allowed|denied|outside", re.IGNORECASE)
 # A line of a capture that names a field text goes into: its number and its role.
 A_FIELD = re.compile(r"#(\d+) (\S*(?:[Tt]ext|[Ee]dit|[Ee]ntry|[Dd]ocument)\S*) ")
 OK_BUTTON = re.compile(r"#(\d+) \S*button\S* 'OK'")
 TYPED = "ladder 4711"
 WAIT_FOR_THE_APP_S = 20.0
+WAIT_FOR_THE_OTHER_APP_S = 3.0
 LOOK_AGAIN_S = 0.5
 
 
@@ -87,6 +100,56 @@ def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
             started.terminate()
         if closing:
             subprocess.run(closing, capture_output=True, check=False)
+
+
+async def the_windows() -> list[dict[str, Any]]:
+    """The windows the driver lists, as it gives them."""
+    listed = said(await asyncio.to_thread(computer.computer_use, {"action": "list_windows"}, "ladder"))
+    return [row for row in listed.get("windows", []) if isinstance(row, dict)]
+
+
+async def windows_like(name: str) -> str:
+    """What the driver says of the windows and the apps whose row names something, shortly, for a
+    rung that failed."""
+    rows = [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
+    apps = said(await asyncio.to_thread(computer.computer_use, {"action": "list_apps"}, "ladder"))
+    named = [row for row in apps.get("apps", []) if name.lower() in json.dumps(row).lower()]
+    return json.dumps({"windows": rows, "apps": named})[:1100]
+
+
+@contextmanager
+def an_app_not_allowed() -> Iterator[tuple[str, int]]:
+    """Opens an app the settings do not allow, and closes it after. Its name and its process come out."""
+    system = next(name for name in NOT_ALLOWED if sys.platform.startswith(name))
+    command, name, closing = NOT_ALLOWED[system]
+    with tempfile.TemporaryDirectory() as folder:
+        if system == "linux":
+            # The same small dialog under another name: to the driver, another program, not allowed.
+            other = shutil.copy(shutil.which(KNOWN["linux"][0][0]) or "", Path(folder) / "not-allowed-dialog")
+            command, name = (
+                [str(other), "--info", "--title=Other", "--text=Not allowed"],
+                "not-allowed-dialog",
+            )
+        started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            yield name, started.pid
+        finally:
+            if started.poll() is None:
+                started.terminate()
+            if closing:
+                subprocess.run(closing, capture_output=True, check=False)
+            started.wait()
+
+
+def with_the_known_app_allowed(config: Config) -> Config:
+    """The settings with the ladder's own app among the allowed ones, where it is not one already: on
+    Linux it is a small dialog and no app of the settings' four."""
+    program = shutil.which(KNOWN["linux"][0][0]) if sys.platform.startswith("linux") else None
+    if program is None:
+        return config
+    base = config.computer.base
+    base = base.model_copy(update={"also_allowed": [*base.also_allowed, os.path.realpath(program)]})
+    return config.model_copy(update={"computer": config.computer.model_copy(update={"base": base})})
 
 
 def capture(mode: str, app: str) -> tuple[bool, str]:
@@ -134,7 +197,8 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 )
             field = A_FIELD.search(seen.text)
             if seen.is_error or field is None:
-                return [(f"3, a field of {app} is found by its number", False, seen.text[:300])]
+                told = f"{seen.text[:300]} || the driver's windows: {await windows_like(app)}"
+                return [(f"3, a field of {app} is found by its number", False, told)]
             number = int(field.group(1))
             rungs.append(
                 (f"3, a field of {app} is found by its number", True, f"element {number}, {field.group(2)}")
@@ -163,6 +227,35 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                     " | ".join(typed.text.splitlines())[:300],
                 )
             )
+            if allowed.held(machine.computer):
+                # Rung 4: the driver itself refuses an app the person did not allow.
+                with an_app_not_allowed() as (other, its_pid):
+                    await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
+                    # Its window is asked for exactly, by what the driver itself lists: a name that
+                    # matched nothing would prove nothing.
+                    rows = [row for row in await the_windows() if row.get("pid") == its_pid]
+                    rows = rows or [
+                        row for row in await the_windows() if other.lower() in json.dumps(row).lower()
+                    ]
+                    if rows:
+                        exactly = {"pid": rows[0].get("pid"), "window_id": rows[0].get("window_id")}
+                        there = await session.toolkit.call(
+                            "computer_use", {"action": "capture", "mode": "ax", **exactly}
+                        )
+                        refused = there.is_error and bool(REFUSED_FOR_THE_LIST.search(there.text))
+                        seen_there = " | ".join(there.text.splitlines())[:300]
+                    else:
+                        refused, seen_there = (
+                            False,
+                            f"its window was not among the driver's: {await windows_like('')}",
+                        )
+                rungs.append(
+                    (
+                        f"4, {other}, which is not allowed, cannot be looked at or worked in",
+                        refused,
+                        seen_there,
+                    )
+                )
             # Rung 5: while a person holds the screen, nothing is done for the agent, not even a look.
             look = {"action": "capture", "mode": "ax", "app": app}
             await session.handle({"type": "take_over"})
@@ -250,7 +343,7 @@ def main(arguments: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    config = load_config(asked.config)
+    config = with_the_known_app_allowed(load_config(asked.config))
     if asked.virtual_screen:
         base = config.computer.base.model_copy(update={"virtual_screen": True})
         config = config.model_copy(update={"computer": config.computer.model_copy(update={"base": base})})
