@@ -5,7 +5,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { App, type AppProps } from './App';
-import { PAGE } from './options';
 import { DEFAULT_PREFERENCES, preferencesFrom, type Preferences } from './preferences';
 import type { Role } from './auth/api';
 import { Icon, type IconName } from './components/Icon';
@@ -319,7 +318,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           <NoSession
             room={room}
             onTurnOn={systems && role === 'admin' ? () => systems.settings(room.id).change(surface, { system_enabled: true }).then(refresh, refresh) : undefined}
-            onStartHelper={systems && role === 'admin' ? () => systems.manage(room.id, 'helper') : undefined}
             onManage={systems && role === 'admin' ? (step) => systems.manage(room.id, step) : undefined}
           />
         )}
@@ -351,56 +349,10 @@ function DesktopButton({ open }: { open: OpenDesktop }) {
 }
 
 /** What a page shows while its browser is not there yet. */
-/** The desktop on the person's own Mac, while no helper is paired: start one, and allow it (spec 21.13). */
-export function MacSetup({ note, onStartHelper }: { note?: string; onStartHelper?(): Promise<{ ok: true } | { ok: false; why: string }> }) {
-  const [said, setSaid] = useState('');
-  const [busy, setBusy] = useState(false);
-  const start = async () => {
-    if (!onStartHelper) return;
-    setBusy(true);
-    const done = await onStartHelper();
-    setBusy(false);
-    setSaid(done.ok ? W.studio.mac.started : done.why);
-  };
-  return (
-    <section className="studio-wait" aria-label={W.studio.mac.title}>
-      <Icon name="computer" size="large" />
-      <h2 className="studio-wait-title">{W.studio.mac.title}</h2>
-      <p className="studio-wait-lead">{W.studio.mac.lead}</p>
-      {onStartHelper ? (
-        <Button kind="primary" icon="play" busy={busy} hint={W.studio.mac.startHint} onClick={() => void start()}>
-          {W.studio.mac.start}
-        </Button>
-      ) : (
-        <p className="studio-wait-note">{W.studio.mac.adminOnly}</p>
-      )}
-      {said && (
-        <p className="studio-wait-note" role="status">
-          {said}
-        </p>
-      )}
-      <p className="studio-tip">{W.studio.mac.allow}</p>
-      <span className="studio-folder">
-        <a className="button" href={PAGE.screenRecordingPane}>
-          {W.studio.mac.screenRecording}
-        </a>
-        <a className="button" href={PAGE.accessibilityPane}>
-          {W.studio.mac.accessibility}
-        </a>
-      </span>
-      <p className="studio-tip">{W.studio.mac.stop}</p>
-      {note && <p className="studio-wait-note">{note}</p>}
-    </section>
-  );
-}
-
-function NoSession({ room, onTurnOn, onStartHelper, onManage }: { room: Room; onTurnOn?(): void; onStartHelper?(): Promise<{ ok: true } | { ok: false; why: string }>; onManage?(step: 'install' | 'allow'): Promise<{ ok: true } | { ok: false; why: string }> }) {
+function NoSession({ room, onTurnOn, onManage }: { room: Room; onTurnOn?(): void; onManage?(step: 'install' | 'allow'): Promise<{ ok: true } | { ok: false; why: string }> }) {
   const [copied, setCopied] = useState(false);
   if (room.backend === 'contained_desktop' && room.runs === 'machine' && room.state !== 'off') {
     return <MachineSetup note={room.note} onManage={onManage} />;
-  }
-  if (room.backend === 'contained_desktop' && room.runs === 'mac' && room.state !== 'off') {
-    return <MacSetup note={room.note} onStartHelper={onStartHelper} />;
   }
   const copy = async () => {
     try {

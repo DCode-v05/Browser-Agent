@@ -286,8 +286,7 @@ export interface LogAnswer {
 /** What came of asking the service to do something: done, or why not, in words for the person. */
 export type Done<Result = undefined> = (Result extends undefined ? { ok: true } : { ok: true; result: Result }) | { ok: false; why: string };
 
-/** `helper`: start the helper of the person's own Mac in Terminal (spec 21.13). */
-export type SystemAction = 'start' | 'stop' | 'restart' | 'helper' | 'install' | 'allow';
+export type SystemAction = 'start' | 'stop' | 'restart' | 'install' | 'allow';
 
 export interface SystemsApi {
   list(): Promise<SystemInfo[] | null>;
