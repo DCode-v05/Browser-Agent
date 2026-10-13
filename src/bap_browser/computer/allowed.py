@@ -21,30 +21,23 @@ from bap_browser.config_computer import Computer
 
 FILE = "allowed.json"
 # What each app the settings can allow is on each system, as the driver itself names it: a bundle on
-# macOS, the identity the driver lists on Windows, a program on Linux. The identities of Windows were
-# read from the driver (`list_apps`, on Windows Server 2025). Windows 11 has another Calculator, whose
-# identity has not been read: it is added there with `computer.base.also_allowed`.
+# macOS, the identity the driver lists on Windows, a program on Linux. On Windows the text editor and
+# the calculator are the ones the driver was seen to allow by these names (Windows Server 2025). The
+# names it lists for File Explorer and Windows Terminal did not let it read their windows, so those
+# two are not here: they are added with `computer.base.also_allowed` once their names are known.
 APPS: dict[str, dict[str, str]] = {
     "text_editor": {
         "darwin": "com.apple.TextEdit",
         "win32": "%windir%\\system32\\notepad.exe",
         "linux": "mousepad",
     },
-    "files": {
-        "darwin": "com.apple.finder",
-        "win32": "c5e2524a-ea46-4f67-841f-6a9465d9d515_cw5n1h2txyewy",
-        "linux": "pcmanfm",
-    },
+    "files": {"darwin": "com.apple.finder", "linux": "pcmanfm"},
     "calculator": {
         "darwin": "com.apple.calculator",
         "win32": "%windir%\\system32\\win32calc.exe",
         "linux": "galculator",
     },
-    "terminal": {
-        "darwin": "com.apple.Terminal",
-        "win32": "Microsoft.WindowsTerminal_8wekyb3d8bbwe",
-        "linux": "xterm",
-    },
+    "terminal": {"darwin": "com.apple.Terminal", "linux": "xterm"},
 }
 # The driver's own tools that Hermes' backend calls. None of them updates the driver, changes its
 # settings for good, runs a command or reads the clipboard.
