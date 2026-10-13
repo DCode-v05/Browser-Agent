@@ -270,34 +270,7 @@ _TABS_TO_DO = {"list": "list the tabs", "new": "open a tab", "switch": "switch t
 def _on_a_desktop(tool: str, arguments: Mapping[str, Any]) -> tuple[str, str, str] | None:
     """A step on the desktop of computer use (spec 21.7), three ways: what the agent is doing, what
     happened, and what it could not do. None for a tool that is not a desktop's."""
-    at = _at(arguments)
-    typed = _count(arguments, None)
     match tool:
-        case "computer_screenshot":
-            return "Looking at the screen", "Looked at the screen", "look at the screen"
-        case "computer_zoom":
-            return "Looking closer at the screen", "Looked closer at the screen", "look closer at the screen"
-        case "computer_click":
-            twice = arguments.get("click_count") == 2
-            doing, did, to = (
-                ("Double-clicking", "Double-clicked", "double-click")
-                if twice
-                else ("Clicking", "Clicked", "click")
-            )
-            return f"{doing}{at}", f"{did}{at}", f"{to}{at}"
-        case "computer_move":
-            return f"Moving the pointer{at}", f"Moved the pointer{at}", "move the pointer"
-        case "computer_drag":
-            return "Dragging on the screen", "Dragged on the screen", "drag on the screen"
-        case "computer_type":
-            return f"Typing {typed}".rstrip(), f"Typed {typed}".rstrip(), "type"
-        case "computer_press_key":
-            return f"Pressing {_key(arguments)}", f"Pressed {_key(arguments)}", f"press {_key(arguments)}"
-        case "computer_scroll":
-            way = _direction(arguments)
-            return f"Scrolling{way}", f"Scrolled{way}", f"scroll{way}"
-        case "computer_wait":
-            return "Waiting", "Waited", "finish waiting"
         case "computer_list_apps":
             return "Looking at the apps", "Looked at the apps", "look at the apps"
         case "computer_open_app":

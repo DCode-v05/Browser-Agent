@@ -96,12 +96,17 @@ def did(desk: Desk, name: str) -> list[dict[str, Any]]:
     return [how for done, how in desk.done if done == name]
 
 
-def test_on_a_machine_the_agent_is_offered_hermes_tool_and_two_of_ours(make_config, tmp_path: Path) -> None:
+def test_on_a_machine_the_agent_is_offered_hermes_tool_and_three_of_ours(make_config, tmp_path: Path) -> None:
     config = make_config(tmp_path, computer={"runs": "machine"})
 
     offered = [tool.name for tool in computer_tools_for(config)]
 
-    assert sorted(offered) == ["computer_open_app", "computer_request_human", "computer_use"]
+    assert sorted(offered) == [
+        "computer_list_apps",
+        "computer_open_app",
+        "computer_request_human",
+        "computer_use",
+    ]
 
 
 def test_the_tool_takes_what_hermes_tool_takes() -> None:

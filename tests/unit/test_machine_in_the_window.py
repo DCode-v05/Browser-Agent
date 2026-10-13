@@ -175,7 +175,7 @@ async def test_a_machine_with_no_driver_does_not_start_and_says_what_to_do(
 def test_the_settings_offer_this_machine_and_a_machine_elsewhere() -> None:
     runs = next(entry for entry in CATALOGUE if isinstance(entry, Choice) and entry.id == "computer_runs")
 
-    assert [option.value for option in runs.options] == ["container", "mac", "machine", "remote"]
+    assert [option.value for option in runs.options] == ["container", "machine", "remote"]
 
 
 def test_what_a_machine_lacks_is_said_in_words_a_person_can_act_on(make_config, tmp_path: Path) -> None:

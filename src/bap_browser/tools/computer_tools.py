@@ -1,87 +1,23 @@
-"""The tools of computer use (spec 21.5): what an agent does on the contained desktop.
-
-A desktop is seen as a picture and acted on by its pixels. No tool returns a picture that was not
-asked for: an action says what it did in a sentence, and `computer_screenshot` shows the result.
+"""The tools of computer use (spec 22.4): Hermes' one tool, `computer_use`, and three of ours that it
+has none of: the apps a person allows, opening one, and asking the person.
 """
 
 from __future__ import annotations
 
-import asyncio
-from typing import Literal
+from pydantic import Field
 
-from pydantic import Field, model_validator
-
-from bap_browser import keys
 from bap_browser.config import Config
 from bap_browser.driver.contained_desktop import APPS, allowed_apps
 from bap_browser.driver.desktop_driver import DesktopDriver
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BadInput, BrowserError
 from bap_browser.safeguards.reading import from_page
-from bap_browser.tools.arguments import Modifier, NoArgs, RequestHumanArgs
+from bap_browser.tools.arguments import NoArgs, RequestHumanArgs
 from bap_browser.tools.browser_tools import request_human
 from bap_browser.tools.computer_use_tool import COMPUTER_USE
-from bap_browser.tools.registry import Args, Shown, ToolDefinition
+from bap_browser.tools.registry import Args, ToolDefinition
 
-LOOK = " Take a screenshot to see the result."
-AFTER = " This is a picture of the screen after it."
-
-
-async def after(session: BrowserSession, driver: DesktopDriver, said: str) -> str | Shown:
-    """What an action returns: a sentence, or with `computer.picture_after_action` the sentence and a
-    picture of the screen after it, as the vendors' loops return one after every action."""
-    if not session.config.computer.picture_after_action:
-        return said
-    shot = await driver.screenshot(full_page=False, annotate=False)
-    return Shown(said.replace(LOOK, AFTER), shot.picture)
-
-
-class PointArgs(Args):
-    x: float = Field(ge=0)
-    y: float = Field(ge=0)
-
-
-class ClickArgs(PointArgs):
-    button: Literal["left", "right", "middle"] = "left"
-    click_count: int = Field(default=1, ge=1, le=3)
-    # Pydantic copies the default for each call. A plain default, unlike a factory, appears in the schema.
-    modifiers: list[Modifier] = Field(default=[])
-
-
-class DragArgs(Args):
-    from_xy: list[float] = Field(min_length=2, max_length=2)
-    to_xy: list[float] = Field(min_length=2, max_length=2)
-
-
-class TypeArgs(Args):
-    text: str = Field(min_length=1)
-    submit: bool = False
-
-
-class PressKeyArgs(Args):
-    keys: str
-    repeat: int = Field(default=1, ge=1, le=50)
-
-
-class ScrollArgs(Args):
-    direction: Literal["up", "down", "left", "right"]
-    amount: int = Field(default=1, ge=1, le=20)
-    x: float | None = Field(default=None, ge=0)
-    y: float | None = Field(default=None, ge=0)
-
-    @model_validator(mode="after")
-    def _a_whole_point(self) -> ScrollArgs:
-        if (self.x is None) != (self.y is None):
-            raise ValueError("give both x and y, or neither")
-        return self
-
-
-class ZoomArgs(Args):
-    region: list[float] = Field(min_length=4, max_length=4)
-
-
-class WaitArgs(Args):
-    seconds: float = Field(gt=0)
+LOOK = " Capture to see the result."
 
 
 class OpenAppArgs(Args):
@@ -89,8 +25,8 @@ class OpenAppArgs(Args):
 
 
 def any_app(config: Config) -> bool:
-    """Whether the agent may open any app by its name: on the person's own Mac, where they allow it."""
-    return config.computer.on_the_base and config.computer.runs != "container" and config.computer.mac_any_app
+    """Whether the agent may open any app by its name: on a person's own machine, where they allow it."""
+    return config.computer.runs not in ("container", "here") and config.computer.mac_any_app
 
 
 async def _desktop(session: BrowserSession) -> DesktopDriver:
@@ -106,83 +42,6 @@ async def _windows(driver: DesktopDriver) -> str:
     if not titles:
         return "No window is open."
     return "Open windows: " + from_page("; ".join(titles)) + "."
-
-
-async def screenshot(session: BrowserSession, args: NoArgs) -> Shown:
-    driver = await _desktop(session)
-    shot = await driver.screenshot(full_page=False, annotate=False)
-    return Shown(
-        f"Screenshot of the desktop, {shot.width} by {shot.height} pixels. x and y of every tool are "
-        "pixels of this picture, from its top left.",
-        shot.picture,
-    )
-
-
-async def zoom(session: BrowserSession, args: ZoomArgs) -> Shown:
-    driver = await _desktop(session)
-    x0, y0, x1, y1 = args.region
-    shot = await driver.zoom((x0, y0, x1, y1))
-    return Shown(
-        f"The region ({x0:g}, {y0:g}) to ({x1:g}, {y1:g}) of the screen at twice its size, "
-        f"{shot.width} by {shot.height} pixels. Give x and y in the pixels of a screenshot, not of this picture.",
-        shot.picture,
-    )
-
-
-async def click(session: BrowserSession, args: ClickArgs) -> str | Shown:
-    driver = await _desktop(session)
-    done = await driver.click_at(
-        args.x, args.y, button=args.button, click_count=args.click_count, modifiers=args.modifiers
-    )
-    how = {1: "Clicked", 2: "Double-clicked", 3: "Triple-clicked"}[args.click_count]
-    button = "" if args.button == "left" else f" with the {args.button} button"
-    return await after(session, driver, f"{how} {done.target}{button}.{LOOK}")
-
-
-async def move(session: BrowserSession, args: PointArgs) -> str | Shown:
-    driver = await _desktop(session)
-    done = await driver.hover_at(args.x, args.y)
-    return await after(session, driver, f"Moved the pointer to {done.target}.{LOOK}")
-
-
-async def drag(session: BrowserSession, args: DragArgs) -> str | Shown:
-    driver = await _desktop(session)
-    start, end = (args.from_xy[0], args.from_xy[1]), (args.to_xy[0], args.to_xy[1])
-    done = await driver.drag(start, end)
-    return await after(session, driver, f"Dragged from {done.source} to {done.target}.{LOOK}")
-
-
-async def type_text(session: BrowserSession, args: TypeArgs) -> str | Shown:
-    driver = await _desktop(session)
-    await driver.type_text(None, args.text, clear=False, submit=args.submit, slowly=False)
-    then = " and pressed Enter" if args.submit else ""
-    return await after(
-        session, driver, f"Typed {len(args.text)} characters where the keyboard's focus is{then}.{LOOK}"
-    )
-
-
-async def press_key(session: BrowserSession, args: PressKeyArgs) -> str | Shown:
-    driver = await _desktop(session)
-    named = keys.normalise(args.keys)
-    await driver.press_key(named, repeat=args.repeat, ref=None)
-    times = "" if args.repeat == 1 else f" {args.repeat} times"
-    # A key that types a character is typed text: it is shown to nobody.
-    shown = "a key" if keys.is_typed_text(args.keys) else named
-    return await after(session, driver, f"Pressed {shown}{times}.{LOOK}")
-
-
-async def scroll(session: BrowserSession, args: ScrollArgs) -> str | Shown:
-    driver = await _desktop(session)
-    at = (args.x, args.y) if args.x is not None and args.y is not None else None
-    await driver.turn_wheel(args.direction, args.amount, at)
-    where = f" at ({at[0]:g}, {at[1]:g})" if at else " where the pointer is"
-    return await after(session, driver, f"Turned the wheel {args.direction} by {args.amount}{where}.{LOOK}")
-
-
-async def wait(session: BrowserSession, args: WaitArgs) -> str:
-    seconds = min(args.seconds, session.config.browser.timeouts.wait_max_s)
-    await asyncio.sleep(seconds)
-    return f"Waited {seconds:g} s."
 
 
 async def list_apps(session: BrowserSession, args: NoArgs) -> str:
@@ -233,52 +92,7 @@ async def open_app(session: BrowserSession, args: OpenAppArgs) -> str:
 
 
 COMPUTER_TOOLS: tuple[ToolDefinition, ...] = (
-    ToolDefinition(
-        "computer_screenshot",
-        "Take a picture of the desktop's screen. It is how the desktop is seen: take one before the "
-        "first action, and after an action whose result matters.",
-        NoArgs,
-        screenshot,
-    ),
-    ToolDefinition(
-        "computer_zoom",
-        "Look at a part of the screen at twice its size, to read small print. region is [x0, y0, x1, y1] "
-        "in the pixels of a screenshot.",
-        ZoomArgs,
-        zoom,
-    ),
-    ToolDefinition(
-        "computer_click",
-        "Click at x and y of the screen. click_count 2 is a double click; button right opens a context menu.",
-        ClickArgs,
-        click,
-    ),
-    ToolDefinition("computer_move", "Move the pointer to x and y without clicking.", PointArgs, move),
-    ToolDefinition(
-        "computer_drag",
-        "Press the left button at from_xy, move to to_xy and let go.",
-        DragArgs,
-        drag,
-    ),
-    ToolDefinition(
-        "computer_type",
-        "Type text where the keyboard's focus is. Click the field first. submit presses Enter after it.",
-        TypeArgs,
-        type_text,
-    ),
-    ToolDefinition(
-        "computer_press_key",
-        "Press a key or a chord, such as Enter, Escape, Tab, ArrowDown, Control+s or Alt+F4.",
-        PressKeyArgs,
-        press_key,
-    ),
-    ToolDefinition(
-        "computer_scroll",
-        "Turn the mouse wheel up, down, left or right, at x and y or where the pointer is.",
-        ScrollArgs,
-        scroll,
-    ),
-    ToolDefinition("computer_wait", "Wait some seconds, for an app that is busy.", WaitArgs, wait),
+    COMPUTER_USE,
     ToolDefinition(
         "computer_list_apps",
         "The apps you may open, whether a folder is shared with the person, and the windows that are open.",
@@ -300,26 +114,11 @@ COMPUTER_TOOLS: tuple[ToolDefinition, ...] = (
     ),
 )
 
-# The tools that only look, or only wait.
-COMPUTER_READS = frozenset(
-    {"computer_screenshot", "computer_zoom", "computer_wait", "computer_list_apps", "computer_request_human"}
-)
-# The tools whose x and y are where the pointer goes.
-COMPUTER_POINTED = frozenset({"computer_click", "computer_move"})
-# The tools whose keys go where the focus is.
-COMPUTER_KEYS = frozenset({"computer_type", "computer_press_key"})
+# Ours of the tools, beside Hermes' one: they only look, or only wait, and are no step on the screen.
+OURS_LOOK = frozenset({"computer_list_apps", "computer_request_human"})
 COMPUTER_NAMES = frozenset(tool.name for tool in COMPUTER_TOOLS)
-# The tools that are no step on the screen. They are not watched for going round in circles.
-COMPUTER_NO_STEP = frozenset({"computer_wait", "computer_list_apps", "computer_request_human"})
-
-
-KEPT_ON_A_MACHINE = frozenset({"computer_open_app", "computer_request_human"})
 
 
 def computer_tools_for(config: Config) -> tuple[ToolDefinition, ...]:
-    """The desktop's tools as the configuration offers them: zoom only where it is turned on. On a
-    machine driven through Hermes' driver it is Hermes' one tool, and the two of ours it has none of."""
-    if config.computer.on_the_base:
-        kept = tuple(tool for tool in COMPUTER_TOOLS if tool.name in KEPT_ON_A_MACHINE)
-        return (COMPUTER_USE, *kept)
-    return tuple(tool for tool in COMPUTER_TOOLS if tool.name != "computer_zoom" or config.computer.zoom)
+    """The tools of computer use (spec 22.4): Hermes' one tool, and three of ours it has none of."""
+    return COMPUTER_TOOLS

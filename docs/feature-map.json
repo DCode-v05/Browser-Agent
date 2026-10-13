@@ -564,15 +564,6 @@
       "reach": "Build the desktop once (`docker build -t bap-browser-desktop -f deploy/desktop.Dockerfile deploy`), run `uv run bap-browser studio --open`, and press the tab Computer.",
       "addresses": [],
       "tools": [
-        "computer_screenshot",
-        "computer_zoom",
-        "computer_click",
-        "computer_move",
-        "computer_drag",
-        "computer_type",
-        "computer_press_key",
-        "computer_scroll",
-        "computer_wait",
         "computer_list_apps",
         "computer_open_app",
         "computer_request_human"

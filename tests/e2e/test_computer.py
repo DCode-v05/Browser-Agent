@@ -1,5 +1,5 @@
-"""Computer use on a real contained desktop (spec 21): the agent's tools open an app, type and save
-a file into the one shared folder, and a person's hand reaches the desktop too.
+"""Computer use on a real contained desktop (spec 21, 22.6): through the driver inside the container,
+the agent's tools open an app, type and save a file into the one shared folder.
 
 The desktop runs in a container. Where this machine has no container program or the desktop's
 image is not built, there is nothing to drive, and these are skipped with that reason.
@@ -9,13 +9,14 @@ import asyncio
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from bap_browser.config import Computer
-from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.errors import BrowserError
-from bap_browser.evals.desktop_ground import Desk
+from bap_browser.evals.desktop_ground import A_PAGE, Desk
 from bap_browser.evals.suite import DESKTOP_SETS, Progress, load_set, run_set
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools.computer_tools import COMPUTER_TOOLS
@@ -42,38 +43,53 @@ async def test_the_agent_writes_a_file_on_the_desktop_and_the_person_has_it(
     config = make_config(tmp_path, computer={"container_command": "docker"})
     session = ServiceSession(
         config,
-        DesktopDriver(config, "e2e"),
+        HermesDriver(config, "e2e"),
         name="computer",
         backend="contained_desktop",
         tools=COMPUTER_TOOLS,
     )
     await session.start()
     call = session.toolkit.call
+
+    async def use(**arguments: Any) -> str:
+        done = await call("computer_use", arguments)
+        assert not done.is_error, done.text
+        return done.text
+
+    async def the_page() -> int:
+        """The number of the place text goes into. A window that has just opened takes a moment."""
+        async with asyncio.timeout(config.computer.app_open_wait_s):
+            while True:
+                found = A_PAGE.search(await use(action="capture", mode="ax", app="mousepad"))
+                if found is not None:
+                    return int(found.group(1))
+                await asyncio.sleep(0.2)
+
     try:
         listed = await call("computer_list_apps", {})
         assert "Text editor" in listed.text and "Terminal" not in listed.text
         assert not (await call("computer_open_app", {"app": "Text editor"})).is_error
-        await call("computer_click", {"x": 640, "y": 400})
-        assert not (await call("computer_type", {"text": "Milk, eggs, bread"})).is_error
-        await call("computer_press_key", {"keys": "Control+s"})
-        # The editor asks where to save: into the shared folder.
-        await call("computer_wait", {"seconds": 1})
-        await call("computer_type", {"text": "Files/list.txt", "submit": True})
-        # The file box offers to complete the folder's name first: Enter once more saves, as a
-        # person would press it again on seeing that.
-        await call("computer_wait", {"seconds": 0.5})
-        await call("computer_press_key", {"keys": "Enter"})
+        await use(action="click", element=await the_page())
+        typed = await use(action="type", text="Milk, eggs, bread")
+        assert "Milk" not in typed
+        await use(action="key", keys="ctrl+s")
+        # The editor asks where to save: into the shared folder. The box is the window in front now.
+        await use(action="wait", seconds=1)
+        await use(action="capture", mode="ax", app="mousepad")
+        await use(action="type", text="~/Files/list.txt")
+        await use(action="wait", seconds=config.computer.settle_ms / 1000)
+        await use(action="capture", mode="ax", app="mousepad")
+        await use(action="key", keys="return")
         saved = Path(config.computer.folder) / "list.txt"
         async with asyncio.timeout(10):
             while not saved.exists():
                 await asyncio.sleep(0.2)
         assert saved.read_text().strip() == "Milk, eggs, bread"
 
-        shot = await call("computer_screenshot", {})
-        assert shot.picture is not None and "1280 by 800" in shot.text
+        seen = await call("computer_use", {"action": "capture", "mode": "vision"})
+        assert seen.picture is not None
         # The window's title now names the file: something changed on the screen.
-        windows = await session.browser.started_driver.windows()  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
-        assert any("list.txt" in title for title in windows)
+        assert "list.txt" in (await call("computer_list_apps", {})).text
     finally:
         await session.close()
     # Nothing of the desktop is left running.
@@ -85,7 +101,7 @@ async def test_the_agent_writes_a_file_on_the_desktop_and_the_person_has_it(
 
 async def test_the_desktop_has_no_network_unless_a_person_allows_it(make_config, tmp_path: Path) -> None:
     config = make_config(tmp_path, computer={"container_command": "docker"})
-    driver = DesktopDriver(config, "e2e-net")
+    driver = HermesDriver(config, "e2e-net")
     await driver.start()
     try:
         # With no network there is no route anywhere: the table has its heading line and nothing more.
@@ -101,7 +117,7 @@ async def test_an_app_a_person_has_not_allowed_cannot_run_on_the_desktop_at_all(
     """The terminal is off: not only does the tool refuse it, its program cannot start, whatever
     opens it. The desktop's own menu holds nothing to open either."""
     config = make_config(tmp_path, computer={"container_command": "docker"})
-    driver = DesktopDriver(config, "e2e-apps")
+    driver = HermesDriver(config, "e2e-apps")
     await driver.start()
     try:
         with pytest.raises(BrowserError, match="Permission denied"):
@@ -121,7 +137,7 @@ async def test_every_desktop_task_is_solved_by_its_reference_solution(
     config = make_config(tmp_path, computer={"container_command": "docker"})
     session = ServiceSession(
         config,
-        DesktopDriver(config, f"e2e-{name}"),
+        HermesDriver(config, f"e2e-{name}"),
         name="computer",
         backend="contained_desktop",
         tools=COMPUTER_TOOLS,

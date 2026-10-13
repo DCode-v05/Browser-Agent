@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 from collections.abc import Callable, Sequence
 from typing import Any, NoReturn
 
@@ -39,8 +38,7 @@ from bap_browser.driver.base import (
 )
 from bap_browser.driver.contained_desktop import App, ContainedDesktop, Desktop
 from bap_browser.driver.screen_here import ScreenHere
-from bap_browser.errors import BadInput, BapError, BrowserError
-from bap_browser.results import Picture
+from bap_browser.errors import BadInput
 
 # The one thing a desktop has where a browser has tabs.
 SCREEN = "desktop"
@@ -113,7 +111,7 @@ SIGNS = {
     "`": "grave",
     "~": "asciitilde",
 }
-NO_PAGE = "A desktop has no web page: this works in a browser only. Look at the screen and act by its pixels."
+NO_PAGE = "A desktop has no web page: this works in a browser only. Work on the desktop with computer_use."
 
 
 def key_name(key: str) -> str | None:
@@ -127,19 +125,6 @@ def key_name(key: str) -> str | None:
     if len(key) >= 2 and key[0] == "F" and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
         return key
     return None
-
-
-def chord(keys: str) -> str:
-    """`Control+Shift+t`, as `bap_browser.keys.normalise` gives it, as the desktop takes it."""
-    *held, key = ["+"] if keys == "+" else keys.replace("++", "+plus").split("+")
-    named = key_name("+" if key == "plus" else key)
-    if named is None or any(part not in HELD for part in held):
-        raise BadInput(
-            "That key cannot be pressed on the desktop. Use a name such as Enter, Escape, Tab, "
-            "ArrowDown or F5, or one character.",
-            reason="the key name is not known",
-        )
-    return "+".join([*(HELD[part] for part in held), named])
 
 
 class DesktopDriver:
@@ -189,159 +174,52 @@ class DesktopDriver:
     def guard_files(self, judge: FileGuard) -> None:
         """No file arrives from a site. What the desktop writes stays in its one shared folder."""
 
-    # What the desktop is asked.
+    # What the driver of a real desktop gives: `driver/hermes_driver.py`.
 
     async def windows(self) -> list[str]:
-        """The titles of the windows that are open, as the desktop gives them."""
-        try:
-            out = await self.desktop.run(
-                "xdotool", "search", "--onlyvisible", "--name", ".", "getwindowname", "%@"
-            )
-        except BrowserError:
-            if not self.desktop.alive:
-                raise
-            # With no window open the search finds nothing, and says so as a failure.
-            return []
-        most, longest = self._settings.windows_listed, self._settings.window_title_chars
-        titles = [line.strip()[:longest] for line in out.decode(errors="replace").splitlines()]
-        return [title for title in titles if title and title != "Openbox"][:most]
+        raise NotImplementedError
 
     async def open_named_app(self, name: str) -> bool:
-        """Opens an app by its name. Only the person's own Mac does that; a desktop opens its own apps."""
-        raise BadInput("This desktop opens only the apps computer_list_apps names.", reason="no such app")
+        raise NotImplementedError
 
     async def open_app(self, app: App) -> bool:
-        """Opens an app. True when a window of it came up in time."""
-        before = len(await self.windows())
-        await self.desktop.start_app(app)
-        waited, pause = 0.0, self._settings.app_poll_ms / 1000
-        while waited < self._settings.app_open_wait_s:
-            await asyncio.sleep(pause)
-            waited += pause
-            if len(await self.windows()) > before:
-                return True
-        return False
-
-    async def _picture(self, *how: str) -> bytes:
-        return await self.desktop.run("import", "-window", "root", *how)
-
-    async def _settle(self) -> None:
-        await asyncio.sleep(self._settings.settle_ms / 1000)
+        raise NotImplementedError
 
     async def change_mark(self) -> str | None:
-        try:
-            small = await self._picture("-resize", f"{self._settings.mark_width}x", "png:-")
-        except BrowserError:
-            return None
-        return hashlib.sha256(small).hexdigest()
+        return None
 
     async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
-        width, height = await self.viewport()
-        data = await self._picture("png:-")
-        self._last_shot = (width, height)
-        return Shot(Picture(data, "image/png"), width, height)
-
-    async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
-        width, height = await self.viewport()
-        x, y = max(0, int(region[0])), max(0, int(region[1]))
-        w, h = min(int(region[2]), width) - x, min(int(region[3]), height) - y
-        if w <= 0 or h <= 0:
-            raise BadInput(
-                f"The region is outside the screen, which is {width} by {height} pixels.",
-                reason="the region is outside the screen",
-            )
-        # A small region is given at twice its size, so that small print can be read.
-        data = await self._picture("-crop", f"{w}x{h}+{x}+{y}", "+repage", "-resize", "200%", "png:-")
-        return Shot(Picture(data, "image/png"), w * 2, h * 2, scaled=True)
+        raise NotImplementedError
 
     def page_point(self, x: float, y: float) -> tuple[float, float]:
         return x, y
 
-    # What the agent does.
+    # What an agent does on a desktop goes through the tool `computer_use`, never through these.
 
-    def _on_screen(self, x: float, y: float) -> tuple[str, str]:
-        width, height = self._settings.screen_width, self._settings.screen_height
-        if not (0 <= x < width and 0 <= y < height):
-            raise BadInput(
-                f"({x:g}, {y:g}) is outside the screen, which is {width} by {height} pixels.",
-                reason="the point is outside the screen",
-            )
-        return str(int(x)), str(int(y))
+    async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
+        self._no_page()
 
     async def click_at(
         self, x: float, y: float, *, button: MouseButton, click_count: int, modifiers: Sequence[str]
     ) -> ActionOutcome:
-        at = self._on_screen(x, y)
-        held = [HELD[name] for name in modifiers if name in HELD]
-        command = ["xdotool", "mousemove", *at]
-        for name in held:
-            command += ["keydown", name]
-        command += ["click", "--repeat", str(click_count), BUTTON_NUMBER[button]]
-        for name in reversed(held):
-            command += ["keyup", name]
-        await self.desktop.run(*command)
-        await self._settle()
-        return ActionOutcome(f"the screen at ({at[0]}, {at[1]})")
+        self._no_page()
 
     async def hover_at(self, x: float, y: float) -> ActionOutcome:
-        at = self._on_screen(x, y)
-        await self.desktop.run("xdotool", "mousemove", *at)
-        await self._settle()
-        return ActionOutcome(f"the screen at ({at[0]}, {at[1]})")
+        self._no_page()
 
     async def type_text(
         self, ref: str | None, text: str, *, clear: bool, submit: bool, slowly: bool
     ) -> ActionOutcome:
-        if ref is not None:
-            self._no_page()
-        if clear:
-            await self.desktop.run("xdotool", "key", "ctrl+a", "key", "Delete")
-        # The text goes in on the standard input: it is in no command line, and so in no list of processes.
-        await self.desktop.run(
-            "xdotool",
-            "type",
-            "--delay",
-            str(self._settings.type_delay_ms),
-            "--file",
-            "-",
-            stdin=text.encode(),
-        )
-        if submit:
-            # A field that completes what is typed takes a moment to settle; an Enter before that is lost.
-            await self._settle()
-            await self.desktop.run("xdotool", "key", "Return")
-        await self._settle()
-        return ActionOutcome("")
+        self._no_page()
 
     async def press_key(self, keys: str, *, repeat: int, ref: str | None) -> ActionOutcome:
-        if ref is not None:
-            self._no_page()
-        await self.desktop.run("xdotool", "key", "--repeat", str(repeat), chord(keys))
-        await self._settle()
-        return ActionOutcome("")
+        self._no_page()
 
     async def turn_wheel(self, direction: str, steps: int, at: tuple[float, float] | None) -> None:
-        """Turns the mouse wheel, where the pointer is or at a point."""
-        command = ["xdotool"]
-        if at is not None:
-            command += ["mousemove", *self._on_screen(*at)]
-        button = {"up": WHEEL_UP, "down": WHEEL_DOWN, "left": WHEEL_LEFT, "right": WHEEL_RIGHT}[direction]
-        notches = steps * self._settings.scroll_notches_per_step
-        await self.desktop.run(*command, "click", "--repeat", str(notches), button)
-        await self._settle()
+        self._no_page()
 
     async def drag(self, start: Place, end: Place) -> Dragged:
-        if isinstance(start, str) or isinstance(end, str):
-            self._no_page()
-        begin, finish = self._on_screen(*start), self._on_screen(*end)
-        pause = str(self._settings.drag_pause_ms / 1000)
-        await self.desktop.run(
-            "xdotool",
-            *("mousemove", *begin, "mousedown", "1", "sleep", pause),
-            *("mousemove", *finish, "sleep", pause, "mouseup", "1"),
-        )
-        await self._settle()
-        return Dragged(f"({begin[0]}, {begin[1]})", f"({finish[0]}, {finish[1]})")
+        self._no_page()
 
     # The live picture.
 
@@ -357,22 +235,7 @@ class DesktopDriver:
                 await frames
 
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
-        how = ["-quality", str(min(level.jpeg_quality, self._settings.frame_jpeg_quality))]
-        if level.max_width < self._settings.screen_width:
-            how = ["-resize", f"{level.max_width}x", *how]
-        pause = max(self._settings.frame_ms / 1000, 1 / level.max_fps)
-        last = b""
-        while self.desktop.alive:
-            try:
-                frame = await self._picture(*how, "jpeg:-")
-            except BapError:
-                await asyncio.sleep(pause)
-                continue
-            # A screen that stands still is sent once.
-            if frame != last:
-                last = frame
-                on_frame(frame)
-            await asyncio.sleep(pause)
+        raise NotImplementedError
 
     # What a person does with the mouse and the keyboard while they are in control.
 

@@ -5112,26 +5112,20 @@ from a table, and typed text goes in on the standard input of the command that t
 
 ### 21.5 Tools
 
-Twelve tools, named `computer_*`. A desktop offers these and no `browser_*` tool.
+Four tools. A desktop offers these and no `browser_*` tool. Every desktop, the contained one
+included, is driven through the tool of section 22.4; the nine tools this section once listed for
+the pointer, the keys and the picture are gone, and with them the driver that sent them.
 
 | Tool | What it does |
 |---|---|
-| `computer_screenshot` | A picture of the screen. x and y of every tool are pixels of it |
-| `computer_zoom` | A part of the screen at twice its size, to read small print |
-| `computer_click` | Click at x and y: button, count (2 is a double click), modifiers |
-| `computer_move` | Move the pointer |
-| `computer_drag` | Press at one point, move to another, let go |
-| `computer_type` | Type text where the keyboard's focus is; `submit` presses Enter after it |
-| `computer_press_key` | A key or a chord, such as Control+s |
-| `computer_scroll` | Turn the wheel, at a point or where the pointer is |
-| `computer_wait` | Wait some seconds |
+| `computer_use` | One tool of fourteen actions: capture, click, type, key, scroll, drag and the rest (section 22.4) |
 | `computer_list_apps` | The apps the agent may open, whether a folder is shared, the open windows |
 | `computer_open_app` | Open one of those apps |
 | `computer_request_human` | Ask the person to do a step that is theirs: a password, a sign-in, a payment |
 
-An action returns a sentence, never a picture: `computer_screenshot` shows the result. The titles of
-windows, and anything in a picture, are marked as written by what is on the screen: data, never
-instructions (section 18.5).
+An action returns a sentence, and a picture only when a capture asks for one. The titles of windows,
+the names of elements, and anything in a picture, are marked as written by what is on the screen:
+data, never instructions (section 18.5).
 
 ### 21.6 Safety
 
@@ -5156,8 +5150,8 @@ desktop, and the desktop's are not drawn for a browser.
 | Setting | Key | Default | Applies | Who may change it | As the vendors do it |
 |---|---|---|---|---|---|
 | Screen size | `computer.screen` | 1280 by 800 | Next session | Admin | Anthropic recommends a screen of about 1024 by 768 to 1366 by 768; OpenAI's tool takes the display's width and height |
-| Let the agent zoom in | `computer.zoom` | On | Now | Admin | Anthropic's `enable_zoom` |
-| A picture after each action | `computer.picture_after_action` | Off | Now | Admin; a user where allowed | The OpenAI and Anthropic loops return a screenshot after every action |
+| Give the model the tool's manual | `computer.base.manual` | On | Next session | Admin | Hermes gives its model the same manual as a skill; it costs about 4,500 tokens a task |
+| Where the agent's input goes | `computer.base.delivery` | Decide by the desktop | Next session | Admin | Hermes' `delivery_mode`: background on a person's machine, in front where nobody is at the screen |
 | Ask me before an app opens | `computer.ask_before_apps` | Off | Now | Admin; a user may turn it on, never off over the admin | Google's "require confirmation" for system-level actions; OpenAI's confirmations |
 
 The apps, the shared folder and the network:
@@ -5575,6 +5569,7 @@ Input is delivered in the background by default: it reaches the target window wi
 | Kept from today | Why | How on Hermes' base |
 | --- | --- | --- |
 | `computer_open_app` | Hermes has no action that opens an app: its backend has `launch_app` and the tool never calls it. Ours is the only one of the three systems compared that can | A tool of ours that calls the backend's `launch_app`, inside the allowlist of section 7 |
+| `computer_list_apps` | The model must know which apps a person allows before it asks for one | Unchanged; the open windows come from the tool's `list_windows` |
 | `computer_request_human` | A password, a sign-in or a payment is the person's to do | Unchanged |
 
 Removed with no replacement: `computer_zoom` (element numbers and the tree replace reading small print), and `computer_move` (background input has no pointer to move).

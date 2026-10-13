@@ -117,8 +117,6 @@ def _typed(name: str, arguments: Mapping[str, Any]) -> str | None:
         {
             "browser_type": "text",
             "browser_press_key": "keys",
-            "computer_type": "text",
-            "computer_press_key": "keys",
             TYPES_ON_A_MACHINE: "text",
             PRESSES_ON_A_MACHINE: "keys",
             SETS_ON_A_MACHINE: "value",

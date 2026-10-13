@@ -92,7 +92,7 @@ class HermesDriver(DesktopDriver):
         lacking = None if self._stand_in else await asyncio.to_thread(computer.lacks, self._config)
         if lacking is not None:
             raise BrowserError(lacking.said, reason=f"the machine lacks: {lacking.what}")
-        if self._settings.base.virtual_screen:
+        if self._settings.base.virtual_screen or self._settings.runs == "here":
             self._screen = await own_screen(self._settings)
         container = None
         if isinstance(self.desktop, ContainedDesktop) and self._settings.runs == "container":
@@ -201,18 +201,30 @@ class HermesDriver(DesktopDriver):
                     on_frame(sent)
             await asyncio.sleep(pause)
 
-    # A person at their own machine has their own mouse and keyboard: nothing is sent for them.
+    # A person at their own machine has their own mouse and keyboard: nothing is sent for them. On a
+    # desktop nobody sits at, the contained one and the micro VM's, their hand in the viewer is sent.
 
-    async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None: ...
+    def _has_a_hand_to_send(self) -> bool:
+        return self._settings.runs in ("container", "here") or self._screen is not None
 
-    async def key(self, action: KeyAction, key: str) -> None: ...
+    async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
+        if self._has_a_hand_to_send():
+            await super().pointer(action, x, y, button)
 
-    async def wheel(self, x: float, y: float, dx: float, dy: float) -> None: ...
+    async def key(self, action: KeyAction, key: str) -> None:
+        if self._has_a_hand_to_send():
+            await super().key(action, key)
+
+    async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
+        if self._has_a_hand_to_send():
+            await super().wheel(x, y, dx, dy)
+
+    async def change_mark(self) -> str | None:
+        """Whether the screen changed is told by the tool's own results, not by a mark of ours."""
+        return None
 
 
 def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
     """The driver of the desktop the configuration names: a container's, or a real machine's, driven
     here, on a person's own Mac, or on a machine elsewhere, all through Hermes' base (spec 22.3)."""
-    if config.computer.on_the_base:
-        return HermesDriver(config, name)
-    return DesktopDriver(config, name)
+    return HermesDriver(config, name)

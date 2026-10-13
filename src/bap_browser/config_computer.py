@@ -121,11 +121,6 @@ class Base(Section):
     ready_poll_s: float = setting(
         5.0, "How often the window looks whether a machine that lacked something is ready now"
     )
-    contained: bool = setting(
-        False,
-        "Whether the contained desktop is driven through Hermes' driver, put inside its container. "
-        "Off: by the older driver of spec 21",
-    )
     virtual_screen: bool = setting(
         False,
         "Whether the engine starts this machine's own virtual screen before it drives it. For a machine "
@@ -154,15 +149,6 @@ class Computer(Section):
         "The variable, in the environment or in `.env`, that holds the token the helper printed",
     )
     helper_port: int = setting(8796, "The port the helper listens on, on the person's Mac")
-    helper_poll_s: float = setting(
-        1.0, "How often the window looks whether a helper on this Mac has paired, while it waits for one"
-    )
-    helper_stop_corner: float = setting(
-        3.0, "How close to the top left corner, in points, the pointer stops the helper for good"
-    )
-    wheel_pixels_per_line: int = setting(
-        40, "How many pixels of a person's wheel, in the viewer, make one line on the Mac"
-    )
     display: str = setting(":1", "The virtual screen's display, when the desktop runs here")
     image: str = setting(
         "bap-browser-desktop:latest",
@@ -171,10 +157,6 @@ class Computer(Section):
     container_command: str = setting("docker", "The program that runs containers")
     screen: Literal["1024x768", "1280x800", "1366x768"] = setting(
         "1280x800", "The desktop's screen, width by height in pixels. Sizes the vendors recommend for a model"
-    )
-    zoom: bool = setting(True, "Whether the agent is offered `computer_zoom`, to read small print")
-    picture_after_action: bool = setting(
-        False, "Whether each action's result holds a picture of the screen after it: fewer calls, more tokens"
     )
     ask_before_apps: bool = setting(False, "Whether a person is asked before the agent opens an app")
     mac_any_app: bool = setting(
@@ -194,25 +176,12 @@ class Computer(Section):
     )
     start_wait_s: float = setting(30.0, "Longest wait for the desktop's screen to be there after a start")
     command_timeout_s: float = setting(15.0, "Longest wait for one command sent into the desktop")
-    type_delay_ms: int = setting(8, "The pause between two characters the agent types")
     settle_ms: int = setting(250, "How long the screen is given to change after an action, before it is read")
     app_open_wait_s: float = setting(8.0, "Longest wait for the window of an app that was opened")
     app_poll_ms: int = setting(200, "How often the desktop is asked whether that window is there")
     frame_ms: int = setting(400, "The pause between two looks at the screen for the live picture")
-    frame_jpeg_quality: int = setting(60, "Quality of a picture of the live view")
-    scroll_notches_per_step: int = setting(3, "Notches of the mouse wheel in one step of a scroll")
-    drag_pause_ms: int = setting(120, "The pause between pressing, moving and letting go in a drag")
-    mark_width: int = setting(
-        160, "Width of the small picture by which it is told whether the screen has changed"
-    )
     window_title_chars: int = setting(80, "How much of a window's title a result holds")
     windows_listed: int = setting(12, "How many open windows a result names at most")
-
-    @property
-    def on_the_base(self) -> bool:
-        """Whether this desktop is driven through Hermes' driver (spec 22): a real machine always,
-        the contained desktop where that is switched on."""
-        return self.runs in ("machine", "mac", "remote") or (self.runs == "container" and self.base.contained)
 
     @property
     def screen_width(self) -> int:
