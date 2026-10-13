@@ -80,6 +80,8 @@ WAIT_FOR_THE_OTHER_APP_S = 3.0
 WAIT_FOR_THE_PAGE_S = 8.0
 # The chord that reaches a browser's address bar.
 ADDRESS_BAR = {"darwin": "cmd+l"}
+# A line of a capture that names a browser's address bar: its number.
+THE_ADDRESS_BAR = re.compile(r"#(\d+) \S+ '[^'\n]*(?:[Aa]ddress|URL)[^'\n]*'")
 LOOK_AGAIN_S = 0.5
 
 
@@ -308,34 +310,44 @@ async def looked_at(session: ServiceSession, pid: int, name: str) -> ToolResult:
 async def a_site_is_read(
     session: ServiceSession, browser: str, address: str, expects: str
 ) -> tuple[str, bool, str]:
-    """With any app allowed: the machine's own browser is opened by its name, taken to an address
-    with the keys, and what the page shows is read. This is how the agent reaches a website."""
-    steps: list[dict[str, Any]] = [
-        {"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")},
-        {"action": "type", "text": address},
-        {"action": "key", "keys": "return"},
-        {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S},
-    ]
-    opened = await session.toolkit.call("computer_open_app", {"app": browser})
-    # A browser takes a while to show its first window.
-    await a_window_of(browser)
-    look = {"action": "capture", "mode": "ax", "app": browser}
-    done = [opened, await session.toolkit.call("computer_use", look)]
-    for step in steps:
+    """With any app allowed: the machine's own browser is opened by its name, its address bar is
+    clicked by its number, an address is typed, and what the page shows is read. This is how the
+    agent reaches a website."""
+
+    async def does(step: dict[str, Any]) -> ToolResult:
         did = await session.toolkit.call("computer_use", step)
         if did.is_error and "foreground" in did.text:
             # The tool says where background delivery is not to be had, and what to do: the agent
             # is told to follow it.
             did = await session.toolkit.call("computer_use", {**step, "delivery_mode": "foreground"})
-        done.append(did)
+        return did
+
+    opened = await session.toolkit.call("computer_open_app", {"app": browser})
+    # A browser takes a while to show its first window.
+    await a_window_of(browser)
+    look = {"action": "capture", "mode": "ax", "app": browser}
+    first = await session.toolkit.call("computer_use", look)
+    bar = THE_ADDRESS_BAR.search(first.text)
+    done = [opened, first]
+    if bar is not None:
+        done.append(await does({"action": "click", "element": int(bar.group(1))}))
+    else:
+        done.append(await does({"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")}))
+    for step in (
+        {"action": "type", "text": address},
+        {"action": "key", "keys": "return"},
+        {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S},
+    ):
+        done.append(await does(step))
     read = await session.toolkit.call("computer_use", look)
     wrong = next((" | ".join(one.text.splitlines())[:200] for one in [*done, read] if one.is_error), None)
+    how = f"the address bar was {'element ' + bar.group(1) if bar else 'reached by its key'}; "
     return (
         f"4, any app is allowed, and {address} is opened in {browser} and read",
         wrong is None and expects.lower() in read.text.lower(),
         wrong
-        or " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
-        or "the page read: " + " | ".join(read.text.splitlines())[:600],
+        or how + " | ".join(line for line in read.text.splitlines() if expects.lower() in line.lower())[:300]
+        or how + "the page read: " + " | ".join(read.text.splitlines())[:600],
     )
 
 
