@@ -53,15 +53,15 @@ def not_ready(config: Config, binary: Path, system: str = sys.platform) -> str |
             # The setting in the driver's environment does not reach a daemon the system starts for
             # it, so the driver is told once, in its own settings.
             tell(config, binary, "telemetry", "disable")
-        if system == "win32" and config.computer.base.autostart:
-            # The driver registers its own logon task, so that it is there before anybody opens a
-            # window: a machine driven from elsewhere.
-            if not tell(config, binary, "autostart", "enable"):
-                waited = config.computer.base.register_timeout_s
-                return (
-                    f"The driver did not register its logon task in time ({waited:g} s). "
-                    "Run bap-browser computer install again."
-                )
+        # The driver registers its own logon task, so that it is there before anybody opens a
+        # window: a machine driven from elsewhere.
+        wanted = system == "win32" and config.computer.base.autostart
+        if wanted and not tell(config, binary, "autostart", "enable"):
+            waited = config.computer.base.register_timeout_s
+            return (
+                f"The driver did not register its logon task in time ({waited:g} s). "
+                "Run bap-browser computer install again."
+            )
         if system != "darwin":
             return None
         app = cua_backend_daemon.resolve_cua_driver_app_path(str(binary))

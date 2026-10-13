@@ -268,9 +268,10 @@ def test_a_driver_too_slow_to_register_its_logon_task_is_said_and_is_no_crash(tm
     """Seen on a Windows runner: registering took longer than the wait, and the command ended in a traceback."""
     binary = tmp_path / "cua-driver"
     binary.write_text(
-        f"#!{sys.executable}\nimport json, sys, time\n"
+        f"#!{sys.executable}\nimport json, sys, threading\n"
         f"if sys.argv[1:] == ['manifest']:\n    print(json.dumps({GOOD!r}))\n"
-        "else:\n    time.sleep(30)\n",
+        # It never answers: it is ended when the wait for it is over.
+        "else:\n    threading.Event().wait()\n",
         encoding="utf-8",
     )
     binary.chmod(0o755)
