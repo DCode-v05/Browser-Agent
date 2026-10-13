@@ -16,10 +16,8 @@ record of what its tasks took. A session a person stopped can be started again f
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +36,7 @@ from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.agent.models import Message, Model
 from bap_browser.agent.room_configs import built_in_config, cloud_config, with_its_own_log
 from bap_browser.config import Config
-from bap_browser.driver.mac_driver import desktop_driver_for, pairing_file, start_helper_in_terminal
+from bap_browser.driver.hermes_driver import desktop_driver_for
 from bap_browser.driver.playwright_driver import PlaywrightDriver
 from bap_browser.errors import BapError
 from bap_browser.evals import Rating, Recorder, overall, summarise, trace_of
@@ -76,29 +74,14 @@ NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent 
 
 
 async def paired_or_asked(room: Room, config: Config) -> None:
-    """Waits until a person asks for a new session, or, for the desktop on This Mac, until a helper
-    pairs anew (spec 21.13)."""
+    """Waits until a person asks for a new session, or, for the desktop on This Mac, until the
+    driver is installed and allowed (spec 22.3)."""
     if config.computer.runs == "machine":
         # It goes on by itself once the driver is installed and, on macOS, allowed.
         await machine_setup.until_ready(config, room.restart)
         room.restart.clear()
         return
-    if config.computer.runs != "mac":
-        await room.restart.wait()
-        room.restart.clear()
-        return
-    pairing = pairing_file(config)
-
-    def stamp() -> float | None:
-        return pairing.stat().st_mtime if pairing.exists() else None
-
-    seen = stamp()
-    while not room.restart.is_set():
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(room.restart.wait(), config.computer.helper_poll_s)
-        now = stamp()
-        if now is not None and now != seen:
-            return
+    await room.restart.wait()
     room.restart.clear()
 
 
@@ -115,8 +98,7 @@ def said_of(failed: BaseException) -> str:
 
 
 # What a person may do with a browser of the window, besides setting it up.
-# `helper`: start the helper of the person's own Mac in Terminal, for the desktop on This Mac.
-ACTIONS = ("start", "stop", "restart", "helper", "install", "allow")
+ACTIONS = ("start", "stop", "restart", "install", "allow")
 # What the summary of an ended session says, in place of "You stopped it."
 STOPPED = "You stopped this browser from the Systems page."
 TURNED_OFF = "This browser was turned off."
@@ -175,8 +157,6 @@ class Studio:
         self._settings = settings
         self._model_for = model_for
         self._extension = extension
-        # Opens the helper of this Mac in Terminal. A test gives one that only notes it.
-        self.open_helper = start_helper_in_terminal
         self.sessions: dict[str, ServiceSession] = {}
         self.rooms = [
             Room(CLOUD, "remote_headless"),
@@ -255,8 +235,6 @@ class Studio:
             return "There is no such browser, or nothing of that name to do with it."
         if not self._settings.enabled(system):
             return "This browser is turned off. Turn it on first."
-        if action == "helper":
-            return self._start_helper(room)
         if action in ("install", "allow"):
             if room.backend != DESKTOP or (room.session is not None and room.session.control != "ended"):
                 return "This is for a machine that is not being worked on yet."
@@ -272,19 +250,6 @@ class Studio:
             return "This browser is running already."
         await self._end(room, RESTARTED)
         room.restart.set()
-        return None
-
-    def _start_helper(self, room: Room) -> str | None:
-        """Starts the helper of this Mac in Terminal (spec 21.13). None when it was started."""
-        config = self._configured(room)
-        if room.backend != DESKTOP or config.computer.runs != "mac":
-            return 'Choose "This Mac" under Where the agent works first.'
-        if sys.platform != "darwin":
-            return "The helper runs on a Mac only."
-        try:
-            self.open_helper(config, Path.cwd())
-        except BapError as failed:
-            return str(failed)
         return None
 
     async def _end(self, room: Room, why: str) -> None:

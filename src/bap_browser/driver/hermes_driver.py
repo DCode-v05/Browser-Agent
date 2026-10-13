@@ -193,3 +193,11 @@ class HermesDriver(DesktopDriver):
     async def key(self, action: KeyAction, key: str) -> None: ...
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None: ...
+
+
+def desktop_driver_for(config: Config, name: str = "computer") -> DesktopDriver:
+    """The driver of the desktop the configuration names: a container's, or a real machine's, driven
+    here, on a person's own Mac, or on a machine elsewhere, all through Hermes' base (spec 22.3)."""
+    if config.computer.runs in ("machine", "mac", "remote"):
+        return HermesDriver(config, name)
+    return DesktopDriver(config, name)

@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Computer use comparison</title>
+<style>
+/* The design tokens of the spec page (bap-browser-spec.html), which this page shares. */
+:root {
+  --bg: #F5F6F8; --surface: #FFFFFF; --surface-2: #EEF0F3;
+  --border: #D5D9E0; --border-strong: #7C8696;
+  --text: #14171C; --text-muted: #5A6270; --focus: #1D4ED8;
+  --agent: #4338CA; --agent-tint: #EEF2FF;
+  --person: #0F766E; --person-tint: #E6F7F5;
+  --waiting: #A14C08; --waiting-tint: #FFF4E0;
+  --danger: #B91C1C; --danger-tint: #FDECEC;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", "Liberation Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1014; --surface: #161920; --surface-2: #1E222B;
+    --border: #2C323D; --border-strong: #6B7585;
+    --text: #E9EBEF; --text-muted: #9AA3B2; --focus: #93C5FD;
+    --agent: #A5B4FC; --agent-tint: #1E2147;
+    --person: #5EEAD4; --person-tint: #0F2F2C;
+    --waiting: #FCD34D; --waiting-tint: #3A2C0A;
+    --danger: #FCA5A5; --danger-tint: #3B1414;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1014; --surface: #161920; --surface-2: #1E222B;
+  --border: #2C323D; --border-strong: #6B7585;
+  --text: #E9EBEF; --text-muted: #9AA3B2; --focus: #93C5FD;
+  --agent: #A5B4FC; --agent-tint: #1E2147;
+  --person: #5EEAD4; --person-tint: #0F2F2C;
+  --waiting: #FCD34D; --waiting-tint: #3A2C0A;
+  --danger: #FCA5A5; --danger-tint: #3B1414;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 var(--font-ui); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+a { color: var(--agent); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+.page { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 48px;
+  max-width: 1320px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 96px; }
+
+/* Contents */
+#toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start;
+  max-height: calc(100vh - 48px); overflow-y: auto; font-size: 14px; line-height: 1.4; }
+#toc > summary { display: none; }
+#toc .name { display: block; font-weight: 600; font-size: 15px; margin-bottom: 12px; }
+#toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+#toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--text-muted); text-decoration: none; }
+#toc a:hover { background: var(--surface-2); color: var(--text); }
+#toc a[aria-current="true"] { background: var(--agent-tint); color: var(--agent); font-weight: 600; }
+#toc ul.sub { display: none; margin: 2px 0 6px 10px; padding-left: 8px; border-left: 1px solid var(--border); font-size: 13px; }
+#toc li.act > ul.sub { display: flex; }
+
+/* Document */
+main { min-width: 0; overflow-wrap: anywhere; }
+table { overflow-wrap: normal; }
+.doc-head { padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+h1 { font: 600 34px/1.15 var(--font-ui); letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.meta span { font: 400 12px/1 var(--font-mono); color: var(--text-muted); border: 1px solid var(--border);
+  border-radius: 999px; padding: 6px 10px; background: var(--surface); }
+.doc-head p { margin: 0; max-width: 72ch; color: var(--text-muted); }
+.doc-head p + p { margin-top: 10px; }
+
+h2 { font: 600 25px/1.25 var(--font-ui); letter-spacing: -0.01em; margin: 64px 0 18px; padding-top: 28px;
+  border-top: 1px solid var(--border); text-wrap: balance; }
+.doc-head + h2 { border-top: 0; margin-top: 12px; }
+h3 { font: 600 18px/1.3 var(--font-ui); margin: 36px 0 12px; text-wrap: balance; }
+h2, h3 { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 20px); }
+main > p, main > ul, main > ol, main > blockquote { max-width: 76ch; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin: 4px 0; }
+li > ul, li > ol { margin: 4px 0; }
+strong { font-weight: 600; }
+
+code { font: 400 0.86em var(--font-mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+pre { margin: 0 0 20px; padding: 16px 18px; overflow-x: auto; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; font: 400 12.5px/1.35 var(--font-mono); }
+pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+
+blockquote { margin: 0 0 18px; padding: 2px 0 2px 16px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }
+blockquote p { margin: 0; }
+
+/* Tables */
+.tw { overflow-x: auto; margin: 0 0 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+th { text-align: left; font: 600 12px/1.3 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-2); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+
+/* Phase badges in the feature tables */
+.ph { display: inline-block; font: 600 11px/1 var(--font-ui); letter-spacing: 0.03em; padding: 4px 8px;
+  border-radius: 999px; margin-right: 6px; white-space: nowrap; }
+.ph-m1 { background: var(--agent-tint); color: var(--agent); }
+.ph-m2, .ph-m3, .ph-m4 { background: var(--person-tint); color: var(--person); }
+.ph-next { background: var(--waiting-tint); color: var(--waiting); }
+.ph-later { background: var(--surface-2); color: var(--text-muted); }
+.ph-no { background: var(--danger-tint); color: var(--danger); }
+
+/* Checklist */
+li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: relative; }
+.box { position: absolute; left: 0; top: 5px; width: 14px; height: 14px; border: 1.5px solid var(--border-strong); border-radius: 3px; }
+
+/* This page: a wider layout, and the seven-column comparison tables share their width in fixed parts. */
+.page { max-width: 1760px; }
+table:has(> thead th:nth-child(7):last-child) { table-layout: fixed; min-width: 1000px; }
+table:has(> thead th:nth-child(7):last-child) th { white-space: normal; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(1) { width: 9%; }
+table:has(> thead th:nth-child(7):last-child) th:is(:nth-child(2), :nth-child(3), :nth-child(4)) { width: 17%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(5) { width: 9%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(6) { width: 14%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(7) { width: 17%; }
+
+@media (max-width: 900px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-inline: 16px; padding-block: 20px 72px; }
+  #toc { position: static; max-height: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px 6px; }
+  #toc > summary { display: block; cursor: pointer; font-weight: 600; padding: 10px; }
+  #toc .name { display: none; }
+  #toc[open] { padding-bottom: 10px; }
+  h1 { font-size: 28px; }
+  h2 { font-size: 22px; margin-top: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<details id="toc" open>
+<summary>Contents</summary>
+<nav aria-label="Contents">
+<span class="name">Computer use comparison</span>
+<ul>
+<li class="s"><a href="#1-the-three-systems">1. The three systems</a>
+<ul class="sub">
+<li><a href="#how-to-read-the-tables">How to read the tables</a></li>
+</ul>
+</li>
+<li class="s"><a href="#2-the-verdict">2. The verdict</a>
+<ul class="sub">
+<li><a href="#wins-by-area">Wins by area</a></li>
+<li><a href="#what-our-system-should-do-next">What Our System should do next</a></li>
+</ul>
+</li>
+<li class="s"><a href="#3-size">3. Size</a>
+</li>
+<li class="s"><a href="#4-what-it-is">4. What it is</a>
+</li>
+<li class="s"><a href="#5-what-the-model-perceives">5. What the model perceives</a>
+</li>
+<li class="s"><a href="#6-the-actions-offered">6. The actions offered</a>
+</li>
+<li class="s"><a href="#7-how-it-sees-and-controls-the-screen">7. How it sees and controls the screen</a>
+</li>
+<li class="s"><a href="#8-safety-permissions-and-consent">8. Safety, permissions and consent</a>
+</li>
+<li class="s"><a href="#9-settings">9. Settings</a>
+</li>
+<li class="s"><a href="#10-tests-and-evaluation">10. Tests and evaluation</a>
+</li>
+<li class="s"><a href="#11-known-gaps">11. Known gaps</a>
+</li>
+<li class="s"><a href="#12-method-and-limits">12. Method and limits</a>
+</li>
+</ul>
+</nav>
+</details>
+<main>
+<header class="doc-head">
+<h1>Our System, Hermes and the OpenAI Agents SDK, compared on computer use</h1>
+<div class="meta"><span>Date: 2026-10-10</span><span>Our System 0b4ae4f</span><span>Hermes dce1e9b</span><span>OpenAI Agents SDK 125efa0</span><span>Read from the code, nothing installed or run</span></div>
+<p>Computer use is a system taking over a computer and working on it directly: a screenshot of the screen, the mouse, the keyboard, opening programs, all through the operating system rather than a web page. This page compares the three systems' computer-use modules only. It does not cover the desktop app shell (the chat window), which an earlier page compares: <code>docs/research/desktop-app-comparison.md</code>.</p>
+</header>
+<h2 id="1-the-three-systems">1. The three systems</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What it covers</td>
+<td><code>src/bap_browser/tools/computer_tools.py</code> and the drivers behind it (spec section 21)</td>
+<td><code>tools/computer_use/</code> (a real machine, through a third-party driver) and <code>tools/bot_desktop/</code> (the agent's own contained desktop)</td>
+<td><code>src/agents/computer.py</code> and <code>ComputerTool</code> in <code>src/agents/tool.py</code>: an interface a developer implements, with one browser example</td>
+</tr>
+<tr>
+<td>First built</td>
+<td>2026-10-08 (commit <code>dc5f015</code>)</td>
+<td>not stated in the repository, present at the commit compared</td>
+<td>not stated in the repository, present at the commit compared</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>DCode-v05/Browser-Agent</code></td>
+<td><code>NousResearch/hermes-agent</code></td>
+<td><code>openai/openai-agents-python</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="how-to-read-the-tables">How to read the tables</h3>
+<p>Sections 4 to 11 hold one table each, in the same shape as the earlier comparison: <strong>Row</strong>, <strong>Our System</strong>, <strong>Hermes</strong>, <strong>OpenAI Agents SDK</strong>, <strong>Best</strong>, <strong>Why</strong>, <strong>Gap or idea for Our System</strong>. The verdict words are a system's name, <strong>Tie</strong> (two systems do it equally well), <strong>Split</strong> (each named system wins a different half of the row), <strong>None</strong> (none of the three has it), or <strong>Not judged</strong> (the row describes rather than ranks). Hermes' two modules are written as <strong>CU</strong> (<code>tools/computer_use/</code>, the real machine) and <strong>BD</strong> (<code>tools/bot_desktop/</code>, the agent's own contained desktop) wherever they differ.</p>
+<h2 id="2-the-verdict">2. The verdict</h2>
+<p>Hermes' computer-use module is the most built of the three. It wins 11 of the 20 ranked rows, mostly because its real-machine driver already works on macOS, Windows and Linux, with three ways to let a model see the screen (a plain screenshot, an accessibility tree with numbered overlays, or the tree alone for a model with no vision), image caps, and a screenshot deduplication layer that skips resending an unchanged picture. Its real-machine driving is not Hermes' own code: it speaks MCP to a separate open-source project, <code>cua-driver</code>, and that project's own docs say its macOS path uses "private SkyLight SPIs" that "Apple can change in any OS update." Hermes' own docs name that risk themselves.</p>
+<p>Our System wins 3 rows outright, draws 3, and splits 3, and each is a real strength, not a consolation. It is the only one of the three with a model-facing <strong>open an app</strong> action and an app allowlist that is on by default and enforced twice (the tool itself, and the container's own binary path), where Hermes' allowlist is opt-in only and its own <code>launch_app</code> method is not wired into its tool at all. It is the only one with a benchmark for computer use: 13 tasks modeled on two published research benchmarks, OSWorld and OS-Harm, each graded by a reference solution. It is the only one with end-to-end tests that drive a real screen: a real Docker container, a real Mac helper over real HTTP, a real micro VM image. Hermes has eight times as many computer-use tests, all against mocked or stubbed drivers.</p>
+<p>The OpenAI Agents SDK wins no row. It is the cleanest interface of the three to implement against, and its one example (a Playwright-driven browser window) is well built, but it ships no driver for a real operating system at all: no screenshot capping, no app concept, no stop action, no OS permission handling. Every one of those is "none, you build it."</p>
+<p>One technical difference runs under several rows and is worth stating plainly: Our System's Mac driver posts real hardware-level input events (<code>CGEventPost</code> to the HID tap), which moves the actual pointer and only reaches the app that is genuinely in front, the same as a person's own hand. Hermes' <code>cua-driver</code> posts events to a specific app's process without moving the pointer or needing that app to be in front, so a person can keep working in the foreground while the agent acts elsewhere. That is a real advantage for Hermes, bought by depending on undocumented internals of the operating system.</p>
+<h3 id="wins-by-area">Wins by area</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Rows</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI SDK</th>
+<th>Tie</th>
+<th>Split</th>
+<th>Not judged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. What it is</td>
+<td>4</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>B. What the model perceives</td>
+<td>3</td>
+<td>0</td>
+<td>3</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>C. The actions offered</td>
+<td>3</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>D. How it sees and controls the screen</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>E. Safety, permissions and consent</td>
+<td>6</td>
+<td>1</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>F. Settings</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>G. Tests and evaluation</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>H. Known gaps</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>23</strong></td>
+<td><strong>3</strong></td>
+<td><strong>11</strong></td>
+<td><strong>0</strong></td>
+<td><strong>3</strong></td>
+<td><strong>3</strong></td>
+<td><strong>3</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="what-our-system-should-do-next">What Our System should do next</h3>
+<ol>
+<li><strong>Wire a screen-change cap into typed text and screenshots the model asks for</strong>, the way Hermes skips resending an unchanged picture (B3). Fewer tokens on a long desktop task.</li>
+<li><strong>Hold <code>computer_screenshot</code> and <code>computer_zoom</code> back while a person has control</strong>, not only the mouse and keyboard (E6). Today a person's own screen is seen even though their keystrokes are not recorded.</li>
+<li><strong>Keep the helper off a non-loopback address until the tailnet design (spec 21.16) lands</strong> (E5). The <code>--host</code> flag already accepts one today, ahead of the authentication design built for it.</li>
+<li><strong>Add an accessibility-tree perception mode</strong>, at least for the contained and VM desktops where <code>xdotool</code>'s own target already knows window geometry (B1). This is the single biggest perception gap against Hermes.</li>
+<li><strong>Build the Windows and Linux (X11) real-machine helpers</strong> already specified in spec sections 21.14 and 21.15 (A3). Hermes already runs on both.</li>
+<li><strong>Keep the real end-to-end tests and the OSWorld/OS-Harm-modeled task set as the model to defend</strong>, not drop for speed (G1, G2). Neither Hermes nor the OpenAI SDK has either.</li>
+</ol>
+<h2 id="3-size">3. Size</h2>
+<p>Lines of code for the computer-use module only, measured by <code>wc -l</code> on the files each system's own code names (not the whole repository).</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Our System</th>
+<th>Hermes (CU)</th>
+<th>Hermes (BD)</th>
+<th>OpenAI Agents SDK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Driver and tool code</td>
+<td>2,434 lines, 9 files</td>
+<td>4,204 lines, 13 files</td>
+<td>2,196 lines, 10 files</td>
+<td>606 lines, 3 files (core) + 312 (the one example)</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>998 lines, 5 files</td>
+<td>not separately counted in lines, 280 test functions across 45 files</td>
+<td>not separately counted in lines, 101 test functions across 15 files</td>
+<td>1,279 lines, 26 tests, 2 files</td>
+</tr>
+<tr>
+<td>Task sets or evaluation</td>
+<td>547 lines of task JSON, 13 tasks</td>
+<td>none found</td>
+<td>none found</td>
+<td>none found</td>
+</tr>
+</tbody>
+</table></div>
+<p>Hermes' totals exclude its related but separate <code>plugins/computer_use/</code>, <code>hermes_cli/subcommands/computer_use*.py</code> and the desktop app's own TSX files for the Screen pane.</p>
+<p>Our System's 9 files: <code>tools/computer_tools.py</code>, <code>config_computer.py</code>, <code>driver/desktop_driver.py</code>, <code>driver/contained_desktop.py</code>, <code>driver/screen_here.py</code>, <code>driver/mac_driver.py</code>, <code>driver/mac_hands.py</code>, <code>service/mac_helper.py</code> and <code>evals/desktop_ground.py</code>. Its 5 test files: <code>tests/unit/test_computer.py</code>, <code>tests/unit/test_computer_settings.py</code>, <code>tests/unit/test_mac_helper.py</code>, <code>tests/e2e/test_computer.py</code> and <code>tests/e2e/test_computer_vm.py</code>, which together collect 51 tests under <code>pytest --collect-only</code> (the figure G1 uses).</p>
+<h2 id="4-what-it-is">4. What it is</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A1</strong> What it is</td>
+<td>Twelve <code>computer_*</code> tools behind the same driver seam as a browser: a session, a live picture, a person's hand, the check on every step.</td>
+<td><strong>CU</strong>: one <code>computer_use</code> tool, background-first, that speaks MCP to the external <code>cua-driver</code> project. <strong>BD</strong>: a separate feature that gives the agent its own Linux desktop over VNC, which CU can then act on.</td>
+<td>An abstract <code>Computer</code>/<code>AsyncComputer</code> interface and a <code>ComputerTool</code> that wraps it. No driver ships.</td>
+<td>Not judged</td>
+<td>Three different shapes: a built-in driver, an orchestrator of an external one, and a bare interface.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>A2</strong> Arrangements</td>
+<td>Four: a contained desktop on the person's own machine, a remote micro VM's own desktop, the same VM reaching the person's private network, and the person's real machine.</td>
+<td><strong>CU</strong> drives whichever screen is in front of it, real or a BD one. <strong>BD</strong> gives the agent a Linux desktop of its own, placed in a sandbox, a VM, or a terminal backend of the person's choosing (Docker, SSH, Singularity, Modal, Daytona, Vercel Sandbox).</td>
+<td>Four <code>Environment</code> values are named (<code>mac</code>, <code>windows</code>, <code>ubuntu</code>, <code>browser</code>) as metadata only. None is implemented in this repository.</td>
+<td>Hermes</td>
+<td>Its real machine arrangement already reaches three operating systems today. Our System's reaches one.</td>
+<td>Build the Windows and Linux real-machine helpers already specified in spec 21.14 and 21.15.</td>
+</tr>
+<tr>
+<td><strong>A3</strong> Built vs designed, by platform</td>
+<td>Container desktop (Linux guest): built. Micro VM's own screen: built. Micro VM on a tailnet: built, waiting for a key. Real Mac: built. Real Windows, real Linux (X11): specified in the spec, no code on <code>main</code>.</td>
+<td><strong>CU</strong>: built and documented for macOS, Windows and Linux, including each OS's own accessibility and input stack. <strong>BD</strong>: built, Linux only, by design.</td>
+<td>Not built on any platform in this repository. The <code>Environment</code> literal names four but implements none.</td>
+<td>Hermes</td>
+<td>It is the only one of the three with a real-machine driver that works on all three major desktop operating systems today.</td>
+<td>Treat the Mac helper's design as the template, and build the Windows and Linux ones next. The spec already names the OS calls each needs.</td>
+</tr>
+<tr>
+<td><strong>A4</strong> Size</td>
+<td>See section 3.</td>
+<td>See section 3.</td>
+<td>See section 3.</td>
+<td>Not judged</td>
+<td>Size is not quality on its own.</td>
+<td>None.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-what-the-model-perceives">5. What the model perceives</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B1</strong> The picture</td>
+<td>A raw screenshot only, full screen or a 2x crop from <code>computer_zoom</code>. No accessibility tree. The spec lists that as not built.</td>
+<td>Three modes: <code>som</code> (a screenshot with numbered overlays on every clickable element, plus the OS's own accessibility tree, the default), <code>vision</code> (a plain screenshot), and <code>ax</code> (the tree alone, for a model with no vision).</td>
+<td>A raw screenshot only. The SDK builds no tree or overlay itself.</td>
+<td>Hermes</td>
+<td>A model that cannot see well, or cannot see at all, still has a tree to read. A model with vision gets numbered targets instead of guessing pixel coordinates.</td>
+<td>An accessibility-tree mode, even a first cut limited to the contained desktop, would close the largest perception gap against Hermes.</td>
+</tr>
+<tr>
+<td><strong>B2</strong> Capping and resizing</td>
+<td>The screenshot is the desktop's configured size (1024x768, 1280x800 or 1366x768) as taken, no further resize. The separate live view the person watches is capped by quality level.</td>
+<td>The longest edge is capped (1,456px default), a picture under 8x8px is left out entirely, and the accessibility tree sent in text is capped at 100 elements and 120 characters each, with the rest spilled to a capped cache file.</td>
+<td>None, you build it: the SDK wraps whatever <code>screenshot()</code> returns, unresized.</td>
+<td>Hermes</td>
+<td>More layers, and each is a stated, measured number.</td>
+<td>Cap the model-facing screenshot's longest edge the way the live view already is, so a large screen does not cost more tokens than it needs to.</td>
+</tr>
+<tr>
+<td><strong>B3</strong> Sent only when asked</td>
+<td>Yes by default (<code>computer.picture_after_action</code> is off). An admin can turn on a picture after every action.</td>
+<td>Yes, and a dedup layer skips resending a picture that has not changed since the last one of the same window, up to twice in a row.</td>
+<td>No: a screenshot is attached after every batch of actions, whether the model asked for one or not.</td>
+<td>Hermes</td>
+<td>The dedup step is a genuine token saving a static screen does not need to pay for again.</td>
+<td>Skip resending a screenshot whose pixels have not changed since the last one, the way Hermes does.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-the-actions-offered">6. The actions offered</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>C1</strong> The full list</td>
+<td>Twelve: screenshot, zoom, click, move, drag, type, press a key, scroll, wait, list the allowed apps, open an app, and ask a person to do a step.</td>
+<td>Fourteen: capture, click, double-click, right-click, middle-click, drag, scroll, type, a key, set a value directly (for a slider or a menu, through the accessibility API rather than opening the menu), wait, list apps, list windows, bring an app to the front. No action opens an app: the backend has a <code>launch_app</code> method, but the tool never calls it.</td>
+<td>Nine: click, double-click, drag, a key, move, screenshot, scroll, type, wait. No app concept at all.</td>
+<td>Our System</td>
+<td>It is the only one of the three whose model-facing tool can open a program by name. Hermes built the method and never wired it in.</td>
+<td>None. This is already a strength to keep.</td>
+</tr>
+<tr>
+<td><strong>C2</strong> Modifiers</td>
+<td>Four named modifiers (Alt, Control, Meta, Shift), composed as a chord and translated per platform.</td>
+<td>Six names with cross-platform aliases (<code>alt</code>→<code>option</code>, <code>windows</code>/<code>super</code>/<code>meta</code>→<code>win</code>), normalized to one set before any hard-blocked combo is checked, so a combo cannot dodge the block list by using a different platform's name for the same key.</td>
+<td>An arbitrary list of strings. The SDK defines no fixed vocabulary, and a driver may ignore keys it does not support without failing the call.</td>
+<td>Hermes</td>
+<td>Normalizing aliases before the block-list check closes a real way to slip past it.</td>
+<td>Normalize modifier names the same way before any blocked-combination check Our System adds.</td>
+</tr>
+<tr>
+<td><strong>C3</strong> Click types and a stop action</td>
+<td>Right and middle click are first class. Double and triple click by count. Drag is a simple press-move-release, with no multi-touch and no in-tool stop action (the session's own Pause, Take over, Hand back and Stop apply, plus a Mac-only corner gesture, see E3).</td>
+<td>Right and middle click are explicit convenience actions for <code>click</code> with a button, with no multi-touch and no in-tool stop action either (the Bot Desktop lease is the nearest equivalent, see E3).</td>
+<td>A button literal covers left, right, wheel, back and forward, with no separate middle-click action. Double-click is its own action. No stop action.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both offer the fuller set of click types. Neither gives the model a stop action of its own, each relying on something outside the tool instead.</td>
+<td>None.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-how-it-sees-and-controls-the-screen">7. How it sees and controls the screen</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong> The real mechanism</td>
+<td>Its own code, in this repository: <code>xdotool</code> and ImageMagick for the container and VM desktops. On a real Mac, <code>screencapture</code> and <code>sips</code> for the picture and CoreGraphics (<code>CGEventPost</code> to the HID tap) for the mouse and keyboard, through <code>ctypes</code>, no external binary. A click posted this way moves the real pointer and only reaches the app genuinely in front, the same as a person's own hand.</td>
+<td>Neither Hermes' CU nor Hermes' own Python code touches an OS API: it speaks MCP to the separate <code>cua-driver</code> project, which uses each OS's own accessibility stack (macOS's private SkyLight SPIs, Windows UIAutomation, Linux AT-SPI) to post input to a specific app's process directly, without moving the real pointer or needing that app in front.</td>
+<td>None, you build it. The one example drives Playwright's own browser automation, not an OS.</td>
+<td>Split: Hermes for not disturbing the person's own pointer, Our System for owning the whole mechanism itself</td>
+<td>Hermes' approach lets a person keep working while the agent acts on another app. Its own docs admit this rests on undocumented internals: "Apple can change in any OS update." Our System's approach uses only public, documented calls, with no third-party project to track, at the cost of moving the real pointer and needing the target app in front.</td>
+<td>Decide deliberately, rather than by default. A pointer-stealing approach is simpler and has no external dependency. A background approach needs either an external driver like <code>cua-driver</code> or new, unproven code against private APIs.</td>
+</tr>
+<tr>
+<td><strong>D2</strong> What must be installed</td>
+<td>Real Mac: nothing, only macOS's own tools. Container desktop: only Docker. The image bundles the rest. Real Windows, real Linux: specified in a draft not yet merged to <code>main</code> (see section 12), so nothing committed says what they would need installed.</td>
+<td><code>cua-driver</code> is pinned and bundled through Hermes' own package manager. One install command fetches it. macOS needs two one-time permission grants, attributed to the driver's own app identity rather than Hermes. Windows and Linux need nothing extra beyond that one install.</td>
+<td>None, you build it. The one example needs Playwright and a Chromium install by hand.</td>
+<td>Hermes</td>
+<td>The same one-command ease Our System's Mac path already has, but across all three operating systems today.</td>
+<td>Once Windows and Linux helpers are built, keep them at zero manual installs the way the Mac one already is.</td>
+</tr>
+<tr>
+<td><strong>D3</strong> Never built into a command line</td>
+<td>Yes: positions are numbers, typed text goes on the standard input of the program that types it or through raw CoreGraphics events, never a shell string. Proven by a test that checks the actual argument list.</td>
+<td>Yes: everything is a structured MCP tool-call argument to the driver process, never shell text. Specific dangerous <code>type</code> patterns (a pipe to a shell, a destructive delete, a fork bomb) and specific destructive key combinations are hard-blocked before dispatch, regardless of approval.</td>
+<td>Yes: every action is a direct Python method call on the developer's object, never interpolated into a string.</td>
+<td>Tie: all three</td>
+<td>All three keep model-written text out of a command line. Hermes adds a further, independent block list on top of that baseline.</td>
+<td>A hard-blocked list of destructive key combinations (closing a desktop without saving, a forced sign-out) would be a cheap addition on top of the existing app allowlist.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="8-safety-permissions-and-consent">8. Safety, permissions and consent</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>E1</strong> Approval before an action</td>
+<td>The same check that runs on every browser step runs here too (approvals, Auto Mode, limits). Opening an app can be set to ask the person first (off by default), and does ask every time when "any app" is turned on. Whether the browser's floor for pay, send, delete and share steps carries over to computer-use actions by the same rule was not independently confirmed in this pass.</td>
+<td><strong>CU</strong>: every action except taking a picture, waiting and the two listing actions is marked as needing approval in the tool's own code, not only by a session-wide setting. Nobody able to answer means the action is refused, not let through.</td>
+<td>None by default: <code>ComputerTool.on_safety_check</code> only fires for a call the model itself flags, and if the developer does not set it, the SDK proceeds without asking anyone.</td>
+<td>Hermes</td>
+<td>Its default is written into the tool itself, for every action but reading the screen, waiting and listing. Our System's equivalent for computer use specifically was not independently confirmed to be as explicit.</td>
+<td>Confirm, and if needed make explicit, that the browser's reviewer floor (pay, send, delete, share) applies to computer-use actions by the same rule, not only by inheritance.</td>
+</tr>
+<tr>
+<td><strong>E2</strong> App allowlist</td>
+<td>A fixed list of four apps, on by default, enforced twice: the tool refuses a disallowed app, and the container also replaces that app's own binary with an empty file, so nothing inside the desktop, not even another app's menu, can start it.</td>
+<td><strong>CU</strong>: no allowlist by default. One exists only when a deployment turns on <code>bounded</code> mode with a reviewed list of apps, browser profiles and origins. There is no "open an app" action in the schema at all by default (see C1), so by default the agent can only act on windows already open. <strong>BD</strong>: the desktop itself only has what was installed in its image.</td>
+<td>None, you build it.</td>
+<td>Our System</td>
+<td>Its allowlist is on by default and enforced at two separate layers. Hermes' equivalent is opt-in and its default state has no app restriction at all, mainly because it also has no way to open one.</td>
+<td>None. This is already a strength to keep as Windows and Linux helpers are added.</td>
+</tr>
+<tr>
+<td><strong>E3</strong> A stop or kill switch</td>
+<td>A real, proven one, but only for the real Mac: pushing the pointer into the screen's top left corner stops the helper for good until it is started again. The contained and VM desktops have no computer-use-specific stop of their own. They rely on the session's shared Pause, Take over, Hand back and Stop, not independently confirmed in this pass.</td>
+<td><strong>BD</strong>: a real, code-enforced lease. A person can take over a Bot Desktop screen at any moment. Every action, including taking a picture, is checked against the lease before it runs and again right after, so even an action already begun is voided if the lease changes mid-flight. Not confirmed for a real macOS or Windows machine with no Bot Desktop attached.</td>
+<td>None, you build it.</td>
+<td>Split: Our System for its real Mac, Hermes for its contained desktop</td>
+<td>Each has a genuine, working stop mechanism for one of its two arrangements, and neither has one confirmed for the other. A physical gesture needs no round trip to a server. A software lease can be re-checked mid-action, which a gesture cannot.</td>
+<td>A stop gesture, or an equivalent lease, for the contained and VM desktops specifically, not only inherited from the browser's session controls.</td>
+</tr>
+<tr>
+<td><strong>E4</strong> An OS permission the person must grant</td>
+<td>macOS Screen Recording and Accessibility, requested automatically when the helper starts, with the exact missing permission named until both are granted, then it re-pairs by itself.</td>
+<td><strong>CU</strong>: the same two macOS permissions, requested through a dedicated command that attributes the system's own prompt to the driver's app identity rather than to Hermes, a one-time manual step rather than an automatic request on first start.</td>
+<td>Not applicable: no OS-level driver ships.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both handle the same two permissions well, by two different routes: one asks automatically, the other through a named command.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>E5</strong> The channel to a real-machine helper</td>
+<td>A bearer token, new each start, checked in constant time, over HTTP. The default bind is loopback, but the helper's own <code>--host</code> flag already accepts a non-loopback address today, ahead of the tailnet design built to secure that case (spec 21.16, not yet built).</td>
+<td>No network exposure in the default path at all: Hermes talks to the driver over a standard-input pipe to a child process, not even loopback TCP. The opt-in modes use a local Unix socket or a named pipe with a random name, never a TCP listener, so there is no code path that could reach the network even by a misconfiguration.</td>
+<td>Not applicable. No separate process: the SDK calls the developer's object directly.</td>
+<td>Hermes</td>
+<td>"Cannot be reached over a network, by how it is built" is a stronger guarantee than "is reachable, but needs a token to answer."</td>
+<td>Refuse a non-loopback <code>--host</code> until the tailnet design of spec 21.16 is built, rather than allowing it today ahead of that design.</td>
+</tr>
+<tr>
+<td><strong>E6</strong> What a person does manually</td>
+<td>Not recorded: the person's own input is tagged apart and excluded from every check. No call writes it to the event log in the files read.</td>
+<td><strong>BD</strong>: stronger than not recording it. While a person holds the lease, the agent's tool cannot even take a screenshot, because, in the system's own words, "the person may be typing a credential." One narrow exception, a thumbnail for the app's own preview, stays local and is not sent to the model.</td>
+<td>Not applicable.</td>
+<td>Hermes</td>
+<td>Refusing to look is a stronger guarantee than looking and choosing not to write down what was typed.</td>
+<td>Hold back <code>computer_screenshot</code> and <code>computer_zoom</code>, not only exclude manual mouse and keyboard input from the checks, while a person has control.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="9-settings">9. Settings</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>F1</strong> Where the settings live</td>
+<td>One typed file, <code>config_computer.py</code>: where the desktop runs, screen size, zoom on or off, a picture after every action, ask before an app opens, which of the four apps are allowed, the shared folder, the network, and the Mac helper's own numbers. Admin and user editability is governed by a tested policy.</td>
+<td>One block of <code>config_defaults.py</code> for each of CU and BD: telemetry (off by default), a Windows-only autostart option, native Wayland, the picture cap, which perception mode, how many elements the tree may hold, the cursor overlay, the opt-in allowlist mode and its manifest, an unsigned-driver escape hatch for development, and a swappable driver backend. A separate block holds the contained desktop's own size, auto-start, memory floor, idle timeout and placement.</td>
+<td>No dedicated settings module. Configuration is spread across the tool's constructor fields and the agent's own model settings.</td>
+<td>Hermes</td>
+<td>More tunables, including a telemetry switch and a way to swap the whole driver for another one.</td>
+<td>A telemetry switch is moot (Our System sends none), but a swappable backend, so a deployment could point at a different driver without a code change, is worth considering once more than one is built.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="10-tests-and-evaluation">10. Tests and evaluation</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G1</strong> Tests</td>
+<td>51 tests, across unit tests and end-to-end tests that drive a real screen: a real Docker container, a real Mac helper over real HTTP with a stand-in for its hands, and a real micro VM image, each skipped with a stated reason when Docker or the image is missing.</td>
+<td>381 test functions (280 for CU, 101 for BD) across 60 files, covering many edge cases (a driver swapped mid-session, a zero-size capture, an administrator window on Windows, a stale system unit on Linux). Every one of them runs against a mocked or stubbed driver. None drives a live screen, and the one file named as a live smoke test is not confirmed to run in CI.</td>
+<td>26 tests, 1,279 lines, covering dispatch, lifecycle and concurrency, also all against a fake driver. None drives a real screen.</td>
+<td>Split: Hermes for test count, Our System for driving a real screen</td>
+<td>More tests catch more edge cases. A test against a real screen catches what a mock cannot. Neither claim makes the other one false.</td>
+<td>None. Growing the mocked-driver unit tests alongside the real end-to-end ones would add Hermes' kind of edge-case coverage without giving up what Our System already has.</td>
+</tr>
+<tr>
+<td><strong>G2</strong> A benchmark</td>
+<td>Yes: 13 tasks of its own (<code>short</code>, <code>long</code>, <code>attack</code>, <code>infeasible</code>), two of them explicitly modeled on published research: an infeasible task that only passes if the agent says it cannot be done, after OSWorld, and a data-exfiltration task that fails if a secret ends up in a public file, after OS-Harm. Every task has a reference solution, graded by code, run on a real Docker desktop.</td>
+<td>None found: no OSWorld, OS-Harm or Hermes-specific computer-use task set exists in the repository (the "desktop" evaluation files that do exist test Hermes Desktop the chat app, not computer use).</td>
+<td>None found.</td>
+<td>Our System</td>
+<td>It is the only one of the three with a graded benchmark for computer use at all, and the only one naming the field's own published benchmarks as its model.</td>
+<td>None. This is already a strength to keep and grow as new platforms are built.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="11-known-gaps">11. Known gaps</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>H1</strong> What each names as not built or limited</td>
+<td>Its own spec section (21.10), as committed on <code>main</code>, names its gaps plainly: a helper for Windows or Linux, reading apps through their accessibility tree, and a desktop of macOS or Windows itself (only Linux desktops exist, contained or on a VM).</td>
+<td>Its own docs name several, each a specific, named failure: background input is measurably slower than a direct click, a password must go through the OS's own autofill and never be typed by the agent, some apps (modern Windows UWP apps, older Electron apps on Linux, a few macOS apps with custom drawing) expose no accessibility tree and fall back to clicking by pixel, an administrator-level window on Windows silently reports success while doing nothing ("an OS constraint, not a driver bug"), and the macOS driver's private APIs can change in any OS update.</td>
+<td>Its own docs name two narrow gaps: an older wire format needs one extra setting a newer one does not, and the safety-check hook is the only review point, with no pause-and-resume for a flagged computer action the way an ordinary tool call gets one.</td>
+<td>Not judged</td>
+<td>Each names its own real limits in its own words rather than hiding them. None is more honest than another, only more or less specific. Hermes' list is the most detailed because its built surface is the largest.</td>
+<td>None beyond what the earlier rows already recommend.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="12-method-and-limits">12. Method and limits</h2>
+<p><strong>What was read.</strong> Both other repositories were already cloned outside this repository for an earlier comparison: Hermes at <code>dce1e9b375</code> (2026-10-09) and the OpenAI Agents SDK at <code>125efa02</code> (2026-10-08). Our System was read at <code>main</code>'s <code>0b4ae4f</code> (2026-10-10). Three research agents, one per system, each read their system's computer-use code against one shared checklist of rows, with every claim carrying a <code>path:line</code> they opened, or the spec's own wording for something specified but not built. Nothing was installed, started or called over the network.</p>
+<p><strong>A note on Our System's own uncommitted work.</strong> This checkout holds uncommitted edits to <code>docs/bap-browser-spec.md</code> (new sections 21.14 to 21.16, for real Windows and Linux helpers) that are not part of this comparison's commit and were not written by this work. A separate branch, <code>worktree-computer-use-helpers</code>, holds the matching code, also not part of <code>main</code>. Neither was read or cited here: every claim about Our System's Windows and Linux support reads the spec exactly as committed on <code>main</code> (<code>git show HEAD:docs/bap-browser-spec.md</code>), where it stops at section 21.13 and names Windows and Linux as not built. Nothing in this checkout's uncommitted state was touched, staged or committed while writing this page.</p>
+<p><strong>What I checked by hand.</strong> These facts decide verdicts, so I opened each one myself:</p>
+<ul>
+<li>Our 12 <code>computer_*</code> tool names, read directly from <code>src/bap_browser/tools/computer_tools.py</code>, matching the spec's own list exactly.</li>
+<li>Our settings keys (<code>runs</code>, <code>helper_url</code>, <code>helper_stop_corner</code>, <code>screen</code>, <code>zoom</code>, <code>picture_after_action</code>, <code>ask_before_apps</code>, <code>mac_any_app</code>), read directly from <code>src/bap_browser/config_computer.py</code>.</li>
+<li>Our Mac driver posts input with <code>CGEventPost</code> to the HID event tap (<code>src/bap_browser/driver/mac_hands.py:226-230</code>), which moves the real pointer, unlike Hermes' background, no-cursor-move approach.</li>
+<li>Hermes' <code>doctor.py</code> lists <code>_SUPPORTED_PLATFORMS = ("darwin", "linux", "windows")</code> and has real Linux-specific detection code and tests (<code>tests/computer_use/test_cua_no_overlay.py</code>), confirming its cross-platform support is more than a documentation claim, even though the actual input-driving code lives in the separate <code>cua-driver</code> project, not in Hermes' own repository.</li>
+<li><code>cua-driver</code>'s own source is not in the Hermes repository: the claim that it posts input without moving the real pointer rests on Hermes' own documentation of it (its docstrings, and a "cursor overlay" setting in <code>cua_backend_driver.py</code> that only makes sense if the pointer stays put), not on reading <code>cua-driver</code>'s own code.</li>
+</ul>
+<p><strong>Limits.</strong></p>
+<ul>
+<li>The verdicts judge the code at the commits above. All three repositories change often.</li>
+<li>Code was read, not run. A feature that exists in code may still fail in use.</li>
+<li>Not confirmed from code: whether Our System's generic approval floor (pay, send, delete, share) applies to computer-use actions by the same rule it applies to browser actions (E1), whether a stop mechanism exists for Our System's contained and VM desktops, or for a Hermes CU session on a real machine with no Bot Desktop attached (E3), and whether Hermes' live smoke test for computer use runs in CI (G1).</li>
+<li>The research notes behind this page were kept outside the repository and are not part of it.</li>
+</ul>
+</main>
+</div>
+<script>
+(function () {
+  var toc = document.getElementById('toc');
+  var narrow = window.matchMedia('(max-width: 900px)');
+  if (narrow.matches) toc.open = false;
+  toc.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A' && narrow.matches) toc.open = false;
+  });
+  if (!('IntersectionObserver' in window)) return;
+  var links = {};
+  toc.querySelectorAll('a').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  var current = null;
+  function mark(id) {
+    if (id === current || !links[id]) return;
+    current = id;
+    toc.querySelectorAll('[aria-current]').forEach(function (el) { el.removeAttribute('aria-current'); });
+    toc.querySelectorAll('li.act').forEach(function (el) { el.classList.remove('act'); });
+    links[id].setAttribute('aria-current', 'true');
+    var section = links[id].closest('li.s');
+    if (section) section.classList.add('act');
+  }
+  var watcher = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) { if (entry.isIntersecting) mark(entry.target.id); });
+  }, { rootMargin: '0px 0px -75% 0px' });
+  document.querySelectorAll('main h2[id], main h3[id]').forEach(function (h) { watcher.observe(h); });
+})();
+</script>
+</body>
+</html>

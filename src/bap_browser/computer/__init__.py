@@ -50,7 +50,7 @@ def base(
     another is given). On the way out every driver it started is stopped. `backend` names a backend
     to use in place of the driver."""
     home = home or home_of(config)
-    elsewhere = config.computer.runs == "remote"
+    elsewhere = config.computer.runs in ("mac", "remote")
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
     if allowed.held(settings) and backend is None:
         # The driver itself holds the agent to the apps the person allowed (spec 22.7).

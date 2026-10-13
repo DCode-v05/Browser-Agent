@@ -8,8 +8,6 @@ import contextlib
 import json
 import logging
 import os
-import secrets
-import signal
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -84,21 +82,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="serve the desktop of computer use instead of a browser: its computer_* tools and its picture",
     )
     serve.set_defaults(run=_serve)
-
-    helper = commands.add_parser(
-        "helper",
-        help="on your Mac: let an engine elsewhere drive this Mac, with your permission (spec 21.13)",
-    )
-    helper.add_argument("--config", help="path of config.json")
-    helper.add_argument(
-        "--allow",
-        default="",
-        help="the apps the engine may open here, by name: text_editor, files, calculator, terminal",
-    )
-    helper.add_argument(
-        "--host", default="127.0.0.1", help="the address to answer on; 127.0.0.1 is this Mac only"
-    )
-    helper.set_defaults(run=_helper)
 
     studio = commands.add_parser(
         "studio",
@@ -332,81 +315,6 @@ def _serve(args: argparse.Namespace) -> int:
         asyncio.run(run_http(config, open_viewer=args.open, desktop=args.desktop))
     # It runs until it is interrupted, so that is how it always ends.
     return 130
-
-
-def _helper(args: argparse.Namespace) -> int:
-    def say(text: str) -> None:
-        # The helper's words are for the person at this Mac, on the error stream.
-        print(text, file=sys.stderr)
-
-    if sys.platform != "darwin":
-        say("The helper runs on a Mac only.")
-        return 2
-    config = load_config(args.config)
-    # Imported here: the helper needs the web server and macOS's own libraries, nothing else.
-    import uvicorn
-
-    from bap_browser.driver.mac_hands import MAC_APPS, MacHands
-    from bap_browser.service.mac_helper import (
-        ANY_APP,
-        Helper,
-        helper_app,
-        pairing_file,
-        watch_permissions,
-        write_pairing,
-    )
-
-    apps = [name for name in args.allow.split(",") if name]
-    unknown = [name for name in apps if name not in MAC_APPS and name != ANY_APP]
-    if unknown:
-        say(f"No such app: {', '.join(unknown)}. Name some of: {', '.join(MAC_APPS)}, or any.")
-        return 2
-    hands = MacHands()
-    token = secrets.token_urlsafe(32)
-    port = config.computer.helper_port
-    address = f"http://{args.host}:{port}"
-    say(f"The helper answers on {address}, to this token only:")
-    say(token)
-    say("Give the token to the engine as BAP_BROWSER_HELPER_TOKEN. It is new each time the helper starts.")
-    named = [MAC_APPS[name] for name in apps if name in MAC_APPS]
-    if ANY_APP in apps:
-        named.append("any app by its name, each after your yes")
-    say(f"Apps the engine may open: {', '.join(named) or 'none'}.")
-    say("To stop it at once, push the pointer into the top left corner of the screen. Ctrl+C ends it.")
-    # A window on this same Mac finds the helper here: its address and token, for this user alone.
-    pairing = pairing_file(config)
-
-    def pair() -> None:
-        write_pairing(pairing, address, token)
-
-    pair()
-    say(f"Paired with bap-browser on this Mac through {pairing}. Choose This Mac in Computer, Configuration.")
-    server = uvicorn.Server(
-        uvicorn.Config(
-            helper_app(Helper(hands, token, apps, config.computer.helper_stop_corner)),
-            host=args.host,
-            port=port,
-            log_level="warning",
-        )
-    )
-
-    async def serve() -> None:
-        # macOS is asked for what is missing; once both are allowed the window is told, and connects.
-        watching = asyncio.create_task(watch_permissions(hands, pair, say, config.computer.helper_poll_s))
-        try:
-            await server.serve()
-        finally:
-            watching.cancel()
-
-    # Closing the Terminal window ends the helper as Ctrl+C does: it stops answering and unpairs.
-    signal.signal(signal.SIGHUP, lambda number, frame: setattr(server, "should_exit", True))
-    try:
-        with contextlib.suppress(KeyboardInterrupt):
-            asyncio.run(serve())
-    finally:
-        pairing.unlink(missing_ok=True)
-
-    return 0
 
 
 def extension_folder(config: Config) -> Path:

@@ -1,0 +1,2548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Desktop app comparison</title>
+<style>
+/* The design tokens of the spec page (bap-browser-spec.html), which this page shares. */
+:root {
+  --bg: #F5F6F8; --surface: #FFFFFF; --surface-2: #EEF0F3;
+  --border: #D5D9E0; --border-strong: #7C8696;
+  --text: #14171C; --text-muted: #5A6270; --focus: #1D4ED8;
+  --agent: #4338CA; --agent-tint: #EEF2FF;
+  --person: #0F766E; --person-tint: #E6F7F5;
+  --waiting: #A14C08; --waiting-tint: #FFF4E0;
+  --danger: #B91C1C; --danger-tint: #FDECEC;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", "Liberation Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1014; --surface: #161920; --surface-2: #1E222B;
+    --border: #2C323D; --border-strong: #6B7585;
+    --text: #E9EBEF; --text-muted: #9AA3B2; --focus: #93C5FD;
+    --agent: #A5B4FC; --agent-tint: #1E2147;
+    --person: #5EEAD4; --person-tint: #0F2F2C;
+    --waiting: #FCD34D; --waiting-tint: #3A2C0A;
+    --danger: #FCA5A5; --danger-tint: #3B1414;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1014; --surface: #161920; --surface-2: #1E222B;
+  --border: #2C323D; --border-strong: #6B7585;
+  --text: #E9EBEF; --text-muted: #9AA3B2; --focus: #93C5FD;
+  --agent: #A5B4FC; --agent-tint: #1E2147;
+  --person: #5EEAD4; --person-tint: #0F2F2C;
+  --waiting: #FCD34D; --waiting-tint: #3A2C0A;
+  --danger: #FCA5A5; --danger-tint: #3B1414;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 var(--font-ui); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+a { color: var(--agent); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+
+.page { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 48px;
+  max-width: 1320px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 96px; }
+
+/* Contents */
+#toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start;
+  max-height: calc(100vh - 48px); overflow-y: auto; font-size: 14px; line-height: 1.4; }
+#toc > summary { display: none; }
+#toc .name { display: block; font-weight: 600; font-size: 15px; margin-bottom: 12px; }
+#toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+#toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--text-muted); text-decoration: none; }
+#toc a:hover { background: var(--surface-2); color: var(--text); }
+#toc a[aria-current="true"] { background: var(--agent-tint); color: var(--agent); font-weight: 600; }
+#toc ul.sub { display: none; margin: 2px 0 6px 10px; padding-left: 8px; border-left: 1px solid var(--border); font-size: 13px; }
+#toc li.act > ul.sub { display: flex; }
+
+/* Document */
+main { min-width: 0; overflow-wrap: anywhere; }
+table { overflow-wrap: normal; }
+.doc-head { padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+h1 { font: 600 34px/1.15 var(--font-ui); letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.meta span { font: 400 12px/1 var(--font-mono); color: var(--text-muted); border: 1px solid var(--border);
+  border-radius: 999px; padding: 6px 10px; background: var(--surface); }
+.doc-head p { margin: 0; max-width: 72ch; color: var(--text-muted); }
+.doc-head p + p { margin-top: 10px; }
+
+h2 { font: 600 25px/1.25 var(--font-ui); letter-spacing: -0.01em; margin: 64px 0 18px; padding-top: 28px;
+  border-top: 1px solid var(--border); text-wrap: balance; }
+.doc-head + h2 { border-top: 0; margin-top: 12px; }
+h3 { font: 600 18px/1.3 var(--font-ui); margin: 36px 0 12px; text-wrap: balance; }
+h2, h3 { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 20px); }
+main > p, main > ul, main > ol, main > blockquote { max-width: 76ch; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin: 4px 0; }
+li > ul, li > ol { margin: 4px 0; }
+strong { font-weight: 600; }
+
+code { font: 400 0.86em var(--font-mono); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+pre { margin: 0 0 20px; padding: 16px 18px; overflow-x: auto; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; font: 400 12.5px/1.35 var(--font-mono); }
+pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+
+blockquote { margin: 0 0 18px; padding: 2px 0 2px 16px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }
+blockquote p { margin: 0; }
+
+/* Tables */
+.tw { overflow-x: auto; margin: 0 0 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+th { text-align: left; font: 600 12px/1.3 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-2); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+
+/* Phase badges in the feature tables */
+.ph { display: inline-block; font: 600 11px/1 var(--font-ui); letter-spacing: 0.03em; padding: 4px 8px;
+  border-radius: 999px; margin-right: 6px; white-space: nowrap; }
+.ph-m1 { background: var(--agent-tint); color: var(--agent); }
+.ph-m2, .ph-m3, .ph-m4 { background: var(--person-tint); color: var(--person); }
+.ph-next { background: var(--waiting-tint); color: var(--waiting); }
+.ph-later { background: var(--surface-2); color: var(--text-muted); }
+.ph-no { background: var(--danger-tint); color: var(--danger); }
+
+/* Checklist */
+li.ck { list-style: none; margin-left: -22px; padding-left: 26px; position: relative; }
+.box { position: absolute; left: 0; top: 5px; width: 14px; height: 14px; border: 1.5px solid var(--border-strong); border-radius: 3px; }
+
+/* This page: a wider layout, and the seven-column comparison tables share their width in fixed parts. */
+.page { max-width: 1760px; }
+table:has(> thead th:nth-child(7):last-child) { table-layout: fixed; min-width: 1000px; }
+table:has(> thead th:nth-child(7):last-child) th { white-space: normal; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(1) { width: 9%; }
+table:has(> thead th:nth-child(7):last-child) th:is(:nth-child(2), :nth-child(3), :nth-child(4)) { width: 17%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(5) { width: 9%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(6) { width: 14%; }
+table:has(> thead th:nth-child(7):last-child) th:nth-child(7) { width: 17%; }
+
+@media (max-width: 900px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-inline: 16px; padding-block: 20px 72px; }
+  #toc { position: static; max-height: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px 6px; }
+  #toc > summary { display: block; cursor: pointer; font-weight: 600; padding: 10px; }
+  #toc .name { display: none; }
+  #toc[open] { padding-bottom: 10px; }
+  h1 { font-size: 28px; }
+  h2 { font-size: 22px; margin-top: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<details id="toc" open>
+<summary>Contents</summary>
+<nav aria-label="Contents">
+<span class="name">Desktop app comparison</span>
+<ul>
+<li class="s"><a href="#1-the-three-systems">1. The three systems</a>
+<ul class="sub">
+<li><a href="#how-to-read-the-tables">How to read the tables</a></li>
+</ul>
+</li>
+<li class="s"><a href="#2-the-verdict">2. The verdict</a>
+<ul class="sub">
+<li><a href="#wins-by-area">Wins by area</a></li>
+<li><a href="#what-our-system-should-do-next">What Our System should do next</a></li>
+</ul>
+</li>
+<li class="s"><a href="#3-size-and-activity">3. Size and activity</a>
+</li>
+<li class="s"><a href="#4-identity-and-maturity">4. Identity and maturity</a>
+</li>
+<li class="s"><a href="#5-install-packaging-and-updates">5. Install, packaging and updates</a>
+</li>
+<li class="s"><a href="#6-window-and-layout">6. Window and layout</a>
+</li>
+<li class="s"><a href="#7-chat-and-sessions">7. Chat and sessions</a>
+</li>
+<li class="s"><a href="#8-the-agents-browser">8. The agent&#x27;s browser</a>
+</li>
+<li class="s"><a href="#9-agent-core">9. Agent core</a>
+</li>
+<li class="s"><a href="#10-human-in-the-loop">10. Human in the loop</a>
+</li>
+<li class="s"><a href="#11-safety-and-security">11. Safety and security</a>
+</li>
+<li class="s"><a href="#12-observability">12. Observability</a>
+</li>
+<li class="s"><a href="#13-configuration">13. Configuration</a>
+</li>
+<li class="s"><a href="#14-extensibility">14. Extensibility</a>
+</li>
+<li class="s"><a href="#15-engineering-quality">15. Engineering quality</a>
+</li>
+<li class="s"><a href="#16-platforms">16. Platforms</a>
+</li>
+<li class="s"><a href="#17-performance">17. Performance</a>
+</li>
+<li class="s"><a href="#18-what-our-system-has-outside-the-desktop-window">18. What Our System has outside the desktop window</a>
+</li>
+<li class="s"><a href="#19-method-and-limits">19. Method and limits</a>
+</li>
+<li class="s"><a href="#20-evidence-by-row">20. Evidence by row</a>
+</li>
+</ul>
+</nav>
+</details>
+<main>
+<header class="doc-head">
+<h1>Our System, Hermes and the OpenAI Agents SDK, compared as a desktop app</h1>
+<div class="meta"><span>Date: 2026-10-10</span><span>Our System 0b4ae4f</span><span>Hermes dce1e9b</span><span>OpenAI Agents SDK 125efa0</span><span>Read from the code, nothing installed or run</span></div>
+<p>This page compares three systems as a person meets them through a desktop app. For Our System that is the Electron app in <code>desktop/</code> and the core it starts. For Hermes it is Hermes Desktop and the agent behind it. The OpenAI Agents SDK has no app, so its column says what the SDK gives a developer who builds one. Each row names the system that does the thing best, says why, and says what Our System could take from the others.</p>
+</header>
+<h2 id="1-the-three-systems">1. The three systems</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What it is</td>
+<td>A browser that an AI agent drives and a person watches and controls</td>
+<td>A general personal agent that runs commands, edits files, browses, sends messages, runs scheduled jobs and writes its own skills</td>
+<td>A Python library for building agents: agents, tools, hand-offs, guardrails, sessions and tracing</td>
+</tr>
+<tr>
+<td>Who makes it</td>
+<td>September (this repository)</td>
+<td>Nous Research</td>
+<td>OpenAI</td>
+</tr>
+<tr>
+<td>What "the desktop app" means here</td>
+<td>The Electron app in <code>desktop/</code>, which shows the agent's browser and the chat in one window, and the core it starts with <code>uv run bap-browser agent --chat</code></td>
+<td>Hermes Desktop (<code>apps/desktop</code>) and the Hermes agent and gateway it starts or connects to</td>
+<td>None. The SDK has no app. Its column says what it gives toward one</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>DCode-v05/Browser-Agent</code></td>
+<td><code>NousResearch/hermes-agent</code></td>
+<td><code>openai/openai-agents-python</code></td>
+</tr>
+<tr>
+<td>Commit compared</td>
+<td><code>0b4ae4f</code>, 2026-10-10</td>
+<td><code>dce1e9b375</code>, 2026-10-09</td>
+<td><code>125efa02</code>, 2026-10-08</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="how-to-read-the-tables">How to read the tables</h3>
+<p>Sections 4 to 17 hold one table each. Every table has the same columns:</p>
+<ul>
+<li><strong>Row</strong>: the row's id and the thing compared. The ids match the evidence list in section 20.</li>
+<li><strong>Our System</strong>, <strong>Hermes</strong>, <strong>OpenAI Agents SDK</strong>: what each one has, in plain words. "None, you build it" means the SDK gives nothing for that row.</li>
+<li><strong>Best</strong>: the verdict, one of the words below.</li>
+<li><strong>Why</strong>: the reason for the verdict.</li>
+<li><strong>Gap or idea for Our System</strong>: what Our System lacks, or could take from the others. "None" means nothing is worth doing now.</li>
+</ul>
+<p>The verdict words:</p>
+<ul>
+<li>A system's name: that system does the thing best.</li>
+<li><strong>Tie</strong>: two systems do it equally well, often in different ways.</li>
+<li><strong>Split</strong>: each named system is best at a different half of the row.</li>
+<li><strong>None</strong>: none of the three has it.</li>
+<li><strong>Not judged</strong>: the row describes the systems and does not rank them.</li>
+</ul>
+<h2 id="2-the-verdict">2. The verdict</h2>
+<p>Hermes Desktop is the most complete desktop app of the three by a wide margin. It wins 58 of the 112 rows, mostly on breadth: an installer that is signed and updates itself, a full chat with sessions and search, 38 model providers, memory, skills, OS notifications and 21 messaging platforms. Hermes is fifteen months old and has 51,081 commits from 4,122 author names.</p>
+<p>Our System wins 21 rows, and they sit where its purpose is. The person watches the agent's own browser in the same window as the chat (C2, E5). The core has its own driver with 30 browser tools (E1 to E4). Approvals know a payment from a click (G1, G2, H4), and Auto Mode has a floor in code that no model can lift (G7). Its web safeguards have no match in the other two: layers against instructions planted in pages, look-alike sites, checks on downloads, and limits that are on by default (H1, H8, H9, H15). Our System is one week old.</p>
+<p>The OpenAI Agents SDK is not an app, so it wins 9 rows, all of them building blocks. It has the clearest agent loop, typed output on any agent, a paused run saved to disk and restored, guardrail hooks, tracing, lifecycle hooks, an importable API and two strict type checkers. Its defaults are the weakest on privacy: traces carry tool and model data to OpenAI unless the developer turns them off.</p>
+<p>Most of what Our System lacks is packaging and chat polish, not design. Two gaps are deeper. The core sends the whole conversation to the model on every call, which a long browser task will outgrow (F11). The model key sits in a plain-text <code>.env</code> file (H6).</p>
+<h3 id="wins-by-area">Wins by area</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Rows</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI SDK</th>
+<th>Tie</th>
+<th>Split</th>
+<th>None or not judged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. Identity and maturity</td>
+<td>6</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>3</td>
+</tr>
+<tr>
+<td>B. Install, packaging, updates</td>
+<td>6</td>
+<td>0</td>
+<td>6</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>C. Window and layout</td>
+<td>10</td>
+<td>1</td>
+<td>8</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>D. Chat and sessions</td>
+<td>9</td>
+<td>1</td>
+<td>7</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>E. The agent's browser</td>
+<td>9</td>
+<td>6</td>
+<td>3</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>F. Agent core</td>
+<td>15</td>
+<td>1</td>
+<td>11</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>G. Human in the loop</td>
+<td>9</td>
+<td>3</td>
+<td>1</td>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>H. Safety and security</td>
+<td>17</td>
+<td>6</td>
+<td>3</td>
+<td>1</td>
+<td>6</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>I. Observability</td>
+<td>7</td>
+<td>1</td>
+<td>4</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>J. Configuration</td>
+<td>6</td>
+<td>1</td>
+<td>3</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>K. Extensibility</td>
+<td>6</td>
+<td>0</td>
+<td>2</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>L. Engineering quality</td>
+<td>6</td>
+<td>0</td>
+<td>5</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>M. Platforms</td>
+<td>2</td>
+<td>0</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>N. Performance</td>
+<td>4</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>112</strong></td>
+<td><strong>21</strong></td>
+<td><strong>58</strong></td>
+<td><strong>9</strong></td>
+<td><strong>14</strong></td>
+<td><strong>5</strong></td>
+<td><strong>5</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>G5 repeats E6 (take-over) and G6 repeats D8 (stop), so those two verdicts count twice.</p>
+<h3 id="what-our-system-should-do-next">What Our System should do next</h3>
+<p>The list runs from the most value for the least work to the largest jobs.</p>
+<ol>
+<li><strong>Send an OS notification when an approval or a help request waits</strong> (G9, C10). Hermes does this. Electron's <code>Notification</code> needs a few lines, and a person who looks away today misses the question until it runs out.</li>
+<li><strong>Add a Content Security Policy and a deny-all permission handler to the desktop shell</strong> (H11). Both are a few lines in <code>desktop/index.html</code> and <code>desktop/electron/main.cjs</code>.</li>
+<li><strong>Add a licence and a <code>SECURITY.md</code></strong> (A2, H16). Without a licence nobody outside the team may use the code. Hermes' <code>SECURITY.md</code> is the model: it says which protections are rules, which are heuristics, and what neither stops.</li>
+<li><strong>Ask for the model key in the app and keep it in the OS keychain</strong> (B5, J4, H6). Electron's <code>safeStorage</code> does the encryption, as Hermes Desktop does for its gateway token.</li>
+<li><strong>Trim old snapshots and tool output from the conversation</strong> (F11). The SDK's <code>ToolOutputTrimmer</code> keeps recent turns whole and cuts older tool output. Hermes adds a cheap model that summarises the middle.</li>
+<li><strong>Stream the model's answer into the chat</strong> (D1). The SDK's stream events are a clean model for the protocol.</li>
+<li><strong>Save a waiting question to disk</strong> (G8), so a crash or a restart does not lose it. The SDK's <code>RunState</code> and Hermes' saved approvals both do this.</li>
+<li><strong>Test, lint and gate the desktop app, and add a Windows runner to CI</strong> (L2, L3, L5, L6). Today the desktop app has 5 tests on helper functions, no lint, no place in <code>scripts/gate.py</code>, and CI runs only on Linux.</li>
+<li><strong>Package the desktop app</strong>: an installer for Windows and macOS, signing, updates and a bundled core (B1 to B6). This is the largest job and the largest gap.</li>
+<li><strong>Add a second model provider and a fallback model</strong> (F2, F12).</li>
+<li><strong>Keep a history of past tasks</strong> with their answers and evidence (D5, D6).</li>
+</ol>
+<h2 id="3-size-and-activity">3. Size and activity</h2>
+<p>These numbers come from the commands in section 19, run the same way on all three repositories. Line counts include blank lines and comments.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Measure</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First commit</td>
+<td>2026-10-03</td>
+<td>2025-07-22</td>
+<td>2025-03-11</td>
+</tr>
+<tr>
+<td>Commits</td>
+<td>204</td>
+<td>51,081</td>
+<td>2,486</td>
+</tr>
+<tr>
+<td>Author names in <code>git shortlog</code></td>
+<td>4</td>
+<td>4,122</td>
+<td>415</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>0</td>
+<td>163</td>
+<td>124</td>
+</tr>
+<tr>
+<td>Tracked files</td>
+<td>501</td>
+<td>17,986</td>
+<td>1,684</td>
+</tr>
+<tr>
+<td>Python lines (of them tests)</td>
+<td>45,187 (21,902)</td>
+<td>2,252,544 (1,330,230)</td>
+<td>484,556 (311,003)</td>
+</tr>
+<tr>
+<td>TypeScript and JavaScript lines (of them tests)</td>
+<td>17,861 (5,587)</td>
+<td>1,048,028 (380,688)</td>
+<td>1,128 (66)</td>
+</tr>
+<tr>
+<td>Desktop app lines of TypeScript, JavaScript and CSS (of them tests)</td>
+<td>1,835 (32)</td>
+<td>837,997 (332,435)</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Python test functions</td>
+<td>1,072</td>
+<td>45,676</td>
+<td>8,311</td>
+</tr>
+<tr>
+<td>CI workflows</td>
+<td>1</td>
+<td>51</td>
+<td>10</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-identity-and-maturity">4. Identity and maturity</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A1</strong> What it is</td>
+<td>A browser an AI agent drives and a person watches and controls. The desktop app shows the agent's browser on the left and the chat on the right, and starts the Python core beside it.</td>
+<td>A general personal agent. Hermes Desktop is its full window app, one of several ways in, next to a terminal interface and chat platforms.</td>
+<td>A library to build agents with. There is no app.</td>
+<td>Not judged</td>
+<td>They are three kinds of product. The rows below compare what each offers at each point.</td>
+<td>Say in one line what Our System is for: the supervised browser that agents use. Hermes and the SDK could be its users as well as its rivals.</td>
+</tr>
+<tr>
+<td><strong>A2</strong> Licence</td>
+<td>None. The repository has no <code>LICENSE</code> file and no licence field.</td>
+<td>MIT.</td>
+<td>MIT.</td>
+<td>Tie: Hermes, OpenAI SDK</td>
+<td>A stated licence tells others what they may do with the code. Without one, nobody outside the team may use it.</td>
+<td>Choose a licence, or state that the code is proprietary, before it is shown outside September.</td>
+</tr>
+<tr>
+<td><strong>A3</strong> Languages and stack</td>
+<td>Python 3.12 core with Playwright, Starlette and the MCP SDK. A React and Vite viewer. Electron 44 with React and shadcn/ui for the desktop app.</td>
+<td>Python agent and gateway. Electron 40 with React 19, Vite and Tailwind for the desktop app. Docusaurus docs, and some Rust and native code.</td>
+<td>Python 3.10 or later, on <code>openai</code>, <code>pydantic</code>, <code>mcp</code>, <code>httpx</code> and <code>websockets</code>, with optional extras for other models, stores and sandboxes.</td>
+<td>Not judged</td>
+<td>All three use common, well-supported tools. Our Electron is the newer of the two apps.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>A4</strong> Size</td>
+<td>45k lines of Python and 18k of TypeScript and JavaScript. The desktop app itself is 1.8k lines.</td>
+<td>2.25M lines of Python and 1.05M of TypeScript and JavaScript. Hermes Desktop alone is 838k lines.</td>
+<td>485k lines of Python, 135k of them in <code>src/agents</code>.</td>
+<td>Not judged</td>
+<td>Size is not quality. It shows how much each team has built and must maintain.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>A5</strong> Age and activity</td>
+<td>One week old: 204 commits, 4 author names, no tags.</td>
+<td>Fifteen months old: 51,081 commits, 4,122 author names, 163 tags, a release about every week.</td>
+<td>Nineteen months old: 2,486 commits, 415 author names, 124 tags, version 0.23.1.</td>
+<td>Hermes</td>
+<td>It has the most contributors and ships about every week. The SDK is steady and versioned.</td>
+<td>Tag a version before each demo, so the demo can be rebuilt exactly.</td>
+</tr>
+<tr>
+<td><strong>A6</strong> Documentation</td>
+<td>One spec, a feature map that links each feature to its spec section, files and tests, a demo guide, status pages and an ADR. All are written for the team. There is no user guide.</td>
+<td>A Docusaurus site of 452 pages, an 847-line guide to the desktop app, and build, design and engineering notes for the app.</td>
+<td>An MkDocs site that covers every feature, a generated API reference, and copies in Japanese, Korean and Chinese.</td>
+<td>Hermes</td>
+<td>It has a guide written for the person who uses the desktop app. The SDK's docs are the best for a developer, who uses no desktop app.</td>
+<td>Write a short user guide for the desktop app: install, a first task, approvals and take-over.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-install-packaging-and-updates">5. Install, packaging and updates</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B1</strong> How a person installs it</td>
+<td>Clone the repository, run <code>uv sync</code>, install Playwright's Chromium, build the viewer, then run <code>npm --prefix desktop start</code>.</td>
+<td>A one-line installer for each OS, a download of Hermes Desktop, or <code>hermes desktop</code> from the command line.</td>
+<td><code>pip install openai-agents</code>. That installs a library for a developer, not an app.</td>
+<td>Hermes</td>
+<td>A person installs Hermes Desktop without a terminal. Our System needs a developer's setup.</td>
+<td>Build an installer. For a desktop app this is the largest gap.</td>
+</tr>
+<tr>
+<td><strong>B2</strong> Installers for each OS</td>
+<td>None. <code>desktop/package.json</code> has no packaging tool, and the spec says the app runs from the repository.</td>
+<td>DMG and ZIP for macOS and MSIX for Windows. An AppImage for Linux is configured, but the release workflow turns it off.</td>
+<td>None. The SDK ships a wheel on PyPI.</td>
+<td>Hermes</td>
+<td>It is the only one with installers.</td>
+<td>Add <code>electron-builder</code> with targets for Windows and macOS.</td>
+</tr>
+<tr>
+<td><strong>B3</strong> Code signing</td>
+<td>None.</td>
+<td>macOS builds are signed, notarized and use the hardened runtime. Windows builds are signed with Azure Trusted Signing when its keys are set.</td>
+<td>Not an app. Releases reach PyPI by trusted publishing (OIDC), with no stored token.</td>
+<td>Hermes</td>
+<td>Signing stops the OS from warning about or blocking the app, and proves who built it.</td>
+<td>Sign with the company's certificates once there is an installer.</td>
+</tr>
+<tr>
+<td><strong>B4</strong> Updates</td>
+<td>None.</td>
+<td><code>electron-updater</code>, plus a channel file that carries its own SHA-256 and a signer name pinned inside the app rather than taken from the feed. The Microsoft Store updates Store builds.</td>
+<td>The developer runs <code>pip install -U</code>.</td>
+<td>Hermes</td>
+<td>Hermes checks that an update comes from the expected signer before it installs it.</td>
+<td>Add updates after the installer, with the signer pinned in the app as Hermes does.</td>
+</tr>
+<tr>
+<td><strong>B5</strong> First run</td>
+<td>The app starts the core at once. If the model key is missing, the chat shows the core's error and a <strong>Start again</strong> button. The person sets the key by editing <code>.env</code> by hand.</td>
+<td>A first-run screen asks whether to use a local or a remote agent. A guided tour follows, and a free-tier path serves a person with no account.</td>
+<td>A quickstart page, and <code>run_demo_loop()</code>, a chat in the terminal for a developer.</td>
+<td>Hermes</td>
+<td>A new person reaches a first message without editing a file.</td>
+<td>Ask for the model key in the app on first run, and keep it in the OS keychain (H6).</td>
+</tr>
+<tr>
+<td><strong>B6</strong> What a person must install first</td>
+<td>Node, Python 3.12, <code>uv</code>, Playwright's Chromium and the whole repository. The app runs <code>uv run --project &lt;repo&gt; bap-browser agent --chat</code>.</td>
+<td>Nothing, with the bundled build, which carries the agent inside the app. A build from source needs Python and the Hermes command line.</td>
+<td>Python 3.10 or later.</td>
+<td>Hermes</td>
+<td>The bundled Hermes Desktop needs nothing else on the machine.</td>
+<td>Bundle the core with the app, for example as a frozen Python build, so a person needs nothing else.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-window-and-layout">6. Window and layout</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>C1</strong> The window</td>
+<td>One window, 1440 by 900 at the start. The agent's browser is on the left and the chat on the right, in a split the person can drag (70 to 30 at the start). A sidebar folds away. Electron 44.</td>
+<td>A chat with a session sidebar on the left and a right rail with files, a terminal, a code review and a preview. It also has command overlays and separate windows for sessions, checks and alerts. Electron 40.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>Its window holds far more. Ours puts the browser first, which suits a browser product.</td>
+<td>Keep the browser first. Add a right rail later for evidence, such as pictures and the files the agent downloaded.</td>
+</tr>
+<tr>
+<td><strong>C2</strong> The agent's browser in the window</td>
+<td>The agent's real browser is a view inside the window. The core drives that very view over CDP, so the person sees each step on the page where it happens.</td>
+<td>A preview pane shows pages and files, but it is a separate copy of a page, not the agent's own browser. The agent's browser runs headless, and on Windows it stays headless unless the person sets <code>AGENT_BROWSER_HEADED</code>. A live screen with take-over (Bot Screen) works only when the agent runs on Linux.</td>
+<td>None, you build it. The computer-use example runs headless.</td>
+<td>Our System</td>
+<td>It is the only one that shows the browser the agent is driving, in the same window as the chat, on every OS.</td>
+<td>Draw the agent's pointer and the working glow in the desktop view too. The spec lists them as missing there.</td>
+</tr>
+<tr>
+<td><strong>C3</strong> Previews of pages and files</td>
+<td>None apart from the live browser.</td>
+<td>The preview pane shows web pages, local files and tool output. It refuses files such as SSH keys, <code>.env</code> and cloud credentials, and caps the size it reads.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>The person can look at what the agent made without leaving the app.</td>
+<td>Show each downloaded file in the window, with the same refusal list for secret files.</td>
+</tr>
+<tr>
+<td><strong>C4</strong> File browser</td>
+<td>None.</td>
+<td>Yes, in the right rail, with open, reveal and rename.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>It is the only one with a file browser.</td>
+<td>Not needed for a browser product, apart from the downloads folder.</td>
+</tr>
+<tr>
+<td><strong>C5</strong> Terminal</td>
+<td>None.</td>
+<td>Yes: xterm.js on node-pty, and the person can take the terminal over from the agent.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>It is the only one with a terminal.</td>
+<td>Not needed. Our System gives the agent no shell, which keeps a whole class of risk out.</td>
+</tr>
+<tr>
+<td><strong>C6</strong> Themes</td>
+<td>Light and dark follow the OS. Colours come from tokens, and a test checks the contrast of every pair of text and background in both themes.</td>
+<td>Preset themes, skins, an accent colour and a theme for each profile.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>It gives the person more choice. Our System is the only one that tests contrast.</td>
+<td>A light and dark switch in the desktop app.</td>
+</tr>
+<tr>
+<td><strong>C7</strong> Languages</td>
+<td>English only. Every string a person reads is in one file, <code>viewer/src/wording.ts</code>, so a translation is one more file of the same shape.</td>
+<td>Nine languages (Arabic, German, English, Spanish, French, Japanese, Russian and two forms of Chinese), with a test that every string is translated.</td>
+<td>Not an app. Only the docs are translated.</td>
+<td>Hermes</td>
+<td>It is the only one a person without English can use today.</td>
+<td>Add a language when a customer needs one. The single wording file makes it cheap.</td>
+</tr>
+<tr>
+<td><strong>C8</strong> Accessibility</td>
+<td>Labels on controls (108 <code>aria-</code> attributes in the viewer) and the contrast test above. No check with a screen reader.</td>
+<td>It turns on Chromium's accessibility tree at start so that dictation tools work, after two bug reports. A setting turns it off.</td>
+<td>Not an app.</td>
+<td>Split: Our System for contrast, Hermes for assistive tools</td>
+<td>Each covers a different half. Our System checks contrast in its tests. Hermes makes the app reachable by dictation and other assistive tools.</td>
+<td>Turn on the accessibility tree as Hermes does, and take a screen reader through one task.</td>
+</tr>
+<tr>
+<td><strong>C9</strong> Shortcuts and command palette</td>
+<td>One shortcut: Ctrl+B folds the sidebar.</td>
+<td>A command palette on Ctrl+K and a screen to change every shortcut.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>A person reaches every action from the keyboard.</td>
+<td>Keys for the actions that matter under pressure: <strong>Stop</strong>, <strong>Take over</strong>, <strong>Allow</strong> and <strong>Deny</strong>.</td>
+</tr>
+<tr>
+<td><strong>C10</strong> Notifications, tray and windows</td>
+<td>None. There is one window, and closing it ends the core.</td>
+<td>OS notifications, a tray icon with "minimize to tray", and several windows.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>Hermes tells the person when it needs them, even when its window is hidden.</td>
+<td>An OS notification when an approval waits (G9).</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-chat-and-sessions">7. Chat and sessions</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong> Streaming answers</td>
+<td>The answer arrives whole when the model call ends. Steps appear live as they start and finish.</td>
+<td>The answer streams in as the model writes it, with Markdown drawn as it arrives.</td>
+<td><code>Runner.run_streamed()</code> yields pieces of text and tool events as they happen. You draw them.</td>
+<td>Hermes</td>
+<td>The person sees the answer form instead of waiting for it.</td>
+<td>Stream the model's text to the chat. The SDK's event types are a clean model for the protocol.</td>
+</tr>
+<tr>
+<td><strong>D2</strong> Tool activity</td>
+<td>Each tool call is one step in a list, with a one-sentence summary, a box on the page where it acted, its duration and whether it failed. A click on a step opens its evidence: the picture and the result.</td>
+<td>Tool calls are grouped in a feed, with a run summary, skill activity and the approvals that wait.</td>
+<td>Typed events, <code>tool_call_item</code> and <code>tool_call_output_item</code>. You draw them.</td>
+<td>Our System</td>
+<td>Each step points at a place on the page and carries a picture, so a person can check the agent's work.</td>
+<td>Group long runs of steps as Hermes does, so a 200-step task stays readable.</td>
+</tr>
+<tr>
+<td><strong>D3</strong> Rich text</td>
+<td>Bold, inline code and links only. Raw HTML never renders.</td>
+<td>Full Markdown with coloured code, maths and Mermaid diagrams. DOMPurify cleans any HTML.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>Tables and code in an answer stay readable.</td>
+<td>Lists and tables at least, since answers about web pages are often tables.</td>
+</tr>
+<tr>
+<td><strong>D4</strong> Attachments</td>
+<td>None.</td>
+<td>Images with a viewer, files and links, in the message box.</td>
+<td>The input format takes text, images and files. You build the picker.</td>
+<td>Hermes</td>
+<td>It is the only one where a person can attach a file.</td>
+<td>Let a person attach a file for the agent to upload to a page, since <code>browser_upload_file</code> exists.</td>
+</tr>
+<tr>
+<td><strong>D5</strong> Session list and search</td>
+<td>None. <strong>New session</strong> starts over in the same place.</td>
+<td>A session sidebar with filters, paging and full-text search (SQLite FTS5).</td>
+<td>Session stores for SQLite, SQLAlchemy, Redis, MongoDB, Dapr and OpenAI's servers, and an encrypted wrapper. No interface.</td>
+<td>Hermes</td>
+<td>A person finds an earlier task and its result.</td>
+<td>Keep a list of past tasks, with their answers and evidence.</td>
+</tr>
+<tr>
+<td><strong>D6</strong> Resume, branch and rewind</td>
+<td>Pause and resume a live run only. An ended session cannot be reopened.</td>
+<td>Sessions reopen, and a person can rewind, edit an earlier message, or branch.</td>
+<td><code>RunState</code> resumes a paused run, and <code>to_input_list()</code> carries a conversation into the next run. Branching is yours to build.</td>
+<td>Hermes</td>
+<td>It has all three in the app.</td>
+<td>Reopen a finished task to ask a follow-up question.</td>
+</tr>
+<tr>
+<td><strong>D7</strong> Several sessions at once</td>
+<td>One session. The studio window runs three browsers with a chat each, but the studio is outside the desktop app.</td>
+<td>Tiled sessions, several agents and several gateways at once. Profiles in the background keep working.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>A person can run more than one task.</td>
+<td>Bring the studio's three browsers into the desktop app.</td>
+</tr>
+<tr>
+<td><strong>D8</strong> Stop</td>
+<td><strong>Stop this task</strong> ends the task and keeps the chat. <strong>Stop</strong> ends the session. Closing the window ends the core and every process it started.</td>
+<td>Cancel in the chat. <code>/stop</code> ends background processes, and <code>/pause</code> holds all new work.</td>
+<td><code>cancel(mode="immediate")</code>, or <code>cancel(mode="after_turn")</code>, which lets the current turn finish and saves state first.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both give the person a stop that takes effect at once and leaves the app usable.</td>
+<td>Offer "stop after this step", like the SDK's <code>after_turn</code>.</td>
+</tr>
+<tr>
+<td><strong>D9</strong> Voice</td>
+<td>None.</td>
+<td>Voice in and out, including a live spoken conversation.</td>
+<td>A voice pipeline (speech to text, agent, text to speech), and realtime agents over WebSocket. No interface.</td>
+<td>Hermes</td>
+<td>It is the only one with voice a person can use today. The SDK's realtime agents are the best parts to build voice from.</td>
+<td>Not needed now.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="8-the-agents-browser">8. The agent's browser</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>E1</strong> Engine and driver</td>
+<td>Its own driver on Playwright and CDP. A page script runs in an isolated world that the page cannot see. In the desktop app the core attaches to the app's own Chromium.</td>
+<td>No driver of its own. It hands the browser to outside engines: the <code>agent-browser</code> program, the <code>browser-harness</code> package, Camofox, or a cloud provider.</td>
+<td>A <code>Computer</code> interface (click, type, scroll, screenshot) that you write against a driver of your choice. The example uses Playwright.</td>
+<td>Our System</td>
+<td>Owning the driver lets Our System check, cap and record every step in one place.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>E2</strong> What the model sees</td>
+<td>A text snapshot: one line per element with a stable reference (<code>e12</code>, or <code>f2e7</code> inside a frame), capped in size. Hidden text is left out. A picture comes only when the agent asks for one.</td>
+<td>An accessibility snapshot with references (<code>@e5</code>), cut to a size. By default the model writes Python against the page instead (E9).</td>
+<td>Screenshots only. There is no text view of the page.</td>
+<td>Our System</td>
+<td>The text view costs few tokens, reaches into frames, and leaves out text a person cannot see, which also blocks one kind of planted instruction.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>E3</strong> Browser tools</td>
+<td>30 tools, 28 of them offered by default (<code>browser_evaluate</code> and <code>browser_run</code> are off). They navigate, read, find, click, type, fill a form, select, scroll, drag, answer dialogs, manage tabs, read the console and network, upload, download, take a screenshot and ask a person.</td>
+<td>By default one tool, <code>browser_exec</code>, and five vault tools. The other mode has 10 tools, and 2 more for raw CDP and dialogs.</td>
+<td>One <code>ComputerTool</code> with OpenAI's mouse and keyboard actions, and a hosted web search.</td>
+<td>Our System</td>
+<td>Each action is its own tool, so the safeguards can check each one before it runs.</td>
+<td>Measure our token use against Hermes' code mode (N3).</td>
+</tr>
+<tr>
+<td><strong>E4</strong> Tabs, dialogs, downloads, uploads and frames</td>
+<td>A tool for each of the first four: <code>browser_tabs</code>, <code>browser_handle_dialog</code>, <code>browser_downloads</code> and <code>browser_upload_file</code>. Frames appear in the snapshot.</td>
+<td>Dialogs and frames work. Its docs list downloads as not supported, and there is no upload tool.</td>
+<td>None, you build it.</td>
+<td>Our System</td>
+<td>It is the only one with all five.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>E5</strong> Live view</td>
+<td>The person watches the agent's browser live in the window. The standalone viewer also shows the agent's pointer and a glow while it works.</td>
+<td>A visible browser window when the person turns it on (not by default on Windows), recordings in WebM, and Bot Screen when the agent runs on Linux.</td>
+<td>None, you build it.</td>
+<td>Our System</td>
+<td>The live view is the product, inside the app, on every OS.</td>
+<td>Recordings a person can replay later (I3).</td>
+</tr>
+<tr>
+<td><strong>E6</strong> Take-over</td>
+<td><strong>Take over</strong> and <strong>Hand back</strong>. After hand-back the agent's next result starts with a note of the address before and after, and a reminder to take a new snapshot.</td>
+<td>Bot Screen gives control as a lease, and the gateway drops input from anyone who does not hold it. It works when the agent runs on Linux.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>It works on every OS and tells the agent where the person left the browser. Hermes' lease is the stronger mechanism.</td>
+<td>Treat a click by the person inside the desktop view as a take-over. The code does not show that it notices one today.</td>
+</tr>
+<tr>
+<td><strong>E7</strong> Signed-in sites</td>
+<td>The desktop app keeps a browser profile of its own (<code>persist:agent</code>), apart from the person's browser. When a site needs a password, the agent hands the step to the person.</td>
+<td>It can copy the person's real browser profile, so the agent is already signed in. A vault (encrypted on disk, or 1Password, or Bitwarden) has tools to fill a login and enter a code.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>The agent can sign in without the person typing each time.</td>
+<td>A vault that fills a field without the value reaching the model, which keeps our rule that the model never sees a password.</td>
+</tr>
+<tr>
+<td><strong>E8</strong> Stealth and cloud browsers</td>
+<td>None. The "cloud browser" in the studio is our own headless Chromium. The spec lists cloud providers as later work.</td>
+<td>Plug-ins for Browser Use cloud, Browserbase and Firecrawl, and the Camofox and Lightpanda engines.</td>
+<td>None.</td>
+<td>Hermes</td>
+<td>Sites that block automation still work through a provider.</td>
+<td>One adapter for a cloud provider, behind the same tools.</td>
+</tr>
+<tr>
+<td><strong>E9</strong> Code mode</td>
+<td><code>browser_run</code> runs a short script of several steps in one call. It stays off until the core runs in its micro VM.</td>
+<td><code>browser_exec</code> is the default: the model writes Python against helper functions. Hermes' own test reports 60 to 66 per cent fewer tokens than its one-step tools, at the same accuracy.</td>
+<td><code>ProgrammaticToolCallingTool</code> lets the model write JavaScript that calls other tools. It is not specific to browsers.</td>
+<td>Hermes</td>
+<td>It is the default, and it is measured.</td>
+<td>Turn on <code>browser_run</code> inside the VM and run the same comparison on our task sets.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="9-agent-core">9. Agent core</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>F1</strong> The agent loop</td>
+<td>A small loop: call the model, run its tools, repeat. It is a reference agent. The main users are outside agents that drive the browser over MCP.</td>
+<td>One <code>AIAgent</code> loop that every surface uses, with phases, retries, compression and budgets.</td>
+<td><code>Runner</code>, with each part of a turn in a module of its own: preparation, tool planning, tool calls, approvals, guardrails and saving.</td>
+<td>OpenAI SDK</td>
+<td>Its loop is the clearest, typed and documented, and it pauses for approvals and resumes. Hermes' loop does more, and the rows below score those features.</td>
+<td>If Our System needs a fuller agent of its own, consider building it on the SDK rather than growing the reference loop.</td>
+</tr>
+<tr>
+<td><strong>F2</strong> Model providers</td>
+<td>OpenAI only, over its Responses API. <code>scripted</code> runs the demo without a key.</td>
+<td>38 provider plug-ins, among them Anthropic, Gemini, Bedrock, Azure, OpenRouter and local models.</td>
+<td>OpenAI natively, and over 100 others through LiteLLM or any-llm.</td>
+<td>Hermes</td>
+<td>It has the most providers, each with its own setup and health check.</td>
+<td>Add Anthropic at least. The browser tools work with any model that calls tools.</td>
+</tr>
+<tr>
+<td><strong>F3</strong> Switching models</td>
+<td>The person picks from <code>agent.offered_models</code> in the settings, all of them OpenAI's.</td>
+<td><code>/model</code> switches model and provider in a live chat.</td>
+<td>Per agent or per run, in code.</td>
+<td>Hermes</td>
+<td>The person switches without a restart.</td>
+<td>Follows from F2.</td>
+</tr>
+<tr>
+<td><strong>F4</strong> Structured output</td>
+<td>Used inside the core, for the Auto Mode reviewer's answer only.</td>
+<td>For side calls, and for the results of sub-agents (<code>output_schema</code>).</td>
+<td><code>output_type</code> on any agent, checked against a strict JSON schema.</td>
+<td>OpenAI SDK</td>
+<td>Any agent can return a typed object.</td>
+<td>Let a task ask for its answer in a given shape, such as a table of prices.</td>
+</tr>
+<tr>
+<td><strong>F5</strong> Several agents</td>
+<td>None.</td>
+<td>Sub-agents (<code>delegate_task</code>) that run in parallel, each in its own git worktree, and a mixture of models whose answers are merged.</td>
+<td>Hand-offs, where another agent takes over, agents as tools, where another agent answers and returns, and hosted sub-agents.</td>
+<td>Tie: Hermes, OpenAI SDK</td>
+<td>The SDK has the clearest model of how agents work together. Hermes runs them in a product.</td>
+<td>Not needed. An outside agent with its own sub-agents can share one Our System.</td>
+</tr>
+<tr>
+<td><strong>F6</strong> Tools beyond the browser</td>
+<td>None in the desktop app, by design. Computer use (a contained desktop, and a Mac through a helper) arrived in the studio window on 2026-10-09.</td>
+<td>Terminal, files, code, web search, vision, image and video generation, speech, a kanban board, to-dos, memory and computer use.</td>
+<td>Python functions as tools, and hosted tools: web search, file search, a code interpreter, image generation, shell, <code>apply_patch</code> and computer use.</td>
+<td>Hermes</td>
+<td>It has the widest set in a product. Our System chose to be a browser.</td>
+<td>Bring computer use into the desktop app when it is ready.</td>
+</tr>
+<tr>
+<td><strong>F7</strong> MCP client</td>
+<td>None. Our System serves MCP and calls no other MCP server.</td>
+<td>A full client, settings for 68 ready-made servers, and a malware check (OSV) before it starts one.</td>
+<td>A client for stdio, SSE and streamable HTTP, and hosted MCP.</td>
+<td>Hermes</td>
+<td>It is the most complete, and it checks a server before it runs it.</td>
+<td>Not needed while outside agents bring their own tools.</td>
+</tr>
+<tr>
+<td><strong>F8</strong> MCP server</td>
+<td>All 30 tools over stdio (<code>bap-browser mcp</code>) and HTTP (<code>bap-browser serve</code>). This sits outside the desktop window.</td>
+<td>Only its messaging conversations, not its tools.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>It is the only one that offers its tools to other agents.</td>
+<td>Let the desktop app show, and approve steps in, a session that an outside agent started over MCP.</td>
+</tr>
+<tr>
+<td><strong>F9</strong> Skills</td>
+<td>None inside. Our System ships a skill that teaches Claude Code to use its tools.</td>
+<td>212 skills in the repository, a hub to install more, a scanner for each, and skills the agent writes from its own work.</td>
+<td>Skills (<code>SKILL.md</code>) for sandbox agents, opened only when needed.</td>
+<td>Hermes</td>
+<td>It has the largest set, and the agent improves its own.</td>
+<td>Saved recipes for sites ("how to check in with this airline") would be Our System's version.</td>
+</tr>
+<tr>
+<td><strong>F10</strong> Long-term memory</td>
+<td>None.</td>
+<td><code>MEMORY.md</code> and <code>USER.md</code> that the agent curates, memory stores as plug-ins, and search over past sessions.</td>
+<td>Conversation stores, but no curated memory.</td>
+<td>Hermes</td>
+<td>It is the only one that remembers the person across sessions.</td>
+<td>Not needed now. If it comes, keep page text out of memory, since a page can plant instructions.</td>
+</tr>
+<tr>
+<td><strong>F11</strong> Context management</td>
+<td>None. The core sends the whole conversation to the model on every call.</td>
+<td>Several stages: old tool output is cut first, then a cheap model summarises the middle while the start and the end stay whole.</td>
+<td>A hook to change the input before each call, a trimmer for old tool output, and compaction on OpenAI's servers.</td>
+<td>Hermes</td>
+<td>Long tasks keep running without hitting the model's limit.</td>
+<td>High priority. A 500-step browser task will pass any model's context. Start as the SDK does: trim old snapshots and tool output.</td>
+</tr>
+<tr>
+<td><strong>F12</strong> Retries and a fallback model</td>
+<td>Retries with growing, random waits, and a breaker that stops calling after repeated failures. No second model.</td>
+<td>Retries, and a chain of fallback providers.</td>
+<td>Retries with waits the developer sets. No second model.</td>
+<td>Hermes</td>
+<td>When one provider fails, the task goes on with another.</td>
+<td>A fallback model, once there is a second provider.</td>
+</tr>
+<tr>
+<td><strong>F13</strong> Usage and cost</td>
+<td>Cost in dollars from tokens and set prices. For each task: tokens, model, time and how it ended.</td>
+<td>Usage by model, billing, account quotas, <code>/usage</code> in the chat and <code>hermes usage --json</code>.</td>
+<td>Tokens per run, including cached and reasoning tokens.</td>
+<td>Hermes</td>
+<td>It is the most complete, with account quotas.</td>
+<td>Show the running cost of a task in the chat.</td>
+</tr>
+<tr>
+<td><strong>F14</strong> Scheduling</td>
+<td>None.</td>
+<td>A full scheduler with job storage, locks, templates, and delivery to any messaging platform.</td>
+<td>None.</td>
+<td>Hermes</td>
+<td>It is the only one.</td>
+<td>Not needed now.</td>
+</tr>
+<tr>
+<td><strong>F15</strong> Messaging platforms</td>
+<td>None.</td>
+<td>21 platforms, among them Slack, Teams, Telegram, WhatsApp, Discord, email and SMS.</td>
+<td>None.</td>
+<td>Hermes</td>
+<td>It is the only one.</td>
+<td>Not needed. The useful part would be a message to the person's phone when an approval waits.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="10-human-in-the-loop">10. Human in the loop</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G1</strong> Approval before actions</td>
+<td>The core checks every step before it runs, in a fixed order. A step that pays, sends, deletes, grants access or shares data goes to the person every time, and no model can approve it. Three modes: every action, risky (the default) and Auto.</td>
+<td>Shell commands and code go through about 15 rules that nothing can bypass and about 80 that ask the person. A plug-in can send any tool call to the same check.</td>
+<td><code>needs_approval</code> on each tool, off by default. A policy function that cannot read the arguments asks the person.</td>
+<td>Split: Our System for web actions, Hermes for shell commands</td>
+<td>Each checks the actions its own agent takes. The SDK checks nothing unless the developer asks it to.</td>
+<td>None for the browser.</td>
+</tr>
+<tr>
+<td><strong>G2</strong> The approval card</td>
+<td>It says why the person is asked, what text leaves and from which site, and the amount the page shows. In Auto Mode it adds the reviewer's sentence. <strong>Allow</strong>, <strong>Allow on this site</strong> or <strong>Deny</strong>, and the question expires.</td>
+<td>A stack of cards the person swipes. <strong>Reject</strong>, <strong>Run once</strong>, and <strong>Always allow</strong>, which asks to confirm because it writes to the config file.</td>
+<td>A list of <code>ToolApprovalItem</code> objects. The docs say to escape tool names and arguments before showing them.</td>
+<td>Our System</td>
+<td>The card shows what is at stake (money, text that leaves, the site), which is what a person needs to decide.</td>
+<td>A queue, as Hermes has, for when several questions wait at once.</td>
+</tr>
+<tr>
+<td><strong>G3</strong> A tool for the agent to ask the person</td>
+<td><code>browser_request_human</code> hands the step to the person. The core nudges the agent to call it on a CAPTCHA or a sign-in form.</td>
+<td><code>clarify</code> asks up to five questions with up to four choices each, plus "Other", and marks a recommended choice.</td>
+<td>None. There is only yes or no on a tool call.</td>
+<td>Split: Hermes for questions, Our System for handing over a step</td>
+<td>They do different jobs. Hermes asks the person for a decision, Our System asks for their hands.</td>
+<td>Let <code>browser_request_human</code> offer choices, so the agent can ask "which flight?" without handing over the browser.</td>
+</tr>
+<tr>
+<td><strong>G4</strong> Pause and resume</td>
+<td><strong>Pause</strong> and <strong>Resume</strong> in the chat. The pause takes effect when the current step ends.</td>
+<td><code>/pause</code> holds all new work, and a long command can move to the background instead of ending.</td>
+<td>A run pauses at each approval and resumes after it. There is no general pause.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both let the person pause a running task and resume it.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>G5</strong> Take-over</td>
+<td>As in E6.</td>
+<td>As in E6.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>As in E6.</td>
+<td>As in E6.</td>
+</tr>
+<tr>
+<td><strong>G6</strong> Stop</td>
+<td>As in D8.</td>
+<td>As in D8.</td>
+<td>As in D8.</td>
+<td>Tie: Our System, Hermes</td>
+<td>As in D8.</td>
+<td>As in D8.</td>
+</tr>
+<tr>
+<td><strong>G7</strong> Autonomy levels and Auto Mode</td>
+<td><strong>Every action</strong>, <strong>risky</strong> and <strong>Auto</strong>. Auto is off until a deployment turns it on, and a deployment can forbid it. In Auto a reviewer model decides only the steps the rules are unsure of, and it can never approve a step that pays, sends, deletes, grants or shares. Auto pauses after 3 refusals in a row or 20 in a session.</td>
+<td><strong>Manual</strong>, <strong>smart</strong> and <strong>off</strong>. In smart mode a second model may approve or deny a flagged command, and stops after 3 denials in a row. <strong>Off</strong> skips every check except the hard rules. The <code>--yolo</code> flag is fixed when the process starts, so a skill cannot turn it on.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>Its floor is in code: the high-risk classes reach the person whatever the model says. Hermes' smart mode lets a model approve any command outside the hard rules.</td>
+<td>At the end of a task, report how many steps the reviewer let through, so a person can audit Auto.</td>
+</tr>
+<tr>
+<td><strong>G8</strong> A paused run saved and resumed later</td>
+<td>None. A session lives in memory, and a restart loses a question that waits.</td>
+<td>Approvals and questions that wait are saved with the session and come back when it reopens.</td>
+<td><code>RunState.to_json()</code> and <code>from_json()</code> save a paused run and restore it, even in another process. The docs say to restore only from trusted storage.</td>
+<td>OpenAI SDK</td>
+<td>It is built for this, and it documents where trust ends.</td>
+<td>Save a session's waiting question to disk, so a crash or a restart does not lose it.</td>
+</tr>
+<tr>
+<td><strong>G9</strong> Telling the person they are needed</td>
+<td>Bars and notices in the chat: Auto paused, a limit reached, questions that ran out unanswered. No OS notification.</td>
+<td>OS notifications. Approvals and questions alert the person even while they look at another session.</td>
+<td>The app must check <code>result.interruptions</code> itself.</td>
+<td>Hermes</td>
+<td>It reaches a person who is not looking at the window.</td>
+<td>An OS notification for each approval and each help request. Of all the gaps here, this one gives the most value for the least work.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="11-safety-and-security">11. Safety and security</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>H1</strong> Instructions planted in content (prompt injection)</td>
+<td>Five layers act on page text before the model reads it. Hidden text is left out, invisible characters are removed, address fragments are cut, page text sits between <code>&lt;&lt;page TOKEN&gt;&gt;</code> marks, and rules scan it with an optional model behind them. Text addressed to an AI agent is withheld, and the person is told. The rules are in English only.</td>
+<td>Rules scan context files (<code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>.cursorrules</code>), skills and tool results. A project file that matches is dropped. Its security policy says the scan is not a security boundary.</td>
+<td>None. Its security policy places prompt injection outside the SDK.</td>
+<td>Our System</td>
+<td>Web pages are where planted instructions come from, and Our System treats page text before the model sees it.</td>
+<td>Rules for languages other than English. The Spanish attack page gets past the scan today.</td>
+</tr>
+<tr>
+<td><strong>H2</strong> Guardrails on input and output</td>
+<td>The scan on what comes in, and the checks on what goes out. No general classifier.</td>
+<td>The injection scan, redaction and a loop guard. No general classifier.</td>
+<td>Four hooks (input, output, tool input and tool output) that can stop a run. None ships with a check inside. A rejected output is replaced before it is saved.</td>
+<td>OpenAI SDK</td>
+<td>It gives the cleanest place to plug in a check.</td>
+<td>None. Our checks are already specific to a browser.</td>
+</tr>
+<tr>
+<td><strong>H3</strong> Dangerous actions</td>
+<td>A classifier on the name of the control the agent presses: pays, sends, deletes, grants or commits. The word lists are in English.</td>
+<td>About 15 hard rules and about 80 others for shell commands, covering Windows commands, SQL, hidden decoding, and commands that send credential files away.</td>
+<td>None. When no handler is set, the computer-use safety checks from OpenAI's API go through without a person.</td>
+<td>Split: Our System for web actions, Hermes for shell commands</td>
+<td>Each covers what its agent can do.</td>
+<td>Word lists in more languages. The spec's later layers do not rest on a control's name, which limits the harm meanwhile.</td>
+</tr>
+<tr>
+<td><strong>H4</strong> Sensitive actions and passwords</td>
+<td>Pay, send, delete, grant and share go to the person every time. So do password, card and code fields, and their values never reach the model: the snapshot shows dots.</td>
+<td>No classes for payment or sending. Writes to sensitive files (SSH keys, <code>.env</code>, shell start-up files) are checked. The vault fills logins.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>It is the only one that tells a payment from a click.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>H5</strong> Secrets kept out of logs, events and results</td>
+<td>Patterns are redacted from every result. The event log never holds page text, typed text or task text. Password values never reach the model in the first place.</td>
+<td>A redactor (1,360 lines), on by default, for logs, display, memory and approval cards. Child processes start without about 40 provider keys and tokens in their environment.</td>
+<td>Logs leave out model and tool data by default. Traces include them by default and go to OpenAI.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Our System keeps secrets from the model at the source. Hermes covers more places.</td>
+<td>None now. Hermes' list of key names would make a good test list for our redaction.</td>
+</tr>
+<tr>
+<td><strong>H6</strong> Where keys are stored</td>
+<td>The model key sits in <code>.env</code> as plain text. The desktop app makes a new service token for each run and keeps it in memory.</td>
+<td>An encrypted vault by default (Fernet), or 1Password or Bitwarden. Files are written readable by the owner only (0600). The desktop keeps its gateway token in the OS keychain.</td>
+<td>An environment variable.</td>
+<td>Hermes</td>
+<td>Keys are encrypted at rest.</td>
+<td>Keep the model key in the OS keychain through Electron's <code>safeStorage</code>, entered in the app (B5).</td>
+</tr>
+<tr>
+<td><strong>H7</strong> Private addresses (server-side request forgery)</td>
+<td>Before the browser goes to an address, a policy blocks cloud metadata addresses, private and local addresses (also after DNS), and private names such as <code>.local</code>, with allow and block lists. The browser then resolves the name again on its own, so a DNS answer that changes in between is not caught.</td>
+<td>The same check before browser navigation. Its own HTTP clients check the address again when they connect, which closes DNS rebinding. Metadata addresses are always blocked.</td>
+<td>None, apart from an allow list for hosted container shells and for web search.</td>
+<td>Hermes</td>
+<td>It closes DNS rebinding for its own requests. For the browser the two are equal.</td>
+<td>Send the browser through a local proxy that checks the address it connects to. The code already names this as a later item.</td>
+</tr>
+<tr>
+<td><strong>H8</strong> Look-alike and malicious sites</td>
+<td>Look-alikes of known sites by edit distance and lure words, mixed scripts in a name, and bare IP addresses. Lists from abuse.ch and RDAP are built but off.</td>
+<td>None beyond the private-address check.</td>
+<td>Not applicable: there is no browser.</td>
+<td>Our System</td>
+<td>It is the only one that checks for a fake site.</td>
+<td>Turn the abuse.ch lists on once a key is set.</td>
+</tr>
+<tr>
+<td><strong>H9</strong> Downloads</td>
+<td>Programs are deleted, found by name and by their first bytes. Archives, HTML and SVG need a yes. On the person's own machine every file needs a yes.</td>
+<td>None. Downloads are not supported.</td>
+<td>Not applicable. Archive inputs to sandboxes have size limits.</td>
+<td>Our System</td>
+<td>It is the only one that checks what arrives.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>H10</strong> Sandboxing</td>
+<td>The agent has no shell. The code tool stays off until the micro VM is in use. The desktop app relies on Electron's sandbox.</td>
+<td>Seven places to run commands: local (the default, with no isolation), Docker, Singularity, Modal, Daytona, SSH and Vercel Sandbox.</td>
+<td><code>SandboxAgent</code> with Docker or hosted providers. The local sandbox gives no OS isolation on Linux, and plain tools run in the host process. Most of the last 30 sandbox commits harden it.</td>
+<td>Tie: Hermes, OpenAI SDK</td>
+<td>Both offer real isolation, and neither turns it on by default. Our System avoids the risk by giving the agent no shell.</td>
+<td>Run the core in the micro VM for the desktop app too, so that the browser itself is contained.</td>
+</tr>
+<tr>
+<td><strong>H11</strong> Electron hardening</td>
+<td>Context isolation, the sandbox and no Node in all three views. The shell cannot navigate, new windows are refused, the agent's browser refuses every permission, and the main process checks the sender of each message. No Content Security Policy, and no permission handler on the default session.</td>
+<td>The same three settings in all seven kinds of window, a new-window rule written against a published CVE, path checks on file messages, and a refusal list for secret files. No Content Security Policy for the main window. On some Windows machines it falls back to <code>--no-sandbox</code> after repeated crashes.</td>
+<td>Not applicable.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both set the core protections. Hermes defends a much larger app, and Our System never turns its sandbox off.</td>
+<td>Add a Content Security Policy and a deny-all permission handler on the default session. Both are a few lines.</td>
+</tr>
+<tr>
+<td><strong>H12</strong> The local service</td>
+<td>Bound to 127.0.0.1, with a new random token each run, compared in constant time. The service checks the Origin on <code>/mcp</code> and on the WebSocket, and the Host header. The token travels in the address fragment, which no server receives, and never touches the disk.</td>
+<td>Bound to the loopback address, with a session token. The app checks the token the backend actually serves and notices a process it did not start. Remote gateways use a new one-time ticket for each connection.</td>
+<td>Not applicable.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both protect the local channel well. Hermes also secures remote connections, which the Our System desktop app does not offer.</td>
+<td>None now.</td>
+</tr>
+<tr>
+<td><strong>H13</strong> Supply chain</td>
+<td>Lock files for Python, the viewer and the desktop app. No scan of dependencies, and no signed builds.</td>
+<td>Lock files, an OSV scan in CI, a malware check before an MCP server starts, a scanner for skills and plug-ins, and signed builds. A desktop plug-in installs from any Git address, with only a warning for <code>http</code> and <code>file</code>.</td>
+<td>A lock file, CI actions pinned to commits, a check that a release matches its tag, trusted publishing and CodeQL.</td>
+<td>Tie: Hermes, OpenAI SDK</td>
+<td>Hermes guards more parts. The SDK has the cleanest release path.</td>
+<td>Add <code>osv-scanner</code>, or <code>pip-audit</code> and <code>npm audit</code>, to CI.</td>
+</tr>
+<tr>
+<td><strong>H14</strong> Telemetry and privacy</td>
+<td>Nothing is sent. There is no privacy page. The event log is kept for 30 days.</td>
+<td>Off by default. Collection and sending are two separate switches, and the telemetry of a third-party driver is forced off.</td>
+<td>Tracing is on by default and sends spans, with tool and model data, to <code>api.openai.com</code>.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Neither sends anything unless the person agrees.</td>
+<td>A one-page privacy note: what is stored, where, and for how long.</td>
+</tr>
+<tr>
+<td><strong>H15</strong> Limits</td>
+<td>For each task: 500 steps, 60 minutes and 120 calls a minute, and a spending cap that is off by default. A step repeated on a page that does not change is noted at the third time and refused at the sixth.</td>
+<td>No turn limit for the main agent by default (<code>agent.max_turns: None</code>). Sub-agents stop at 250. Guards stop repeated text and repeated tool calls. A price warning, but no spending cap.</td>
+<td>10 turns by default and a timeout for each tool. No time limit, cost cap or loop guard.</td>
+<td>Our System</td>
+<td>Every limit is on by default, and the loop guard looks at whether the page changed.</td>
+<td>Turn the spending cap on by default, at a modest figure.</td>
+</tr>
+<tr>
+<td><strong>H16</strong> Security policy</td>
+<td>None. There is no <code>SECURITY.md</code>.</td>
+<td>A 335-line <code>SECURITY.md</code> with private reporting, 90-day disclosure, and a frank trust model: the approval gate, redaction and the skill scanner are not security boundaries, and only OS isolation is.</td>
+<td>A <code>SECURITY.md</code> with private reporting, its scope, and the rules its reviewers check.</td>
+<td>Hermes</td>
+<td>It tells users plainly which protections they can rely on.</td>
+<td>Write a <code>SECURITY.md</code> as frank as Hermes': which safeguards are rules, which use a model, and what neither stops.</td>
+</tr>
+<tr>
+<td><strong>H17</strong> Audit record</td>
+<td>One JSON line for each tool call with what the check decided: stage, outcome, findings and risk. Never page text or typed text. Kept for 30 days. A question that timed out leaves no line, and lines are not signed.</td>
+<td>The session store holds messages, tool calls and approvals. A separate log records sign-ins to the dashboard. Neither is tamper-evident.</td>
+<td>Every item of a run is in the result object in memory, and in the traces. Nothing is saved by default.</td>
+<td>Our System</td>
+<td>It is the only record written for audit: what was decided and why, without the content.</td>
+<td>Write a line for the question that timed out (an open finding), and chain each line's hash to the line before it.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="12-observability">12. Observability</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>I1</strong> Logging</td>
+<td>Logs go to standard error at a level the person sets, and <code>events.jsonl</code> holds one redacted line per step.</td>
+<td>Four log files that rotate, written through one queue, with every line passed through the redactor.</td>
+<td>Python <code>logging</code> under the name <code>openai.agents</code>. Model and tool data are left out by default.</td>
+<td>Hermes</td>
+<td>A person can send the rotating files with a bug report.</td>
+<td>Write the core's log to a rotating file when the desktop app starts the core.</td>
+</tr>
+<tr>
+<td><strong>I2</strong> Tracing</td>
+<td>None.</td>
+<td>OpenTelemetry export and a Langfuse plug-in, both off by default.</td>
+<td>Built-in traces and spans, with processors and exporters, on by default.</td>
+<td>OpenAI SDK</td>
+<td>It is the most complete, and it is built into every run.</td>
+<td>Spans for each step (the model call, the check and the tool call) would explain a slow task.</td>
+</tr>
+<tr>
+<td><strong>I3</strong> Record and replay</td>
+<td>For each task, a list of steps with their timing in the Evaluations page. No replay player. The spec lists one as next work.</td>
+<td>Trajectories saved for evaluation and training, and session rewind. No replay player.</td>
+<td>A saved run state, and scripted models for repeatable tests.</td>
+<td>None</td>
+<td>None of the three can replay a past session for a person.</td>
+<td>A replay of the browser's pictures in step with the timeline would put Our System ahead of both.</td>
+</tr>
+<tr>
+<td><strong>I4</strong> Usage and cost views</td>
+<td>For each task: time split into model, tool and waiting, the steps, tokens, cost, and how the task ended.</td>
+<td>Usage by model, billing and quotas.</td>
+<td>Token counts in the result.</td>
+<td>Hermes</td>
+<td>It is the most complete. Our split of time into model, tool and waiting is something the others lack.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>I5</strong> Diagnostics</td>
+<td><code>bap-browser doctor</code> checks Python, which browsers start, and whether a key is set, without reading the key.</td>
+<td><code>hermes doctor</code> runs seven groups of checks, and <code>--fix</code> repairs what it can.</td>
+<td>None.</td>
+<td>Hermes</td>
+<td>It repairs as well as reports.</td>
+<td>Run <code>doctor</code> from the desktop app when the core fails to start.</td>
+</tr>
+<tr>
+<td><strong>I6</strong> Evaluations and benchmarks</td>
+<td>50 tasks with known answers on a practice site, graded by code, runnable with the agent or with reference solutions. 26 attack pages and 4 harmless pages for the safeguards. An Evaluations page shows the results.</td>
+<td>147 evaluation files, side-by-side runs of a change against its base, and the browser benchmark.</td>
+<td>Scripted models for tests. No evaluation suite.</td>
+<td>Hermes</td>
+<td>It is larger, and it compares two versions directly.</td>
+<td>Run each change side by side with its base on our task sets. Keep the attack pages: neither of the others has them.</td>
+</tr>
+<tr>
+<td><strong>I7</strong> Performance budget</td>
+<td><code>perf/budget.json</code> gives a target and a fail time for about 39 tool cases, and <code>bap-browser bench</code> measures them.</td>
+<td>One gate: the dashboard answers within one second at the 99th percentile under load. Elsewhere it counts operations rather than time.</td>
+<td>None.</td>
+<td>Our System</td>
+<td>Every tool has a time budget that a command checks.</td>
+<td>Run <code>bench</code> in CI.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="13-configuration">13. Configuration</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>J1</strong> Config files</td>
+<td>Every default sits in one typed file (<code>config.py</code>). <code>config.json</code> overrides it, then environment variables, then options for one session.</td>
+<td>One <code>config.yaml</code> with a version number, and migrations that <code>hermes update</code> applies. The example file is 127 KB.</td>
+<td>None. Configuration is Python code.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Our System has one typed source for every value. Hermes migrates a person's file when the app updates, which an installed app needs.</td>
+<td>Give <code>config.json</code> a version and migrate it, once there are installed copies.</td>
+</tr>
+<tr>
+<td><strong>J2</strong> Environment variables</td>
+<td>Every setting can be set as <code>BAP_BROWSER__SECTION__KEY</code>.</td>
+<td>A <code>.env</code> file for secrets, with a 28 KB example.</td>
+<td>Many <code>OPENAI_*</code> variables.</td>
+<td>Our System</td>
+<td>One rule reaches every setting.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>J3</strong> Settings screen</td>
+<td>23 settings drawn from one catalogue, each changed live.</td>
+<td>More than 20 pages, among them appearance, models, providers, keys, keyboard, plug-ins and notifications, and a config page drawn from the backend's schema, with search.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>Far more can be changed without editing a file.</td>
+<td>Add the model key and the desktop app's folders.</td>
+</tr>
+<tr>
+<td><strong>J4</strong> Providers and keys in the app</td>
+<td>None. The key lives in <code>.env</code>.</td>
+<td>A <strong>Providers</strong> page and a <strong>Keys</strong> page. Values stay hidden until the person asks to see them.</td>
+<td>None, you build it.</td>
+<td>Hermes</td>
+<td>A person sets keys without editing a file.</td>
+<td>See B5 and H6.</td>
+</tr>
+<tr>
+<td><strong>J5</strong> Profiles</td>
+<td>None. There is one browser profile, and roles for admin and user.</td>
+<td>Profiles, each a separate Hermes home, in one app.</td>
+<td>None.</td>
+<td>Hermes</td>
+<td>It is the only one.</td>
+<td>Not needed now.</td>
+</tr>
+<tr>
+<td><strong>J6</strong> Settings a deployment locks</td>
+<td>An admin locks what users may change or see, through <code>/api/admin/policy</code> and a separate admin sign-in.</td>
+<td>A switch that locks all of the config, and a managed scope that locks single keys through file permissions.</td>
+<td>None.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Both let an organisation fix settings. Our System does it with roles in the service, Hermes with files that an IT team pushes.</td>
+<td>None.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="14-extensibility">14. Extensibility</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>K1</strong> Plug-ins</td>
+<td>None. Our System ships a plug-in for Claude Code instead.</td>
+<td>18 kinds of plug-in (browsers, models, memory, platforms and more), under a rule that a plug-in never touches core files, and a catalogue of 523 entries.</td>
+<td>Optional extras inside the package.</td>
+<td>Hermes</td>
+<td>It has the only real plug-in system.</td>
+<td>Not needed now.</td>
+</tr>
+<tr>
+<td><strong>K2</strong> Skills</td>
+<td>As in F9.</td>
+<td>As in F9.</td>
+<td>As in F9.</td>
+<td>Hermes</td>
+<td>As in F9.</td>
+<td>As in F9.</td>
+</tr>
+<tr>
+<td><strong>K3</strong> Hooks</td>
+<td>None.</td>
+<td>Gateway hooks on start, on session start and end, on each agent step and on each command.</td>
+<td><code>RunHooks</code> and <code>AgentHooks</code> at each stage: agent start and end, tool start and end, and hand-off.</td>
+<td>OpenAI SDK</td>
+<td>It has typed hooks at every point of a run.</td>
+<td>A hook after each step would let a deployment add its own check.</td>
+</tr>
+<tr>
+<td><strong>K4</strong> Custom tools</td>
+<td>None. The list of tools is fixed.</td>
+<td><code>registry.register()</code>, with a clear contract for handlers.</td>
+<td><code>@function_tool</code> turns a typed Python function into a tool, schema included.</td>
+<td>OpenAI SDK</td>
+<td>Adding a tool takes the least work.</td>
+<td>Not needed. The fixed list is what lets the safeguards know every action.</td>
+</tr>
+<tr>
+<td><strong>K5</strong> MCP</td>
+<td>A server.</td>
+<td>A full client and a narrow server.</td>
+<td>A client.</td>
+<td>Split: Our System serves, Hermes consumes</td>
+<td>They face opposite ways. See F7 and F8.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>K6</strong> An API for embedding</td>
+<td><code>Toolkit(session).call(name, arguments)</code> calls any tool from Python. Other programs use MCP.</td>
+<td><code>AIAgent</code>, from a checkout of the repository only. <code>setup.py</code> refuses to build a wheel outside Nix.</td>
+<td>The whole package is the API, on PyPI.</td>
+<td>OpenAI SDK</td>
+<td>It is built to be imported.</td>
+<td>Publish the core as a package, so another program can use the tools without the repository.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="15-engineering-quality">15. Engineering quality</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L1</strong> Tests</td>
+<td>1,072 Python test functions, which pytest expands to 2,072 tests. 456 viewer test cases. 5 desktop tests.</td>
+<td>45,676 Python test functions, 1,536 desktop test files and 57 desktop end-to-end specs.</td>
+<td>8,311 test functions and 125 integration tests.</td>
+<td>Hermes</td>
+<td>It has by far the most. Our System has about as many lines of tests as of source (21.9k against 22.5k).</td>
+<td>Test the desktop app itself (L2).</td>
+</tr>
+<tr>
+<td><strong>L2</strong> Kinds of tests</td>
+<td>Unit, service, end-to-end in a real browser, and the viewer in a real browser. The desktop app's tests cover four helper functions only.</td>
+<td>Unit, integration, live canaries against real providers, end-to-end, desktop end-to-end with Playwright, and install tests on each OS.</td>
+<td>Unit tests and about 15 integration profiles, among them providers, voice, sandboxes and security.</td>
+<td>Hermes</td>
+<td>It tests the installed app on each OS.</td>
+<td>A Playwright test that starts the Electron app, runs the demo task and approves a step.</td>
+</tr>
+<tr>
+<td><strong>L3</strong> CI</td>
+<td>One workflow, on Ubuntu.</td>
+<td>51 workflows, including installs on Windows and macOS.</td>
+<td>10 workflows, including CodeQL.</td>
+<td>Hermes</td>
+<td>It runs on the operating systems people use.</td>
+<td>Add a Windows runner. The team builds on Windows and macOS, but CI checks only Linux.</td>
+</tr>
+<tr>
+<td><strong>L4</strong> Type checking</td>
+<td>Pyright, and <code>tsc</code> for the viewer and the desktop app.</td>
+<td><code>ty</code> on the changed code, and <code>tsc</code> on four desktop projects.</td>
+<td>mypy in strict mode and Pyright, both on the whole tree.</td>
+<td>OpenAI SDK</td>
+<td>Two strict checkers run on every file.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>L5</strong> Lint and format</td>
+<td>Ruff for Python and ESLint for the viewer. The desktop app has no lint script and no ESLint config.</td>
+<td>Ruff with a strict config, ESLint and Prettier, and a hook before each commit.</td>
+<td>Ruff.</td>
+<td>Hermes</td>
+<td>Every part is linted, before each commit.</td>
+<td>Lint the desktop app.</td>
+</tr>
+<tr>
+<td><strong>L6</strong> Code rules and gates</td>
+<td><code>scripts/gate.py</code> runs every check in one order, and <code>scripts/patterns.py</code> enforces the rules in <code>docs/bad-patterns.md</code>. The gate leaves the desktop app out.</td>
+<td>A code-health check that compares each change with its base and lets it only get better, 8 narrow checkers (Windows pitfalls, <code>/tmp</code> paths and others), and ESLint rules against bugs the team has had.</td>
+<td><code>make check</code>, and a coverage floor of 85 per cent.</td>
+<td>Hermes</td>
+<td>It has the most rules, and a limit that only tightens.</td>
+<td>Add the desktop app's checks to <code>scripts/gate.py</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="16-platforms">16. Platforms</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>M1</strong> Operating systems</td>
+<td>Runs from source on Windows and macOS, where the team works. CI runs on Linux only. No installers.</td>
+<td>macOS (Apple Silicon first) and Windows 10 and 11 (the MSIX needs Windows 11 22H2). Linux and WSL2 for the command line, with Linux desktop builds off in releases. Android through Termux, command line only.</td>
+<td>Anywhere Python runs. The local sandbox needs macOS or Linux.</td>
+<td>Hermes</td>
+<td>Its installs are tested on each OS.</td>
+<td>See B2 and L3.</td>
+</tr>
+<tr>
+<td><strong>M2</strong> Windows care</td>
+<td>Short paths against the long-path limit, quoting for spaces, an end to each HTTP connection after its answer, and <code>taskkill /T /F</code> to end the core's whole process tree.</td>
+<td>Recovery from two kinds of Chromium crash, a fix for Git Bash variables, a fix for a cookie-folder bug, and the same process-tree kill.</td>
+<td>Docker for the sandbox on Windows.</td>
+<td>Hermes</td>
+<td>It has found and fixed more Windows cases, though one of its fixes turns the sandbox off.</td>
+<td>None.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="17-performance">17. Performance</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+<th>Best</th>
+<th>Why</th>
+<th>Gap or idea for Our System</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N1</strong> Start time</td>
+<td>Not measured.</td>
+<td>Not measured. A watchdog restarts a gateway that hangs at start.</td>
+<td>Not measured.</td>
+<td>None</td>
+<td>None of the three states a start time.</td>
+<td>Measure the time from opening the app to a ready chat.</td>
+</tr>
+<tr>
+<td><strong>N2</strong> Latency budgets</td>
+<td>A target and a fail time for about 39 tool cases (I7).</td>
+<td>The dashboard's one-second gate (I7).</td>
+<td>None.</td>
+<td>Our System</td>
+<td>Every tool has a budget.</td>
+<td>None.</td>
+</tr>
+<tr>
+<td><strong>N3</strong> Token use</td>
+<td>The 30 tool definitions measure 2,759 tokens, counted as characters divided by 4, against a budget of 3,750 (measured at <code>0b4ae4f</code>). Pages go to the model as text, not pictures.</td>
+<td>Code mode saves 60 to 66 per cent by its own test, and an offline probe measures the size of the prompt.</td>
+<td>A trimmer for old tool output, compaction and prompt caching. No measured figure.</td>
+<td>Hermes</td>
+<td>It measured a large saving.</td>
+<td>Measure tokens per task on our task sets, and compare with <code>browser_run</code>.</td>
+</tr>
+<tr>
+<td><strong>N4</strong> Measured results in the repository</td>
+<td>Tool speeds stated for 2026-10-06 on macOS: open a small page 11 ms, read a page 1.1 ms, fill a field 1.8 ms, take a screenshot 17 ms.</td>
+<td>The browser benchmark, side-by-side runs of tool changes, and a benchmark of how easy the code is to navigate.</td>
+<td>None.</td>
+<td>Tie: Our System, Hermes</td>
+<td>Our System measures each tool's speed. Hermes measures whole agent runs.</td>
+<td>Measure whole tasks too: time, steps and tokens.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="18-what-our-system-has-outside-the-desktop-window">18. What Our System has outside the desktop window</h2>
+<p>The comparison counts only what a person reaches from the desktop app. Our System has more, which the window does not reach yet:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The MCP server for outside agents, over stdio and HTTP</td>
+<td><code>src/bap_browser/mcp/server.py</code>, <code>src/bap_browser/service/server.py</code></td>
+</tr>
+<tr>
+<td>The studio window: the cloud browser, the person's own Chrome and the built-in browser as pages, each with its session and chat</td>
+<td><code>uv run bap-browser studio</code>, <code>src/bap_browser/agent/studio.py</code>, <code>viewer/src/Studio.tsx</code></td>
+</tr>
+<tr>
+<td>Computer use: a contained desktop as the fourth page of the studio, a desktop served from the micro VM, and a person's own Mac through a helper they run there (added 2026-10-09 and 2026-10-10)</td>
+<td><code>src/bap_browser/driver/desktop_driver.py</code>, <code>src/bap_browser/driver/mac_driver.py</code>, <code>src/bap_browser/service/mac_helper.py</code></td>
+</tr>
+<tr>
+<td>Take-over of the person's own Chrome through the extension, with the chat in Chrome's side panel</td>
+<td><code>src/bap_browser/service/bridge.py</code>, <code>src/bap_browser/extension/manifest.json</code></td>
+</tr>
+<tr>
+<td>The admin console, the policy lock and the user sign-in</td>
+<td><code>src/bap_browser/service/accounts.py</code>, <code>/api/admin/policy</code> in <code>src/bap_browser/service/app.py</code></td>
+</tr>
+<tr>
+<td>The Evaluations page and the task sets: 50 browser tasks, and desktop sets including an attack set</td>
+<td><code>src/bap_browser/evals/</code>, <code>src/bap_browser/evals/sets/</code></td>
+</tr>
+<tr>
+<td><code>bap-browser doctor</code> and <code>bap-browser bench</code></td>
+<td><code>src/bap_browser/doctor.py</code>, <code>src/bap_browser/bench/runner.py</code></td>
+</tr>
+<tr>
+<td>A Claude Code plug-in and skill for the browser tools</td>
+<td><code>plugin/.claude-plugin/plugin.json</code>, <code>plugin/skills/browse/SKILL.md</code></td>
+</tr>
+<tr>
+<td>The code tool <code>browser_run</code>, off by default</td>
+<td><code>src/bap_browser/code/runner.py</code></td>
+</tr>
+<tr>
+<td>A container image for the service and one for the desktop of computer use</td>
+<td><code>deploy/Dockerfile</code>, <code>deploy/desktop.Dockerfile</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="19-method-and-limits">19. Method and limits</h2>
+<p><strong>What was read.</strong> Both other repositories were cloned on 2026-10-10 into a folder outside this repository: Hermes at <code>dce1e9b375</code> (2026-10-09) and the OpenAI Agents SDK at <code>125efa02</code> (2026-10-08). Seven research agents each read one part (our app, our safeguards, Hermes Desktop, the Hermes core, Hermes' safeguards, the SDK's core and the SDK's safeguards) against one shared checklist of rows. Each claim in their notes carries a <code>path:line</code> they opened. Nothing was installed, started or called over the network. Our rows were read at <code>6f075fb</code>. <code>main</code> then moved to <code>0b4ae4f</code>. The 26 commits in between add computer use, a Mac helper and repository rules, and they do not change <code>desktop/</code>, so the desktop rows hold. The numbers in section 3 were measured again at <code>0b4ae4f</code>.</p>
+<p><strong>What I checked by hand.</strong> These facts decide verdicts, so I opened each one myself:</p>
+<ul>
+<li>This repository has no <code>LICENSE</code> file.</li>
+<li><code>desktop/index.html</code> sets no Content Security Policy, and <code>desktop/electron/main.cjs:118-135</code> sets the three isolation settings on every view.</li>
+<li>The SDK includes sensitive data in traces by default (<code>src/agents/run_config.py:53-56</code>) and sends traces to <code>api.openai.com</code> (<code>src/agents/tracing/processors.py:46</code>).</li>
+<li>The SDK runs a computer-use action without a person when no safety handler is set (<code>src/agents/run_internal/tool_execution.py:2513-2522</code>).</li>
+<li>Hermes has no turn limit for the main agent and a limit of 250 for a sub-agent (<code>hermes_cli/config_defaults.py:78</code> and <code>:1361</code>).</li>
+<li>Bot Screen runs only on a Linux host (<code>tools/bot_desktop/runtime.py:80</code>).</li>
+<li>Hermes' preview pane is a separate render, not the agent's browser (<code>apps/desktop/electron/preview-reach.ts:1-21</code>).</li>
+<li>Hermes' browser calls the private-address check (<code>tools/browser_tool.py:88</code>).</li>
+</ul>
+<p><strong>A correction to the agents' notes.</strong> One agent wrote that Hermes stops the main agent after 500 turns and a sub-agent after 50. The config says otherwise: no limit for the main agent and 250 for a sub-agent. The 500 and 50 come from an out-of-date comment in <code>agent/iteration_budget.py:4</code>. H15 uses the config.</p>
+<p><strong>How the numbers were measured.</strong></p>
+<ul>
+<li>Commits, authors, tags and files: <code>git rev-list --count HEAD</code>, <code>git shortlog -sn HEAD | wc -l</code>, <code>git tag | wc -l</code>, <code>git ls-files | wc -l</code>, and the first commit from <code>git log --reverse --format=%cd --date=short | head -1</code>.</li>
+<li>Lines: a short Python script counts the newline characters in every tracked file with a given extension, leaving out lock files. Python is <code>.py</code>. TypeScript and JavaScript are <code>.ts</code>, <code>.tsx</code>, <code>.js</code>, <code>.cjs</code>, <code>.mjs</code> and <code>.jsx</code>. A file counts as a test when a folder in its path is <code>tests</code>, <code>test</code>, <code>e2e</code>, <code>tests-js</code> or <code>integration_tests</code>, or when its name starts with <code>test_</code> or holds <code>.test.</code> or <code>.spec.</code>. Blank lines and comments count.</li>
+<li>Python test functions: <code>grep -rE "^\s*(async\s+)?def test_" tests --include=*.py | wc -l</code> in each repository. This counts functions, not the cases that parametrisation adds. For Our System, <code>uv run pytest --collect-only -q</code> collects 2,072 cases from its 1,072 functions.</li>
+<li>Viewer test cases: the count of <code>it(</code> and <code>test(</code> calls in <code>viewer/src/**/*.test.ts(x)</code>.</li>
+<li>Hermes counts (providers, platforms, skills, MCP settings, plug-in catalogue, workflows): <code>ls &lt;folder&gt; | wc -l</code> or <code>find ... -iname SKILL.md | wc -l</code>, as the evidence list names them.</li>
+</ul>
+<p><strong>Limits.</strong></p>
+<ul>
+<li>The verdicts judge the code at the commits above. Hermes and the SDK change every day.</li>
+<li>Code was read, not run. A feature that exists in code may still fail in use. Our own open findings are in <code>docs/auto-mode-safeguards-status.md</code>.</li>
+<li>Line counts include blank lines and comments, so they overstate the code of all three alike.</li>
+<li>Three points are not confirmed from code. The first is whether Our System notices a person who clicks into the desktop view without pressing <strong>Take over</strong> (E6). The second is whether Hermes' main chat turn supports structured output (F4). The third is the absence of an ask-the-person tool and of action classes in the SDK, which rests on targeted searches rather than a full reading (G3, H4).</li>
+<li>The research notes behind this page were kept outside the repository and are not part of it.</li>
+</ul>
+<h2 id="20-evidence-by-row">20. Evidence by row</h2>
+<p>Paths for Hermes are relative to the <code>hermes-agent</code> repository, and paths for the SDK to <code>openai-agents-python</code>. "Absent" means a search found nothing.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Our System</th>
+<th>Hermes</th>
+<th>OpenAI Agents SDK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A1</strong></td>
+<td><code>README.md:1-3</code></td>
+<td><code>README.md:19-26</code>, <code>apps/desktop/package.json:6</code></td>
+<td><code>pyproject.toml:2-6</code>, <code>README.md:3</code></td>
+</tr>
+<tr>
+<td><strong>A2</strong></td>
+<td>Absent: <code>ls LICENSE*</code></td>
+<td><code>LICENSE:1-3</code></td>
+<td><code>LICENSE:1-3</code></td>
+</tr>
+<tr>
+<td><strong>A3</strong></td>
+<td><code>pyproject.toml:4-13</code>, <code>desktop/package.json:14-35</code></td>
+<td><code>apps/desktop/package.json:186</code></td>
+<td><code>pyproject.toml:8-23</code></td>
+</tr>
+<tr>
+<td><strong>A4, A5</strong></td>
+<td>Section 19</td>
+<td>Section 19</td>
+<td>Section 19</td>
+</tr>
+<tr>
+<td><strong>A6</strong></td>
+<td><code>docs/feature-map.json</code>, <code>docs/demo-guide.md</code></td>
+<td><code>website/docs/</code> (452 files), <code>website/docs/user-guide/desktop.md</code></td>
+<td><code>mkdocs.yml:51-200</code></td>
+</tr>
+<tr>
+<td><strong>B1</strong></td>
+<td><code>README.md:8-13</code>, <code>desktop/electron/main.cjs:74</code></td>
+<td><code>README.md:28-31</code>, <code>hermes_cli/main_desktop.py:1</code></td>
+<td><code>README.md:29-48</code></td>
+</tr>
+<tr>
+<td><strong>B2</strong></td>
+<td><code>desktop/package.json:8-13</code>, <code>docs/bap-browser-spec.md:2944-2945</code></td>
+<td><code>apps/desktop/electron-builder.config.cjs:180,236,285</code>, <code>website/docs/getting-started/platform-support.md:48-49</code></td>
+<td><code>.github/workflows/publish.yml</code></td>
+</tr>
+<tr>
+<td><strong>B3</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/electron-builder.config.cjs:126,181-195,338-350</code></td>
+<td><code>.github/workflows/publish.yml:116-122</code></td>
+</tr>
+<tr>
+<td><strong>B4</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/electron-builder.config.cjs:89-102</code>, <code>apps/desktop/electron/updater/channel.ts:18-41</code></td>
+<td><code>README.md:29-48</code></td>
+</tr>
+<tr>
+<td><strong>B5</strong></td>
+<td><code>desktop/electron/main.cjs:87-107</code>, <code>desktop/src/App.tsx:170-178</code></td>
+<td><code>apps/desktop/electron/first-run-setup-gate.ts:9-25</code>, <code>apps/desktop/src/components/onboarding-chat/intro.ts:1-39</code></td>
+<td><code>src/agents/repl.py:16-34</code></td>
+</tr>
+<tr>
+<td><strong>B6</strong></td>
+<td><code>desktop/electron/main.cjs:74-76</code></td>
+<td><code>apps/desktop/electron/backend-child.ts:1-21</code>, <code>apps/desktop/package.json:36-37</code></td>
+<td><code>pyproject.toml:6</code></td>
+</tr>
+<tr>
+<td><strong>C1</strong></td>
+<td><code>desktop/electron/main.cjs:110-139</code>, <code>desktop/src/App.tsx:161-186</code></td>
+<td><code>apps/desktop/src/app/right-sidebar/</code>, <code>apps/desktop/electron/session-windows.ts:52-55</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C2</strong></td>
+<td><code>desktop/electron/main.cjs:16-25,66-99,134</code></td>
+<td><code>apps/desktop/electron/preview-reach.ts:1-21</code>, <code>tools/browser_tool_session.py:67-83</code>, <code>tools/bot_desktop/runtime.py:80</code></td>
+<td><code>examples/tools/computer_use.py:33</code></td>
+</tr>
+<tr>
+<td><strong>C3</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/electron/hardening.ts:285-333,531-578</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C4</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/src/app/right-sidebar/files/</code>, <code>apps/desktop/src/app/right-sidebar/file-actions.tsx</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C5</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/package.json:108-113,136</code>, <code>apps/desktop/electron/terminal-ipc.ts</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C6</strong></td>
+<td><code>desktop/src/main.tsx:9</code>, <code>viewer/src/tokens.test.ts:72-76</code></td>
+<td><code>apps/desktop/src/themes/presets.ts</code>, <code>apps/desktop/src/themes/skin.ts</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C7</strong></td>
+<td><code>viewer/src/wording.ts</code></td>
+<td><code>apps/desktop/src/i18n/</code>, <code>apps/desktop/src/i18n/catalog-completeness.test.ts</code></td>
+<td><code>docs/ja</code>, <code>docs/ko</code>, <code>docs/zh</code></td>
+</tr>
+<tr>
+<td><strong>C8</strong></td>
+<td><code>aria-</code> attributes in <code>viewer/src</code>, <code>viewer/src/tokens.test.ts:72-76</code></td>
+<td><code>apps/desktop/electron/renderer-accessibility.ts:1-40</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C9</strong></td>
+<td><code>desktop/src/components/ui/sidebar.tsx:30,97</code></td>
+<td><code>apps/desktop/src/app/command-palette/index.tsx:1-30</code>, <code>apps/desktop/src/app/settings/keybind-settings.tsx</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>C10</strong></td>
+<td><code>desktop/electron/main.cjs:197</code></td>
+<td><code>apps/desktop/electron/notification-registry.ts:1-14</code>, <code>apps/desktop/electron/tray-host.ts:1-24</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>D1</strong></td>
+<td><code>viewer/src/protocol.ts:44-97</code></td>
+<td><code>apps/desktop/package.json:81-83,150</code></td>
+<td><code>src/agents/stream_events.py:11-60</code></td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td><code>viewer/src/protocol.ts:61-62</code>, <code>docs/demo-guide.md:113-115</code></td>
+<td><code>apps/desktop/src/components/assistant-ui/tool/</code></td>
+<td><code>src/agents/stream_events.py:24-50</code></td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td><code>viewer/src/components/richText.tsx:1-37</code></td>
+<td><code>apps/desktop/package.json:86-150</code> (shiki, katex, mermaid, dompurify)</td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>D4</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/src/app/chat/composer/attachments.tsx:5-122</code></td>
+<td><code>src/agents/items.py</code></td>
+</tr>
+<tr>
+<td><strong>D5</strong></td>
+<td><code>viewer/src/protocol.ts:152</code></td>
+<td><code>apps/desktop/src/app/chat/sidebar/use-server-session-search.ts</code></td>
+<td><code>src/agents/memory/session.py:53-96</code>, <code>src/agents/extensions/memory/</code></td>
+</tr>
+<tr>
+<td><strong>D6</strong></td>
+<td><code>viewer/src/protocol.ts:138-139</code></td>
+<td><code>apps/desktop/src/app/session/hooks/use-prompt-actions/rewind.ts:1-9</code></td>
+<td><code>src/agents/run_state.py</code>, <code>src/agents/repl.py:76</code></td>
+</tr>
+<tr>
+<td><strong>D7</strong></td>
+<td><code>README.md:17</code></td>
+<td><code>apps/desktop/src/app/chat/sidebar/fleet-rail.ts</code>, <code>apps/desktop/ENGINEERING.md:74-76</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>D8</strong></td>
+<td><code>viewer/src/protocol.ts:140,151</code>, <code>desktop/electron/main.cjs:53-64</code></td>
+<td><code>hermes_cli/commands.py:124-126</code>, <code>apps/desktop/src/app/session/hooks/use-prompt-actions/rewind.ts:1-6</code></td>
+<td><code>src/agents/result.py:933-958</code></td>
+</tr>
+<tr>
+<td><strong>D9</strong></td>
+<td>Absent</td>
+<td><code>apps/desktop/src/app/chat/composer/hooks/use-voice-live-conversation.ts</code></td>
+<td><code>src/agents/voice/</code>, <code>src/agents/realtime/</code></td>
+</tr>
+<tr>
+<td><strong>E1</strong></td>
+<td><code>src/bap_browser/driver/playwright_driver.py:1-10</code></td>
+<td><code>tools/browser_tool_session.py:331-362</code>, <code>tools/browser_use_cli.py:234-241</code></td>
+<td><code>src/agents/computer.py:8-66</code></td>
+</tr>
+<tr>
+<td><strong>E2</strong></td>
+<td><code>src/bap_browser/driver/snapshot.py</code></td>
+<td><code>tools/browser_tool.py:817-848</code>, <code>tools/browser_tool_snapshot.py:69-108</code></td>
+<td><code>src/agents/computer.py:27-29</code></td>
+</tr>
+<tr>
+<td><strong>E3</strong></td>
+<td><code>src/bap_browser/tools/offered.py</code>, <code>src/bap_browser/config.py:173</code></td>
+<td><code>tools/browser_tool.py:1308-1370</code>, <code>tools/browser_use_cli.py:829</code>, <code>tools/browser_vault_tool.py</code></td>
+<td><code>src/agents/tool.py:836,891</code></td>
+</tr>
+<tr>
+<td><strong>E4</strong></td>
+<td><code>docs/feature-map.json</code> ("tools")</td>
+<td><code>tools/browser_supervisor_dialogs.py</code>, <code>tools/browser_supervisor_frames.py</code>, <code>website/docs/user-guide/features/browser.md</code></td>
+<td><code>src/agents/computer.py:8-66</code></td>
+</tr>
+<tr>
+<td><strong>E5</strong></td>
+<td><code>docs/demo-guide.md:93-95</code></td>
+<td><code>tools/browser_tool_session.py:67-83</code>, <code>apps/desktop/src/plugins/hermes-bots/screen-pane.tsx:1-12</code></td>
+<td><code>examples/tools/computer_use.py:33</code></td>
+</tr>
+<tr>
+<td><strong>E6</strong></td>
+<td><code>src/bap_browser/service/session.py:209,220-221,500</code></td>
+<td><code>apps/desktop/src/plugins/hermes-bots/screen-pane.tsx:1-12</code>, <code>tools/bot_desktop/runtime.py:80</code></td>
+<td><code>src/agents/tool.py:890-898</code></td>
+</tr>
+<tr>
+<td><strong>E7</strong></td>
+<td><code>desktop/electron/main.cjs:130-131</code></td>
+<td><code>tools/browser_tool_real_profile.py</code>, <code>agent/vault_backends/</code></td>
+<td><code>src/agents/computer.py</code></td>
+</tr>
+<tr>
+<td><strong>E8</strong></td>
+<td><code>src/bap_browser/config.py</code> (<code>Backend.kind</code>), <code>docs/bap-browser-spec.md:2984</code></td>
+<td><code>plugins/browser/browser_use/provider.py</code>, <code>plugins/browser/browserbase/provider.py</code>, <code>plugins/browser/firecrawl/provider.py</code></td>
+<td><code>src/agents/extensions/sandbox/</code></td>
+</tr>
+<tr>
+<td><strong>E9</strong></td>
+<td><code>docs/feature-map.json</code> ("code-tool")</td>
+<td><code>tools/browser_use_cli.py:234-241,829</code>, <code>evals/browser_use/README.md:52-65</code></td>
+<td><code>src/agents/tool.py:1641-1646</code></td>
+</tr>
+<tr>
+<td><strong>F1</strong></td>
+<td><code>src/bap_browser/agent/loop.py:1-5</code></td>
+<td><code>run_agent.py:214</code>, <code>agent/conversation_loop.py:1381-1709</code></td>
+<td><code>src/agents/run.py</code>, <code>src/agents/run_internal/</code></td>
+</tr>
+<tr>
+<td><strong>F2</strong></td>
+<td><code>src/bap_browser/config.py:405-407</code></td>
+<td><code>plugins/model-providers/</code> (38)</td>
+<td><code>src/agents/extensions/models/</code></td>
+</tr>
+<tr>
+<td><strong>F3</strong></td>
+<td><code>src/bap_browser/config.py:408-411</code></td>
+<td><code>hermes_cli/cli_model_switch_mixin.py:829,928</code></td>
+<td><code>src/agents/models/default_models.py:103</code></td>
+</tr>
+<tr>
+<td><strong>F4</strong></td>
+<td><code>src/bap_browser/safeguards/model.py:132</code></td>
+<td><code>agent/auxiliary_structured_output.py:1-20</code>, <code>tools/delegation_output_schema.py:1-15</code></td>
+<td><code>src/agents/agent_output.py:22-39</code></td>
+</tr>
+<tr>
+<td><strong>F5</strong></td>
+<td>Absent</td>
+<td><code>tools/delegate_tool.py:1-12,60</code>, <code>hermes_cli/moa_config.py:1-15</code></td>
+<td><code>src/agents/agent.py:354-355,606-646</code></td>
+</tr>
+<tr>
+<td><strong>F6</strong></td>
+<td><code>docs/feature-map.json</code> ("computer-use")</td>
+<td><code>tools/</code> (281 files)</td>
+<td><code>src/agents/tool.py:454-1646</code></td>
+</tr>
+<tr>
+<td><strong>F7</strong></td>
+<td>Absent</td>
+<td><code>tools/mcp_tool.py</code>, <code>optional-mcps/</code> (68), <code>tools/osv_check.py:1-20</code></td>
+<td><code>docs/mcp.md:20-25</code></td>
+</tr>
+<tr>
+<td><strong>F8</strong></td>
+<td><code>src/bap_browser/mcp/server.py</code></td>
+<td><code>mcp_serve.py:1-8</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>F9</strong></td>
+<td><code>plugin/skills/browse/SKILL.md</code></td>
+<td><code>tools/skills_tool.py:1-4</code>, <code>skills/</code> and <code>optional-skills/</code> (212 <code>SKILL.md</code>)</td>
+<td><code>src/agents/sandbox/capabilities/skills.py:29-85</code></td>
+</tr>
+<tr>
+<td><strong>F10</strong></td>
+<td>Absent</td>
+<td><code>tools/memory_tool.py:1-7</code>, <code>plugins/memory/</code></td>
+<td><code>src/agents/memory/</code></td>
+</tr>
+<tr>
+<td><strong>F11</strong></td>
+<td><code>src/bap_browser/agent/openai_model.py:1-5</code></td>
+<td><code>agent/context_compressor.py:1-2</code>, <code>agent/conversation_compression.py:1-8</code></td>
+<td><code>src/agents/extensions/tool_output_trimmer.py:1-24</code>, <code>src/agents/run_config.py:455</code></td>
+</tr>
+<tr>
+<td><strong>F12</strong></td>
+<td><code>src/bap_browser/safeguards/model.py:85-108</code></td>
+<td><code>agent/agent_init_fallback.py:11-18</code></td>
+<td><code>src/agents/retry.py:16-30</code></td>
+</tr>
+<tr>
+<td><strong>F13</strong></td>
+<td><code>src/bap_browser/safeguards/model.py:31-36</code>, <code>src/bap_browser/evals/summary.py:14-25</code></td>
+<td><code>hermes_state_usage.py</code>, <code>agent/account_usage.py</code>, <code>hermes_cli/subcommands/usage.py:1-5</code></td>
+<td><code>src/agents/usage.py</code>, <code>docs/usage.md:3-18</code></td>
+</tr>
+<tr>
+<td><strong>F14</strong></td>
+<td>Absent</td>
+<td><code>cron/jobs.py:2-3</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>F15</strong></td>
+<td>Absent</td>
+<td><code>plugins/platforms/</code> (21)</td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>G1</strong></td>
+<td><code>src/bap_browser/safeguards/check.py:185-221</code>, <code>src/bap_browser/safeguards/reviewer.py:146-164</code></td>
+<td><code>tools/approval.py:945-1016</code>, <code>tools/approval_detection.py:107-140,228-482</code></td>
+<td><code>src/agents/tool.py:499-511</code>, <code>docs/human_in_the_loop.md:15</code></td>
+</tr>
+<tr>
+<td><strong>G2</strong></td>
+<td><code>src/bap_browser/driver/session.py:26-30</code></td>
+<td><code>apps/desktop/src/components/assistant-ui/tool/approval.tsx:190-423</code></td>
+<td><code>src/agents/run_internal/approvals.py:46-48</code>, <code>docs/human_in_the_loop.md:199</code></td>
+</tr>
+<tr>
+<td><strong>G3</strong></td>
+<td><code>src/bap_browser/tools/browser_tools.py:338</code>, <code>src/bap_browser/tools/human_checks.py:1-39</code></td>
+<td><code>tools/clarify_tool.py:1-80</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>G4</strong></td>
+<td><code>src/bap_browser/service/session.py:207,218</code></td>
+<td><code>hermes_cli/commands.py:126</code>, <code>tools/interrupt.py:74-99</code></td>
+<td><code>src/agents/run_state.py:1366-1413</code></td>
+</tr>
+<tr>
+<td><strong>G5</strong></td>
+<td>As E6</td>
+<td>As E6</td>
+<td>As E6</td>
+</tr>
+<tr>
+<td><strong>G6</strong></td>
+<td>As D8</td>
+<td>As D8</td>
+<td>As D8</td>
+</tr>
+<tr>
+<td><strong>G7</strong></td>
+<td><code>src/bap_browser/config_safeguards.py:14-20</code>, <code>src/bap_browser/safeguards/reviewer.py:146-164</code>, <code>src/bap_browser/safeguards/check.py:382-391</code></td>
+<td><code>apps/desktop/src/store/approval-mode.ts:3</code>, <code>tools/approval.py:46,94-112,741-770</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>G8</strong></td>
+<td><code>src/bap_browser/service/session.py:45</code></td>
+<td><code>gateway/session_state.py:236</code>, <code>apps/desktop/src/app/session/hooks/use-session-actions/restore-pending-approval.ts:1-28</code></td>
+<td><code>src/agents/run_state.py:1885,2247,2305,2318-2323,2393</code></td>
+</tr>
+<tr>
+<td><strong>G9</strong></td>
+<td><code>docs/bap-browser-spec.md:4540-4542,4571</code></td>
+<td><code>apps/desktop/src/store/native-notifications.ts:25-39</code></td>
+<td><code>docs/human_in_the_loop.md:53</code></td>
+</tr>
+<tr>
+<td><strong>H1</strong></td>
+<td><code>docs/bap-browser-spec.md:4086-4221</code>, <code>src/bap_browser/safeguards/scan.py</code></td>
+<td><code>tools/threat_patterns.py:1-60</code>, <code>agent/context_file_sources.py:52-58</code>, <code>SECURITY.md:150-158</code></td>
+<td><code>SECURITY.md:38</code></td>
+</tr>
+<tr>
+<td><strong>H2</strong></td>
+<td><code>src/bap_browser/safeguards/scan.py</code></td>
+<td><code>agent/tool_guardrails.py:1-60</code></td>
+<td><code>src/agents/guardrail.py:71-185</code>, <code>src/agents/tool_guardrails.py:40-117</code>, <code>docs/guardrails.md:56</code></td>
+</tr>
+<tr>
+<td><strong>H3</strong></td>
+<td><code>src/bap_browser/safeguards/actions.py</code></td>
+<td><code>tools/approval_detection.py:107-140,228-482</code></td>
+<td><code>src/agents/run_internal/tool_execution.py:2513-2522</code></td>
+</tr>
+<tr>
+<td><strong>H4</strong></td>
+<td><code>src/bap_browser/safeguards/reviewer.py:29,146-150</code>, <code>docs/bap-browser-spec.md:4240-4257</code></td>
+<td><code>tools/approval_detection.py:17-39</code></td>
+<td><code>src/agents/tool.py:499-511</code></td>
+</tr>
+<tr>
+<td><strong>H5</strong></td>
+<td><code>src/bap_browser/policy/redaction.py:13-27</code>, <code>docs/bap-browser-spec.md:4493-4496</code></td>
+<td><code>agent/redact.py:97,887-951</code>, <code>tools/environments/local_env_policy.py:1-50</code></td>
+<td><code>src/agents/_debug.py:12-28</code>, <code>src/agents/run_config.py:53-56</code></td>
+</tr>
+<tr>
+<td><strong>H6</strong></td>
+<td><code>desktop/electron/main.cjs:80</code>, <code>src/bap_browser/config.py:419-422</code></td>
+<td><code>agent/vault_backends/local.py:1-20</code>, <code>hermes_cli/auth.py:793-797</code>, <code>apps/desktop/electron/hardening.ts:156-236</code></td>
+<td><code>src/agents/_config.py:13-17</code></td>
+</tr>
+<tr>
+<td><strong>H7</strong></td>
+<td><code>src/bap_browser/policy/url_policy.py:7-8,27-30,112-144</code></td>
+<td><code>tools/url_safety.py:96-137,339-429</code>, <code>tools/browser_tool.py:88</code></td>
+<td><code>src/agents/tool.py:1332-1374</code></td>
+</tr>
+<tr>
+<td><strong>H8</strong></td>
+<td><code>src/bap_browser/safeguards/lookalikes.py</code>, <code>docs/auto-mode-safeguards-status.md:50</code></td>
+<td><code>tools/url_safety.py:70-93</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>H9</strong></td>
+<td><code>docs/bap-browser-spec.md:4302-4317</code></td>
+<td><code>website/docs/user-guide/features/browser.md</code></td>
+<td><code>src/agents/run_config.py:48-50</code></td>
+</tr>
+<tr>
+<td><strong>H10</strong></td>
+<td><code>docs/feature-map.json</code> ("code-tool")</td>
+<td><code>SECURITY.md:48-75</code>, <code>agent/terminal_env_registry.py:27</code></td>
+<td><code>docs/sandbox/guide.md:67-73</code>, <code>git log --oneline -30 -- src/agents/sandbox</code></td>
+</tr>
+<tr>
+<td><strong>H11</strong></td>
+<td><code>desktop/electron/main.cjs:118-168</code>, <code>desktop/index.html:1-13</code></td>
+<td><code>apps/desktop/electron/window-open-policy.ts:1-94</code>, <code>apps/desktop/electron/main.ts:13581-13588</code>, <code>apps/desktop/electron/windows-sandbox-fallback.ts:1-20</code>, <code>apps/desktop/index.html</code></td>
+<td>Not applicable</td>
+</tr>
+<tr>
+<td><strong>H12</strong></td>
+<td><code>src/bap_browser/service/app.py:77,563-567,683</code>, <code>src/bap_browser/service/wrapping.py:32-43</code>, <code>src/bap_browser/config.py:317</code>, <code>desktop/electron/core-line.cjs:21-24</code></td>
+<td><code>apps/desktop/electron/backend-discovery.ts:23,42,152</code>, <code>apps/desktop/electron/dashboard-token.ts:1-101</code></td>
+<td>Not applicable</td>
+</tr>
+<tr>
+<td><strong>H13</strong></td>
+<td><code>uv.lock</code>, <code>viewer/package-lock.json</code>, <code>desktop/package-lock.json</code></td>
+<td><code>tools/osv_check.py:1-20</code>, <code>tools/skills_guard.py:21-33</code>, <code>tools/plugin_guard.py:1-9</code>, <code>.github/workflows/osv-scanner.yml</code>, <code>apps/desktop/electron/desktop-plugin-install.ts:355-364</code></td>
+<td><code>.github/workflows/publish.yml:40-44,116-122</code>, <code>.github/workflows/codeql.yml:1-24</code></td>
+</tr>
+<tr>
+<td><strong>H14</strong></td>
+<td>Absent: no telemetry code in <code>src</code>, <code>desktop</code> or <code>viewer/src</code>, <code>docs/bap-browser-spec.md:4498-4500</code></td>
+<td><code>hermes_cli/config_defaults.py:2329-2342,2545-2547</code></td>
+<td><code>src/agents/tracing/processors.py:46</code>, <code>src/agents/run_config.py:53-56</code></td>
+</tr>
+<tr>
+<td><strong>H15</strong></td>
+<td><code>src/bap_browser/config_safeguards.py:458-471</code>, <code>src/bap_browser/safeguards/limits.py:56-170</code></td>
+<td><code>hermes_cli/config_defaults.py:78,1361</code>, <code>agent/repetition_guard.py:16-57</code>, <code>agent/tool_guardrails.py:36-45</code>, <code>hermes_cli/model_cost_guard.py:12-13</code></td>
+<td><code>src/agents/run_config.py:45</code>, <code>src/agents/tool.py:514-519</code></td>
+</tr>
+<tr>
+<td><strong>H16</strong></td>
+<td>Absent: no <code>SECURITY.md</code></td>
+<td><code>SECURITY.md:1-20,76-100,320-335</code></td>
+<td><code>SECURITY.md:1-44</code></td>
+</tr>
+<tr>
+<td><strong>H17</strong></td>
+<td><code>docs/bap-browser-spec.md:4483-4500</code>, <code>docs/auto-mode-safeguards-status.md:68</code></td>
+<td><code>hermes_state_timeline.py</code>, <code>hermes_cli/dashboard_auth/audit.py:1-33</code></td>
+<td><code>src/agents/result.py:369,374</code></td>
+</tr>
+<tr>
+<td><strong>I1</strong></td>
+<td><code>src/bap_browser/tools/event_log.py:1-35</code>, <code>src/bap_browser/cli.py:245</code></td>
+<td><code>hermes_logging.py:1-17</code></td>
+<td><code>src/agents/_debug.py:12-28</code></td>
+</tr>
+<tr>
+<td><strong>I2</strong></td>
+<td>Absent</td>
+<td><code>agent/monitoring/otlp_exporter.py:1-7</code>, <code>plugins/observability/langfuse/__init__.py:1-7</code></td>
+<td><code>src/agents/tracing/processors.py:28-903</code></td>
+</tr>
+<tr>
+<td><strong>I3</strong></td>
+<td><code>src/bap_browser/evals/record.py:1-7</code>, <code>docs/bap-browser-spec.md:2980</code></td>
+<td><code>mini_swe_runner.py:1-9</code>, <code>batch_runner.py:2-6</code></td>
+<td><code>docs/testing.md:3-6</code></td>
+</tr>
+<tr>
+<td><strong>I4</strong></td>
+<td><code>src/bap_browser/evals/summary.py:14-29</code></td>
+<td><code>hermes_cli/subcommands/usage.py:1-5</code></td>
+<td><code>docs/usage.md:3-27</code></td>
+</tr>
+<tr>
+<td><strong>I5</strong></td>
+<td><code>src/bap_browser/doctor.py:1-23</code></td>
+<td><code>hermes_cli/doctor.py:1-4</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>I6</strong></td>
+<td><code>src/bap_browser/evals/sets/</code>, <code>tests/site/attacks/</code> (26)</td>
+<td><code>evals/</code> (147 Python files), <code>evals/toolperf_abeval/ab_eval.py:1-15</code></td>
+<td><code>docs/testing.md:1-20</code></td>
+</tr>
+<tr>
+<td><strong>I7</strong></td>
+<td><code>perf/budget.json</code>, <code>src/bap_browser/bench/runner.py:1-20</code></td>
+<td><code>scripts/iso-certify.py:1-32</code>, <code>tests/perf_guards/test_pattern_b_scaling.py:1-8</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>J1</strong></td>
+<td><code>src/bap_browser/config.py:1-35</code></td>
+<td><code>hermes_cli/config.py:436-438</code>, <code>cli-config.yaml.example:1-9</code></td>
+<td><code>src/agents/_config.py:13-54</code></td>
+</tr>
+<tr>
+<td><strong>J2</strong></td>
+<td><code>src/bap_browser/config.py:25-27</code></td>
+<td><code>.env.example:1-18</code></td>
+<td><code>src/agents/_debug.py:5-28</code></td>
+</tr>
+<tr>
+<td><strong>J3</strong></td>
+<td><code>src/bap_browser/settings/catalogue.py</code></td>
+<td><code>apps/desktop/src/app/settings/</code>, <code>apps/desktop/src/app/settings/config-settings.tsx:10</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>J4</strong></td>
+<td><code>src/bap_browser/config.py:419-422</code></td>
+<td><code>apps/desktop/src/app/settings/keys-settings.tsx</code>, <code>apps/desktop/src/app/settings/env-credentials.tsx:1-20</code></td>
+<td><code>src/agents/_config.py:13-19</code></td>
+</tr>
+<tr>
+<td><strong>J5</strong></td>
+<td><code>src/bap_browser/config.py:198-202</code></td>
+<td><code>hermes_cli/profiles.py:1</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>J6</strong></td>
+<td><code>src/bap_browser/service/app.py:273-300,656-657</code></td>
+<td><code>hermes_cli/managed_scope.py:1-7</code>, <code>hermes_cli/config.py:235</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>K1</strong></td>
+<td><code>plugin/.claude-plugin/plugin.json</code></td>
+<td><code>plugins/AGENTS.md:1-15</code>, <code>plugin-catalog/</code> (523)</td>
+<td><code>src/agents/extensions/</code></td>
+</tr>
+<tr>
+<td><strong>K2</strong></td>
+<td>As F9</td>
+<td>As F9</td>
+<td>As F9</td>
+</tr>
+<tr>
+<td><strong>K3</strong></td>
+<td>Absent</td>
+<td><code>gateway/hooks.py:1-8</code></td>
+<td><code>src/agents/lifecycle.py</code></td>
+</tr>
+<tr>
+<td><strong>K4</strong></td>
+<td><code>src/bap_browser/tools/offered.py</code></td>
+<td><code>website/docs/developer-guide/adding-tools.md:96-119</code></td>
+<td><code>src/agents/decorators.py</code>, <code>src/agents/tool.py:454</code></td>
+</tr>
+<tr>
+<td><strong>K5</strong></td>
+<td>As F7 and F8</td>
+<td>As F7 and F8</td>
+<td>As F7 and F8</td>
+</tr>
+<tr>
+<td><strong>K6</strong></td>
+<td><code>docs/feature-map.json</code> ("tools")</td>
+<td><code>run_agent.py:1-6</code>, <code>setup.py:1-18</code></td>
+<td><code>README.md:58-69</code></td>
+</tr>
+<tr>
+<td><strong>L1</strong></td>
+<td>Section 19</td>
+<td>Section 19, <code>apps/desktop/e2e/</code></td>
+<td>Section 19, <code>integration_tests/</code></td>
+</tr>
+<tr>
+<td><strong>L2</strong></td>
+<td><code>desktop/electron/core-line.test.cjs</code></td>
+<td><code>pyproject.toml:841-849</code>, <code>apps/desktop/package.json:65-78</code></td>
+<td><code>Makefile</code></td>
+</tr>
+<tr>
+<td><strong>L3</strong></td>
+<td><code>.github/workflows/ci.yml</code></td>
+<td><code>.github/workflows/</code> (51)</td>
+<td><code>.github/workflows/</code> (10)</td>
+</tr>
+<tr>
+<td><strong>L4</strong></td>
+<td><code>.github/workflows/ci.yml:16-30</code></td>
+<td><code>.github/workflows/lint.yml:1,51-84</code>, <code>apps/desktop/package.json:60</code></td>
+<td><code>pyproject.toml:193-194</code>, <code>Makefile</code></td>
+</tr>
+<tr>
+<td><strong>L5</strong></td>
+<td><code>desktop/package.json:8-13</code></td>
+<td><code>ruff.strict.toml</code>, <code>lefthook.yml:1-4</code>, <code>apps/desktop/package.json:61-64</code></td>
+<td><code>pyproject.toml:157-172</code></td>
+</tr>
+<tr>
+<td><strong>L6</strong></td>
+<td><code>scripts/gate.py:38-48</code>, <code>scripts/patterns.py</code></td>
+<td><code>scripts/check:1-16</code>, <code>scripts/code_health/</code>, <code>apps/desktop/eslint.config.mjs:17-67</code></td>
+<td><code>Makefile</code> (<code>check</code>, <code>coverage</code>)</td>
+</tr>
+<tr>
+<td><strong>M1</strong></td>
+<td><code>.github/workflows/ci.yml:8</code></td>
+<td><code>website/docs/getting-started/platform-support.md:17-49</code></td>
+<td><code>pyproject.toml:30</code>, <code>README.md:77</code></td>
+</tr>
+<tr>
+<td><strong>M2</strong></td>
+<td><code>CLAUDE.md</code> ("Gotchas"), <code>desktop/electron/main.cjs:57-63</code></td>
+<td><code>apps/desktop/electron/windows-sandbox-fallback.ts</code>, <code>apps/desktop/electron/windows-stack-cookie-fallback.ts</code>, <code>apps/desktop/electron/backend-child.ts:1-15</code></td>
+<td><code>README.md:77</code></td>
+</tr>
+<tr>
+<td><strong>N1</strong></td>
+<td>Absent</td>
+<td><code>hermes_startup_watchdog.py:1-9</code></td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>N2</strong></td>
+<td>As I7</td>
+<td>As I7</td>
+<td>Absent</td>
+</tr>
+<tr>
+<td><strong>N3</strong></td>
+<td><code>tests/unit/test_registry.py:96-104</code>, run on <code>TOOLS</code> from <code>src/bap_browser/tools/offered.py</code></td>
+<td><code>evals/browser_use/README.md</code>, <code>evals/prompt_footprint/property_guidance.py:1-2</code></td>
+<td><code>src/agents/extensions/tool_output_trimmer.py:1-24</code></td>
+</tr>
+<tr>
+<td><strong>N4</strong></td>
+<td><code>docs/demo-guide.md:214-217</code></td>
+<td><code>evals/browser_use/</code>, <code>evals/toolperf_abeval/</code>, <code>evals/codebase_navigability/</code></td>
+<td>Absent</td>
+</tr>
+</tbody>
+</table></div>
+</main>
+</div>
+<script>
+(function () {
+  var toc = document.getElementById('toc');
+  var narrow = window.matchMedia('(max-width: 900px)');
+  if (narrow.matches) toc.open = false;
+  toc.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A' && narrow.matches) toc.open = false;
+  });
+  if (!('IntersectionObserver' in window)) return;
+  var links = {};
+  toc.querySelectorAll('a').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  var current = null;
+  function mark(id) {
+    if (id === current || !links[id]) return;
+    current = id;
+    toc.querySelectorAll('[aria-current]').forEach(function (el) { el.removeAttribute('aria-current'); });
+    toc.querySelectorAll('li.act').forEach(function (el) { el.classList.remove('act'); });
+    links[id].setAttribute('aria-current', 'true');
+    var section = links[id].closest('li.s');
+    if (section) section.classList.add('act');
+  }
+  var watcher = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) { if (entry.isIntersecting) mark(entry.target.id); });
+  }, { rootMargin: '0px 0px -75% 0px' });
+  document.querySelectorAll('main h2[id], main h3[id]').forEach(function (h) { watcher.observe(h); });
+})();
+</script>
+</body>
+</html>
