@@ -188,8 +188,8 @@ def test_every_task_of_a_set_is_whole(name: str) -> None:
 
 def test_the_sets_are_as_large_as_the_status_page_says() -> None:
     assert {name: len(load_set(name)) for name in SETS} == {
-        "short": 20,
-        "confirm": 16,
-        "attack": 10,
+        "short": 30,
+        "confirm": 100,
+        "attack": 25,
         "long": 4,
     }

@@ -415,7 +415,7 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         await page.get_by_role("tab", name="Evaluations").click()
         long_tasks = page.get_by_role("listitem", name="Long tasks")
         await long_tasks.get_by_text("This set has not been run yet.").wait_for()
-        assert await page.get_by_role("listitem", name="Short tasks").get_by_text("20 tasks").count() == 1
+        assert await page.get_by_role("listitem", name="Short tasks").get_by_text("30 tasks").count() == 1
         assert await view.silent_controls() == []
 
         await page.get_by_label("Times each task is tried").select_option("1")

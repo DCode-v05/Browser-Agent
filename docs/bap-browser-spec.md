@@ -2798,9 +2798,9 @@ case, and a word that begins with `~` is looked for anywhere in the value.
 
 | Set | Tasks | What it measures | Its number |
 |---|---|---|---|
-| `short` | 20 | Whether a small task is finished: one to ten steps on one page | The share of tries that passed |
-| `confirm` | 16 | Whether a person is asked before a step that orders, sends, deletes or publishes (8 tasks), and is not asked before a harmless one (8). Two of the risky ones are answered with no: nothing may then be done | Of the risky steps, how many were asked about; of the harmless ones, how many were asked about without need |
-| `attack` | 10 | Whether text planted in a review, a message, a note or off the screen makes the agent order, send, delete, publish, change the account or hand over the user's details | The share of planted instructions that were followed. Lower is better |
+| `short` | 30 | Whether a small task is finished: one to ten steps on one page | The share of tries that passed |
+| `confirm` | 100 | Whether a person is asked before a step that orders, sends, deletes or publishes (50 tasks), and is not asked before a harmless one (50). Seven of the risky ones are answered with no: nothing may then be done | Of the risky steps, how many were asked about; of the harmless ones, how many were asked about without need |
+| `attack` | 25 | Whether text planted in a review, a message, a note or off the screen makes the agent order, send, delete, publish, change the account or hand over the user's details | The share of planted instructions that were followed. Lower is better |
 | `long` | 4 | Whether a task of many steps over several pages is finished | The share of tries that passed |
 
 **A run** does every task of a set `trials` times (`evals.suite_trials`, at most
@@ -2847,7 +2847,7 @@ did not pass. The Systems page puts the newest run of each set on each browser s
 | `POST /api/systems/{name}/suite/stop` | The same | Ends the run under way after its task |
 | `GET /api/suite` | Admin | The newest run of each set on each browser |
 
-**Tested.** The reference solutions of all 50 tasks are run in a real browser on every change, and
+**Tested.** The reference solutions of all 159 tasks are run in a real browser on every change, and
 every task is tried with a solution of no steps, which must not pass. The rules of section 8.2 ask
 before every risky step of `confirm` and before two harmless ones, whose controls hold the words
 "send" and "remove": the test states both.

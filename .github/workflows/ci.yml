@@ -72,46 +72,23 @@ jobs:
         run: uv run python scripts/ladder.py
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py --through-helper
+      # With the setting on, the installer has the driver register its own logon task (spec 22.10).
       - if: runner.os == 'Windows'
-        name: Experiment, File Explorer and Windows Terminal by their programs, and the logon task
-        continue-on-error: true
+        name: The driver's logon task is registered when the settings ask for it
         shell: bash
         env:
           BAP_BROWSER__COMPUTER__BASE__AUTOSTART: "true"
         run: |
-          (explorer.exe &) ; sleep 6
           uv run bap-browser computer install
           uv run python - <<'EOF'
-          import json, subprocess
-          import psutil
+          import subprocess, sys
           from bap_browser import computer
           from bap_browser.computer import driver
           from bap_browser.config import load_config
-          config = load_config()
-          binary = driver.installed(computer.home_of(config))
-          for words in (["autostart", "status"],):
-              said = subprocess.run([str(binary), *words], capture_output=True, text=True)
-              print("AUTOSTART", said.returncode, "|", said.stdout.strip()[:400], "|", said.stderr.strip()[:300])
-          found = {}
-          for one in psutil.process_iter(["name", "exe"]):
-              if (one.info["name"] or "").lower() in ("explorer.exe", "windowsterminal.exe") and one.info["exe"]:
-                  found[one.info["name"].lower()] = one.info["exe"]
-          print("PROGRAMS", found)
-          for form in ("plain", "canonical"):
-              named = [path if form == "plain" else "\\\\?\\" + path for path in found.values()]
-              base = config.computer.base.model_copy(update={"also_allowed": named})
-              here = config.computer.model_copy(update={"runs": "machine", "base": base})
-              try:
-                  with computer.base(config.model_copy(update={"computer": here})):
-                      computer.ask_with(lambda action, about: True)
-                      windows = json.loads(computer.computer_use({"action": "list_windows"}, "try"))
-                      for row in windows.get("windows", []):
-                          if any(word in json.dumps(row).lower() for word in ("explorer", "terminal")):
-                              asked = {"action": "capture", "mode": "ax", "pid": row["pid"], "window_id": row["window_id"]}
-                              seen = computer.computer_use(asked, "try")
-                              print("TRIED", form, "|", row.get("app_name"), "|", row.get("title"), "|", str(seen)[:200].replace("\n", " "))
-              except Exception as failed:
-                  print("TRIED", form, "FAILED", str(failed)[:400])
+          binary = driver.installed(computer.home_of(load_config()))
+          said = subprocess.run([str(binary), "autostart", "status"], capture_output=True, text=True).stdout.strip()
+          print(said)
+          sys.exit(0 if said.startswith("registered") else 1)
           EOF
       - if: runner.os == 'macOS'
         run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."

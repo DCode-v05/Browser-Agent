@@ -23,8 +23,10 @@ FILE = "allowed.json"
 # What each app the settings can allow is on each system, as the driver itself names it: a bundle on
 # macOS, the identity the driver lists on Windows, a program on Linux. On Windows the text editor and
 # the calculator are the ones the driver was seen to allow by these names (Windows Server 2025). The
-# names it lists for File Explorer and Windows Terminal did not let it read their windows, so those
-# two are not here: they are added with `computer.base.also_allowed` once their names are known.
+# windows of File Explorer and Windows Terminal carry no identity the pinned driver compares with
+# this list: neither the names it lists for them nor the paths of their programs, plain or in the
+# long form Windows itself uses, let it read them (tried on a runner). Those two cannot be allowed
+# with this driver.
 APPS: dict[str, dict[str, str]] = {
     "text_editor": {
         "darwin": "com.apple.TextEdit",
