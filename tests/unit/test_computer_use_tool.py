@@ -534,32 +534,35 @@ class WithAMenu(Desk):
 
 
 class ItsOwnDesktop:
-    """The desktop the engine itself started, as far as the driver asks it: where the window in front is."""
+    """The desktop the engine itself started, as far as the driver asks it: what its pointer is sent."""
 
     folder = None
     alive = True
 
-    async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
-        assert "xwininfo" in command[-1]
-        return b"  Absolute upper-left X:  300\n  Absolute upper-left Y:  200\n  Width: 640\n"
+    def __init__(self) -> None:
+        self.sent: list[str] = []
+
+    async def send(self, line: str) -> None:
+        self.sent.append(line)
 
 
-def where_nobody_sits(make_config, tmp_path: Path) -> tuple[ServiceSession, WithAMenu]:
+def where_nobody_sits(make_config, tmp_path: Path) -> tuple[ServiceSession, WithAMenu, ItsOwnDesktop]:
     computer = {"runs": "container", "base": {"home": str(tmp_path / "home")}}
     config = make_config(tmp_path, computer=computer)
     desk = WithAMenu()
     driver = HermesDriver(config, backend=lambda: desk)
-    driver.desktop = ItsOwnDesktop()  # pyright: ignore[reportAttributeAccessIssue]
+    own = ItsOwnDesktop()
+    driver.desktop = own  # pyright: ignore[reportAttributeAccessIssue]
     session = ServiceSession(
         config, driver, name="computer", backend="contained_desktop", tools=computer_tools_for
     )
-    return session, desk
+    return session, desk, own
 
 
 async def test_where_nobody_sits_a_capture_names_what_is_on_the_screen_and_counts_the_rest(
     make_config, tmp_path: Path
 ) -> None:
-    session, _ = where_nobody_sits(make_config, tmp_path)
+    session, _, _ = where_nobody_sits(make_config, tmp_path)
     await session.start()
     try:
         seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
@@ -574,25 +577,32 @@ async def test_where_nobody_sits_a_capture_names_what_is_on_the_screen_and_count
 async def test_where_nobody_sits_a_click_by_number_is_a_click_of_the_pointer_at_that_place(
     make_config, tmp_path: Path
 ) -> None:
-    session, desk = where_nobody_sits(make_config, tmp_path)
+    session, desk, own = where_nobody_sits(make_config, tmp_path)
     await session.start()
     try:
         await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
         clicked = await session.toolkit.call("computer_use", {"action": "click", "element": 1})
+        twice = await session.toolkit.call(
+            "computer_use", {"action": "double_click", "element": 2, "capture_after": True}
+        )
     finally:
         await session.close()
 
-    assert not clicked.is_error, clicked.text
-    # The middle of the button, in the pixels of its own window: 310 + 40 - 300, 210 + 12 - 200.
-    assert [(how.get("element"), how.get("x"), how.get("y")) for how in did(desk, "click")] == [
-        (None, 50, 22)
-    ]
+    assert not clicked.is_error and "pointer pressed element 1" in clicked.text
+    # The middle of each, on the screen: 310 + 40, 210 + 12; then 310 + 100, 250 + 50, twice.
+    assert own.sent == ["mousemove 350 222 click --repeat 1 1", "mousemove 410 300 click --repeat 2 1"]
+    # The accessibility bus pressed nothing. What the second press changed was looked at after it.
+    assert did(desk, "click") == []
+    assert (
+        "#1 push button 'Save'" in twice.text
+        and [how["mode"] for how in did(desk, "capture")].count("ax") == 2
+    )
 
 
 async def test_where_nobody_sits_what_is_not_on_the_screen_is_not_pressed(
     make_config, tmp_path: Path
 ) -> None:
-    session, desk = where_nobody_sits(make_config, tmp_path)
+    session, desk, own = where_nobody_sits(make_config, tmp_path)
     await session.start()
     try:
         await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
@@ -601,7 +611,7 @@ async def test_where_nobody_sits_what_is_not_on_the_screen_is_not_pressed(
         await session.close()
 
     assert clicked.is_error and "not on the screen" in clicked.text
-    assert did(desk, "click") == []
+    assert did(desk, "click") == [] and own.sent == []
 
 
 async def test_on_a_persons_machine_an_item_of_a_closed_menu_is_still_named_and_pressed_by_number(

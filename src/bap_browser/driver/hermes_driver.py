@@ -12,7 +12,6 @@ import base64
 import contextlib
 import json
 import os
-import re
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
@@ -45,10 +44,8 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
-# Where the window in front is on the screen. `xdotool` itself gives its corner wrongly under a
-# window manager that draws a frame: it adds the frame's width twice.
-WINDOW_IN_FRONT = 'xwininfo -id "$(xdotool getactivewindow)"'
-ITS_CORNER = re.compile(r"Absolute upper-left [XY]:\s+(-?\d+)")
+# How the desktop's own pointer does each press: the button, and how many times.
+PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
 # The states of a session in which a person is at the screen.
@@ -157,19 +154,19 @@ class HermesDriver(DesktopDriver):
             for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
         }
 
-    async def place_of(self, element: int) -> tuple[int, int] | Literal["nowhere"] | None:
-        """The middle of an element, in the pixels of the window in front, which is what a click by
-        coordinate takes. "nowhere" for one with no size: an item of a menu that is not open, or a
-        hidden button. None where the element is not known, or the desktop is not this engine's own."""
+    async def press(self, element: int, action: str) -> Literal["pressed", "nowhere"] | None:
+        """Presses an element with the desktop's own pointer, at its middle on the screen. "nowhere"
+        for one with no size: an item of a menu that is not open, or a hidden button. None where the
+        element is not known, or the desktop is not this engine's own: then nothing was done."""
         own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
         if own is None or element not in self._placed:
             return None
         x, y, wide, high = self._placed[element]
         if not wide or not high:
             return "nowhere"
-        said = (await own.run("sh", "-c", WINDOW_IN_FRONT)).decode()
-        left, top = (int(found) for found in ITS_CORNER.findall(said)[:2])
-        return x + wide // 2 - left, y + high // 2 - top
+        button, times = PRESSED[action]
+        await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
+        return "pressed"
 
     # What the two tools kept from before ask.
 

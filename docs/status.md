@@ -1355,8 +1355,11 @@ Found, and not mended:
   "outside the capability manifest".
 - **"Remove Wool socks" is still asked about.** Taking a thing out of a basket and removing an
   account are told apart by nothing in the control's name. Asking is the safe side.
-- **`xdotool` gives a window's corner wrongly** under a window manager that draws a frame. The place
-  of the window in front is asked of `xwininfo`.
+- **A click by coordinate takes the pixels of the captured window, and a capture does not say which
+  window that was.** A first version turned an element's place on the screen into those pixels by
+  asking where the window in front is. CI caught it on the machine's own virtual screen: the window
+  in front was not the one captured, and the click missed. The pointer is now sent to the place on
+  the screen itself, by the desktop's own hand, with no window to reckon from.
 
 The rest of the model's run, tried and not got:
 

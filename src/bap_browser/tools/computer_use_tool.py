@@ -50,6 +50,7 @@ NOT_ON_THE_SCREEN = (
     "Element {element} is not on the screen now: it is an item of a menu that is not open, or a hidden "
     "button. Click its menu to open it, capture again, and act on what the capture names."
 )
+LOOK_AGAIN = " Capture to see what it changed."
 # The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
 # What marks a line of the tool's text that names a file on the engine's machine. No model here
@@ -196,12 +197,15 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if in_front and args.action in PRESSES and args.element is not None and args.coordinate is None:
         # Pressed by its number, a button that opens a box leaves its app not answering until the
         # box is closed (seen on Linux). On a desktop nobody sits at, the pointer presses it.
-        place = await driver.place_of(args.element)
-        if place == "nowhere":
+        pressed = await driver.press(args.element, args.action)
+        if pressed == "nowhere":
             raise BadInput(NOT_ON_THE_SCREEN.format(element=args.element), reason="not on the screen")
-        if place is not None:
-            del asked["element"]
-            asked["coordinate"] = list(place)
+        if pressed == "pressed" and not args.capture_after:
+            return f"{args.action}: done. The pointer pressed element {args.element}.{LOOK_AGAIN}"
+        if pressed == "pressed":
+            # What it changed is looked at the way the tool itself would after an action.
+            await asyncio.sleep(session.config.computer.settle_ms / 1000)
+            asked = {"action": "capture", "mode": "ax"}
     result = await driver.use(asked)
     shown = session.config.computer.base.elements_shown
     label = session.config.computer.window_title_chars
