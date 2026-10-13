@@ -211,6 +211,8 @@ export interface SuiteTask {
 export interface SuiteTotals {
   tasks: number;
   trials: number;
+  /** The tries that could not run: the model did not answer, or the try was ended. A run recorded before these were counted has none. */
+  errors?: number;
   passed: number;
   pass_rate: number | null;
   /** The tasks that passed every time they were tried. */

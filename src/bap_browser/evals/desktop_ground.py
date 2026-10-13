@@ -83,8 +83,15 @@ class Desk:
         # The apps are closed first: none holds a file of the last task open.
         names = " ".join(app.command for app in APPS)
         # Each is waited for until it is gone. An app that is opened while its last run is still
-        # ending hands its window to that run over the session's bus, and then there is none.
-        gone = f"for app in {names}; do pkill -x $app; while pgrep -x $app >/dev/null; do sleep 0.1; done; done; true"
+        # ending hands its window to that run over the session's bus, and then there is none. One
+        # that does not end when asked, as an app left with a box open can, is ended by force.
+        settings = self._session.config.computer
+        looks = max(1, int(settings.app_close_wait_s * 1000 / settings.app_poll_ms))
+        pause = settings.app_poll_ms / 1000
+        gone = (
+            f"for app in {names}; do pkill -x $app; n=0; while pgrep -x $app >/dev/null; do "
+            f"n=$((n+1)); [ $n -ge {looks} ] && pkill -9 -x $app; sleep {pause}; done; done; true"
+        )
         await self.driver().desktop.run("sh", "-c", gone)
         prepare(self.shared(), task.seed)
 

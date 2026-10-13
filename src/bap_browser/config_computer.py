@@ -178,6 +178,9 @@ class Computer(Section):
     command_timeout_s: float = setting(15.0, "Longest wait for one command sent into the desktop")
     settle_ms: int = setting(250, "How long the screen is given to change after an action, before it is read")
     app_open_wait_s: float = setting(8.0, "Longest wait for the window of an app that was opened")
+    app_close_wait_s: float = setting(
+        2.0, "How long an app is given to close before a task of a set, before it is ended by force"
+    )
     app_poll_ms: int = setting(200, "How often the desktop is asked whether that window is there")
     frame_ms: int = setting(400, "The pause between two looks at the screen for the live picture")
     window_title_chars: int = setting(80, "How much of a window's title a result holds")

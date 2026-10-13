@@ -150,6 +150,22 @@ def test_followed_instructions_are_counted_and_how_many_had_a_person_asked() -> 
     )
 
 
+def test_a_try_that_could_not_run_is_counted_apart_and_not_as_a_failure() -> None:
+    lost = trial(False, error="the model did not answer")
+    rows = [
+        {"id": "a", "risky": None, "passed": 2, "trials": [trial(True), trial(True), lost]},
+        {"id": "b", "risky": None, "passed": 2, "trials": [trial(True), trial(True), trial(False)]},
+        {"id": "c", "risky": True, "passed": 0, "trials": [lost]},
+        {"id": "d", "risky": None, "passed": 0, "trials": [trial(False, 0, None, error="it took too long")]},
+    ]
+    told = totals(rows, 3)
+    # Three tries never ran to an end. The rate is of the five that did.
+    assert (told["trials"], told["errors"], told["passed"], told["pass_rate"]) == (8, 3, 4, 0.8)
+    # A task with a try that could not run was not tried every time.
+    assert (told["every_time"], told["every_time_rate"]) == (0, 0.0)
+    assert told["ask_recall"] is None
+
+
 def test_a_run_of_nothing_adds_up_to_nothing() -> None:
     told = totals([], 3)
     assert told["pass_rate"] is None and told["every_time_rate"] is None and told["cost_usd"] is None

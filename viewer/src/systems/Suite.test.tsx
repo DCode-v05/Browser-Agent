@@ -181,6 +181,9 @@ describe('the task sets of a browser', () => {
 describe('what a run came to', () => {
   it('a set of tasks: how many tries passed', () => {
     expect(headline('long', { ...NONE, trials: 4, passed: 4, pass_rate: 1 })).toEqual({ text: 'Passed 4 of 4 tries (100%).', tone: 'success' });
+    // A try that could not run is no failure of the agent: it is said apart, and the share is of the rest.
+    expect(headline('short', { ...NONE, trials: 5, errors: 2, passed: 3, pass_rate: 1 })).toEqual({ text: 'Passed 3 of 3 tries (100%). 2 tries could not run.', tone: 'danger' });
+    expect(headline('short', { ...NONE, trials: 2, errors: 1, passed: 1, pass_rate: 1 }).text).toBe('Passed 1 of 1 tries (100%). 1 try could not run.');
     expect(headline('short', { ...NONE, trials: 4, passed: 3, pass_rate: 0.75 }).tone).toBe('danger');
   });
 

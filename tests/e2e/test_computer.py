@@ -129,6 +129,32 @@ async def test_an_app_a_person_has_not_allowed_cannot_run_on_the_desktop_at_all(
         await driver.close()
 
 
+async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_config, tmp_path: Path) -> None:
+    """A task set makes the desktop ready before each task. An app left stuck by the task before is
+    ended by force, so the run goes on."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, "e2e-stuck"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+    try:
+        desktop = session.browser.started_driver.desktop  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
+        # A program under the editor's name that takes no notice of being asked to end.
+        stuck = "cp /bin/sleep /tmp/mousepad && (trap '' TERM; /tmp/mousepad 600 >/dev/null 2>&1 &) ; sleep 0.3; pgrep -x mousepad"
+        assert (await desktop.run("sh", "-c", stuck)).strip()
+
+        await Desk(session).ready(load_set("short", "desktop")[0])
+
+        left = await desktop.run("sh", "-c", "pgrep -x mousepad || true")
+        assert left.strip() == b""
+    finally:
+        await session.close()
+
+
 @pytest.mark.parametrize("name", DESKTOP_SETS)
 async def test_every_desktop_task_is_solved_by_its_reference_solution(
     make_config, tmp_path: Path, name: str
