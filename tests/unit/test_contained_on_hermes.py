@@ -35,12 +35,11 @@ def test_a_mac_is_named_as_a_machine_or_as_one_elsewhere_and_by_no_word_of_its_o
         a_config(tmp_path, "mac")
 
 
-def test_on_its_own_desktop_the_model_is_told_how_to_press_what_opens_a_box(tmp_path: Path) -> None:
-    """Seen in a run: pressed by its number, a button that opens a box leaves its app not answering
-    until the box is closed, and every step after waits out a limit."""
+def test_on_its_own_desktop_the_model_is_told_how_to_reach_the_items_of_a_menu(tmp_path: Path) -> None:
+    """A capture there names what is on the screen, and an item of a menu is on it once the menu is open."""
     told = instructions_for(a_config(tmp_path, "container"))
 
-    assert "opens a box" in told and "by its key" in told
+    assert "click the menu, then capture again" in told
 
 
 def test_for_the_contained_desktop_the_engine_starts_the_dock_in_the_drivers_place(tmp_path: Path) -> None:

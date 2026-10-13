@@ -5600,6 +5600,20 @@ Removed with no replacement: `computer_zoom` (element numbers and the tree repla
 
 Three capture modes replace today's screenshot-only view, with Hermes' caps and its rule for an unchanged picture.
 
+**On a desktop nobody sits at** (the contained desktop, the micro VM's own screen), two things differ
+from Hermes' own tool, because input there goes in front:
+
+- A capture's text names only the elements that have a place on the screen. An app reports far more:
+  the items of every menu that is not open, and hidden buttons (248 of a text editor's 255). Those are
+  counted in one line, and named once their menu is open.
+- A click on an element by its number is delivered as a click of the pointer at the element's middle.
+  Pressed through the accessibility bus, a button or menu item that opens a box leaves its app not
+  answering until the box is closed, about 25 seconds a step (seen on Linux). An element with no place
+  on the screen is not pressed: the result says to open its menu and capture again.
+
+On a person's own machine, where input goes in the background, neither applies: every element is
+named and pressed as Hermes' tool does it.
+
 | Mode | What the model gets | For |
 | --- | --- | --- |
 | `som` (default) | A screenshot with a number drawn on every element that can be acted on, and the accessibility tree | Models with vision: click by number, not by guessed pixels |

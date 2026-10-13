@@ -13810,6 +13810,19 @@ with the engine, and nothing of the helper is open to the internet.</p>
 <p>Removed with no replacement: <code>computer_zoom</code> (element numbers and the tree replace reading small print), and <code>computer_move</code> (background input has no pointer to move).</p>
 <h3 id="225-what-the-model-sees">22.5 What the model sees</h3>
 <p>Three capture modes replace today's screenshot-only view, with Hermes' caps and its rule for an unchanged picture.</p>
+<p><strong>On a desktop nobody sits at</strong> (the contained desktop, the micro VM's own screen), two things differ
+from Hermes' own tool, because input there goes in front:</p>
+<ul>
+<li>A capture's text names only the elements that have a place on the screen. An app reports far more:
+  the items of every menu that is not open, and hidden buttons (248 of a text editor's 255). Those are
+  counted in one line, and named once their menu is open.</li>
+<li>A click on an element by its number is delivered as a click of the pointer at the element's middle.
+  Pressed through the accessibility bus, a button or menu item that opens a box leaves its app not
+  answering until the box is closed, about 25 seconds a step (seen on Linux). An element with no place
+  on the screen is not pressed: the result says to open its menu and capture again.</li>
+</ul>
+<p>On a person's own machine, where input goes in the background, neither applies: every element is
+named and pressed as Hermes' tool does it.</p>
 <div class="tw"><table>
 <thead>
 <tr>

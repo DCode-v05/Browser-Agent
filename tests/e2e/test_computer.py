@@ -6,8 +6,10 @@ image is not built, there is nothing to drive, and these are skipped with that r
 """
 
 import asyncio
+import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -127,6 +129,55 @@ async def test_an_app_a_person_has_not_allowed_cannot_run_on_the_desktop_at_all(
         assert b"<item" not in menu
     finally:
         await driver.close()
+
+
+async def test_a_menu_item_that_opens_a_box_is_pressed_by_its_number_and_the_app_goes_on_answering(
+    make_config, tmp_path: Path
+) -> None:
+    """Pressed through the accessibility bus, "Save As..." left the editor not answering for about 25
+    seconds a step. On a desktop nobody sits at, the pointer presses what is named by its number."""
+    config = make_config(tmp_path, computer={"container_command": "docker"})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, "e2e-menu"),
+        name="computer",
+        backend="contained_desktop",
+        tools=COMPUTER_TOOLS,
+    )
+    await session.start()
+
+    async def use(**arguments: Any) -> str:
+        done = await session.toolkit.call("computer_use", arguments)
+        assert not done.is_error, done.text
+        return done.text
+
+    def numbered(text: str, words: str) -> int:
+        found = re.search(rf"#(\d+) [a-z ]+ '{re.escape(words)}", text)
+        assert found is not None, text
+        return int(found.group(1))
+
+    try:
+        assert not (await session.toolkit.call("computer_open_app", {"app": "Text editor"})).is_error
+        async with asyncio.timeout(config.computer.app_open_wait_s):
+            while (page := A_PAGE.search(await use(action="capture", mode="ax", app="mousepad"))) is None:
+                await asyncio.sleep(0.2)
+        await use(action="click", element=int(page.group(1)))
+        await use(action="type", text="kept")
+        closed = await use(action="capture", mode="ax", app="mousepad")
+        # An item of a menu that is not open is not on the screen, and is not named.
+        assert "Save As" not in closed and "not on the screen" in closed
+
+        await use(action="click", element=numbered(closed, "File"))
+        opened = await use(action="capture", mode="ax", app="mousepad")
+        await use(action="click", element=numbered(opened, "Save As..."))
+
+        began = time.perf_counter()
+        await use(action="wait", seconds=1)
+        await use(action="capture", mode="ax", app="mousepad")
+        assert time.perf_counter() - began < 8, "the app stopped answering after the box opened"
+        assert "Save As" in (await session.toolkit.call("computer_list_apps", {})).text
+    finally:
+        await session.close()
 
 
 async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_config, tmp_path: Path) -> None:

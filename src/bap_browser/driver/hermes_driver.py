@@ -12,10 +12,11 @@ import base64
 import contextlib
 import json
 import os
+import re
 import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from typing import Any
+from typing import Any, Literal
 
 from bap_browser import computer
 from bap_browser.computer import contained
@@ -44,6 +45,10 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
+# Where the window in front is on the screen. `xdotool` itself gives its corner wrongly under a
+# window manager that draws a frame: it adds the frame's width twice.
+WINDOW_IN_FRONT = 'xwininfo -id "$(xdotool getactivewindow)"'
+ITS_CORNER = re.compile(r"Absolute upper-left [XY]:\s+(-?\d+)")
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
 # The states of a session in which a person is at the screen.
@@ -84,6 +89,7 @@ class HermesDriver(DesktopDriver):
         self._base: AbstractContextManager[None] | None = None
         self._last: Shot | None = None
         self._screen: ScreenHere | None = None
+        self._placed: dict[int, tuple[int, int, int, int]] = {}
 
     # The session.
 
@@ -140,6 +146,30 @@ class HermesDriver(DesktopDriver):
                 "The machine's screen is not being driven any more.", reason="the session ended"
             )
         return await asyncio.to_thread(computer.computer_use, arguments, session or self._name)
+
+    # Where things are, on a desktop this engine itself started (spec 22.5).
+
+    def saw(self, elements: list[dict[str, Any]]) -> None:
+        """Keeps where each element of the newest capture is on the screen, by its number."""
+        self._placed = {
+            int(one["index"]): (int(x), int(y), int(wide), int(high))
+            for one in elements
+            for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
+        }
+
+    async def place_of(self, element: int) -> tuple[int, int] | Literal["nowhere"] | None:
+        """The middle of an element, in the pixels of the window in front, which is what a click by
+        coordinate takes. "nowhere" for one with no size: an item of a menu that is not open, or a
+        hidden button. None where the element is not known, or the desktop is not this engine's own."""
+        own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
+        if own is None or element not in self._placed:
+            return None
+        x, y, wide, high = self._placed[element]
+        if not wide or not high:
+            return "nowhere"
+        said = (await own.run("sh", "-c", WINDOW_IN_FRONT)).decode()
+        left, top = (int(found) for found in ITS_CORNER.findall(said)[:2])
+        return x + wide // 2 - left, y + high // 2 - top
 
     # What the two tools kept from before ask.
 
