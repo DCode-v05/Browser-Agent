@@ -18,12 +18,12 @@ from bap_browser.address import presentable_address, without_credentials
 from bap_browser.code import IN_A_SCRIPT, Ran, ScriptRunner
 from bap_browser.config import Config
 from bap_browser.driver.base import POINT, Box, Driver, Located, TabInfo
-from bap_browser.driver.desktop_driver import SCREEN
+from bap_browser.driver.desktop_driver import SCREEN, DesktopDriver
 from bap_browser.driver.session import ApprovalOutcome, BrowserSession, Question
 from bap_browser.errors import BadInput, BapError, PolicyBlocked
 from bap_browser.results import Picture, ToolResult
 from bap_browser.safeguards.check import NOT_APPROVED, Check
-from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, PRESS_ON_A_DESKTOP, Step
+from bap_browser.safeguards.findings import OPENS_AN_ADDRESS, PRESS, PRESS_ON_A_DESKTOP, Step, gravest_of
 from bap_browser.safeguards.incoming import quoted_name
 from bap_browser.safeguards.limits import NOTHING_CHANGED, Limits, Reached, same_step
 from bap_browser.safeguards.reading import Reader, as_written, from_page
@@ -430,6 +430,12 @@ class Toolkit:
                 elif (name, arguments.get("action")) in PRESS_ON_A_DESKTOP and "element" in arguments:
                     # On a desktop an element is named by its number in the newest capture.
                     control = await driver.locate(str(arguments["element"]))
+                elif (name, arguments.get("action")) in PRESS_ON_A_DESKTOP and isinstance(
+                    driver, DesktopDriver
+                ):
+                    # A click by its place names no element: it is judged as a press of the gravest
+                    # control the screen holds, which it may be on.
+                    control = gravest_of(driver.on_screen(), self._session.config)
                 asked = arguments.get("fields") if name == "browser_fill_form" else None
                 for entry in asked if isinstance(asked, list) else []:
                     ref = entry.get("ref") if isinstance(entry, Mapping) else None

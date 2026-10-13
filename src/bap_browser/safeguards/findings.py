@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal
@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from bap_browser import keys
 from bap_browser.address import site_pattern
+from bap_browser.config import Config
 from bap_browser.driver.base import Located
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError
@@ -81,6 +82,20 @@ A_SITE_FOR = {
     "government": "a government site",
     "more": "a sensitive site",
 }
+
+
+def gravest_of(controls: Sequence[Located], config: Config) -> Located | None:
+    """Among the controls a screen holds, one whose press pays, sends, deletes or gives access. A
+    click by its place names no element (spec 22.7): where the screen holds such a control the
+    click may be on it, and is judged as a press of it."""
+    words = config.permissions.consequential_words
+    for control in controls:
+        if (
+            class_of(control.name, config.safeguards.actions, words, role=control.role)
+            in NEVER_ON_A_MODELS_WORD
+        ):
+            return control
+    return None
 
 
 @dataclass(frozen=True)

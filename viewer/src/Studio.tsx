@@ -288,8 +288,8 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           </div>
         </nav>
       )}
-      {onAMachine(room) && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
-        // A real machine is not driven through its picture: the person at it has their own hands.
+      {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
+        // Where the picture cannot be driven, the person at the machine has their own hands.
         <p className="system-note studio-own-hands" role="status">
           {W.studio.beside.yourOwnHands}
         </p>

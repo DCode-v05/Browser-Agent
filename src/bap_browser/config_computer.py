@@ -188,6 +188,13 @@ class Computer(Section):
         2.0, "How long an app is given to close before a task of a set, before it is ended by force"
     )
     app_poll_ms: int = setting(200, "How often the desktop is asked whether that window is there")
+    double_press_ms: int = setting(
+        500, "On a Mac a person drives through the page: a second press within this long is a double press"
+    )
+    double_press_points: int = setting(4, "And within this far of the first, in points of the screen")
+    key_gap_ms: int = setting(
+        12, "On a desktop nobody sits at: the pause between the keys of text the desktop's own keyboard types"
+    )
     frame_ms: int = setting(400, "The pause between two looks at the screen for the live picture")
     window_title_chars: int = setting(80, "How much of a window's title a result holds")
     windows_listed: int = setting(12, "How many open windows a result names at most")

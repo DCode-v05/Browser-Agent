@@ -257,7 +257,7 @@ export const W = {
     /** The chat alone, in a window to keep beside a real machine's screen (spec 22.3.1). */
     beside: {
       open: 'Chat beside your screen',
-      yourOwnHands: "You're in control of this machine. Use its own mouse and keyboard: the picture here only shows the screen. Press Hand back when you have finished.",
+      yourOwnHands: "You're in control of this machine. Use its own mouse and keyboard: the picture here only shows the screen. On a Mac the picture can be driven too, once the program that runs bap-browser is allowed under System Settings, Privacy & Security, Accessibility. Press Hand back when you have finished.",
     },
     desktop: {
       open: 'Open desktop app',

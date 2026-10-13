@@ -1638,6 +1638,38 @@ Not done, and not checked:
 - What the chat's window shows was not looked at by me: a picture of the screen would have held the
   person's own screen. The page it loads is the one the browser tests walk.
 
+### 1aw. Built on 2026-10-14: three gaps of 1av closed
+
+| Gap | What was built |
+|---|---|
+| A click by a coordinate was not judged | Where the newest capture holds a control on the screen that pays, sends, deletes or grants, a click by a coordinate waits for a person's yes: it may be on that control. Where it holds none, nobody is asked |
+| Typed text did not replace a selection | On a desktop nobody sits at, plain text on one line is typed with the desktop's own keyboard. Other text, and text that keyboard could not type, goes the driver's way as before |
+| Take over on a real Mac could not use the picture | What a person does on the picture is posted to macOS itself (`driver/mac_hand.py`, no added package). The page says whether the picture can be driven, and shows the note about the Mac's own mouse only when it cannot |
+
+Seen:
+
+- In a real container, all 13 desktop tests passed in 148 s. The task "write old, Select All, write
+  new" now ends with "new" in the file; before, it ended with "newold".
+- In the same container: the desktop's own keyboard typed quotes, `$HOME`, `~`, braces and `%` as
+  they are. It could not type "café" or "日本" (`xdo_enter_text_window reported an error`), and
+  "one", a new line, "two" came out as "onetwo". That is why only plain text on one line goes that way.
+- On this Mac, with the studio on `computer.runs: machine`: after Take over, the pointer at a
+  quarter and at half of the picture put the real pointer at 0.25, 0.25 and 0.50, 0.50 of the
+  2560 by 1440 screen, read back from macOS. The note about the Mac's own mouse was not shown.
+  Only a move was made: nothing was pressed or typed on the person's screen.
+
+Not done, and not checked:
+
+- **A press, a drag, a key and the wheel on a real Mac were not tried**, so as not to act on the
+  person's own screen. They are tested for the events they make, not for what macOS does with them.
+- **Take over through the picture is not built for a Mac reached through the helper**, nor for
+  Windows or a Linux machine a person sits at. Through the helper it would pass the allowed apps.
+- **Text with letters outside plain text, or of several lines, still does not replace a selection**
+  on a desktop nobody sits at.
+- **A click by a coordinate asks whenever the screen holds a grave control**, wherever the click
+  is: a mail window with "Send" in it asks on every such click. A click by number does not.
+- **Still waiting on the person**: the model's key (no call to Anthropic has been made), and a tailnet.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

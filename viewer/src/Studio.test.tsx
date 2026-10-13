@@ -598,6 +598,11 @@ describe('the chat in a window of its own, beside a real machine the agent works
     expect(screen.getByText(W.studio.beside.yourOwnHands)).toBeInTheDocument();
   });
 
+  it('says no such thing on a machine whose screen takes the hand a person lays on its picture', () => {
+    withComputer({ ...computer, runs: 'machine', state: 'person', hand: true }, vi.fn());
+    expect(screen.queryByText(W.studio.beside.yourOwnHands)).not.toBeInTheDocument();
+  });
+
   it('says no such thing while the agent has the machine, or on the contained desktop', () => {
     withComputer({ ...computer, runs: 'machine', state: 'agent' }, vi.fn());
     expect(screen.queryByText(W.studio.beside.yourOwnHands)).not.toBeInTheDocument();
