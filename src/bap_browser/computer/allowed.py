@@ -75,9 +75,7 @@ def system_of(platform: str) -> str:
 def held(computer: Computer) -> bool:
     """Whether the driver is to hold the agent to the allowed apps: on this machine, in `bounded`
     mode, and not where the person lets the agent open any app."""
-    return (
-        computer.runs == "machine" and computer.base.permission_mode == "bounded" and not computer.mac_any_app
-    )
+    return computer.runs == "machine" and computer.base.permission_mode == "bounded" and not computer.any_app
 
 
 def is_a_program(named: str) -> bool:

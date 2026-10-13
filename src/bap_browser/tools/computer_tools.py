@@ -26,7 +26,7 @@ class OpenAppArgs(Args):
 
 def any_app(config: Config) -> bool:
     """Whether the agent may open any app by its name: on a person's own machine, where they allow it."""
-    return config.computer.runs not in ("container", "here") and config.computer.mac_any_app
+    return config.computer.runs not in ("container", "here") and config.computer.any_app
 
 
 async def _desktop(session: BrowserSession) -> DesktopDriver:
@@ -50,7 +50,7 @@ async def list_apps(session: BrowserSession, args: NoArgs) -> str:
     allowed = allowed_apps(session.config.computer)
     names = ", ".join(app.name for app in allowed) or "none"
     if any_app(session.config):
-        names += "; and any app on this Mac, by its name: each opening asks the person first"
+        names += "; and any app on this machine, by its name: each opening asks the person first"
     shared = (
         " The folder Files in the home folder is shared with the person: what is saved there, they have."
         if driver.desktop.folder is not None
@@ -65,7 +65,7 @@ async def open_app(session: BrowserSession, args: OpenAppArgs) -> str:
     known = next((app for app in APPS if wanted in (app.name.lower(), app.id, app.command)), None)
     allowed = allowed_apps(session.config.computer)
     if known is None and any_app(session.config):
-        # On the person's own Mac, where they allow any app: it is opened by its name, after their yes.
+        # On the person's own machine, where they allow any app: it is opened by its name, after their yes.
         name = args.app.strip()
         if not await driver.open_named_app(name):
             raise BrowserError(

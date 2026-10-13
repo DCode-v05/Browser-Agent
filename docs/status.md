@@ -1386,6 +1386,28 @@ Not built:
   its answers, which costs money on every run.
 - The nightly run has not run: the repository has no secret yet.
 
+### 1ap. Built on 2026-10-13: any app, on every system, where a person says so
+
+You asked that on Windows the agent reach everything. The switch that lets it work in any app was
+named and worded for the Mac alone (`computer.mac_any_app`, "On this Mac, let the agent open any
+app"). It is now `computer.any_app`, "Let the agent work in any app on the machine", for Windows,
+macOS and Linux.
+
+- Off by default. With it on, the driver is started without the list of allowed apps: the agent may
+  read and work in any window, and open any app by its name. Each opening still asks the person.
+- It is the way to File Explorer and Windows Terminal on Windows, which the list cannot name with
+  the pinned driver (entry 1ao).
+- For a machine elsewhere it is set on that machine, where its helper runs.
+
+Seen on GitHub's runners, with the real driver (`scripts/ladder.py --any-app`):
+
+- Windows: "any app is allowed, and Character Map, outside the list, is looked at: passed";
+  "explorer.exe is looked at: passed", 71 elements; "wt.exe is looked at: passed", 16 elements.
+- Linux: "any app is allowed, and not-allowed-dialog, outside the list, is looked at: passed".
+
+Not checked: macOS, where the driver is still not allowed on this Mac. No app was opened by its name
+on a real Windows machine; a test with a stand-in sees it asked for after the person's yes.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
