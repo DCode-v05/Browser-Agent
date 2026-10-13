@@ -26,9 +26,11 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 from bap_browser import computer
@@ -107,9 +109,12 @@ async def the_windows() -> list[dict[str, Any]]:
 
 
 async def windows_like(name: str) -> str:
-    """What the driver says of the windows whose row names something, shortly, for a rung that failed."""
+    """What the driver says of the windows and the apps whose row names something, shortly, for a
+    rung that failed."""
     rows = [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
-    return json.dumps(rows)[:700]
+    apps = said(await asyncio.to_thread(computer.computer_use, {"action": "list_apps"}, "ladder"))
+    named = [row for row in apps.get("apps", []) if name.lower() in json.dumps(row).lower()]
+    return json.dumps({"windows": rows, "apps": named})[:1100]
 
 
 @contextmanager
@@ -117,14 +122,23 @@ def an_app_not_allowed() -> Iterator[tuple[str, int]]:
     """Opens an app the settings do not allow, and closes it after. Its name and its process come out."""
     system = next(name for name in NOT_ALLOWED if sys.platform.startswith(name))
     command, name, closing = NOT_ALLOWED[system]
-    started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        yield name, started.pid
-    finally:
-        if started.poll() is None:
-            started.terminate()
-        if closing:
-            subprocess.run(closing, capture_output=True, check=False)
+    with tempfile.TemporaryDirectory() as folder:
+        if system == "linux":
+            # The same small dialog under another name: to the driver, another program, not allowed.
+            other = shutil.copy(shutil.which(KNOWN["linux"][0][0]) or "", Path(folder) / "not-allowed-dialog")
+            command, name = (
+                [str(other), "--info", "--title=Other", "--text=Not allowed"],
+                "not-allowed-dialog",
+            )
+        started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            yield name, started.pid
+        finally:
+            if started.poll() is None:
+                started.terminate()
+            if closing:
+                subprocess.run(closing, capture_output=True, check=False)
+            started.wait()
 
 
 def with_the_known_app_allowed(config: Config) -> Config:
