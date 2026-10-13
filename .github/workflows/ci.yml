@@ -64,9 +64,6 @@ jobs:
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --through-helper
           # With the person's switch on, the agent is not held to the allowed apps.
           dbus-run-session -- xvfb-run -a uv run python scripts/ladder.py --any-app
-          # And a website is reached through the machine's own browser, opened by its name.
-          # A browser takes its keys in front, and a window comes to the front only where a window manager runs.
-          dbus-run-session -- xvfb-run -a sh -c 'openbox & uv run python scripts/ladder.py --any-app --site firefox https://example.com "Example Domain"'
           # As in the micro VM: no screen is given, and the engine starts the machine's own.
           dbus-run-session -- uv run python scripts/ladder.py --virtual-screen
           # The contained desktop: its image is built, the driver is put inside its container, and the

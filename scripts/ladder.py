@@ -330,14 +330,19 @@ async def a_site_is_read(
     bar = THE_ADDRESS_BAR.search(first.text)
     done = [opened, first]
     if bar is not None:
-        done.append(await does({"action": "click", "element": int(bar.group(1))}))
+        # The bar is given its value as a field is, which no first page of a new browser gets between.
+        number = int(bar.group(1))
+        steps: list[dict[str, Any]] = [
+            {"action": "click", "element": number},
+            {"action": "set_value", "element": number, "value": address},
+        ]
     else:
-        done.append(await does({"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")}))
-    for step in (
-        {"action": "type", "text": address},
-        {"action": "key", "keys": "return"},
-        {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S},
-    ):
+        steps = [
+            {"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")},
+            {"action": "type", "text": address},
+        ]
+    steps += [{"action": "key", "keys": "return"}, {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S}]
+    for step in steps:
         done.append(await does(step))
     read = await session.toolkit.call("computer_use", look)
     wrong = next((" | ".join(one.text.splitlines())[:200] for one in [*done, read] if one.is_error), None)
