@@ -27,7 +27,9 @@ export function headline(set: SetName, totals: SuiteTotals): { text: string; ton
     const missed = totals.ask_recall !== null && totals.ask_recall < 1;
     return { text: S.asked(percent(totals.ask_recall), percent(totals.needless_asks)), tone: missed ? 'danger' : 'success' };
   }
-  return { text: S.passed(totals.passed, totals.trials, percent(totals.pass_rate)), tone: totals.passed < totals.trials ? 'danger' : 'success' };
+  const errors = totals.errors ?? 0;
+  const passed = S.passed(totals.passed, totals.trials - errors, percent(totals.pass_rate));
+  return { text: errors > 0 ? `${passed} ${S.couldNotRun(errors)}` : passed, tone: totals.passed < totals.trials ? 'danger' : 'success' };
 }
 
 /** The one number of a run, for a table that compares browsers. */

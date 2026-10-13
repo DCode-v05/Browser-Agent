@@ -1252,9 +1252,11 @@ browser and desktop, is solved by its reference solution, and a task nobody did 
 
 What the audit found, most serious first:
 
-- **A model's own failure and a failure of the plumbing land in one column.** A provider error, a
-  timeout and a task done wrong are all a try that did not pass (`evals/suite.py`, `run_trial`). A run
-  cut short by a rate limit reads as a worse agent.
+- **A model's own failure and a failure of the plumbing landed in one column.** A provider error, a
+  timeout and a task done wrong were all a try that did not pass (`evals/suite.py`, `run_trial`). A run
+  cut short by a rate limit read as a worse agent. Fixed the same day, at your word: such a try is
+  kept with its reason, counted apart, and left out of every rate; the window says "2 tries could not
+  run."
 - **The sets are too small to see a small change.** 20 tasks tried once cannot tell 85% from 100%:
   one task is 5 points, and the noise is about 22. The computer's 13 tasks are fewer still.
 - **No model has run the browser's adversarial set since the safeguards came back**, nor the desktop's

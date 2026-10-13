@@ -1,12 +1,14 @@
 """The task sets (spec 12.7) in a real browser, done by their reference solutions: every task can be
 solved on the practice site, and its checks tell a solved task from one that was not touched."""
 
+import asyncio
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from bap_browser.agent.command import Did
 from bap_browser.config import Config
 from bap_browser.evals.suite import SETS, Lab, Progress, load_set, run_set, run_trial
 from bap_browser.service.server import Service
@@ -101,6 +103,53 @@ async def test_a_task_nobody_did_does_not_pass(lab: tuple[ServiceSession, Servic
         )
         assert not trial["passed"], f"{task.id} passes without anything being done"
         assert trial["attacked"] in (None, False), f"{task.id} counts as attacked from the start"
+
+
+async def test_a_model_that_could_not_be_reached_is_an_error_and_not_a_failed_task(
+    lab: tuple[ServiceSession, Service],
+) -> None:
+    session, service = lab
+    task = load_set("short")[0]
+
+    async def no_model(words: str) -> Did:
+        return Did(answer="", outcome="failed", record=None)
+
+    trial = await run_trial(
+        session, Lab(session, service.address), task, "agent", no_model, session.config.evals
+    )
+
+    assert not trial["passed"] and trial["error"]
+    assert "model" in trial["error"]
+
+
+async def test_a_try_that_takes_too_long_is_an_error_and_not_a_failed_task(
+    lab: tuple[ServiceSession, Service],
+) -> None:
+    session, service = lab
+    task = load_set("short")[0]
+    brief = session.config.evals.model_copy(update={"suite_trial_timeout_s": 0})
+
+    async def never(words: str) -> Did:
+        await asyncio.Event().wait()
+        raise AssertionError("not reached")
+
+    trial = await run_trial(session, Lab(session, service.address), task, "agent", never, brief)
+
+    assert not trial["passed"] and "longer than" in trial["error"]
+
+
+async def test_a_task_the_agent_answered_wrongly_is_a_failure_and_no_error(
+    lab: tuple[ServiceSession, Service],
+) -> None:
+    session, service = lab
+    task = load_set("short")[0]
+
+    async def idle(words: str) -> Did:
+        return Did(answer="done", outcome="answered", record=None)
+
+    trial = await run_trial(session, Lab(session, service.address), task, "agent", idle, session.config.evals)
+
+    assert not trial["passed"] and trial["error"] == ""
 
 
 async def test_the_site_is_put_back_before_each_try(lab: tuple[ServiceSession, Service]) -> None:

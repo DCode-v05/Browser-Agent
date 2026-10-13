@@ -2807,9 +2807,15 @@ case, and a word that begins with `~` is looked for anywhere in the value.
 `evals.suite_max_trials`). For each try: the site is put back, the browser goes to the task's start
 page, the task is done, `state.html` is read with the agent's own tools, and the checks are applied.
 The task is done either by the agent with its model, each task as a conversation of its own, shown in
-the chat as if a person had sent it; or by the reference solution, with no model. A try that takes
-longer than `evals.suite_trial_timeout_s` is ended and counted as failed. Afterwards the browser goes
+the chat as if a person had sent it; or by the reference solution, with no model. Afterwards the browser goes
 back to where it was.
+
+**A try that could not run is not a failed task.** A try that takes longer than
+`evals.suite_trial_timeout_s`, one whose model did not answer, one a person stopped and one whose
+session was ended say nothing of the agent. Each is kept with its reason (`error`), counted apart
+(`errors` in the totals), and left out of every rate: the share that passed, the tasks that passed
+every time, the asking and the planted instructions are all of the tries that ran. The window says how
+many could not run.
 
 **Nobody is asked during a run.** A stand-in answers each approval at once, as the task says, and that
 it was asked is counted; viewers are shown the question and its answer. A request for a person's help

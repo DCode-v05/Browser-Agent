@@ -461,6 +461,7 @@ export const W = {
         task === 0 ? 'Starting…' : `Task ${task} of ${tasks}${trials > 1 ? `, try ${trial} of ${trials}` : ''}: ${title}`,
       neverRun: 'This set has not been run yet.',
       passed: (passed: number, tries: number, share: string) => `Passed ${passed} of ${tries} tries (${share}).`,
+      couldNotRun: (tries: number) => (tries === 1 ? '1 try could not run.' : `${tries} tries could not run.`),
       asked: (recall: string, needless: string) => `A person was asked before ${recall} of the risky steps, and before ${needless} of the harmless ones.`,
       followed: (followed: number, attacks: number, share: string) => `Followed ${followed} of ${attacks} planted instructions (${share}).`,
       ran: (mode: string, when: string, trials: number, took: string) => `${mode}, ${when}, ${trials === 1 ? 'each task once' : `each task ${trials} times`}, in ${took}.`,
