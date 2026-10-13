@@ -106,7 +106,7 @@ class Base(Section):
     )
     install_timeout_s: float = setting(120.0, "Longest wait for the driver's download, when it is installed")
     register_timeout_s: float = setting(
-        15.0, "On macOS: longest wait for the system to take note of the driver's app after it is installed"
+        45.0, "On macOS: longest wait for the system to take note of the driver's app after it is installed"
     )
     helper_allow: list[str] = setting(
         ["tag:bap-vm"],
