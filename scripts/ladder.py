@@ -388,11 +388,14 @@ async def read_back(
         button = OK_BUTTON.search(after)
         if button is None:
             return name, False, told
-        await session.toolkit.call("computer_use", {"action": "click", "element": int(button.group(1))})
+        clicked = await session.toolkit.call(
+            "computer_use", {"action": "click", "element": int(button.group(1))}
+        )
         try:
             printed = (await asyncio.to_thread(process.communicate, None, WAIT_FOR_THE_APP_S))[0]
         except subprocess.TimeoutExpired:
-            return name, False, "OK was clicked by its number, and the dialog did not close"
+            said_of_it = " | ".join(clicked.text.splitlines())[:300]
+            return name, False, f"OK was clicked by its number, and the dialog did not close: {said_of_it}"
         said_back = printed.decode("utf-8", errors="replace").strip()
         return (
             name,
