@@ -5158,6 +5158,7 @@ desktop, and the desktop's are not drawn for a browser.
 | Setting | Key | Default | Applies | Who may change it | As the vendors do it |
 |---|---|---|---|---|---|
 | Screen size | `computer.screen` | 1280 by 800 | Next session | Admin | Anthropic recommends a screen of about 1024 by 768 to 1366 by 768; OpenAI's tool takes the display's width and height |
+| Where the helper of a machine elsewhere answers | `computer.helper_url` | `http://127.0.0.1:8796` | Next session | Admin | A web address, typed in a field. What is no web address is refused |
 | Give the model the tool's manual | `computer.base.manual` | On | Next session | Admin | Hermes gives its model the same manual as a skill; it costs about 4,500 tokens a task |
 | Where the agent's input goes | `computer.base.delivery` | Decide by the desktop | Next session | Admin | Hermes' `delivery_mode`: background on a person's machine, in front where nobody is at the screen |
 | Ask me before an app opens | `computer.ask_before_apps` | Off | Now | Admin; a user may turn it on, never off over the admin | Google's "require confirmation" for system-level actions; OpenAI's confirmations |

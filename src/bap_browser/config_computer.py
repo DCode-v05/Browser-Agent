@@ -142,7 +142,8 @@ class Computer(Section):
         "through the helper they run there and the tailnet (`remote`)",
     )
     helper_url: str = setting(
-        "http://127.0.0.1:8796", "Where the helper on the person's Mac answers, when the desktop is `mac`"
+        "http://127.0.0.1:8796",
+        "Where the helper on a person's machine answers, when the desktop is `remote`",
     )
     helper_token_env: str = setting(
         "BAP_BROWSER_HELPER_TOKEN",

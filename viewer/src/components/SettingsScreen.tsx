@@ -386,6 +386,7 @@ export function SettingRow({ setting, status, source, onSave, onAct, onToast, lo
       </div>
       {setting.control === 'path' && typeof setting.value === 'string' && <p className="setting-path">{setting.value}</p>}
       {setting.control === 'list' && <SiteList setting={setting} labelledBy={titleId} onSave={onSave} lockedWords={lockedWords} />}
+      {setting.control === 'address' && <AddressField setting={setting} labelledBy={titleId} describedBy={descriptionId} onSave={onSave} />}
       {footer}
     </div>
   );
@@ -425,6 +426,27 @@ function SiteList({ setting, labelledBy, onSave, lockedWords }: { setting: Setti
         {W.settings.listHint}
       </p>
     </div>
+  );
+}
+
+function AddressField({ setting, labelledBy, describedBy, onSave }: { setting: Setting; labelledBy: string; describedBy: string; onSave(value: SettingValue): Promise<boolean> }) {
+  const saved = typeof setting.value === 'string' ? setting.value : '';
+  const [text, setText] = useState(saved);
+  return (
+    <input
+      type="url"
+      className="sites one-line"
+      spellCheck={false}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      value={text}
+      disabled={setting.locked}
+      onChange={(event) => setText(event.target.value)}
+      // What was typed stays in the field when it is refused, so it can be corrected.
+      onBlur={() => {
+        if (text.trim() !== saved) void onSave(text.trim());
+      }}
+    />
   );
 }
 

@@ -581,6 +581,31 @@ async def saved(opened: Window, system: str, setting: str, value: Any) -> None:
             await asyncio.sleep(0.05)
 
 
+async def test_the_helpers_address_is_typed_on_the_computers_own_configuration(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
+        page = opened.page
+        await opened.open("Computer")
+        await page.get_by_role("tab", name="Configuration").click()
+        computer = page.get_by_role("article", name="Computer")
+        field = computer.get_by_role("textbox", name="Where the helper of a machine elsewhere answers")
+        await field.wait_for()
+        assert await field.input_value() == "http://127.0.0.1:8796"
+
+        await field.fill("https://desk.tail1234.ts.net:8796/")
+        await field.blur()
+        await saved(opened, "computer", "computer_helper_url", "https://desk.tail1234.ts.net:8796")
+
+        # What is no web address is refused, in words, and what was typed stays to be corrected.
+        await field.fill("desk on my tailnet")
+        await field.blur()
+        await computer.get_by_text("That doesn't look like a web address.").wait_for()
+        assert await field.input_value() == "desk on my tailnet"
+        await saved(opened, "computer", "computer_helper_url", "https://desk.tail1234.ts.net:8796")
+        await page.screenshot(path=SHOTS / "computer-helper-address.png")
+
+
 async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:

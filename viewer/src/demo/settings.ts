@@ -318,6 +318,7 @@ function problemWith(entry: Entry | undefined, surface: Surface, value: SettingV
     if (!Array.isArray(value) || !value.every((site) => SITE.test(site))) return 'bad_site';
     return null;
   }
+  if (entry.control === 'address') return typeof value === 'string' && /^https?:\/\/\S+$/.test(value) ? null : 'bad_address';
   if (entry.control === 'switch') return typeof value === 'boolean' ? null : 'not_a_choice';
   if (entry.choices) return entry.choices.some((choice) => choice.value === value && !choice.disabled) ? null : 'not_a_choice';
   return 'not_a_choice';

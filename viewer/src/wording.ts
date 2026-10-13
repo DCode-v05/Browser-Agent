@@ -428,6 +428,7 @@ export const W = {
         not_on_this_surface: "This setting isn't yours to change.",
         not_a_choice: "That isn't one of the choices.",
         bad_site: "That doesn't look like a site. Use a name such as example.com.",
+        bad_address: "That doesn't look like a web address. Start it with http:// or https://.",
       },
     },
     overall: {
@@ -678,6 +679,7 @@ export const W = {
       not_on_this_surface: "This setting isn't available here.",
       not_a_choice: "That isn't one of the choices.",
       bad_site: "That doesn't look like a site. Use a name such as example.com.",
+      bad_address: "That doesn't look like a web address. Start it with http:// or https://.",
     },
     listHint: 'One site per line. example.com also covers its subdomains.',
     listEmpty: 'No sites',

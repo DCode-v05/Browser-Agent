@@ -42,6 +42,7 @@ function settingsOf(system: string, refuse?: ChangeResult) {
       ],
     }),
     setting('blocked_sites', 'Blocked sites', { control: 'list', value: ['ads.example'], fixed: ['internal.example'] }),
+    setting('computer_helper_url', 'Where the helper answers', { control: 'address', value: 'http://127.0.0.1:8796', default: 'http://127.0.0.1:8796' }),
     setting('clear_browsing_data', 'Clear browsing data', {
       control: 'action',
       value: null,
@@ -259,6 +260,17 @@ describe('one browser’s configuration, for the admin (spec 9.17)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Every row says what its control does.
     for (const row of cloudCard.querySelectorAll('.setting')) expect(row.querySelector('.setting-description')).not.toBeEmptyDOMElement();
+  });
+
+  it('takes an address typed into its field, and saves it when the field is left', async () => {
+    const { user, changedOn } = asAdmin('configuration');
+    const cloudCard = await card('Cloud browser');
+    const field = await within(cloudCard).findByRole('textbox', { name: 'Where the helper answers' });
+    expect(field).toHaveValue('http://127.0.0.1:8796');
+    await user.clear(field);
+    await user.type(field, 'https://desk.tail1234.ts.net');
+    await user.tab();
+    await waitFor(() => expect(changedOn('cloud')).toContainEqual({ computer_helper_url: 'https://desk.tail1234.ts.net' }));
   });
 
   it('has "Use this browser" once, at the top, and not again among the settings', async () => {

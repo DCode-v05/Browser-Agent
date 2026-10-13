@@ -126,7 +126,7 @@ def test_every_setting_names_a_surface_and_a_group(make_config: MakeConfig, tmp_
     assert len({entry.id for entry in CATALOGUE}) == len(CATALOGUE)
     for entry in CATALOGUE:
         assert entry.surfaces and set(entry.surfaces) <= set(SURFACES)
-        assert entry.control in ("choice", "select", "switch", "list", "about", "action")
+        assert entry.control in ("choice", "select", "switch", "list", "about", "action", "address")
         # What the deployment has is always a value a person may have. Two hold no value at all.
         if entry.control not in ("about", "action"):
             assert entry.problem(entry.deployed(config), config) is None, entry.id
