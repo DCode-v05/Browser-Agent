@@ -78,6 +78,8 @@ WAIT_FOR_THE_APP_S = 20.0
 WAIT_FOR_THE_OTHER_APP_S = 3.0
 # How long a page of a website is given to load before it is read.
 WAIT_FOR_THE_PAGE_S = 8.0
+# How often the address is given before the page is said not to have come.
+TRIES_FOR_THE_PAGE = 3
 # The chord that reaches a browser's address bar.
 ADDRESS_BAR = {"darwin": "cmd+l"}
 # A line of a capture that names a browser's address bar: its number.
@@ -326,25 +328,33 @@ async def a_site_is_read(
     # A browser takes a while to show its first window.
     await a_window_of(browser)
     look = {"action": "capture", "mode": "ax", "app": browser}
-    first = await session.toolkit.call("computer_use", look)
-    bar = THE_ADDRESS_BAR.search(first.text)
-    done = [opened, first]
-    if bar is not None:
-        # The bar is given its value as a field is, which no first page of a new browser gets between.
-        number = int(bar.group(1))
-        steps: list[dict[str, Any]] = [
-            {"action": "click", "element": number},
-            {"action": "set_value", "element": number, "value": address},
-        ]
-    else:
-        steps = [
-            {"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")},
-            {"action": "type", "text": address},
-        ]
-    steps += [{"action": "key", "keys": "return"}, {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S}]
-    for step in steps:
-        done.append(await does(step))
-    read = await session.toolkit.call("computer_use", look)
+    done = [opened]
+    bar = None
+    read = opened
+    # A new browser may put a page of its own in the way of the first try. The agent, told that
+    # the effect was not seen, captures and tries again: so does this.
+    for _ in range(TRIES_FOR_THE_PAGE):
+        first = await session.toolkit.call("computer_use", look)
+        done.append(first)
+        bar = THE_ADDRESS_BAR.search(first.text)
+        if bar is not None:
+            # The bar is given its value as a field is.
+            number = int(bar.group(1))
+            steps: list[dict[str, Any]] = [
+                {"action": "click", "element": number},
+                {"action": "set_value", "element": number, "value": address},
+            ]
+        else:
+            steps = [
+                {"action": "key", "keys": ADDRESS_BAR.get(sys.platform, "ctrl+l")},
+                {"action": "type", "text": address},
+            ]
+        steps += [{"action": "key", "keys": "return"}, {"action": "wait", "seconds": WAIT_FOR_THE_PAGE_S}]
+        for step in steps:
+            done.append(await does(step))
+        read = await session.toolkit.call("computer_use", look)
+        if read.is_error or expects.lower() in read.text.lower():
+            break
     wrong = next((" | ".join(one.text.splitlines())[:200] for one in [*done, read] if one.is_error), None)
     how = f"the address bar was {'element ' + bar.group(1) if bar else 'reached by its key'}; "
     return (
