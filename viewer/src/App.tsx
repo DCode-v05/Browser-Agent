@@ -44,8 +44,7 @@ export interface AppProps {
   /** Drawn as one page of the window of several browsers (spec 9.16). That window has the page's
    *  bar, its heading and its main part: the app is then none of them a second time. */
   inWindow?: boolean;
-  /** Opened as the chat alone, to keep beside a screen the person watches themselves: a real
-   *  machine the agent works on (spec 22.3.1). No picture is drawn. */
+  /** The chat alone, with no picture: kept beside a real machine's own screen (spec 22.3.1). */
   beside?: boolean;
 }
 
