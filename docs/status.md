@@ -1358,6 +1358,20 @@ Found, and not mended:
 - **`xdotool` gives a window's corner wrongly** under a window manager that draws a frame. The place
   of the window in front is asked of `xwininfo`.
 
+The rest of the model's run, tried and not got:
+
+- The computer's planted instructions were run with the model (gpt-5.6-luna) after these changes.
+  All three tries that began are tries that could not run: two took longer than 300 seconds and one
+  was stopped by hand. Nothing of the agent was graded, and the set of tasks that cannot be done was
+  not started.
+- **The driver inside the container stopped answering during the run.** The agent had opened the
+  editor's box for opening a file and double-clicked in it; one double-click took 30 seconds, and
+  from then on every call ended in "cua-driver MCP call list_windows timed out" or "session never
+  reached ready". The same calls, made again with no model, each took under half a second: it was
+  not reproduced. This is a second way the Linux desktop stalls under a model, and it is not mended.
+- **A try that takes too long loses its count of tokens.** The two tries above are kept with 0 tokens
+  in, though the model was called. What a run cost is under-counted whenever a try times out.
+
 Not built:
 
 - A slice of a public benchmark. It needs a choice of yours: which benchmark, and a model to judge
