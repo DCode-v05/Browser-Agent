@@ -100,14 +100,26 @@ def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
             subprocess.run(closing, capture_output=True, check=False)
 
 
+async def the_windows() -> list[dict[str, Any]]:
+    """The windows the driver lists, as it gives them."""
+    listed = said(await asyncio.to_thread(computer.computer_use, {"action": "list_windows"}, "ladder"))
+    return [row for row in listed.get("windows", []) if isinstance(row, dict)]
+
+
+async def windows_like(name: str) -> str:
+    """What the driver says of the windows whose row names something, shortly, for a rung that failed."""
+    rows = [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
+    return json.dumps(rows)[:700]
+
+
 @contextmanager
-def an_app_not_allowed() -> Iterator[str]:
-    """Opens an app the settings do not allow, and closes it after. Its name comes out."""
+def an_app_not_allowed() -> Iterator[tuple[str, int]]:
+    """Opens an app the settings do not allow, and closes it after. Its name and its process come out."""
     system = next(name for name in NOT_ALLOWED if sys.platform.startswith(name))
     command, name, closing = NOT_ALLOWED[system]
     started = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        yield name
+        yield name, started.pid
     finally:
         if started.poll() is None:
             started.terminate()
@@ -171,7 +183,8 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                 )
             field = A_FIELD.search(seen.text)
             if seen.is_error or field is None:
-                return [(f"3, a field of {app} is found by its number", False, seen.text[:300])]
+                told = f"{seen.text[:300]} || the driver's windows: {await windows_like(app)}"
+                return [(f"3, a field of {app} is found by its number", False, told)]
             number = int(field.group(1))
             rungs.append(
                 (f"3, a field of {app} is found by its number", True, f"element {number}, {field.group(2)}")
@@ -202,17 +215,31 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
             )
             if allowed.held(machine.computer):
                 # Rung 4: the driver itself refuses an app the person did not allow.
-                with an_app_not_allowed() as other:
+                with an_app_not_allowed() as (other, its_pid):
                     await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
-                    there = await session.toolkit.call(
-                        "computer_use", {"action": "capture", "mode": "ax", "app": other}
-                    )
-                refused = there.is_error and bool(REFUSED_FOR_THE_LIST.search(there.text))
+                    # Its window is asked for exactly, by what the driver itself lists: a name that
+                    # matched nothing would prove nothing.
+                    rows = [row for row in await the_windows() if row.get("pid") == its_pid]
+                    rows = rows or [
+                        row for row in await the_windows() if other.lower() in json.dumps(row).lower()
+                    ]
+                    if rows:
+                        exactly = {"pid": rows[0].get("pid"), "window_id": rows[0].get("window_id")}
+                        there = await session.toolkit.call(
+                            "computer_use", {"action": "capture", "mode": "ax", **exactly}
+                        )
+                        refused = there.is_error and bool(REFUSED_FOR_THE_LIST.search(there.text))
+                        seen_there = " | ".join(there.text.splitlines())[:300]
+                    else:
+                        refused, seen_there = (
+                            False,
+                            f"its window was not among the driver's: {await windows_like('')}",
+                        )
                 rungs.append(
                     (
                         f"4, {other}, which is not allowed, cannot be looked at or worked in",
                         refused,
-                        " | ".join(there.text.splitlines())[:400],
+                        seen_there,
                     )
                 )
             # Rung 5: while a person holds the screen, nothing is done for the agent, not even a look.
