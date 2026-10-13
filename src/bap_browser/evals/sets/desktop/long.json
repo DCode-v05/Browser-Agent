@@ -22,11 +22,7 @@
           "app",
           "Text editor"
         ],
-        [
-          "click",
-          640,
-          400
-        ],
+        ["page"],
         [
           "type",
           "alpha"
@@ -98,11 +94,7 @@
           "app",
           "Text editor"
         ],
-        [
-          "click",
-          640,
-          400
-        ],
+        ["page"],
         [
           "type",
           "4417"

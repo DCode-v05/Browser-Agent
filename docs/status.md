@@ -1146,12 +1146,51 @@ Found by running it:
 
 Not built, and not checked:
 
-- The contained desktop still runs on the older driver unless `base.contained` is switched on. The
-  13 tasks' reference solutions are written for the older tools, so the default is not changed yet.
+- The contained desktop still ran on the older driver by default. Entry 1ak changes that.
 - Hermes' own desktop inside the container (`dock_entry.py`, TigerVNC and Xfce) is not used: the
   desktop's own screen and window manager are.
 - The handoff's plan is mapped, step by step, at the top of
   `docs/plans/2026-10-10-helpers-and-tailnet.md`.
+
+### 1ak. Built on 2026-10-13: every desktop on Hermes' tool, and the older driver removed
+
+Every desktop is now driven the same way: the contained desktop, the micro VM's own screen, a
+person's own machine, and a machine elsewhere.
+
+| | |
+|---|---|
+| The tools | `computer_use`, `computer_list_apps`, `computer_open_app`, `computer_request_human`. The nine older tools for the pointer, the keys and the picture are deleted, with the `xdotool` driver that sent them |
+| A capture's text | Names the page before the menus, up to `computer.base.elements_shown` (60), and names no file of the engine's machine. The driver reads up to 800 elements of a window |
+| Where input goes | `computer.base.delivery`: `auto` sends it in front where nobody is at the screen (the container, the VM), and in the background on a person's machine |
+| A "not done" answer | An action the tool answers with `ok: false` is a failure of the step, not a result |
+| The tasks | The 13 tasks of the desktop's sets are solved with Hermes' tool. A solution finds the page by its number |
+| Settings | The tool's manual and where input goes are on the Configuration. The zoom tool and the picture after each action are gone, with eight tunables of the older driver and `computer.base.contained` |
+
+Seen, each with Docker on this Mac (arm64):
+
+- `uv run pytest tests/e2e/test_computer.py`: 7 passed in 49 s. The agent's tools open the editor,
+  find its page by number, type, save into the shared folder, and the file is on this Mac. Each of
+  the four sets of tasks is solved by its reference solutions.
+- `uv run pytest tests/e2e/test_computer_vm.py`: 3 passed, against an image built again from this
+  code. An MCP client outside the VM saves a file inside it with `computer_use`.
+- `uv run python scripts/gate.py`: the gate is passed.
+
+Found by running it:
+
+- **Key chords do nothing in the background on X11.** They reach the window only when it is in
+  front, which is why delivery is decided by the desktop.
+- **GTK's save box takes Enter for itself right after typing.** A solution waits `settle_ms` and
+  looks again before Enter.
+- **An app opened while its last run is ending shows no window.** The ground now waits for each app
+  to be gone before a task.
+
+Not built, and not checked:
+
+- No model has run the tasks with the new tool. Only the reference solutions have.
+- `computer.runs: mac` is still accepted in `config.json` and is reached through the link, as
+  `remote` is. It is no longer offered on the Configuration.
+- Not checked on macOS (the driver's app is not allowed under Accessibility on this Mac), over a
+  real tailnet, or on a person's own Windows or Linux machine.
 
 ## How to go on
 

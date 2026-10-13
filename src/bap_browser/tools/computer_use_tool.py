@@ -6,11 +6,14 @@ picture only where a capture was asked for one.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field
 
+from bap_browser.config_computer import Computer
 from bap_browser.driver.hermes_driver import HermesDriver, as_shot
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BrowserError
@@ -37,6 +40,15 @@ Action = Literal[
 Held = Literal["cmd", "shift", "option", "alt", "ctrl", "fn", "win", "windows", "super", "meta"]
 # The actions that only look, or only wait.
 LOOKS = frozenset({"capture", "wait", "list_apps", "list_windows"})
+# The actions whose input is delivered to a window: in the background, or in front.
+DELIVERED = frozenset(
+    {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key"}
+)
+# The roles of an app's menus, as the systems name them.
+MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
+# What marks a line of the tool's text that names a file on the engine's machine. No model here
+# can read one, and its path is nothing a result should hold.
+OF_THIS_MACHINE = ("saved to", "read_file", "search_files")
 REFUSALS = {"human_has_control": "a person has the screen"}
 
 
@@ -66,10 +78,67 @@ class ComputerUseArgs(Args):
     capture_after: bool | None = None
 
 
+def delivery_for(computer: Computer) -> str | None:
+    """How the agent's input is delivered when a call does not say: in front, on a desktop nobody is
+    at. None leaves it to the driver, which delivers in the background."""
+    chosen = computer.base.delivery
+    nobody_is_there = computer.runs in ("container", "here") or computer.base.virtual_screen
+    in_front = chosen == "foreground" or (chosen == "auto" and nobody_is_there)
+    return "foreground" if in_front else None
+
+
+def cleared(summary: str) -> str:
+    """A capture's text with no line that names a file of the engine's machine."""
+    return "\n".join(
+        line for line in summary.splitlines() if not any(word in line for word in OF_THIS_MACHINE)
+    )
+
+
+def of_a_capture(summary: str, elements: list[dict[str, Any]], shown: int, label: int) -> str:
+    """What a capture says in text: what was captured, and its elements by number. Hermes' own text
+    names the first forty as the window gives them, which in an app with large menus is menus alone.
+    Here the page comes first and the menus after, and no file of the engine's machine is named."""
+    kept = [
+        line
+        for line in summary.splitlines()
+        if not line.lstrip().startswith(("#", "...")) and not any(word in line for word in OF_THIS_MACHINE)
+    ]
+    of_the_page = [one for one in elements if str(one.get("role", "")) not in MENUS]
+    of_the_menus = [one for one in elements if str(one.get("role", "")) in MENUS]
+    named = [*of_the_page, *of_the_menus][: max(shown, 0)]
+    lines = [
+        f"#{one.get('index')} {one.get('role')} {str(one.get('label', ''))[:label]!r}".rstrip()
+        for one in named
+    ]
+    left = len(elements) - len(named)
+    if left > 0:
+        menus_left = len([one for one in of_the_menus if one not in named])
+        lines.append(
+            f"{left} more are not named here, {menus_left} menu items among them. Capture with mode=som to see "
+            "them numbered in a picture."
+        )
+    if of_the_menus:
+        lines.append(f"This window has {len(of_the_menus)} menu items.")
+    return "\n".join([*kept, *lines])
+
+
+def every_element(answer: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Every element of a capture, as the tool gave them: in its answer, or, past a hundred, in the
+    file it names. None when the answer holds no list of them."""
+    file = answer.get("elements_file") or answer.get("meta", {}).get("elements_file")
+    if file:
+        try:
+            return list(json.loads(Path(str(file)).read_text(encoding="utf-8"))["elements"])
+        except (OSError, ValueError, KeyError):
+            return None
+    listed = answer.get("elements")
+    return list(listed) if isinstance(listed, list) else None
+
+
 def plain(answer: dict[str, Any]) -> str:
     """A result of Hermes' tool as plain text. What the screen wrote is marked as the screen's."""
     if isinstance(answer.get("summary"), str):
-        return from_page(answer["summary"])
+        return from_page(cleared(answer["summary"]))
     lines: list[str] = []
     if "action" in answer:
         lines.append(f"{answer['action']}: {'done' if answer.get('ok') else 'not done'}.")
@@ -92,17 +161,34 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     driver = await session.driver(may_restart=True)
     if not isinstance(driver, HermesDriver):
         raise BrowserError("This session drives no machine.", reason="this is not a machine")
-    result = await driver.use(args.model_dump(exclude_none=True))
+    asked = args.model_dump(exclude_none=True)
+    how = delivery_for(session.config.computer)
+    if how and args.action in DELIVERED and "delivery_mode" not in asked:
+        asked["delivery_mode"] = how
+    result = await driver.use(asked)
+    shown = session.config.computer.base.elements_shown
+    label = session.config.computer.window_title_chars
     shot = as_shot(result)
     if shot is not None:
-        return Shown(from_page(str(result.get("text_summary", ""))), shot.picture)
+        elements = await asyncio.to_thread(every_element, result)
+        summary = str(result.get("text_summary", ""))
+        # Up to a hundred elements the tool's own text stands; past that, ours names the page first.
+        text = of_a_capture(summary, elements, shown, label) if elements is not None else cleared(summary)
+        return Shown(from_page(text), shot.picture)
     answer = json.loads(result) if isinstance(result, str) else result
     if not isinstance(answer, dict):
         return str(result)
+    if "error" not in answer and isinstance(answer.get("summary"), str):
+        elements = await asyncio.to_thread(every_element, answer)
+        if elements is not None:
+            return from_page(of_a_capture(answer["summary"], elements, shown, label))
     if "error" in answer:
         hint = f" {answer['hint']}" if answer.get("hint") else ""
         reason = REFUSALS.get(str(answer.get("code")), "the machine did not do it")
         raise BrowserError(f"{answer['error']}{hint}", reason=reason)
+    if answer.get("ok") is False:
+        # The driver answered, and did not do it. That is a failure, with what the driver said.
+        raise BrowserError(plain(answer), reason="the machine did not do it")
     return plain(answer)
 
 

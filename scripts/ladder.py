@@ -180,10 +180,7 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
     """The ladder on the contained desktop. The engine starts the container, puts the driver in it,
     and through the session opens the text editor, finds its field by number and types into it. The
     editor then marks its own window as changed."""
-    # The editor's menus alone are 169 elements, and the driver stops reading a window at
-    # `ax_max_elements`: at Hermes' 200 it never reaches the page. Here it reads on.
-    base = config.computer.base.model_copy(update={"contained": True, "ax_max_elements": 800})
-    inside = config.computer.model_copy(update={"runs": "container", "base": base, "share_folder": False})
+    inside = config.computer.model_copy(update={"runs": "container", "share_folder": False})
     machine = config.model_copy(update={"computer": inside})
     inside_it = HermesDriver(machine)
     session = ServiceSession(

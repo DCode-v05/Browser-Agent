@@ -22,7 +22,7 @@ from bap_browser.computer.hermes.computer_use.schema import COMPUTER_USE_SCHEMA
 from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.service.session import ServiceSession
 from bap_browser.tools.computer_tools import computer_tools_for
-from bap_browser.tools.computer_use_tool import ComputerUseArgs
+from bap_browser.tools.computer_use_tool import ComputerUseArgs, delivery_for
 from bap_browser.tools.event_log import masked
 from bap_browser.tools.sentences import label_for, summary_for
 
@@ -96,12 +96,17 @@ def did(desk: Desk, name: str) -> list[dict[str, Any]]:
     return [how for done, how in desk.done if done == name]
 
 
-def test_on_a_machine_the_agent_is_offered_hermes_tool_and_two_of_ours(make_config, tmp_path: Path) -> None:
+def test_on_a_machine_the_agent_is_offered_hermes_tool_and_three_of_ours(make_config, tmp_path: Path) -> None:
     config = make_config(tmp_path, computer={"runs": "machine"})
 
     offered = [tool.name for tool in computer_tools_for(config)]
 
-    assert sorted(offered) == ["computer_open_app", "computer_request_human", "computer_use"]
+    assert sorted(offered) == [
+        "computer_list_apps",
+        "computer_open_app",
+        "computer_request_human",
+        "computer_use",
+    ]
 
 
 def test_the_tool_takes_what_hermes_tool_takes() -> None:
@@ -331,3 +336,132 @@ async def test_a_screen_that_stands_still_is_shown_once_and_again_when_it_change
 
     assert still == 1
     assert len(frames) == 2 and frames[0] != frames[1]
+
+
+class Editor(Desk):
+    """An app like a text editor: two hundred menu items first, and then the page."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        menus = [UIElement(index=n, role="menu item", label=f"Item {n}") for n in range(200)]
+        page = [
+            UIElement(index=200, role="text", label="", bounds=(10, 60, 600, 400)),
+            UIElement(index=201, role="push button", label="Close"),
+        ]
+        return CaptureResult(
+            mode=mode, width=640, height=480, elements=[*menus, *page], app="Editor", window_title="Untitled"
+        )
+
+
+async def a_capture_of_the_editor(make_config, tmp_path: Path, **base: Any) -> str:
+    computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), **base}}
+    config = make_config(tmp_path, computer=computer)
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=Editor),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        return (await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})).text
+    finally:
+        await session.close()
+
+
+async def test_the_page_of_an_app_is_named_before_its_menus(make_config, tmp_path: Path) -> None:
+    seen = await a_capture_of_the_editor(make_config, tmp_path)
+
+    assert "#200 text" in seen and "#201 push button 'Close'" in seen
+    assert seen.index("#200 text") < seen.index("menu item")
+    # The menus are still counted, and how to see them is said.
+    assert "200 menu items" in seen
+
+
+async def test_a_capture_names_no_more_elements_than_the_settings_allow(make_config, tmp_path: Path) -> None:
+    seen = await a_capture_of_the_editor(make_config, tmp_path, elements_shown=10)
+
+    assert seen.count("\n#") + seen.count("\n  #") <= 10
+
+
+async def test_a_capture_names_no_file_of_the_engines_machine(make_config, tmp_path: Path) -> None:
+    seen = await a_capture_of_the_editor(make_config, tmp_path)
+
+    assert str(tmp_path) not in seen
+    assert "read_file" not in seen and "saved to" not in seen
+
+
+def test_the_driver_reads_far_enough_into_a_window_to_reach_its_page(make_config, tmp_path: Path) -> None:
+    """Spec 22.5: a text editor's menus alone are 169 elements. Hermes' own bound is 200."""
+    assert make_config(tmp_path).computer.base.ax_max_elements >= 600
+
+
+class Refuses(Desk):
+    """A machine whose driver cannot press a key in the background, and says so."""
+
+    def key(self, keys: str, **how: Any) -> ActionResult:
+        self.done.append(("key", {"keys": keys, **how}))
+        if how.get("delivery_mode") == "foreground":
+            return ActionResult(ok=True, action="hotkey")
+        return ActionResult(ok=False, action="hotkey", message="Background delivery is not available.")
+
+
+async def pressed(make_config, tmp_path: Path, **base: Any) -> tuple[Any, list[dict[str, Any]]]:
+    computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), **base}}
+    config = make_config(tmp_path, computer=computer)
+    machine = Refuses()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: machine),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        result = await session.toolkit.call("computer_use", {"action": "key", "keys": "ctrl+s"})
+    finally:
+        await session.close()
+    return result, did(machine, "key")
+
+
+async def test_an_action_the_driver_did_not_do_is_a_failure_that_says_why(
+    make_config, tmp_path: Path
+) -> None:
+    result, _ = await pressed(make_config, tmp_path)
+
+    assert result.is_error
+    assert "Background delivery is not available" in result.text
+
+
+async def test_where_nobody_is_at_the_screen_input_goes_to_the_window_in_front(
+    make_config, tmp_path: Path
+) -> None:
+    result, keys = await pressed(make_config, tmp_path, delivery="foreground")
+
+    assert not result.is_error, result.text
+    assert keys[-1]["delivery_mode"] == "foreground"
+
+
+@pytest.mark.parametrize(
+    ("runs", "base", "how"),
+    [
+        ("machine", {}, None),
+        ("mac", {}, None),
+        ("remote", {}, None),
+        ("container", {}, "foreground"),
+        ("here", {}, "foreground"),
+        ("machine", {"virtual_screen": True}, "foreground"),
+        ("machine", {"delivery": "foreground"}, "foreground"),
+        ("container", {"delivery": "background"}, None),
+    ],
+)
+def test_input_is_in_the_background_only_where_a_person_is_at_the_screen(
+    runs: str, base: dict[str, Any], how: str | None, make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": runs, "base": base})
+
+    assert delivery_for(config.computer) == how

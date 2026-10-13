@@ -18,11 +18,7 @@
           "app",
           "Text editor"
         ],
-        [
-          "click",
-          640,
-          400
-        ],
+        ["page"],
         [
           "type",
           "Meeting at 10"

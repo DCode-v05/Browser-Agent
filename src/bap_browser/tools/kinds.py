@@ -7,13 +7,7 @@ from collections.abc import Mapping
 from typing import Any, get_args
 
 from bap_browser.tools.browser_tools import RUN_A_SCRIPT
-from bap_browser.tools.computer_tools import (
-    COMPUTER_KEYS,
-    COMPUTER_NAMES,
-    COMPUTER_NO_STEP,
-    COMPUTER_POINTED,
-    COMPUTER_READS,
-)
+from bap_browser.tools.computer_tools import COMPUTER_NAMES, OURS_LOOK
 from bap_browser.tools.computer_use_tool import COMPUTER_USE, LOOKS, Action
 
 # Hermes' one tool for a machine does many things, and is judged by what a call of it does: its
@@ -31,7 +25,7 @@ def of(name: str, arguments: Mapping[str, Any]) -> str:
 
 
 # The tools whose x and y are where the pointer goes. For browser_scroll they are only where the wheel turns.
-POINTED = frozenset({"browser_click", "browser_hover"}) | COMPUTER_POINTED
+POINTED = frozenset({"browser_click", "browser_hover"})
 # The tools that only read, or only wait. With "ask before every action" these are still not asked about.
 READS = frozenset(
     {
@@ -47,7 +41,7 @@ READS = frozenset(
         "browser_request_human",
         "browser_begin_task",
     }
-    | COMPUTER_READS
+    | OURS_LOOK
     | IT_LOOKS
 )
 DECLARES_A_TASK = "browser_begin_task"
@@ -57,8 +51,8 @@ LISTS_THE_TABS = ("browser_tabs", "list")
 TYPES_ON_A_MACHINE = f"{BY_ITS_ACTION}.type"
 PRESSES_ON_A_MACHINE = f"{BY_ITS_ACTION}.key"
 SETS_ON_A_MACHINE = f"{BY_ITS_ACTION}.set_value"
-GO_WHERE_THE_FOCUS_IS = (
-    frozenset({"browser_type", "browser_press_key", TYPES_ON_A_MACHINE, PRESSES_ON_A_MACHINE}) | COMPUTER_KEYS
+GO_WHERE_THE_FOCUS_IS = frozenset(
+    {"browser_type", "browser_press_key", TYPES_ON_A_MACHINE, PRESSES_ON_A_MACHINE}
 )
 # The tools that touch no site: asking a person, waiting, and the list of saved files.
 NO_SITE_IN_A_BROWSER = frozenset(
@@ -82,13 +76,12 @@ RUN_BESIDE_A_DIALOG = frozenset(
 NO_STEP_ON_A_PAGE = (
     NO_SITE_IN_A_BROWSER
     | {"browser_tabs", ANSWERS_A_DIALOG, RUN_A_SCRIPT}
-    | COMPUTER_NO_STEP
+    | OURS_LOOK
     | (IT_LOOKS - {f"{BY_ITS_ACTION}.capture"})
 )
 # What a hover brings up is often drawn by a style, which cannot be seen from here.
-# The pointer itself is in no picture of a desktop.
-CHANGES_UNSEEN = frozenset({"browser_hover", "computer_move"})
+CHANGES_UNSEEN = frozenset({"browser_hover"})
 # A script in the page is mostly a way to read it. Whether it repeats itself is told by what it gives.
 TOLD_BY_ITS_RESULT = READS | {"browser_evaluate"}
 # The tools that press keys. A key that types a character is typed text.
-PRESSES_KEYS = frozenset({"browser_press_key", "computer_press_key", PRESSES_ON_A_MACHINE})
+PRESSES_KEYS = frozenset({"browser_press_key", PRESSES_ON_A_MACHINE})

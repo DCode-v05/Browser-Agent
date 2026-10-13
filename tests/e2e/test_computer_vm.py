@@ -18,6 +18,8 @@ import pytest
 from mcp import Client
 from mcp.client import streamable_http
 
+from bap_browser.evals.desktop_ground import A_PAGE
+
 IMAGE = "bap-browser-computer:latest"
 SERVE = ["uv", "run", "--project", "/app", "--no-sync", "bap-browser", "serve", "--desktop"]
 
@@ -83,22 +85,33 @@ async def test_an_agent_outside_the_vm_works_on_its_desktop(vm: tuple[str, str, 
         Client(streamable_http.streamable_http_client(f"{address}/mcp", http_client=http)) as client,
     ):
         names = {tool.name for tool in (await client.list_tools()).tools}
-        assert "computer_screenshot" in names and not any(name.startswith("browser_") for name in names)
+        assert "computer_use" in names and not any(name.startswith("browser_") for name in names)
 
         async def call(tool: str, arguments: dict[str, Any]) -> str:
             result = await client.call_tool(tool, arguments)
+            assert not result.is_error, result.content
             return " ".join(getattr(part, "text", "") for part in result.content)
+
+        async def use(**arguments: Any) -> str:
+            return await call("computer_use", arguments)
 
         listed = await call("computer_list_apps", {})
         assert "Text editor" in listed and "Terminal" not in listed
         assert "Opened Text editor" in await call("computer_open_app", {"app": "Text editor"})
-        await call("computer_click", {"x": 640, "y": 400})
-        await call("computer_type", {"text": "made in the VM"})
-        await call("computer_press_key", {"keys": "Control+s"})
-        await call("computer_wait", {"seconds": 1})
-        await call("computer_type", {"text": "~/Files/vm.txt", "submit": True})
-        await call("computer_wait", {"seconds": 1})
-        shot = await client.call_tool("computer_screenshot", {})
+        async with asyncio.timeout(30):
+            while (page := A_PAGE.search(await use(action="capture", mode="ax", app="mousepad"))) is None:
+                await asyncio.sleep(0.2)
+        await use(action="click", element=int(page.group(1)))
+        await use(action="type", text="made in the VM")
+        await use(action="key", keys="ctrl+s")
+        await use(action="wait", seconds=1)
+        await use(action="capture", mode="ax", app="mousepad")
+        await use(action="type", text="~/Files/vm.txt")
+        await use(action="wait", seconds=1)
+        await use(action="capture", mode="ax", app="mousepad")
+        await use(action="key", keys="return")
+        await use(action="wait", seconds=1)
+        shot = await client.call_tool("computer_use", {"action": "capture", "mode": "vision"})
         assert any(getattr(part, "type", "") == "image" for part in shot.content)
     saved = subprocess.run(
         ["docker", "exec", name, "cat", "/home/pwuser/Files/vm.txt"], capture_output=True, check=False

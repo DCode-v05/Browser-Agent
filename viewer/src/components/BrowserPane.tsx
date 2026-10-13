@@ -107,7 +107,7 @@ function FrameBadge({ state, view, now }: { state: ViewerState; view: StateView;
 }
 
 /** The tools that press a mouse button. */
-const CLICKS = new Set(['browser_click', 'computer_click']);
+const CLICKS = new Set(['browser_click']);
 
 /** The element the agent acted on most recently. A step on something off screen has none. */
 function lastTarget(steps: readonly Step[]): Box | undefined {
