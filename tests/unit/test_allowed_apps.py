@@ -42,8 +42,11 @@ def test_on_windows_and_linux_each_allowed_app_is_named_as_the_driver_names_it(t
     on_linux = allowed.manifest(settings, "linux", found_in("/usr/bin"))
 
     # On Windows an app is named by the identity the driver itself lists for it, not by a path.
-    assert on_windows["resources"]["apps"] == [
-        {"bundle_id": "%windir%\\system32\\notepad.exe", "launch": True}
+    assert [app["bundle_id"] for app in on_windows["resources"]["apps"]] == [
+        "%windir%\\system32\\notepad.exe",
+        "c5e2524a-ea46-4f67-841f-6a9465d9d515_cw5n1h2txyewy",
+        "%windir%\\system32\\win32calc.exe",
+        "Microsoft.WindowsTerminal_8wekyb3d8bbwe",
     ]
     assert [app["executable"] for app in on_linux["resources"]["apps"]] == [
         "/usr/bin/mousepad",

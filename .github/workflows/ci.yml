@@ -83,18 +83,17 @@ jobs:
           from bap_browser import computer
           from bap_browser.config import load_config
           config = load_config()
-          base = config.computer.base.model_copy(update={"permission_mode": "standard"})
-          here = config.computer.model_copy(update={"runs": "machine", "base": base})
+          apps = config.computer.apps.model_copy(update={"terminal": True})
+          here = config.computer.model_copy(update={"runs": "machine", "apps": apps})
           with computer.base(config.model_copy(update={"computer": here})):
               computer.ask_with(lambda action, about: True)
-              listed = computer.computer_use({"action": "list_apps"}, "read")
-              windows = computer.computer_use({"action": "list_windows"}, "read")
-          for answer in (listed, windows):
-              rows = json.loads(answer) if isinstance(answer, str) else {}
-              for row in [*rows.get("apps", []), *rows.get("windows", [])]:
-                  text = json.dumps(row)
-                  if any(word in text.lower() for word in ("calc", "explorer", "terminal", "cmd", "powershell")):
-                      print(text[:400])
+              windows = json.loads(computer.computer_use({"action": "list_windows"}, "read"))
+              for row in windows.get("windows", []):
+                  if not any(word in json.dumps(row).lower() for word in ("calc", "explorer", "terminal")):
+                      continue
+                  asked = {"action": "capture", "mode": "ax", "pid": row["pid"], "window_id": row["window_id"]}
+                  seen = computer.computer_use(asked, "read")
+                  print(row.get("app_name"), "|", row.get("title"), "|", str(seen)[:260].replace("\n", " "))
           EOF
       - if: runner.os == 'macOS'
         run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."
