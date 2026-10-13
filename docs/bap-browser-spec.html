@@ -13985,6 +13985,11 @@ that design.</p>
 <td>Hermes has none unless <code>bounded</code> mode is turned on. Ours stays on: the driver runs in <code>bounded</code> mode with a capability list written from the apps the admin allows, and <code>computer_open_app</code> opens nothing outside it</td>
 </tr>
 <tr>
+<td>The allowlist on a machine elsewhere</td>
+<td>Ours</td>
+<td>The helper on that machine starts the driver in <code>bounded</code> mode with the list written from that machine's own settings, and passes the engine on to that driver alone. The engine is not trusted to hold itself: it cannot start another driver there, and it cannot stop that one</td>
+</tr>
+<tr>
 <td>A switched-off app cannot run</td>
 <td>Ours</td>
 <td>In the contained desktop, an empty file still stands where its program is</td>

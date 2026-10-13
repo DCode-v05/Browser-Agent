@@ -303,8 +303,10 @@ async def through_the_engine(config: Config) -> list[tuple[str, bool, str]]:
                     " | ".join(typed.text.splitlines())[:300],
                 )
             )
-            if allowed.held(machine.computer):
-                # Rung 4: the driver itself refuses an app the person did not allow.
+            here = machine.computer.model_copy(update={"runs": "machine"})
+            if allowed.held(here):
+                # Rung 4: the driver itself refuses an app the person did not allow. Through the
+                # helper it is the helper's driver that refuses, with the same settings.
                 with an_app_not_allowed() as (other, its_pid):
                     await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
                     # Its window is asked for exactly, by what the driver itself lists: a name that
@@ -482,7 +484,12 @@ def a_helper_here(config: Config) -> Iterator[Config]:
     os.environ[variable] = code
     started = subprocess.Popen(
         [sys.executable, "-m", "bap_browser", "computer", "helper", "--this-machine-alone"],
-        env={**os.environ, "BAP_BROWSER__COMPUTER__HELPER_PORT": str(port)},
+        env={
+            **os.environ,
+            "BAP_BROWSER__COMPUTER__HELPER_PORT": str(port),
+            # The helper holds the engine to the apps of its own settings: the ladder's app is one.
+            "BAP_BROWSER__COMPUTER__BASE__ALSO_ALLOWED": json.dumps(config.computer.base.also_allowed),
+        },
         stdout=subprocess.DEVNULL,
     )
     try:

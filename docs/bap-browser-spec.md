@@ -5662,6 +5662,7 @@ Hermes' rules are taken as they are, and today's stricter ones are kept on top. 
 | Hard-blocked keys | Hermes | Empty trash, force delete, lock screen, log out, force log out, `ctrl+alt+delete`, `alt+f4`: refused whatever was approved. Key names are made one form first, so another system's name for a key cannot slip past |
 | Hard-blocked typing | Hermes | A download piped to a shell, `sudo rm -r`, `rm -rf /`, a fork bomb: refused before the approval is even asked |
 | App allowlist, on by default | Ours | Hermes has none unless `bounded` mode is turned on. Ours stays on: the driver runs in `bounded` mode with a capability list written from the apps the admin allows, and `computer_open_app` opens nothing outside it |
+| The allowlist on a machine elsewhere | Ours | The helper on that machine starts the driver in `bounded` mode with the list written from that machine's own settings, and passes the engine on to that driver alone. The engine is not trusted to hold itself: it cannot start another driver there, and it cannot stop that one |
 | A switched-off app cannot run | Ours | In the contained desktop, an empty file still stands where its program is |
 | The lease | Hermes | One file says who drives: the agent or one person. While a person holds it, the tool refuses every action and every screenshot, because they may be typing a password. Checked before an action and again right after |
 | Take over, Hand back, Pause, Stop | Ours | Unchanged in the viewer; Take over takes the lease |

@@ -18,9 +18,11 @@ import json
 import os
 import secrets
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http import HTTPStatus
+from pathlib import Path
 from typing import IO, Any
 
 import uvicorn
@@ -32,7 +34,8 @@ from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from bap_browser import computer
-from bap_browser.computer import driver
+from bap_browser.computer import allowed, driver
+from bap_browser.computer.hermes.computer_use.cua_backend_daemon import EmbeddedCuaDaemon
 from bap_browser.computer.seams.process import sanitize_subprocess_env, windows_hide_flags
 from bap_browser.config import Config
 
@@ -42,6 +45,9 @@ RUNS = frozenset({"manifest", "--help", "--version", "status", "doctor", "call",
 PERMISSIONS = ("permissions", frozenset({"status", "grant"}))
 THE_CONVERSATION = "mcp"
 WITH_IT = frozenset({"--no-overlay"})
+STOPS_IT = "stop"
+# What is asked of a driver that is running, and so of the one that holds the engine.
+OF_THE_RUNNING_ONE = frozenset({"status", "call"})
 THIS_MACHINE = frozenset({"127.0.0.1", "::1", "localhost"})
 # Sent by the link when the engine has no more to say.
 NO_MORE = ""
@@ -86,6 +92,9 @@ class Helper:
     say: Callable[[str], None]
     run_timeout_s: float
     message_bytes: int
+    endpoint: str = ""
+    """The driver this helper started with the list of allowed apps, by its own private endpoint.
+    Every way to the driver then goes to that one. Empty where the person allows any app."""
     stopped: bool = False
     running: list[subprocess.Popen[bytes]] = field(default_factory=list)
 
@@ -111,7 +120,7 @@ class Helper:
     def start_driver(self, with_it: Sequence[str]) -> subprocess.Popen[bytes]:
         """Starts the driver for one conversation with an engine."""
         driver = subprocess.Popen(
-            [*self.driver, THE_CONVERSATION, *with_it],
+            [*self.driver, THE_CONVERSATION, *with_it, *self.held(THE_CONVERSATION)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             env=self.environment(),
@@ -119,6 +128,12 @@ class Helper:
         )
         self.running.append(driver)
         return driver
+
+    def held(self, asked: str) -> list[str]:
+        """What is added to a start of the driver so that it reaches the one that holds the engine."""
+        if not self.endpoint:
+            return []
+        return [*(["--embedded"] if asked == THE_CONVERSATION else []), "--socket", self.endpoint]
 
     def note(self, line: str) -> None:
         """Tells the person of a step the engine takes: its kind, and how much is typed, never what."""
@@ -179,13 +194,16 @@ def helper_app(helper: Helper) -> Starlette:
             argv = allowed_to_run((await request.json()).get("argv"))
         except (ValueError, AttributeError):
             argv = None
+        if argv is not None and helper.endpoint and argv[0] == STOPS_IT:
+            # The driver that holds the engine is the helper's to stop, and the person's.
+            argv = None
         if argv is None:
             return JSONResponse({"error": "The helper does not run that of the driver."}, status_code=BAD)
         helper.say(f"The engine asked the driver: {' '.join(argv[:2] if argv[0] == 'call' else argv[:1])}")
         try:
             done = await asyncio.to_thread(
                 subprocess.run,
-                [*helper.driver, *argv],
+                [*helper.driver, *argv, *(helper.held(argv[0]) if argv[0] in OF_THE_RUNNING_ONE else [])],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -248,6 +266,25 @@ def helper_app(helper: Helper) -> Starlette:
     return Starlette(routes=[Route("/run", run, methods=["POST"]), WebSocketRoute("/mcp", converse)])
 
 
+@contextmanager
+def holding_to_the_allowed_apps(config: Config, binary: Path) -> Iterator[str]:
+    """The driver started with the list of apps this machine's person allows (spec 22.7), for as long
+    as the helper runs: its private endpoint. Empty where the settings do not hold the agent to a list.
+    The engine is elsewhere and is not trusted to hold itself, so the driver is started here."""
+    here = config.model_copy(update={"computer": config.computer.model_copy(update={"runs": "machine"})})
+    if not allowed.held(here.computer):
+        yield ""
+        return
+    with computer.base(here):
+        listed = computer.settings_seen()["computer_use"]["capability_manifest"]
+        held = EmbeddedCuaDaemon(str(binary), "bounded", capability_manifest=listed)
+        held.start()
+        try:
+            yield held.socket_path
+        finally:
+            held.stop()
+
+
 def run_helper(config: Config, this_machine_alone: bool) -> int:
     """Runs the helper on this machine until the person ends it (spec 22.6.2). It listens on this
     machine's own address only; `tailscale serve` is what shows it to the tailnet."""
@@ -282,13 +319,23 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
     else:
         print("It takes calls from this machine alone.")
     try:
-        uvicorn.run(
-            helper_app(it),
-            host="127.0.0.1",
-            port=port,
-            log_level="warning",
-            ws_max_size=base.helper_message_bytes,
-        )
+        with holding_to_the_allowed_apps(config, binary) as endpoint:
+            it.endpoint = endpoint
+            print(
+                "The engine is held to the apps you allow in the settings."
+                if endpoint
+                else "The engine is not held to a list of apps."
+            )
+            uvicorn.run(
+                helper_app(it),
+                host="127.0.0.1",
+                port=port,
+                log_level="warning",
+                ws_max_size=base.helper_message_bytes,
+            )
+    except RuntimeError as wrong:
+        print(f"The driver could not be started with the list of allowed apps: {wrong}")
+        return 1
     finally:
         it.stop()
     return 0

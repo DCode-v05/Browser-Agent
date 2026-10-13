@@ -72,6 +72,30 @@ jobs:
         run: uv run python scripts/ladder.py
       - if: runner.os == 'Windows'
         run: uv run python scripts/ladder.py --through-helper
+      - if: runner.os == 'Windows'
+        name: What the driver names the apps of Windows
+        continue-on-error: true
+        shell: bash
+        run: |
+          (explorer.exe &) ; (calc.exe &) ; sleep 8
+          uv run python - <<'EOF'
+          import json
+          from bap_browser import computer
+          from bap_browser.config import load_config
+          config = load_config()
+          base = config.computer.base.model_copy(update={"permission_mode": "standard"})
+          here = config.computer.model_copy(update={"runs": "machine", "base": base})
+          with computer.base(config.model_copy(update={"computer": here})):
+              computer.ask_with(lambda action, about: True)
+              listed = computer.computer_use({"action": "list_apps"}, "read")
+              windows = computer.computer_use({"action": "list_windows"}, "read")
+          for answer in (listed, windows):
+              rows = json.loads(answer) if isinstance(answer, str) else {}
+              for row in [*rows.get("apps", []), *rows.get("windows", [])]:
+                  text = json.dumps(row)
+                  if any(word in text.lower() for word in ("calc", "explorer", "terminal", "cmd", "powershell")):
+                      print(text[:400])
+          EOF
       - if: runner.os == 'macOS'
         run: uv run python scripts/ladder.py || echo "On macOS the ladder waits for a person to allow the driver."
         shell: bash

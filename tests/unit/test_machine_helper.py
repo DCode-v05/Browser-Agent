@@ -30,8 +30,8 @@ if sys.argv[1:] == ["manifest"]:
     print(json.dumps({"binary_version": "0.21.0", "mcp_invocation": {"command": "/somewhere/cua-driver", "args": ["mcp"]}}))
 elif sys.argv[1:2] == ["mcp"]:
     for line in sys.stdin:
-        sys.stdout.write("back: " + line)
-        sys.stdout.flush()
+        started = "started with: " + " ".join(sys.argv[2:])
+        print(started if line.strip() == "started with?" else "back: " + line.rstrip(), flush=True)
 else:
     print("asked: " + " ".join(sys.argv[1:]))
 """
@@ -47,10 +47,11 @@ def said() -> list[str]:
     return []
 
 
-def a_helper(tmp_path: Path, said: list[str], *, tailnet: bool) -> Helper:
+def a_helper(tmp_path: Path, said: list[str], *, tailnet: bool, endpoint: str = "") -> Helper:
     program = tmp_path / "driver.py"
     program.write_text(A_DRIVER, encoding="utf-8")
     return Helper(
+        endpoint=endpoint,
         driver=[sys.executable, str(program)],
         code=CODE,
         allowed=("tag:bap-vm",),
@@ -172,6 +173,54 @@ def test_after_the_person_stops_it_nothing_more_is_done(tmp_path: Path, said: li
     answer = client.post("/run", json={"argv": ["manifest"]}, headers=asking(forwarded=FROM_THE_VM))
 
     assert answer.status_code == 423
+
+
+# A helper that holds the engine to the apps its person allows (spec 22.7): every way to the driver
+# goes to the one the helper started with that list, and to no other.
+
+THE_HELD_ONE = "/somewhere/held.sock"
+
+
+def test_an_engine_held_to_the_allowed_apps_converses_with_the_driver_that_holds_it(
+    tmp_path: Path, said: list[str]
+) -> None:
+    client = TestClient(helper_app(a_helper(tmp_path, said, tailnet=True, endpoint=THE_HELD_ONE)))
+
+    with client.websocket_connect("/mcp", headers=asking(forwarded=FROM_THE_VM)) as link:
+        link.send_text("started with?")
+        started = link.receive_text().strip()
+
+    assert started == f"started with: --embedded --socket {THE_HELD_ONE}"
+
+
+def test_a_single_call_of_a_held_engine_goes_to_the_driver_that_holds_it(
+    tmp_path: Path, said: list[str]
+) -> None:
+    client = TestClient(helper_app(a_helper(tmp_path, said, tailnet=True, endpoint=THE_HELD_ONE)))
+
+    answer = client.post(
+        "/run", json={"argv": ["call", "list_windows"]}, headers=asking(forwarded=FROM_THE_VM)
+    )
+
+    assert answer.json()["stdout"].strip() == f"asked: call list_windows --socket {THE_HELD_ONE}"
+
+
+def test_a_held_engine_cannot_stop_the_driver_that_holds_it(tmp_path: Path, said: list[str]) -> None:
+    client = TestClient(helper_app(a_helper(tmp_path, said, tailnet=True, endpoint=THE_HELD_ONE)))
+
+    answer = client.post("/run", json={"argv": ["stop"]}, headers=asking(forwarded=FROM_THE_VM))
+
+    assert answer.status_code == 400
+
+
+def test_an_engine_that_is_not_held_reaches_the_driver_as_it_is(tmp_path: Path, said: list[str]) -> None:
+    client = TestClient(helper_app(a_helper(tmp_path, said, tailnet=True)))
+
+    with client.websocket_connect("/mcp", headers=asking(forwarded=FROM_THE_VM)) as link:
+        link.send_text("started with?")
+        started = link.receive_text().strip()
+
+    assert started == "started with:"
 
 
 # The link: the program the engine starts in the driver's place.
