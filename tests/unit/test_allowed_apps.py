@@ -109,15 +109,64 @@ def test_an_admin_who_sets_the_mode_to_standard_is_not_overruled(tmp_path: Path)
 # The tools the pinned driver (0.21.0) has, as `cua-driver list-tools` names them. The driver refuses
 # to start with a file that allows a tool it does not know.
 THE_DRIVERS_TOOLS = frozenset(
-    "bring_to_front browser_click browser_dialog browser_download browser_navigate browser_pointer "
-    "browser_prepare browser_set_input_files browser_type check_for_update check_permissions click "
-    "clipboard_read clipboard_write double_click drag end_session escalate_session get_accessibility_tree "
-    "get_agent_cursor_state get_browser_state get_config get_cursor_position get_desktop_state "
-    "get_recording_state get_screen_size get_session get_session_state get_window_state health_report "
-    "hotkey install_ffmpeg invoke_menu kill_app launch_app list_apps list_sessions list_windows "
-    "move_cursor page press_key replay_trajectory right_click scroll set_agent_cursor_enabled "
-    "set_agent_cursor_motion set_agent_cursor_theme set_config set_value set_window_frame "
-    "start_recording start_session stop_recording type_text verify_state zoom".split()
+    [
+        "bring_to_front",
+        "browser_click",
+        "browser_dialog",
+        "browser_download",
+        "browser_navigate",
+        "browser_pointer",
+        "browser_prepare",
+        "browser_set_input_files",
+        "browser_type",
+        "check_for_update",
+        "check_permissions",
+        "click",
+        "clipboard_read",
+        "clipboard_write",
+        "double_click",
+        "drag",
+        "end_session",
+        "escalate_session",
+        "get_accessibility_tree",
+        "get_agent_cursor_state",
+        "get_browser_state",
+        "get_config",
+        "get_cursor_position",
+        "get_desktop_state",
+        "get_recording_state",
+        "get_screen_size",
+        "get_session",
+        "get_session_state",
+        "get_window_state",
+        "health_report",
+        "hotkey",
+        "install_ffmpeg",
+        "invoke_menu",
+        "kill_app",
+        "launch_app",
+        "list_apps",
+        "list_sessions",
+        "list_windows",
+        "move_cursor",
+        "page",
+        "press_key",
+        "replay_trajectory",
+        "right_click",
+        "scroll",
+        "set_agent_cursor_enabled",
+        "set_agent_cursor_motion",
+        "set_agent_cursor_theme",
+        "set_config",
+        "set_value",
+        "set_window_frame",
+        "start_recording",
+        "start_session",
+        "stop_recording",
+        "type_text",
+        "verify_state",
+        "zoom",
+    ]
 )
 
 
