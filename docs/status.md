@@ -1407,6 +1407,45 @@ Seen on GitHub's runners, with the real driver (`scripts/ladder.py --any-app`):
 
 Not checked: macOS, where the driver is still not allowed on this Mac. No app was opened by its name
 on a real Windows machine; a test with a stand-in sees it asked for after the person's yes.
+### 1aq. Built on 2026-10-13: what the agent sees and its pointer, on the Computer's configuration
+
+Hermes' tool was read again for what is not taken. Its 14 actions are all offered here, and Hermes'
+own `main` of this day has the same 14 and no change to its computer use since the commit taken.
+What was left of spec 22.8 for the window is built.
+
+| Setting | Key | What it does |
+|---|---|---|
+| What the agent sees | `computer.base.capture_mode`, new | A capture the model asks for with no mode named holds this: a picture with numbers, a picture alone, or the elements alone. A mode the model names still holds |
+| Show where the agent acts | `computer.base.no_overlay` | Whether the driver draws its own pointer: decided by the system, shown, or left out |
+
+Both are the admin's alone and hold from the next session.
+
+The strip over the live picture now says which desktop it is: "A desktop of its own, in a
+container", "This machine's own virtual screen", "This machine's own screen" or "A machine
+elsewhere". It said "This machine's own screen" of all four.
+
+Seen:
+
+- `uv run pytest tests/viewer/test_studio.py -k what_the_agent_sees`, in a real browser: 1 passed.
+  Every choice of the two is pressed on the Computer's Configuration, and the service holds each
+  (`.bap-browser/viewer-shots/computer-what-the-agent-sees.png`).
+- `uv run pytest tests/viewer/test_studio.py -k a_task_typed_on_the_computers`, in a real browser
+  with the desktop in a real container: 1 passed. "Open the text editor" is typed on the Computer's
+  page; the activity lists "Opened text_editor" and "Looked at the screen", the live picture shows
+  the editor, and the chat answers (`.bap-browser/viewer-shots/computer-a-task-on-the-desktop.png`).
+  The test is left out where Docker or the desktop's image is not there.
+- `uv run pytest tests/unit/test_computer_settings.py tests/unit/test_computer_use_tool.py`: with
+  "The elements alone" chosen, a capture with no mode reaches the backend as `ax`; one that names
+  `vision` reaches it as `vision`.
+
+Not built, and not checked:
+
+- Neither setting was tried against the real driver: the pointer was not seen drawn or left out on
+  a screen.
+- A user cannot set either. The admin's value holds for everyone.
+- Of Hermes' parts around the tool, three stay untaken: its Linux desktop's own runtime with
+  `screen status, start, stop, install`, its second model for pictures, and its stream of the
+  desktop.
 
 ## How to go on
 

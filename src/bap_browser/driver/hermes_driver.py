@@ -76,6 +76,15 @@ async def own_screen(settings: Computer) -> ScreenHere:
     return screen
 
 
+# What the strip over the live picture says of each place a desktop runs.
+WHERE = {
+    "container": "A desktop of its own, in a container",
+    "here": "This machine's own virtual screen",
+    "machine": "This machine's own screen",
+    "remote": "A machine elsewhere",
+}
+
+
 class HermesDriver(DesktopDriver):
     def __init__(
         self, config: Config, name: str = "computer", backend: Callable[[], Any] | None = None
@@ -127,7 +136,7 @@ class HermesDriver(DesktopDriver):
         return self._base is not None
 
     def description(self) -> str:
-        return "This machine's own screen"
+        return WHERE[self._settings.runs]
 
     async def viewport(self) -> tuple[int, int]:
         if self._last is None:

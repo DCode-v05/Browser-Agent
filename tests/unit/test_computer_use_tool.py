@@ -661,3 +661,52 @@ async def test_on_a_persons_machine_an_item_of_a_closed_menu_is_still_named_and_
 
     assert "Save As" in seen.text
     assert [how.get("element") for how in did(desk, "click")] == [3]
+
+
+async def captured(make_config, tmp_path: Path, asked: dict[str, Any], **base: Any) -> dict[str, Any]:
+    computer = {"runs": "machine", "base": {"home": str(tmp_path / "home"), **base}}
+    config = make_config(tmp_path, computer=computer)
+    machine = Desk()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: machine),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        result = await session.toolkit.call("computer_use", {"action": "capture", **asked})
+    finally:
+        await session.close()
+    assert not result.is_error, result.text
+    # The person's live picture is a capture of the whole screen, and is not the agent's.
+    return next(how for how in reversed(did(machine, "capture")) if how["app"] != "screen")
+
+
+async def test_a_capture_with_no_mode_named_holds_what_the_admin_chose(make_config, tmp_path: Path) -> None:
+    assert (await captured(make_config, tmp_path, {}, capture_mode="ax"))["mode"] == "ax"
+    assert (await captured(make_config, tmp_path, {}))["mode"] == "som"
+
+
+async def test_a_capture_holds_the_mode_the_model_names_whatever_the_admin_chose(
+    make_config, tmp_path: Path
+) -> None:
+    assert (await captured(make_config, tmp_path, {"mode": "vision"}, capture_mode="ax"))["mode"] == "vision"
+
+
+@pytest.mark.parametrize(
+    ("runs", "said"),
+    [
+        ("container", "A desktop of its own, in a container"),
+        ("here", "This machine's own virtual screen"),
+        ("machine", "This machine's own screen"),
+        ("remote", "A machine elsewhere"),
+    ],
+)
+def test_the_strip_over_the_picture_says_which_desktop_it_is(
+    runs: str, said: str, make_config, tmp_path: Path
+) -> None:
+    config = make_config(tmp_path, computer={"runs": runs})
+
+    assert HermesDriver(config, backend=Desk).description() == said

@@ -5165,6 +5165,8 @@ desktop, and the desktop's are not drawn for a browser.
 | Where the helper of a machine elsewhere answers | `computer.helper_url` | `http://127.0.0.1:8796` | Next session | Admin | A web address, typed in a field. What is no web address is refused |
 | Give the model the tool's manual | `computer.base.manual` | On | Next session | Admin | Hermes gives its model the same manual as a skill; it costs about 4,500 tokens a task |
 | Where the agent's input goes | `computer.base.delivery` | Decide by the desktop | Next session | Admin | Hermes' `delivery_mode`: background on a person's machine, in front where nobody is at the screen |
+| What the agent sees | `computer.base.capture_mode` | A picture with numbers | Next session | Admin | Hermes' `capture(mode=)`: `som`, `vision` or `ax`. It holds for a capture the model asks for with no mode named |
+| Show where the agent acts | `computer.base.no_overlay` | Decide by the system | Next session | Admin | Hermes' `no_overlay`: the driver's own pointer, drawn on the screen or left out |
 | Ask me before an app opens | `computer.ask_before_apps` | Off | Now | Admin; a user may turn it on, never off over the admin | Google's "require confirmation" for system-level actions; OpenAI's confirmations |
 
 The apps, the shared folder and the network:
