@@ -1229,6 +1229,50 @@ Not built, and not checked:
   was not looked at: the driver is not allowed on this Mac.
 - A result still says "written by the site" of what an app wrote on a desktop.
 
+### 1am. Checked on 2026-10-13: the evaluations of browser use and computer use, and loose ends closed
+
+The plan "Evaluations for bap-browser" (entry 1o) was checked against `main`, and the evaluations were
+audited with the checklist of Claude Code's `build-eval` guide. No model was run: that spends your key
+and waits for your word.
+
+| Layer of the plan | In the system | Size, against the plan |
+|---|---|---|
+| Short task set | Yes | 20 browser tasks, 4 desktop tasks. The plan asks for 30 to 50 |
+| Adversarial set | Yes | 10 browser, 4 desktop. The plan asks for 25 |
+| Confirmation set | Yes | 16 steps, 8 risky and 8 harmless. The plan asks for 100 |
+| Repeated trials | Yes | 1 to 10 tries a task; a run says how many tasks passed every time |
+| Long tasks | Yes | 4 browser, 2 desktop |
+| Parity across the browsers | Yes | "Task sets, browser by browser" on the Systems page |
+| A slice of a public benchmark | No | Not built |
+| Results in the window; a small set in CI | Yes | CI runs every reference solution. No nightly run with a model |
+
+Seen: `uv run pytest tests/e2e/test_task_sets.py tests/unit/test_task_grading.py
+tests/unit/test_desktop_tasks.py tests/e2e/test_computer.py`: 65 passed. Every task of every set,
+browser and desktop, is solved by its reference solution, and a task nobody did does not pass.
+
+What the audit found, most serious first:
+
+- **A model's own failure and a failure of the plumbing land in one column.** A provider error, a
+  timeout and a task done wrong are all a try that did not pass (`evals/suite.py`, `run_trial`). A run
+  cut short by a rate limit reads as a worse agent.
+- **The sets are too small to see a small change.** 20 tasks tried once cannot tell 85% from 100%:
+  one task is 5 points, and the noise is about 22. The computer's 13 tasks are fewer still.
+- **No model has run the browser's adversarial set since the safeguards came back**, nor the desktop's
+  sets with Hermes' tool. The numbers of entries 1o and 1t are of older code.
+- **A run keeps totals and each try's outcome, not the whole conversation.** The record of a task keeps
+  its steps and the first 200 characters of the task and the answer.
+- Sound as they are: each try starts from a site put back; each task has a model client of its own;
+  grading reads the end state by code and no model judges; the reference solutions pass and doing
+  nothing fails; tokens and cost come from the provider's own counts.
+
+Loose ends closed:
+
+- `computer.runs: mac` is gone. It had come to mean what `remote` means. A `config.json` that still
+  says `mac` is refused with the four values that are taken.
+- `worktree-computer-use-helpers` is recorded as merged, and none of its code is taken: its plan is
+  met on Hermes' base (entry 1ai), and its code extends the Mac helper that was removed.
+- `handoff.md` and `computer-use-comparison.html` are in `docs/`.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
