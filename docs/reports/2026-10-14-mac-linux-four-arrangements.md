@@ -149,8 +149,10 @@ the picture were drawn.
 - **The desktop's node name changes after a restart.** The desktop joins with an ephemeral key. After
   a restart it came back as `bap-desk-2`, and an engine pointed at `bap-desk-1` had to be given the
   new name. Not changed: keeping Tailscale's state would put key material on disk.
-- **The desktop's records live in its container.** `deploy/box-desktop.sh` removes the container, and
-  the records with it. Not changed yet.
+- **The desktop's records lived in its container.** `deploy/box-desktop.sh` removed the container, and
+  the records with it. Fixed: the desktop's `/data` is now the volume `bap-desk-data`, which the next
+  container finds again. Proven on the box: a record written in one container was read by the next
+  after `docker rm -f`.
 - **A test that cannot run on Windows.** The helper's Tailscale test uses a shell script for
   `tailscale`, which Windows cannot start. It is now skipped there, as the driver's tests are.
 
