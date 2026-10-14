@@ -160,6 +160,18 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Nothing has been given to the agent yet: no browser pane to show, so the chat opens alone,
+   centred, the width a chat reads at rather than stretched edge to edge. */
+.workspace:not([data-started]) {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.workspace:not([data-started]) .activity {
+  width: 100%;
+  max-width: var(--dialog-width);
+}
+
 /* Browser column: one card. Tabs and address are pills; under them a warm stage holds the picture. */
 
 .browser {

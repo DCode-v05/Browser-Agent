@@ -128,6 +128,15 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     };
   }, [hosted, settings, surface, settingsVersion]);
 
+  // Nothing has been given to the agent yet: the browser pane has nothing of its own to show, so it
+  // stays off screen and the chat takes the whole width, the way a chat app opens (spec 9.5). `steps`
+  // only grows within a session (a new one resets state entirely), so this stays true once it is,
+  // even reconnecting to a session already past that: no separate latch is needed.
+  const started = state.task !== null || state.steps.length > 0 || state.ended !== null;
+  // Without a session there is nothing to hide behind chat: the browser pane says so itself
+  // ("No session to show", "Waiting for an agent to connect"), the same as always.
+  const showBrowser = !state.session || started;
+
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
   const driving = view.key === 'person';
@@ -239,7 +248,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         else if (view.controls.includes('resume')) send({ type: 'resume' });
       } else if (key === 't' && (view.key === 'agent' || view.key === 'blocked')) {
         send({ type: 'take_over' });
-      } else if (key === 'f' && !driving) {
+      } else if (key === 'f' && !driving && started) {
         setWantsFull((value) => !value);
       }
     };
@@ -366,7 +375,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           <span className="connection-dot" aria-hidden="true" />
           {W.connection[state.connection]}
         </span>
-        {!full && !beside && state.session && (
+        {!full && !beside && started && state.session && (
           <span className="wide-only">
             <Button kind="quiet" icon="expand" onClick={() => setWantsFull(true)} label={L.buttons.showFull}>
               {null}
@@ -390,8 +399,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         </section>
       )}
 
-      <Workspace className="workspace">
-        {!beside && (
+      <Workspace className="workspace" data-started={showBrowser || undefined}>
+        {!beside && showBrowser && (
           <BrowserPane
             state={state}
             view={view}
@@ -416,7 +425,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
                 onSend={(text) => send({ type: 'task', text })}
               />
             )}
-            <Timeline state={state} now={now} options={options} selected={selected} onOpen={openStep} />
+            {started && <Timeline state={state} now={now} options={options} selected={selected} onOpen={openStep} />}
             {selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}
           </section>
         )}

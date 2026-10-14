@@ -328,9 +328,10 @@ describe('timeline', () => {
     expect(screen.getByText(/^16 steps · \d+:\d\d · [\d,]+ chars$/)).toBeInTheDocument();
   });
 
-  it('is empty until the agent works', () => {
+  it('is not shown before the agent works: nothing of a browser is there to hide behind, either', () => {
     show('empty');
-    expect(screen.getByText('Steps appear here as the agent works.')).toBeInTheDocument();
+    expect(screen.queryByText('Steps appear here as the agent works.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
   });
 
   it('a row opens the step drawer with its picture, timing and result', async () => {
@@ -800,6 +801,8 @@ describe('full view keeps what needs a person on screen', () => {
         handlers = given;
         given.onStatus('connected');
         given.onEvent({ type: 'session_started', session: 'default', agent: 'Agent', backend: 'remote_headless', browser: 'Chromium', viewport: { width: 1280, height: 800 }, ts: 1000 });
+        // A task is what puts the browser there to be shown full width: nothing is, before one.
+        given.onEvent({ type: 'task_set', task: 'Buy a plane ticket', from: 'person', sites: [], ts: 1000 });
         given.onCaughtUp?.();
       },
       send: () => undefined,
