@@ -21,7 +21,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from bap_browser import browser_extension
 from bap_browser.agent import machine_setup
@@ -64,6 +64,12 @@ from bap_browser.tools.computer_tools import computer_tools_for
 logger = logging.getLogger(__name__)
 
 CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
+# Which pages the window has (spec 9.16), and whether the admin's own tools (Systems,
+# Configuration, Evaluations) show beside them: every page, as today (`full`); the three browsers
+# and computer use, with no admin tools, for a deployment that is a browser alone (`browser`); or
+# the desktop app's own browser, attached to the window the app itself shows, and computer use
+# alone, also with no admin tools (`desktop`).
+RoomsMode = Literal["full", "browser", "desktop"]
 # The backend of the page that is no browser: the contained desktop of computer use (spec 21).
 DESKTOP = "contained_desktop"
 ONLY_A_BROWSER = "The checklist is for a browser. The desktop of computer use is checked with its task sets."
@@ -152,18 +158,23 @@ class Studio:
         settings: SettingsStore,
         model_for: Callable[[Service], Model],
         extension: Path,
+        rooms_mode: RoomsMode = "full",
     ) -> None:
         self._config = config
         self._settings = settings
         self._model_for = model_for
         self._extension = extension
+        self._rooms_mode = rooms_mode
         self.sessions: dict[str, ServiceSession] = {}
-        self.rooms = [
-            Room(CLOUD, "remote_headless"),
-            Room(CHROME, "takeover_chrome"),
-            Room(BUILT_IN, "bundled_chromium"),
-            Room(COMPUTER, DESKTOP),
-        ]
+        if rooms_mode == "desktop":
+            self.rooms = [Room(BUILT_IN, "bundled_chromium"), Room(COMPUTER, DESKTOP)]
+        else:
+            self.rooms = [
+                Room(CLOUD, "remote_headless"),
+                Room(CHROME, "takeover_chrome"),
+                Room(BUILT_IN, "bundled_chromium"),
+                Room(COMPUTER, DESKTOP),
+            ]
         self._recorders = {room.id: Recorder(config.evals, room.id, room.backend) for room in self.rooms}
         # The settings know which browsers there are: a user's preferred one is among them.
         settings.systems = tuple(room.id for room in self.rooms)
@@ -441,7 +452,7 @@ class Studio:
         if room.id == CLOUD:
             config = cloud_config(config)
         elif room.id == BUILT_IN:
-            config = built_in_config(config)
+            config = built_in_config(config, keep_cdp=self._rooms_mode == "desktop")
         elif room.id == COMPUTER:
             # Its picture is sent to whoever watches, as a headless browser's is.
             config = cloud_config(config)

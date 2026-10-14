@@ -90,6 +90,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     studio.add_argument("--config", help="path of config.json")
     studio.add_argument("--open", action="store_true", help="open the window in your browser")
+    only = studio.add_mutually_exclusive_group()
+    only.add_argument(
+        "--browser",
+        action="store_true",
+        help="only the three browsers and computer use, with none of the admin's own tools",
+    )
+    only.add_argument(
+        "--desktop",
+        action="store_true",
+        help="only the desktop app's own browser and computer use, for the desktop app itself to start",
+    )
     studio.set_defaults(run=_studio)
 
     computer = commands.add_parser(
@@ -413,6 +424,7 @@ def _studio(args: argparse.Namespace) -> int:
         return OpenAIModel(config.agent, client)
 
     extension = browser_extension.install(extension_folder(config))
+    rooms_mode = "browser" if args.browser else "desktop" if args.desktop else "full"
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(Interrupted, KeyboardInterrupt):
         asyncio.run(
@@ -421,6 +433,7 @@ def _studio(args: argparse.Namespace) -> int:
                 hosted,
                 open_viewer=args.open,
                 extension=extension,
+                rooms_mode=rooms_mode,
             )
         )
     # It runs until it is interrupted, so that is how it always ends.
