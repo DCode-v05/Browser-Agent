@@ -178,13 +178,13 @@ On the Mac:
 | System | Tasks | Model calls | Input tokens | Output tokens | Cost |
 |---|---:|---:|---:|---:|---:|
 | Remote use (Cloud browser) | 11 | 69 | 506,672 | 4,116 | $0.2063 * |
-| Browser use (My Chrome) | 0 | 0 | 0 | 0 | $0.0000 |
-| Built-in browser | 0 | 0 | 0 | 0 | $0.0000 |
+| Browser use (My Chrome) | 3 | 15 | 157,513 | 1,562 | $0.6613 |
+| Built-in browser | 3 | 15 | 172,494 | 2,192 | $0.7338 |
 | Computer use | 31 | 206 | 1,566,377 | 17,369 | $2.7768 * |
-| All four systems | 42 | 275 | 2,073,049 | 21,485 | $2.9830 * |
+| All four systems | 48 | 305 | 2,403,056 | 25,239 | $4.3781 * |
 
 \* 29 older tasks ran on `gpt-5.6-luna`, which has no price here. They are counted in tokens but not
-in cost. The 13 Claude tasks cost $2.98.
+in cost. The 19 Claude tasks cost $4.38.
 
 On the team box, Claude only:
 
@@ -194,8 +194,34 @@ On the team box, Claude only:
 | The engine | Computer use | 2 | 5 | 48,022 | 839 | $0.2089 |
 | The desktop | Computer use | 4 | 23 | 238,174 | 2,290 | $0.9985 |
 
-A computer task costs more than a browser task: each step sends a capture of the screen, so input
-tokens are about 24 to 66 thousand a task against about 17 thousand for a page.
+### Browser use and the built-in browser
+
+The same three tasks were typed into the Mac's My Chrome page (the agent in a tab of the person's
+own Chrome, through the extension) and its Built-in browser page, on the evening of 14 October:
+
+| Task | System | Time | Input tokens | Output tokens | Cost | Answer |
+|---|---|---:|---:|---:|---:|---|
+| Open example.com and tell me the page's heading | Built-in browser | 94 s | 36,440 | 439 | $0.1545 | No visible heading; the tab's title is "Example Domain" |
+| | My Chrome | 224 s | 43,506 | 475 | $0.1835 | The same |
+| Tell me Bengaluru's population from its Wikipedia page | Built-in browser | 212 s | 116,358 | 1,142 | $0.4883 | 8,443,675 (2011 census) |
+| | My Chrome | 264 s | 95,392 | 801 | $0.3976 | 8,443,675 (2011 census) |
+| Tell me the top story on Hacker News | Built-in browser | 14 s | 19,696 | 611 | $0.0910 | "Iosevka is an open-source, sans-serif and slab-serif, monospace font" |
+| | My Chrome | 15 s | 18,615 | 286 | $0.0802 | The same |
+
+Both answers about example.com are right: the page now has no `h1`, only the title "Example Domain",
+as fetched separately. Two things went wrong:
+
+- In the Built-in browser's chat, the agent later said it had made up its example.com description and
+  the note about hidden text on Wikipedia. Neither was made up. The retraction is the error.
+- My Chrome showed "Hidden instructions were found on wikipedia.org and withheld from the agent" on
+  an ordinary Wikipedia article. This looks like a false alarm of the page-text safeguard. Not looked
+  into yet.
+
+### Tokens a task
+
+A short page takes about 17 to 20 thousand input tokens a task (Hacker News, the Cloud browser's
+tasks). A long page costs more: the Wikipedia article took 95 to 116 thousand. A computer task takes
+about 24 to 66 thousand, since each step sends a capture of the screen.
 
 ## What this does not show
 
@@ -203,5 +229,4 @@ tokens are about 24 to 66 thousand a task against about 17 thousand for a page.
 - The Mac's own engine on the Mac was tested by the ladder, with no model, on this day; tasks with the
   model there were run earlier.
 - On the Mac, Take over moved only the pointer: nothing was pressed or typed on the person's screen.
-- Browser use (My Chrome) and the built-in browser recorded no tasks on these machines, so their
-  usage rows are zero.
+- Browser use (My Chrome) and the built-in browser were run on the Mac only, three tasks each.
