@@ -3520,7 +3520,7 @@ Configuration, Evaluations) beside them, for a deployment that is one kind alone
 </tr>
 <tr>
 <td><code>--desktop</code></td>
-<td>The desktop app's own browser (<code>bundled_chromium</code>, attached to the window the app itself shows) and Computer alone. For the desktop app (section 14.3) to start as its own core; not meant to be opened by a person directly</td>
+<td>The desktop app's own browser (<code>bundled_chromium</code>, attached to the window the app itself shows) and Computer alone. Run from a terminal, it opens the app's own window itself, the same as <code>npm --prefix desktop run start</code>; run by the app's own core (marked <code>BAP_BROWSER_DESKTOP_APP_CORE</code>), it serves what that window needs instead</td>
 </tr>
 </tbody>
 </table></div>

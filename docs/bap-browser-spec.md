@@ -1663,7 +1663,7 @@ Configuration, Evaluations) beside them, for a deployment that is one kind alone
 | Flag | Pages |
 |---|---|
 | `--browser` | The three browsers above and Computer. No admin tools, and no "Open desktop app" |
-| `--desktop` | The desktop app's own browser (`bundled_chromium`, attached to the window the app itself shows) and Computer alone. For the desktop app (section 14.3) to start as its own core; not meant to be opened by a person directly |
+| `--desktop` | The desktop app's own browser (`bundled_chromium`, attached to the window the app itself shows) and Computer alone. Run from a terminal, it opens the app's own window itself, the same as `npm --prefix desktop run start`; run by the app's own core (marked `BAP_BROWSER_DESKTOP_APP_CORE`), it serves what that window needs instead |
 
 Neither flag changes a page's own backend or behaviour; they only say which pages are on the
 window. Without either, every page is there, as before.

@@ -2282,6 +2282,16 @@ Not done: a notification of our own, the way Claude's desktop app gives one. Tha
 dependency or a Windows-only `powershell.exe` call with no package added — a choice for you, not mine
 to make silently.
 
+## `studio --desktop`, run directly, opens the app itself
+
+Found 2026-10-14: running `bap-browser studio --desktop` from a terminal only served the backend the
+desktop app starts beside itself, with no window to show it. A person had to separately know to run
+`npm --prefix desktop run start`. Now the bare command opens the app's own window
+(`DesktopApp.open_until_closed`, `src/bap_browser/desktop_app.py`); the app's own core still gets
+served, not opened a second time, because it marks the backend it starts
+(`BAP_BROWSER_DESKTOP_APP_CORE`, `desktop/electron/main.cjs`) and `cli.py`'s `_studio` checks for
+that mark before deciding which of the two to do.
+
 ## Documents
 
 | File | What it is |
