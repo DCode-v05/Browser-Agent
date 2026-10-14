@@ -112,6 +112,11 @@ class Base(Section):
         ["tag:bap-vm"],
         "Who on the tailnet the helper on a person's machine lets in: Tailscale tags, or the logins of people",
     )
+    tailscale_socket: str = setting(
+        "",
+        "On the helper's machine: where Tailscale listens, where that is not its own place, as on a "
+        "machine with no root where it runs in userspace mode. Empty: Tailscale's own",
+    )
     helper_hands: bool = setting(
         False,
         "On the helper's machine: whether a person who has taken over on the engine's page may use "

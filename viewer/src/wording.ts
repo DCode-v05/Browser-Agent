@@ -254,6 +254,17 @@ export const W = {
       turnedOff: 'The desktop is turned off',
       view: 'Desktop and chat',
     },
+    /** Where the computer page's engine runs, and what it works on (spec 22.6): said on the page. */
+    where: {
+      engine: 'Engine on',
+      worksOn: 'Works on',
+      thisComputer: 'this computer',
+      container: 'a Linux desktop of its own, in a container beside the engine',
+      here: "the engine's own Linux desktop",
+      machine: "the engine's own machine: its real screen",
+      remote: 'a machine elsewhere, through its helper',
+      remoteNamed: (machine: string) => `${machine}, a machine elsewhere, through its helper`,
+    },
     /** The chat alone, in a window to keep beside a real machine's screen (spec 22.3.1). */
     beside: {
       open: 'Chat beside your screen',

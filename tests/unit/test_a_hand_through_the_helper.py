@@ -2,6 +2,7 @@
 mouse and keyboard through the helper there, where its person switched that on."""
 
 import socket
+import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -15,6 +16,7 @@ from desktop_stand_in import Desk
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from bap_browser.agent.loop import instructions_for
 from bap_browser.computer.hermes.computer_use.backend import CaptureResult
 from bap_browser.driver.hermes_driver import HermesDriver
 from bap_browser.driver.mac_hand import MacHand
@@ -189,3 +191,43 @@ def a_helper_on_a_port(served: Helper) -> Iterator[str]:
     finally:
         server.should_exit = True
         thread.join(timeout=10)
+
+
+A_LINUX_DRIVER = """
+import json, sys
+if sys.argv[1:] == ["manifest"]:
+    print(json.dumps({"binary_version": "0.21.0", "binary_path": "/home/pwuser/.bap-browser/computer/driver/0.21.0/cua-driver"}))
+"""
+
+
+async def test_a_machine_elsewhere_is_worked_on_as_its_own_system_says(
+    make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An engine on a Mac driving a Linux desktop through its helper names that desktop's apps as
+    Linux does, and tells the model the machine runs Linux: not as the engine's own system."""
+    program = tmp_path / "driver.py"
+    program.write_text(A_LINUX_DRIVER, encoding="utf-8")
+    served = a_helper(tmp_path, [], None)
+    served.tailnet = False
+    served.driver = [sys.executable, str(program)]
+    desk = Desk()
+    with a_helper_on_a_port(served) as address:
+        monkeypatch.setenv("BAP_BROWSER_HELPER_TOKEN", CODE)
+        config = make_config(
+            tmp_path,
+            computer={"runs": "remote", "helper_url": address, "base": {"home": str(tmp_path / "home")}},
+        )
+        driver = HermesDriver(config, backend=lambda: desk)
+        session = ServiceSession(
+            config, driver, name="computer", backend="contained_desktop", tools=computer_tools_for
+        )
+        await session.start()
+        try:
+            assert driver.system_driven == "linux"
+            await session.toolkit.call("computer_open_app", {"app": "Text editor"})
+        finally:
+            await session.close()
+
+    assert desk.opened == ["mousepad"]
+    told = instructions_for(config, system=driver.system_driven)
+    assert "runs Linux" in told and "macOS" not in told.split("THEIR_MANUAL")[0].split("Use this system")[0]

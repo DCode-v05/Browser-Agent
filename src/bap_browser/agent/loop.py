@@ -103,17 +103,18 @@ THEIR_MANUAL = (
 )
 
 
-def instructions_for(config: Config) -> str:
+def instructions_for(config: Config, system: str = sys.platform) -> str:
     """What the model is told of its work in computer use: on a person's own machine, or on a
-    desktop of its own that nobody sits at. Then Hermes' manual for the tool, where that is on."""
+    desktop of its own that nobody sits at. Then Hermes' manual for the tool, where that is on.
+    `system` is the driven machine's: a machine elsewhere may run another system than the engine's."""
     computer_settings = config.computer
     if computer_settings.runs in ("container", "here") or computer_settings.base.virtual_screen:
         rules = ITS_OWN_DESKTOP
     else:
         apps = THE_ALLOWED_APPS
         if computer_settings.any_app:
-            apps = ANY_APP.format(address=ADDRESS_BAR.get(sys.platform, "ctrl+l"))
-        rules = MACHINE_SYSTEM.format(system=THIS_SYSTEM.get(sys.platform, "Linux"), apps=apps)
+            apps = ANY_APP.format(address=ADDRESS_BAR.get(system, "ctrl+l"))
+        rules = MACHINE_SYSTEM.format(system=THIS_SYSTEM.get(system, "Linux"), apps=apps)
     return rules + THEIR_MANUAL + computer.manual() if computer_settings.base.manual else rules
 
 

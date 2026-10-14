@@ -1976,6 +1976,23 @@
   overflow-x: auto;
 }
 
+/* Where the computer page's engine runs, and what it works on: which page is which. */
+.studio-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.studio-where b {
+  color: var(--text);
+  font-weight: var(--weight-emphasis);
+}
+
 /* What a person is told once they have taken over a real machine. */
 .studio-own-hands {
   margin: 0;
