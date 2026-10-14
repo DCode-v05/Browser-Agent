@@ -7,6 +7,7 @@ import { describeState } from '../state/view';
 import { W } from '../wording';
 import { agentStatus, ChatPanel } from './ChatPanel';
 import { richText } from './richText';
+import { TheWords, wordsFor } from '../words';
 
 const T0 = 1_759_480_000;
 
@@ -122,6 +123,35 @@ describe('the chat panel (spec 9.14)', () => {
   it('says how to go on once the session has ended', () => {
     render(<ChatPanel chat={{ enabled: true, working: false, messages: [] }} status="stopped" doing="" open={false} maxChars={20} onSend={() => {}} />);
     expect(screen.getByText(W.chat.startAgain)).toBeTruthy();
+  });
+});
+
+describe('sample tasks, for someone who does not yet know what to ask', () => {
+  it('are offered while nothing has been said, and one pressed is given to the agent at once', () => {
+    const onSend = vi.fn();
+    render(<ChatPanel chat={{ enabled: true, working: false, messages: [] }} status="ready" doing="" open maxChars={200} onSend={onSend} />);
+    const samples = screen.getAllByRole('button', { name: /^Try: / });
+    expect(samples).toHaveLength(Object.keys(W.chat.samples).length);
+    fireEvent.click(samples[0]);
+    expect(onSend).toHaveBeenCalledWith(Object.values(W.chat.samples)[0]);
+  });
+
+  it('are gone once a task has been given', () => {
+    const state = play([started, said(1, 'person', 'Open example.com')]);
+    render(<ChatPanel chat={state.chat} status="ready" doing="" open maxChars={20} onSend={() => {}} />);
+    expect(screen.queryAllByRole('button', { name: /^Try: / })).toHaveLength(0);
+  });
+
+  it('on the computer page are tasks for a computer: apps, not pages', () => {
+    const desktop = wordsFor('contained_desktop');
+    render(
+      <TheWords.Provider value={desktop}>
+        <ChatPanel chat={{ enabled: true, working: false, messages: [] }} status="ready" doing="" open maxChars={200} onSend={() => {}} />
+      </TheWords.Provider>,
+    );
+    const offered = screen.getAllByRole('button', { name: /^Try: / }).map((one) => one.textContent);
+    expect(offered).toEqual(Object.values(desktop.chat.samples));
+    expect(offered.join(' ')).toContain('Safari');
   });
 });
 

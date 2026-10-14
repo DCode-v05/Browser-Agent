@@ -11,7 +11,7 @@ import { transcript } from '../state/transcript';
 import type { ControlName, StateView } from '../state/view';
 import { W } from '../wording';
 import { ModeChip, TaskLine } from './AutoMode';
-import { agentStatus } from './ChatPanel';
+import { agentStatus, Samples } from './ChatPanel';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 import { richText } from './richText';
@@ -151,7 +151,7 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
       <header className="talk-head">
         {!embedded && <span className="brand-mark" aria-hidden="true" />}
         <h1 className="talk-title" tabIndex={-1} ref={titleRef}>
-          {embedded ? W.chat.title : W.product}
+          {embedded ? W.chat.title : L.product}
         </h1>
         <span className="agent-status" data-status={status} data-testid="agent-status">
           <span className="agent-status-dot" aria-hidden="true" />
@@ -173,6 +173,9 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
       <div className="talk-scroll">
         <div className="talk-items" role="log" aria-label={W.chat.messages}>
           {items.length === 0 && <p className="talk-empty">{W.chat.empty}</p>}
+          {items.length === 0 && open && (
+            <Samples onPick={(task) => onCommand({ type: 'task', text: task })} />
+          )}
           {items.map((item) => {
             if (item.kind === 'person') {
               return (

@@ -56,6 +56,10 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const connection = useMemo(() => createConnection(), [createConnection]);
   const [state, dispatch] = useReducer(reduce, initialState);
   const L = wordsFor(state.session?.backend);
+  // The window's own title says what the page is for, where the page is the window's whole.
+  useEffect(() => {
+    if (!inWindow) document.title = L.product;
+  }, [inWindow, L.product]);
   const [, setTick] = useState(0);
   const [wantsFull, setWantsFull] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -335,7 +339,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         ) : (
           <h1 className="brand">
             <span className="brand-mark" aria-hidden="true" />
-            <span className="brand-name">{W.product}</span>
+            <span className="brand-name">{L.product}</span>
           </h1>
         )}
         {state.session && (

@@ -139,7 +139,7 @@ export function BrowsersCard({ systems, policy, wordFor, onOpen }: BrowsersProps
       </header>
       <p className="system-hint">{V.lead}</p>
       <TableScroll label={V.title}>
-      <table className="system-table">
+      <table className="system-table system-table-words">
         <thead>
           <tr>
             <th scope="col">{V.system}</th>

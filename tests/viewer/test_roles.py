@@ -299,7 +299,7 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             overall = systems.get_by_role("article", name="Evaluations of all systems")
             await overall.get_by_text("1 task, 1 step").wait_for()
             await overall.get_by_role("row", name="Built-in browser").wait_for()
-            browsers = systems.get_by_role("article", name="The browsers")
+            browsers = systems.get_by_role("article", name="The browsers and the desktop")
             await browsers.get_by_role("row", name="Cloud browser").get_by_text("Kept from them").wait_for()
             assert await admin_view.accessibility_violations() == []
             assert await admin_view.silent_controls() == []

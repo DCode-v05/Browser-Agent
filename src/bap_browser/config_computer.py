@@ -112,6 +112,13 @@ class Base(Section):
         ["tag:bap-vm"],
         "Who on the tailnet the helper on a person's machine lets in: Tailscale tags, or the logins of people",
     )
+    helper_hands: bool = setting(
+        False,
+        "On the helper's machine: whether a person who has taken over on the engine's page may use "
+        "this machine's mouse and keyboard through the helper. They are not held to the allowed apps, "
+        "as the agent is: switch it on only for an engine you trust. On macOS, the program that runs "
+        "the helper is allowed under Accessibility",
+    )
     helper_tailnet: bool = setting(
         True,
         "Whether the helper takes calls from the tailnet. Off, it takes them from its own machine alone",

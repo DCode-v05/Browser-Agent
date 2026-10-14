@@ -406,9 +406,9 @@ export const W = {
       saved: { user: 'Set. A user who was signed in signs in again with it.', admin: 'Changed. Use it the next time you sign in.' },
     },
     overview: {
-      title: 'The browsers',
+      title: 'The browsers and the desktop',
       lead: 'Where each one stands. Its configuration and its evaluations are under its own tab: the buttons take you there.',
-      system: 'Browser',
+      system: 'System',
       state: 'State',
       inUse: 'In use',
       forUsers: 'Users',
@@ -573,6 +573,15 @@ export const W = {
     title: 'Chat',
     messages: 'Messages',
     empty: 'Tell the agent what to do. It answers here when it has finished.',
+    /** Tasks to start from, offered while nothing has been said. One pressed is given to the agent. */
+    samplesLead: 'Or press one of these to start:',
+    sample: (task: string) => `Try: ${task}`,
+    sampleHint: 'Gives the agent this task now.',
+    samples: {
+      first: 'Open the Skylark Air demo site and check in for booking SK4821, last name Lovelace.',
+      second: 'Find the best phone under ₹1 lakh on amazon.in and compare the top three.',
+      third: 'What is on this page? Sum it up in three lines.',
+    },
     you: 'You',
     agent: 'Agent',
     working: 'Working on it…',
@@ -779,6 +788,7 @@ type Some<T> = T extends string ? string : T extends (...given: infer A) => unkn
  * desktop. Only the words that differ are here; every other word is `W`'s.
  */
 export const ON_A_DESKTOP: Some<typeof W> = {
+  product: 'bap-browser · Computer use',
   buttons: {
     showFull: 'Show the desktop full width',
     showSplit: 'Show the desktop beside the activity',
@@ -839,6 +849,13 @@ export const ON_A_DESKTOP: Some<typeof W> = {
   settings: {
     about: {
       browser: 'System in use',
+    },
+  },
+  chat: {
+    samples: {
+      first: 'Open Safari, go to amazon.in and find the best phone under ₹1 lakh.',
+      second: 'Which apps are open on this computer?',
+      third: 'Open the text editor and write a shopping list: milk, eggs and bread.',
     },
   },
   parts: {

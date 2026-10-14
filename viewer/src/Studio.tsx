@@ -166,6 +166,11 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     if (now) setRooms(now);
   }, [loadRooms]);
   const showingSystems = onSystems && systems !== undefined && role === 'admin';
+  const named = wordsFor(showingSystems ? undefined : room?.backend).product;
+  // The window's own title says what the page shown is for: computer use on the desktop's page.
+  useEffect(() => {
+    document.title = named;
+  }, [named]);
   // The browser a person prefers is the one their window opens on: it is opened at once, and works.
   const prefer = async (id: string) => {
     const told = await systems?.prefer(id);
@@ -239,7 +244,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
       <header className="studio-bar">
         <h1 className="brand">
           <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-name">{W.product}</span>
+          <span className="brand-name">{named}</span>
         </h1>
         <div className="studio-tabs" role="tablist" aria-label={W.studio.pages}>
           {rooms.map((one) => (

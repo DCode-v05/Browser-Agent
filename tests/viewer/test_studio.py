@@ -941,11 +941,11 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
 
         # All systems: where each browser stands, and the tasks of all three as one.
         await views.get_by_role("tab", name="All systems").click()
-        browsers = systems.get_by_role("article", name="The browsers")
+        browsers = systems.get_by_role("article", name="The browsers and the desktop")
         await browsers.wait_for()
         assert [
             await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
-        ] == ["The browsers", "Evaluations of all systems", "Task sets, browser by browser"]
+        ] == ["The browsers and the desktop", "Evaluations of all systems", "Task sets, browser by browser"]
         rows = browsers.get_by_role("row")
         model = (await opened.ask("GET", "/api/systems"))[1]["systems"][0]["model"]
         assert [" ".join(text.split()) for text in await rows.all_inner_texts()][1:] == [

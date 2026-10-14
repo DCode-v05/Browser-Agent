@@ -60,7 +60,10 @@ async def serve_viewer(
                 if not door.done():
                     door.set_result(leave)
                 return
-            if command.get("type") == "stop":
+            if command.get("type") == "seen":
+                # Only what the person sees: no turn to wait, and nothing for the session to do.
+                subscriber.in_front = command.get("visible") is not False
+            elif command.get("type") == "stop":
                 # Stop never waits its turn: a pause or a take-over ahead of it may be waiting for an
                 # action that does not end.
                 await session.handle(command)

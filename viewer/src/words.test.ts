@@ -33,6 +33,11 @@ describe('the words of a page of computer use', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('names the product with what the page is for: computer use', () => {
+    expect(desktop.product).toBe('bap-browser · Computer use');
+    expect(wordsFor('remote_headless').product).toBe('bap-browser');
+  });
+
   it('words that are not overridden are the same as a browser has', () => {
     expect(desktop.buttons.close).toBe(W.buttons.close);
     expect(desktop.signIn).toBe(W.signIn);

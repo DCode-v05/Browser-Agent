@@ -180,6 +180,25 @@ def test_a_person_opens_the_chat_of_a_service_elsewhere_from_their_own_machine(
     assert said_by_the_side(tmp_path)["chat"] == "https://vm.tail1234.ts.net/?session=computer&beside"
 
 
+def test_the_link_the_service_gave_signs_the_chats_window_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The viewer's link carries its token after the #, where no server is sent it: the window
+    keeps it there, and is let in as the page that link opens is. Anything else after the # is not
+    taken along."""
+    (tmp_path / "electron").mkdir()
+    (tmp_path / "electron" / "side.cjs").write_text(SIDE_THAT_ENDS, encoding="utf-8")
+    monkeypatch.setattr(DesktopApp, "program", lambda self: Path(sys.executable))
+    app = app_in(tmp_path)
+    app.chat_beside_until_closed("https://vm.tail1234.ts.net/#token=abc-123", "computer", 400)
+    assert (
+        said_by_the_side(tmp_path)["chat"]
+        == "https://vm.tail1234.ts.net/?session=computer&beside#token=abc-123"
+    )
+    app.chat_beside_until_closed("https://vm.tail1234.ts.net/#elsewhere", "computer", 400)
+    assert said_by_the_side(tmp_path)["chat"] == "https://vm.tail1234.ts.net/?session=computer&beside"
+
+
 @pytest.mark.parametrize("service", ["vm.tail1234.ts.net", "file:///etc/passwd", "", "ftp://vm:8765"])
 def test_what_is_no_address_of_a_service_is_refused_before_anything_is_opened(
     tmp_path: Path, service: str
