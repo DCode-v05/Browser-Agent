@@ -26,6 +26,9 @@ const CORNER = 12;
 // no title bar of its own, a slim overlay instead, coloured to match the shell's theme.
 const OVERLAY_HEIGHT = 36;
 const overlayOf = (dark) => ({ color: dark ? '#1E1E1E' : '#F5F4F2', symbolColor: dark ? '#E9EBDF' : '#1A1714', height: OVERLAY_HEIGHT });
+// A view with nothing loaded in it yet (the agent's, before the core attaches) is this colour
+// instead of a flash of white: the shell's own secondary surface, not a blank page's default.
+const paneBackgroundOf = (dark) => (dark ? '#1E1E1E' : '#F5F4F2');
 // The studio's pages the app shows, and how long it waits for them once the core has started.
 const PAGES = ['builtin', 'computer'];
 const PAGES_WAIT_MS = 90000;
@@ -116,8 +119,9 @@ function startCore() {
     if (!viewer || service) return;
     service = viewer.origin;
     // The core says where it is before it has found the app's browser: the first page keeps the mark
-    // it finds that browser by.
-    agentView.webContents.loadURL(`${service}/demo-site/${DEMO_PAGES.start}${AGENT_MARK}`);
+    // it finds that browser by, same as before the core was there to say anything (a blank page, not
+    // the demo site: a fresh session shows nothing until a task sends it somewhere).
+    agentView.webContents.loadURL(`about:blank${AGENT_MARK}`);
     void showWhenReady(viewer);
   });
   core.on('exit', (code) => {
@@ -176,9 +180,10 @@ function createWindow() {
   const agentSession = session.fromPartition('persist:agent');
   // A page the agent visits is given nothing it asks the person's machine for.
   agentSession.setPermissionRequestHandler((_contents, _permission, answer) => answer(false));
-  agentView = new WebContentsView({ webPreferences: { session: agentSession, sandbox: true, contextIsolation: true, nodeIntegration: false } });
-  chatView = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-  computerView = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  const paneBackground = paneBackgroundOf(nativeTheme.shouldUseDarkColors);
+  agentView = new WebContentsView({ backgroundColor: paneBackground, webPreferences: { session: agentSession, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  chatView = new WebContentsView({ backgroundColor: paneBackground, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  computerView = new WebContentsView({ backgroundColor: paneBackground, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
   for (const view of [agentView, chatView, computerView]) {
     view.setBorderRadius(CORNER);
     win.contentView.addChildView(view);
@@ -229,8 +234,10 @@ ipcMain.on('place', (event, rects) => {
 });
 
 ipcMain.on('theme', (event, dark) => {
-  if (!fromShell(event) || typeof dark !== 'boolean' || process.platform === 'darwin') return;
-  win?.setTitleBarOverlay(overlayOf(dark));
+  if (!fromShell(event) || typeof dark !== 'boolean') return;
+  if (process.platform !== 'darwin') win?.setTitleBarOverlay(overlayOf(dark));
+  const paneBackground = paneBackgroundOf(dark);
+  for (const view of [agentView, chatView, computerView]) view?.setBackgroundColor(paneBackground);
 });
 
 ipcMain.on('show', (event, page) => {

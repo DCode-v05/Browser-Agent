@@ -2318,6 +2318,22 @@ lights and needs none of this. Not done: the rest of the structural pass (the to
 the browser view's chrome) that was asked for alongside it — this piece alone was large enough to
 check in on first.
 
+## The app's own browser view still loaded the demo site, and the frame led before chat did
+
+Found 2026-10-15, watching the two fixes above running for real: the desktop app's shell
+(`desktop/electron/main.cjs`) loads the demo site into the agent's own browser view itself, before
+the core is even there to attach to it — the previous fix only touched the studio's own sessions, not
+this earlier load. It now loads a blank page carrying the same mark (`#bap-agent`) the core looks for.
+
+Asked for next: the browser frame led the split view even with nothing of its own to show (an idle,
+pageless frame beside a narrow chat), which still read as broken. The frame now waits for the session
+to be doing something (a task, a step, an ended run) before it takes its place in the layout
+(`viewer/src/App.tsx`); until then chat has the whole width, the way a chat app opens, matching
+Cursor and Copilot Chat. A session with no browser connected at all is unaffected, since the frame
+already said so itself in that case ("Waiting for an agent to connect"). The desktop app's own agent
+view, which has the same empty stretch before the core attaches, gets the shell's secondary surface
+colour instead of a flash of white while it waits.
+
 ## Documents
 
 | File | What it is |

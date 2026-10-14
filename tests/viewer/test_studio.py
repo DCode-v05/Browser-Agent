@@ -4,6 +4,7 @@ a new session on a page whose session was stopped."""
 
 import asyncio
 import json
+import re
 import shutil
 import subprocess
 import urllib.error
@@ -178,10 +179,10 @@ async def test_the_window_has_a_page_for_each_browser(
             "Built-in browser Ready",
             "Computer Could not start",
         ]
-        # The cloud browser's page: its picture, and its own chat. A fresh session shows no page of
-        # its own until a task sends it somewhere: not the demo site.
+        # The cloud browser's page: its chat, leading, with no picture of its own browser yet (there
+        # is nothing of it to show until a task sends it somewhere: not the demo site).
         await page.get_by_label("Your task").wait_for()
-        await page.get_by_role("img", name="Live browser view: untitled page, about:blank").wait_for()
+        assert await page.get_by_role("img", name=re.compile("^Live browser view:")).count() == 0
         assert await page.get_by_title("Session", exact=True).inner_text() == "Session\ncloud"
         log = (await opened.ask("GET", "/api/systems/cloud/log"))[1]
         assert log["lines"] == []

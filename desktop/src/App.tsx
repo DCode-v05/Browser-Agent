@@ -83,6 +83,8 @@ export function App() {
   usePlacing(agentFrame, chatFrame);
 
   const running = state.core === 'running';
+  // Nothing of a task sent the agent's browser anywhere yet: there is no real address to show.
+  const hasPage = state.address !== '' && state.address !== 'about:blank';
   const secure = state.address.startsWith('https://');
   const onTheComputer = state.page === 'computer';
   const show = (page: DesktopPage) => window.desktop.show(page);
@@ -170,7 +172,7 @@ export function App() {
               <h1 className="ml-1 truncate text-sm font-semibold" data-testid="page-title">
                 {W.computerTitle}
               </h1>
-            ) : (
+            ) : hasPage ? (
               <>
                 <Button variant="ghost" size="icon" title={W.back} aria-label={W.back} disabled={!state.canGoBack} onClick={() => window.desktop.go('back')}>
                   <ArrowLeft />
@@ -188,7 +190,7 @@ export function App() {
                   </span>
                 </div>
               </>
-            )}
+            ) : null}
           </header>
 
           <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1 px-3 pb-3">
