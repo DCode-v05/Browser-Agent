@@ -1702,8 +1702,8 @@ window. Without either, every page is there, as before.
 - **Where the browser is, said to the model.** Each task from the chat is handed to the model with the
   address the browser is on, so "sign in on this page" means the page the person is looking at.
 - **The desktop app, from the window.** Where the desktop app of section 14.3 is installed beside the
-  service (`server.desktop_dir`: its packages are there and its shell is built), the bar has a button,
-  "Open desktop app". It asks the service to start the app (`POST /api/desktop`, with the token), which
+  service (`server.desktop_dir`: its packages are there and its shell is built), the row under the bar
+  has a button, "Open desktop app". It asks the service to start the app (`POST /api/desktop`, with the token), which
   opens in a window of its own with its own browser, its own agent core and its own chat. The app that is
   open is not started a second time; it is ended when the service stops. `GET /api/sessions` says whether
   there is an app to open (`desktop`), and the button is not shown when there is none.
@@ -1729,7 +1729,9 @@ browser's (Colour mode, Show where the agent is acting) are one for the window, 
 they are changed on.
 
 Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
-beside "Sign out".
+beside "Sign out", at its end. What can be done from the page shown (Systems, Chat beside your screen,
+Open desktop app) is at the end of the row under the bar, beside that page's views: the bar keeps to
+the product, the pages and who is signed in, and fits on one line on a laptop's screen.
 
 **Each thing is in one place.** What is one browser's is under that browser's tab, and nowhere else.
 What is not one browser's is on the Systems page, which is the admin's. Nothing is set in two places,
@@ -2977,12 +2979,12 @@ repository, is not packaged, and keeps the core on the same machine.
 
 | Part | What it is |
 |---|---|
-| The app | Electron, which ships its own Chromium: that Chromium is the agent's browser. One window: a rail at the left, the agent's browser in the middle, the chat at the right, with a divider that can be dragged |
+| The app | Electron, which ships its own Chromium: that Chromium is the agent's browser. One window with two pages. The browser page: a rail at the left, the agent's browser in the middle, its chat at the right, with a divider that can be dragged. The computer page: the desktop the agent works on, with its chat, across the room of both |
 | The shell | React with shadcn/ui components (sidebar, button, badge, resizable panels) in the colours and typeface of section 9.5. It draws the window's frame only; the browser and the chat are views of the app laid over it |
 | The agent's browser | A view of its own, with a kept profile apart from the rest of the app, so a sign-in made there is still there next time. A page that asks the machine for anything (camera, location, notifications) is refused |
-| The core | Started by the app as a process of its own (`bap-browser agent --chat`). It attaches to the app's browser through the app's debugging port (`browser.cdp_url`) and drives the view whose address carries a mark (`browser.cdp_target`). Every tool, the safety policy and the approvals are the core's, as everywhere |
-| The chat | The session's viewer, shown as the conversation of section 9.14 |
-| Rail | Opens the start page or one of the demo sites in the agent's browser, and shows whether the core is running. When the core stops, the chat's place says why in the core's own words, and offers to start it again |
+| The core | Started by the app as a process of its own: the studio with the app's two pages, `bap-browser studio --desktop --dev` (`--dev` because its token is the run's own, made by the app and shown to nobody). It attaches to the app's browser through the app's debugging port (`browser.cdp_url`) and drives the view whose address carries a mark (`browser.cdp_target`). Every tool, the safety policy and the approvals are the core's, as everywhere |
+| The chat | Each page of the studio as a guest of the app: `?session=builtin&embed=1` beside the browser, `?session=computer&embed=1` for the computer |
+| Rail | Switches between the browser page and the computer page, opens one of the demo sites in the agent's browser, and shows whether the core is running. When the core stops, the chat's place says why in the core's own words, and offers to start it again |
 | Run | `npm --prefix desktop install`, then `npm --prefix desktop start`, with the model's key in `.env` |
 
 Known limits of this first app: the debugging port is open to every program on the same machine while

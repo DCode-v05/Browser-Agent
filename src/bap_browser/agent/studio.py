@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -459,15 +459,10 @@ class Studio:
         return with_its_own_log(config, room.id)
 
     async def run(self, service: Service) -> None:
-        """Runs the three browsers and the desktop until the service stops."""
+        """Runs the window's pages until the service stops: the three browsers and the desktop, or
+        the desktop app's two (spec 14.3). Each page is run as its kind is."""
         self.service = service
-        cloud, chrome, built_in, computer = self.rooms
-        working = [
-            asyncio.create_task(self._own_browser(cloud)),
-            asyncio.create_task(self._persons_chrome(chrome)),
-            asyncio.create_task(self._own_browser(built_in)),
-            asyncio.create_task(self._own_desktop(computer)),
-        ]
+        working = [asyncio.create_task(self._keeping(room)) for room in self.rooms]
         try:
             await unless_stopped(asyncio.gather(*working), service)
         finally:
@@ -477,6 +472,13 @@ class Studio:
             for room in self.rooms:
                 if room.session is not None:
                     await room.session.close()
+
+    def _keeping(self, room: Room) -> Coroutine[Any, Any, None]:
+        if room.backend == DESKTOP:
+            return self._own_desktop(room)
+        if room.backend == "takeover_chrome":
+            return self._persons_chrome(room)
+        return self._own_browser(room)
 
     async def _wanted(self, room: Room) -> None:
         """Waits until a session is wanted on the page: a person turned the browser on, or asked

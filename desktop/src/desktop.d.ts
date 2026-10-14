@@ -9,7 +9,11 @@ export interface DesktopState {
   address: string;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** What the window shows: the agent's browser and its chat, or the desktop the agent works on. */
+  page: DesktopPage;
 }
+
+export type DesktopPage = 'browser' | 'computer';
 
 export interface Rect {
   x: number;
@@ -28,6 +32,7 @@ declare global {
       go(action: 'back' | 'forward' | 'reload'): void;
       go(action: 'open', page: DemoPage): void;
       startAgain(): void;
+      show(page: DesktopPage): void;
     };
   }
 }

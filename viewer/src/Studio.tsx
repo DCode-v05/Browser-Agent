@@ -196,17 +196,18 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         </Button>
       )}
       {openDesktop && <DesktopButton open={openDesktop} />}
-      {onSignOut && (
-        <>
-          <span className="studio-role" data-role={role}>
-            <Icon name={role === 'admin' ? 'settings' : 'person'} />
-            {W.signIn.role[role]}
-          </span>
-          <Button icon="close" hint={W.studio.hint.signOut} onClick={onSignOut}>
-            {W.studio.signOut}
-          </Button>
-        </>
-      )}
+    </span>
+  );
+  // Who is signed in: at the end of the window's bar, apart from what the page shown does.
+  const account = onSignOut && (
+    <span className="studio-side">
+      <span className="studio-role" data-role={role}>
+        <Icon name={role === 'admin' ? 'settings' : 'person'} />
+        {W.signIn.role[role]}
+      </span>
+      <Button icon="close" hint={W.studio.hint.signOut} onClick={onSignOut}>
+        {W.studio.signOut}
+      </Button>
     </span>
   );
 
@@ -220,6 +221,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             <span className="brand-name">{W.product}</span>
           </h1>
           {side}
+          {account}
         </header>
         <main className="studio-page">
           <section className="studio-wait" aria-label={W.studio.noBrowser}>
@@ -262,11 +264,12 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             </button>
           ))}
         </div>
-        {side}
+        {account}
       </header>
-      {systems && !showingSystems && (
-        // Under each browser: the browser itself, how it is set up, and what its tasks took (spec 9.17).
-        <nav className="studio-views">
+      {/* Under each browser: the browser itself, how it is set up, and what its tasks took (spec 9.17);
+          and, at the row's end, what can be done from the page shown. */}
+      <nav className="studio-views">
+        {systems && !showingSystems && (
           <div className="systems-views" role="tablist" aria-label={W.studio.views(W.backend[room.backend])}>
             {views.map((name) => (
               <button
@@ -286,8 +289,9 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
               </button>
             ))}
           </div>
-        </nav>
-      )}
+        )}
+        {side}
+      </nav>
       {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
         // Where the picture cannot be driven, the person at the machine has their own hands.
         <p className="system-note studio-own-hands" role="status">

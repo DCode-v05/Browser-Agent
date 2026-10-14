@@ -1351,6 +1351,8 @@
 .talk-head {
   flex: none;
   display: flex;
+  /* A narrow chat puts what does not fit on a second line, rather than cut a word short. */
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
@@ -1917,8 +1919,15 @@
 .studio-views {
   flex: none;
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4) 0;
-  /* On a narrow screen the views are scrolled sideways, not broken in the middle of a word. */
+}
+
+/* On a narrow screen the views are scrolled sideways, not broken in the middle of a word. */
+.studio-views .systems-views {
+  max-width: 100%;
   overflow-x: auto;
 }
 

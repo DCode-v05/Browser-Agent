@@ -1,6 +1,7 @@
-// The desktop app (spec 14.3): one window with the agent's browser on the left and the chat on the
-// right. The browser is this app's own Chromium. The agent's core runs beside the app as its own
-// process and drives that browser by attaching to it; the chat is the session's viewer.
+// The desktop app (spec 14.3): one window with two pages. The browser page has the agent's browser
+// on the left and its chat on the right; the browser is this app's own Chromium. The computer page is
+// the desktop the agent works on, with its chat. The agent's core is the studio, running beside the
+// app as its own process: it drives the app's browser by attaching to it.
 
 'use strict';
 
@@ -10,7 +11,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const readline = require('node:readline');
 
-const { viewerOf, errorOf, chatAddress, placeable } = require('./core-line.cjs');
+const { viewerOf, errorOf, chatAddress, placeable, coreArguments, around, sessionsUp } = require('./core-line.cjs');
 
 // The core finds the page it is to drive by this mark in the page's address.
 const AGENT_MARK = '#bap-agent';
@@ -21,12 +22,17 @@ const DEBUG_PORT = Number(process.env.BAP_DESKTOP_DEBUG_PORT) || 19200 + crypto.
 // The pages of the demo site the shell may open in the agent's browser.
 const DEMO_PAGES = { start: 'start.html', checkin: 'checkin.html', signup: 'signup.html' };
 const CORNER = 12;
+// The studio's pages the app shows, and how long it waits for them once the core has started.
+const PAGES = ['builtin', 'computer'];
+const PAGES_WAIT_MS = 90000;
+const PAGES_POLL_MS = 500;
 
 app.commandLine.appendSwitch('remote-debugging-port', String(DEBUG_PORT));
 
 let win = null;
 let agentView = null;
 let chatView = null;
+let computerView = null;
 let core = null;
 /** Where the core's service is, once it has said so. */
 let service = '';
@@ -39,7 +45,17 @@ const state = {
   address: '',
   canGoBack: false,
   canGoForward: false,
+  /** browser: the agent's browser and its chat. computer: the desktop the agent works on. */
+  page: 'browser',
 };
+
+/** Shows the page the person chose, once the core is there to show it. */
+function showPage() {
+  const running = state.core === 'running';
+  agentView.setVisible(state.page === 'browser');
+  chatView.setVisible(running && state.page === 'browser');
+  computerView.setVisible(running && state.page === 'computer');
+}
 
 function tellShell() {
   if (!win || win.isDestroyed()) return;
@@ -68,10 +84,10 @@ function startCore() {
   lastError = '';
   state.core = 'starting';
   state.message = '';
-  chatView.setVisible(false);
+  showPage();
   tellShell();
 
-  core = spawn('uv', ['run', '--project', REPOSITORY, 'bap-browser', 'agent', '--chat'], {
+  core = spawn('uv', coreArguments(REPOSITORY), {
     // The project's folder, where the file with the model's key is.
     cwd: REPOSITORY,
     env: {
@@ -92,19 +108,38 @@ function startCore() {
     const viewer = viewerOf(line);
     if (!viewer || service) return;
     service = viewer.origin;
-    state.core = 'running';
-    chatView.webContents.loadURL(chatAddress(viewer));
-    chatView.setVisible(true);
-    agentView.webContents.loadURL(`${service}/demo-site/${DEMO_PAGES.start}`);
-    tellShell();
+    // The core says where it is before it has found the app's browser: the first page keeps the mark
+    // it finds that browser by.
+    agentView.webContents.loadURL(`${service}/demo-site/${DEMO_PAGES.start}${AGENT_MARK}`);
+    void showWhenReady(viewer);
   });
   core.on('exit', (code) => {
     core = null;
     state.core = 'stopped';
     state.message = lastError || `The agent's core stopped (code ${code}).`;
-    chatView.setVisible(false);
+    showPage();
     tellShell();
   });
+}
+
+/** Shows the studio's pages once it has a session on each: a page opened before has none to show. */
+async function showWhenReady(viewer) {
+  const ends = Date.now() + PAGES_WAIT_MS;
+  while (core && Date.now() < ends) {
+    try {
+      const answer = await fetch(`${viewer.origin}/api/sessions`, { headers: { Authorization: `Bearer ${viewer.token}` } });
+      if (answer.ok && sessionsUp(await answer.json(), PAGES)) break;
+    } catch {
+      // The service is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, PAGES_POLL_MS));
+  }
+  if (!core) return;
+  state.core = 'running';
+  chatView.webContents.loadURL(chatAddress(viewer, 'builtin'));
+  computerView.webContents.loadURL(chatAddress(viewer, 'computer'));
+  showPage();
+  tellShell();
 }
 
 function createWindow() {
@@ -133,14 +168,17 @@ function createWindow() {
   agentSession.setPermissionRequestHandler((_contents, _permission, answer) => answer(false));
   agentView = new WebContentsView({ webPreferences: { session: agentSession, sandbox: true, contextIsolation: true, nodeIntegration: false } });
   chatView = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-  for (const view of [agentView, chatView]) {
+  computerView = new WebContentsView({ webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  for (const view of [agentView, chatView, computerView]) {
     view.setBorderRadius(CORNER);
     win.contentView.addChildView(view);
   }
-  chatView.setVisible(false);
   // A view that has loaded nothing does not answer a debugger, and whoever attaches to the app's
-  // browser would wait for it for ever. It is given an empty page from the start.
-  chatView.webContents.loadURL('about:blank');
+  // browser would wait for it for ever. Each is given an empty page from the start.
+  for (const view of [chatView, computerView]) {
+    view.setVisible(false);
+    view.webContents.loadURL('about:blank');
+  }
 
   const page = agentView.webContents;
   // A page that opens a new window gets it in the same place: the agent drives one page.
@@ -150,10 +188,12 @@ function createWindow() {
   });
   for (const event of ['did-navigate', 'did-navigate-in-page', 'did-finish-load']) page.on(event, tellShell);
   // A link in the agent's answer opens in the person's own browser, not over the chat.
-  chatView.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  for (const view of [chatView, computerView]) {
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/.test(url)) shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  }
 
   // The core is started once the marked page is there for it to find.
   page.once('did-finish-load', startCore);
@@ -175,6 +215,14 @@ ipcMain.on('place', (event, rects) => {
   if (!fromShell(event) || typeof rects !== 'object' || rects === null) return;
   agentView.setBounds(placeable(rects.agent));
   chatView.setBounds(placeable(rects.chat));
+  computerView.setBounds(placeable(around(placeable(rects.agent), placeable(rects.chat))));
+});
+
+ipcMain.on('show', (event, page) => {
+  if (!fromShell(event) || (page !== 'browser' && page !== 'computer')) return;
+  state.page = page;
+  showPage();
+  tellShell();
 });
 
 ipcMain.on('go', (event, action, name) => {

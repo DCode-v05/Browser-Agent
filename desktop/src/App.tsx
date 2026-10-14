@@ -1,8 +1,9 @@
-// The app's shell: a rail at the left, the agent's browser in the middle, the chat at the right.
-// The browser and the chat are views of the desktop app laid over the two empty frames drawn here;
-// the shell tells the app where those frames are.
+// The app's shell: a rail at the left, then one of two pages. The browser page has the agent's
+// browser in the middle and its chat at the right; the computer page is the desktop the agent works
+// on, with its chat, across both. They are views of the desktop app laid over the empty frames drawn
+// here; the shell tells the app where those frames are.
 
-import { ArrowLeft, ArrowRight, Globe, Lock, MonitorSmartphone, PlaneTakeoff, ReceiptText, RotateCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Globe, Lock, Monitor, MonitorSmartphone, PlaneTakeoff, ReceiptText, RotateCw } from 'lucide-react';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -25,12 +26,14 @@ import {
 } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
-import type { DesktopState, Rect } from './desktop';
+import type { DesktopPage, DesktopState, Rect } from './desktop';
 
 const W = {
   product: 'BAP Browser',
   agent: 'Agent',
   browser: 'Browser',
+  computer: 'Computer',
+  computerTitle: 'The desktop the agent works on',
   tryItOn: 'Try it on',
   checkin: 'Skylark Air check-in',
   signup: 'Northfield sign-up',
@@ -46,7 +49,7 @@ const W = {
   browserStarting: "The agent's browser",
 } as const;
 
-const NOWHERE: DesktopState = { core: 'starting', message: '', address: '', canGoBack: false, canGoForward: false };
+const NOWHERE: DesktopState = { core: 'starting', message: '', address: '', canGoBack: false, canGoForward: false, page: 'browser' };
 
 function rectOf(element: HTMLElement | null): Rect {
   const box = element?.getBoundingClientRect();
@@ -81,6 +84,13 @@ export function App() {
 
   const running = state.core === 'running';
   const secure = state.address.startsWith('https://');
+  const onTheComputer = state.page === 'computer';
+  const show = (page: DesktopPage) => window.desktop.show(page);
+  // A page of the demo site is in the browser: the browser's page is shown with it.
+  const open = (page: 'start' | 'checkin' | 'signup') => {
+    show('browser');
+    window.desktop.go('open', page);
+  };
 
   return (
     <TooltipProvider>
@@ -102,9 +112,15 @@ export function App() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton isActive onClick={() => window.desktop.go('open', 'start')} disabled={!running}>
+                    <SidebarMenuButton isActive={!onTheComputer} tooltip={W.browser} onClick={() => show('browser')}>
                       <MonitorSmartphone />
                       <span>{W.browser}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={onTheComputer} tooltip={W.computer} onClick={() => show('computer')}>
+                      <Monitor />
+                      <span>{W.computer}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -115,13 +131,13 @@ export function App() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => window.desktop.go('open', 'checkin')} disabled={!running}>
+                    <SidebarMenuButton onClick={() => open('checkin')} disabled={!running}>
                       <PlaneTakeoff />
                       <span>{W.checkin}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => window.desktop.go('open', 'signup')} disabled={!running}>
+                    <SidebarMenuButton onClick={() => open('signup')} disabled={!running}>
                       <ReceiptText />
                       <span>{W.signup}</span>
                     </SidebarMenuButton>
@@ -141,21 +157,29 @@ export function App() {
         <SidebarInset className="h-svh min-w-0">
           <header className="flex h-14 shrink-0 items-center gap-1 px-3">
             <SidebarTrigger />
-            <Button variant="ghost" size="icon" title={W.back} aria-label={W.back} disabled={!state.canGoBack} onClick={() => window.desktop.go('back')}>
-              <ArrowLeft />
-            </Button>
-            <Button variant="ghost" size="icon" title={W.forward} aria-label={W.forward} disabled={!state.canGoForward} onClick={() => window.desktop.go('forward')}>
-              <ArrowRight />
-            </Button>
-            <Button variant="ghost" size="icon" title={W.reload} aria-label={W.reload} disabled={!running} onClick={() => window.desktop.go('reload')}>
-              <RotateCw />
-            </Button>
-            <div className="ml-1 flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-secondary px-4 text-sm" role="group" aria-label={W.address}>
-              {secure ? <Lock className="size-4 shrink-0 text-muted-foreground" /> : <Globe className="size-4 shrink-0 text-muted-foreground" />}
-              <span className="truncate font-mono text-[13px]" data-testid="address">
-                {state.address}
-              </span>
-            </div>
+            {onTheComputer ? (
+              <h1 className="ml-1 truncate text-sm font-semibold" data-testid="page-title">
+                {W.computerTitle}
+              </h1>
+            ) : (
+              <>
+                <Button variant="ghost" size="icon" title={W.back} aria-label={W.back} disabled={!state.canGoBack} onClick={() => window.desktop.go('back')}>
+                  <ArrowLeft />
+                </Button>
+                <Button variant="ghost" size="icon" title={W.forward} aria-label={W.forward} disabled={!state.canGoForward} onClick={() => window.desktop.go('forward')}>
+                  <ArrowRight />
+                </Button>
+                <Button variant="ghost" size="icon" title={W.reload} aria-label={W.reload} disabled={!running} onClick={() => window.desktop.go('reload')}>
+                  <RotateCw />
+                </Button>
+                <div className="ml-1 flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-secondary px-4 text-sm" role="group" aria-label={W.address}>
+                  {secure ? <Lock className="size-4 shrink-0 text-muted-foreground" /> : <Globe className="size-4 shrink-0 text-muted-foreground" />}
+                  <span className="truncate font-mono text-[13px]" data-testid="address">
+                    {state.address}
+                  </span>
+                </div>
+              </>
+            )}
           </header>
 
           <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1 px-3 pb-3">

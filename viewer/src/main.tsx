@@ -29,6 +29,8 @@ const PAGE_KEY = 'bap-browser.page';
 const VISIT_KEY = 'bap-browser.visit';
 /** The service's own token, as the address module keeps it. */
 const OPERATOR_KEY = 'bap-browser.token';
+/** A visit to end, kept only while the page that signed out gives way to the sign-in page. */
+const LEAVING_KEY = 'bap-browser.leaving';
 /** What the viewer keeps by itself when the service it shows has no settings to give (spec 10.2). */
 const KEPT_BY_THE_VIEWER = ['colour_mode', 'show_agent_pointer'];
 
@@ -90,6 +92,12 @@ if (!recorded) {
 }
 
 const auth = authFrom(location.href);
+// The page that signed out has gone: nothing of it can still ask with the visit that is ending.
+const leaving = recorded ? null : tabStorage.getItem(LEAVING_KEY);
+if (leaving) {
+  tabStorage.removeItem(LEAVING_KEY);
+  await auth.signOut(leaving);
+}
 if (!recorded) {
   let known = await auth.state(token);
   if (known && known !== 'no_accounts' && known.role === null && visit && operator) {
@@ -118,8 +126,10 @@ function signedIn(visitToken: string) {
   location.reload();
 }
 
-async function signOut() {
-  if (token) await auth.signOut(token);
+function signOut() {
+  // The page leaves first, and the sign-in page ends the visit: a request this page still has on the
+  // way would otherwise go with a visit that is over.
+  if (token) tabStorage.setItem(LEAVING_KEY, token);
   tabStorage.removeItem(VISIT_KEY);
   tabStorage.removeItem(OPERATOR_KEY);
   tabStorage.removeItem(PAGE_KEY);
@@ -199,7 +209,7 @@ createRoot(document.getElementById('root')!).render(
         systems={systems}
         role={role}
         me={me}
-        onSignOut={signsIn ? () => void signOut() : undefined}
+        onSignOut={signsIn ? signOut : undefined}
         passwords={signsIn && role === 'admin' && live ? { set: (whose, password) => auth.setPassword(live, whose, password) } : undefined}
         settings={settings}
         surface={surface}

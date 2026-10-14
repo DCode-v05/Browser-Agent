@@ -314,6 +314,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           state={state}
           view={view}
           maxChars={options.maxTaskChars}
+          embedded={embedded}
           selected={selected}
           cards={cards}
           drawer={selectedStep && <StepDrawer step={selectedStep} viewport={state.session?.viewport ?? { width: 1280, height: 800 }} onClose={closeStep} />}

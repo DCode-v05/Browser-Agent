@@ -1732,6 +1732,48 @@ Seen, with the engine in the micro VM's image in Docker joined to the tailnet as
   found by searching Amazon.in up to ₹1,00,000 sorted by customer review. No timeout happened in
   that run, so the new recovery was not needed there: the unit tests hold it.
 
+### 1az. Built on 2026-10-14: the desktop app's Computer page, and the studio it starts
+
+From the teammate's report ("Production UX pass"): the desktop app still started its old core,
+`bap-browser agent --chat`, and had no Computer page.
+
+| Built | How |
+|---|---|
+| The desktop app starts the studio with its two pages | `bap-browser studio --desktop --dev`: its own browser, which the core drives by attaching to it, and the computer |
+| A Computer page in the app | The rail has Browser and Computer. The computer page is `?session=computer&embed=1`, across the room of the browser and its chat. Its header says "The desktop the agent works on" |
+| The app shows a page once the studio has a session on it | Before, a page opened at once had none to show and said "This link can't open the session" |
+
+Found and fixed on the way:
+
+- **`studio --desktop` stopped as soon as it started**: `Studio.run` took four pages for granted
+  and the desktop mode has two ("not enough values to unpack"). No test had run that mode. Each
+  page is now run by its kind, and a test runs the mode.
+- **With the rail folded to icons, the icon above each group could not be pressed**: the group's
+  hidden label lay over it. It now takes no presses.
+- **The core announces itself before it finds the app's browser**, and the app then moved that
+  browser to the demo site, losing the mark the core finds it by. The first page keeps the mark.
+- **The chat beside the app's browser showed the product's name**, which a page shown inside
+  another app drops, and its mode chip was cut short ("Asks for risky"). It says "Chat", and a
+  narrow chat's head puts what does not fit on a second line.
+
+Seen, in the app on this Mac (pictures of the app's own window only, through its debugging port):
+the browser page with the demo site and its chat; the Computer page with the contained desktop
+live, "Ready for your task", Take over and Stop session; a demo site pressed from the Computer page
+brings the browser page back; Browser and Computer in the folded rail each work.
+
+The Studio page, after the teammate's pass on the Settings page and in its manner, within the
+tokens: the page's actions (Systems, Chat beside your screen, Open desktop app) wrapped onto a
+half-empty second line of the bar at 1360 by 850. They are now at the end of the row of the page's
+views, and the bar is one line: the product, the four pages, Admin and Sign out. Seen in a real
+browser at 1360 and at 900 wide.
+
+Also fixed: **"Sign out" could leave a request on its way with the visit it had just ended**, and
+the service refused it (a 401 in the page's console). The roles test failed on it now and then
+in CI. The page now leaves first, and the sign-in page it goes to ends the visit.
+
+Not done: a pass over the other pages the teammate's report lists (the chat's cards, the Systems
+page's overview, the sign-in pages). The ones seen on the way looked right and were left.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
