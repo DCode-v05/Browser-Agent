@@ -81,7 +81,41 @@ of this repository.
 The helper holds the engine to the apps your Mac's own settings allow. To let it work in any app,
 turn on "Let the agent work in any app on the machine" on the Mac before starting the helper.
 
-## On the Linux box
+## On the Linux box, in one command
+
+When the box has hours again, from the checkout on it, inside `tmux`:
+
+```sh
+bash deploy/box-up.sh https://YOUR-MAC.YOUR-TAILNET.ts.net:8796
+```
+
+It fetches Tailscale into your home folder and checks it against Tailscale's published checksum,
+asks for the three secrets without showing them (the auth key, the helper's pairing code, the
+Claude key), builds what is missing, and starts the studio on the tailnet with the Computer page
+driving the Mac. Nothing it is given is written to a file. Tested on a Linux machine as a plain
+user: it fetched and checked Tailscale 1.104.1, then stopped because no key was given.
+
+## Or a Linux VM on the Mac itself, with no team box
+
+The image `bap-browser-vm:tailnet` is the same micro VM, with Tailscale in it. Built once with
+`docker build --build-arg TAILSCALE=true -t bap-browser-vm:tailnet -f deploy/Dockerfile .`, it
+joins the tailnet as `tag:bap-vm` like the box would:
+
+```sh
+read -s "?Tailscale auth key: " TS_AUTHKEY && export TS_AUTHKEY
+read -s "?Pairing code: " BAP_BROWSER_HELPER_TOKEN && export BAP_BROWSER_HELPER_TOKEN
+docker run --rm -it --env-file .env -e TS_AUTHKEY -e BAP_BROWSER_HELPER_TOKEN \
+  -e BAP_BROWSER__COMPUTER__RUNS=remote \
+  -e BAP_BROWSER__COMPUTER__HELPER_URL=https://YOUR-MAC.YOUR-TAILNET.ts.net:8796 \
+  -e BAP_BROWSER__AGENT__PROVIDER=anthropic -e BAP_BROWSER__AGENT__MODEL=claude-opus-5-5 \
+  -e BAP_BROWSER__AGENT__API_KEY_ENV=ANTHROPIC_API_KEY \
+  -e BAP_BROWSER__AGENT__BASE_URL=https://api.anthropic.com/v1 \
+  bap-browser-vm:tailnet uv run --project /app --no-sync bap-browser studio
+```
+
+The key file stays on your own Mac: the VM is given it at start and keeps nothing.
+
+## On the Linux box, step by step
 
 1. Tailscale without root. Download the static build for the box's processor from
    `pkgs.tailscale.com/stable`, unpack it in your home folder, and put that folder on `PATH`.
@@ -162,13 +196,23 @@ Proven over a real tailnet on 2026-10-14, with the Mac alone on it:
   modes, typing found in the app, Stickies (not allowed) refused, Take over held, 14 pictures of
   the screen streamed.
 
+Proven across two machines on 2026-10-14, the VM being the micro VM's image in Docker on the Mac:
+
+- The VM joined with a reusable, ephemeral, tagged key as `tag:bap-vm`, in userspace mode.
+- From the VM, through Tailscale's proxy, the helper answered at the Mac's name on port 8796
+  (driver 0.21.0). Another port listening on the Mac, 8799, gave no answer: the tailnet's grants
+  let the VM reach the helper's port and no other.
+- From the Mac, the VM's viewer opened over HTTPS, with a Let's Encrypt certificate for its tailnet
+  name that checked. This needed a fix: with its state in memory the VM's Tailscale had no folder
+  for the certificate ("no TailscaleVarRoot"); `deploy/vm-start.sh` now gives it a temporary one.
+- A task given on the VM's Computer page from the Mac's browser was done by Claude in the VM on the
+  Mac: "Which apps are open on this computer?" was answered with the Mac's open apps, and the helper
+  on the Mac said each call it was given.
+
 Not proven:
 
 - The Linux box on the tailnet: its join in userspace mode, `tag:bap-vm`, the grant to port 8796,
   and the link through its proxy over the real network.
-- HTTPS: the tailnet's HTTPS certificates are off, so the helper was published over HTTP. Inside
-  the tailnet that traffic is still encrypted by WireGuard. The viewer on the box needs them on
-  (`deploy/vm-start.sh` serves it with `--https=443`).
 - The speed of the live picture across the tailnet.
 - The Anthropic provider against the real service.
 - Take over from the viewer of a Mac reached through the helper. With the engine on the Mac itself

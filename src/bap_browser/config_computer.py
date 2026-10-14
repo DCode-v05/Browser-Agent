@@ -188,6 +188,33 @@ class Computer(Section):
         2.0, "How long an app is given to close before a task of a set, before it is ended by force"
     )
     app_poll_ms: int = setting(200, "How often the desktop is asked whether that window is there")
+    watch_apps: list[str] = setting(
+        [
+            "Mail",
+            "Outlook",
+            "Gmail",
+            "Messages",
+            "WhatsApp",
+            "Telegram",
+            "Signal",
+            "Slack",
+            "Teams",
+            "Discord",
+            "System Settings",
+            "System Preferences",
+            "Settings",
+            "Keychain Access",
+            "Passwords",
+            "1Password",
+            "Bitwarden",
+            "Wallet",
+        ],
+        "Watch mode: the apps in which the agent acts only while a person has its page open, as in "
+        "OpenAI's Operator. It may still look at them. Matched by whole words of the app's name",
+    )
+    watch_wait_s: float = setting(
+        120.0, "In such an app, how long the agent waits for a person to open the page before it stops"
+    )
     double_press_ms: int = setting(
         500, "On a Mac a person drives through the page: a second press within this long is a double press"
     )

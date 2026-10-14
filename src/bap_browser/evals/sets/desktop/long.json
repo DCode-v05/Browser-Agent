@@ -22,7 +22,9 @@
           "app",
           "Text editor"
         ],
-        ["page"],
+        [
+          "page"
+        ],
         [
           "type",
           "alpha"
@@ -94,7 +96,9 @@
           "app",
           "Text editor"
         ],
-        ["page"],
+        [
+          "page"
+        ],
         [
           "type",
           "4417"
@@ -110,6 +114,56 @@
         [
           "submit",
           "~/Files/Practice/code.txt"
+        ],
+        [
+          "wait",
+          1
+        ]
+      ]
+    },
+    {
+      "id": "add-up-numbers",
+      "title": "Add up the numbers in a file",
+      "task": "Add up the numbers in numbers.txt in the folder Practice inside Files, and save the total in a new file total.txt in the same folder.",
+      "start": "desktop",
+      "seed": {
+        "files": {
+          "numbers.txt": "12\n30\n18\n"
+        }
+      },
+      "pass": [
+        {
+          "state": "files.total_txt",
+          "has": "60"
+        },
+        {
+          "state": "files.numbers_txt",
+          "has": "12\n30\n18"
+        }
+      ],
+      "solution": [
+        [
+          "app",
+          "Text editor"
+        ],
+        [
+          "page"
+        ],
+        [
+          "type",
+          "60"
+        ],
+        [
+          "key",
+          "Control+s"
+        ],
+        [
+          "wait",
+          1
+        ],
+        [
+          "submit",
+          "~/Files/Practice/total.txt"
         ],
         [
           "wait",
