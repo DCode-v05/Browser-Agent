@@ -56,13 +56,14 @@ def create_app(
     settings: SettingsStore | None = None,
     systems: Systems | None = None,
     accounts: Accounts | None = None,
+    dev: bool = False,
 ) -> Starlette:
     """`mcp` is what answers MCP over HTTP, and `bridge` is where the extension in a person's own
     Chrome dials in. Without them the service has no such endpoints. `desktop` is the desktop app,
     for the window to open. `settings` holds what a person chose in the settings screen. `systems`
-    is whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
-    may sign in, as the admin or as a user (spec 4.11); without it, the service's own token is the
-    one way in."""
+    is whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who may
+    sign in, as the admin or as a user (spec 4.11), and `dev` whether its own token stays admin
+    once a real password exists; without `accounts`, the service's own token is the one way in."""
     package = Path(str(files("bap_browser")))
     viewer = package / "viewer_dist"
     if not (viewer / "index.html").is_file():
@@ -78,9 +79,8 @@ def create_app(
         return isinstance(given, str) and hmac.compare_digest(given.encode(), token.encode())
 
     def role_of(given: Any) -> Role | None:
-        """Who a token speaks for (spec 4.11). The service's own token is the admin's: it is the
-        person who started the service. Any other is a visit someone signed in for."""
-        if signed_in(given):
+        """Who a token speaks for (spec 4.11, `dev` above)."""
+        if signed_in(given) and (dev or accounts is None or not accounts.has("admin")):
             return "admin"
         return accounts.role_of(given) if accounts is not None else None
 

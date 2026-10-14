@@ -552,9 +552,12 @@ the page that asks for it does not keep it.
 - A page whose visit is over goes back to its sign-in page: signed out on another page, a new password,
   or its time up. The service closes that visit's open connections itself, and does nothing more that
   the visit asks for.
-- The service's own token, which whoever started the service holds, speaks as the admin. It makes the
-  first password, and it is how an admin who lost theirs makes a new one: they start the service and
-  open the link it prints.
+- The service's own token, which whoever started the service holds, speaks as the admin until an
+  admin password exists. It makes the first password, and it is how an admin who lost theirs makes
+  a new one: they start the service and open the link it prints. Once an admin password is set, the
+  service's own token stops speaking as the admin, unless the service was started with `--dev`: a
+  password is then the only way in. `--dev` is for working on `bap-browser` itself, where a
+  permanent way in without signing in again each run is worth more than the gap it leaves open.
 
 **What the admin allows: the policy.** Three lists, kept in `settings.file` under `"policy"`. Whether
 users may use a browser is set on that browser's Configuration; what users may change and see is set on

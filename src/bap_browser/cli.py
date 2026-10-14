@@ -101,6 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="only the desktop app's own browser and computer use, for the desktop app itself to start",
     )
+    studio.add_argument(
+        "--dev",
+        action="store_true",
+        help="keep the service's own token signing in as the admin even once a real admin "
+        "password is set, for fast iteration while working on bap-browser itself",
+    )
     studio.set_defaults(run=_studio)
 
     computer = commands.add_parser(
@@ -434,6 +440,7 @@ def _studio(args: argparse.Namespace) -> int:
                 open_viewer=args.open,
                 extension=extension,
                 rooms_mode=rooms_mode,
+                dev=args.dev,
             )
         )
     # It runs until it is interrupted, so that is how it always ends.

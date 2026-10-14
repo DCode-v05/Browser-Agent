@@ -1979,6 +1979,21 @@ show Computer as a second pane with a rail to switch to it — that is the deskt
 this work, not done yet. See `docs/plans/2026-10-14-production-ux-pass.md` for the fuller plan this
 is one piece of.
 
+## `studio --dev`
+
+Added 2026-10-14. The service's own operator token (printed at startup, or `BAP_BROWSER_TOKEN`)
+used to speak as the admin forever, even after a real admin password was set. Now it does so only
+until a password exists; after that, only a password signs in, unless the service was started with
+`--dev` (spec 4.11). `agent --chat` and plain `serve` have no accounts at all today (spec 4.11, "a
+service nobody signs in to"), so `--dev` was wired into `studio` alone, the one command that builds
+an `Accounts` and passes it to the service.
+
+Changed: `src/bap_browser/service/app.py` (`create_app`'s `role_of`), `src/bap_browser/service/server.py`
+and `src/bap_browser/agent/window.py` (both thread `dev` through), `src/bap_browser/cli.py` (the
+`--dev` flag). Tests: `tests/service/test_roles_api.py` gained two cases, for the default and for
+`--dev`, and its `signed_in` test helper now re-signs in as the admin once a password exists, since
+the operator token it used to reuse no longer qualifies.
+
 ## Documents
 
 | File | What it is |
