@@ -61,15 +61,16 @@ changes shape — not just at the end.
 |---|---|---|---|---|
 | 0 | Anthropic model provider (earlier in session) | **Shipped** | PR #66, merged | Unrelated to this bundle, done before it started |
 | 0b | Contained-desktop rootless-Docker fix | **Shipped**, CI green, merging now | PR #67 `fix/contained-desktop-rootless-docker` | |
-| 1 | CLI split (`--browser` / `--desktop`, merged pages) | Not started | | |
+| 1 | CLI split (`--browser` / `--desktop`, merged pages) | Backend done, Electron side not started | PR #70, CI running | `built_in_config(keep_cdp=)`, `Studio(rooms_mode=)`. Desktop app itself still spawns the old single-session core; adding its Computer pane is its own remaining sub-piece |
 | 2 | Auth + `--dev` bypass | Not started | | |
 | 3 | Take-over UX (background delivery default, working indicator, task queue) | Not started | | |
 | 4 | Windows prerequisites / first-run permissions flow | Not started | | |
 | 5 | Full visual redesign (all pages, settings named specifically) | Not started | | |
-| 6 | VM direction 2 (VM drives Windows) | Not started | | |
+| 6 | VM direction 1 (Windows drives VM) | **Done**, verified visually | shipped in PR #67 | |
+| 6b | VM direction 2 (VM drives Windows) | Not started | | Plan: `computer helper --this-machine-alone` on Windows + reverse SSH tunnel, see "VM facts" above |
 | 7 | Full Windows computer-use evaluation via live UI | Not started | | |
 | 8 | Final explanation doc | Not started | | |
-| 9 | Merge every branch into main (incl. committing `worktree-computer-use-helpers`'s WIP first) | Not started | | |
+| 9 | Merge every branch into main (incl. committing `worktree-computer-use-helpers`'s WIP first) | 1 of several done | PR #67 merged; #70 pending | |
 
 ## Decisions already made (do not re-ask)
 
