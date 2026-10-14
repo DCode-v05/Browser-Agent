@@ -116,8 +116,9 @@ function startCore() {
     if (!viewer || service) return;
     service = viewer.origin;
     // The core says where it is before it has found the app's browser: the first page keeps the mark
-    // it finds that browser by.
-    agentView.webContents.loadURL(`${service}/demo-site/${DEMO_PAGES.start}${AGENT_MARK}`);
+    // it finds that browser by, same as before the core was there to say anything (a blank page, not
+    // the demo site: a fresh session shows nothing until a task sends it somewhere).
+    agentView.webContents.loadURL(`about:blank${AGENT_MARK}`);
     void showWhenReady(viewer);
   });
   core.on('exit', (code) => {
