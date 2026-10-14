@@ -28,7 +28,25 @@ export interface SocketOptions {
    * be loading the older one, and releasing its address at once would fail that load.
    */
   releaseAfterMs?: number;
+  /** Whether the page is the one in front, and word when that changes. By default, the document's. */
+  inFront?: InFront;
 }
+
+export interface InFront {
+  now(): boolean;
+  /** Calls the listener when the page comes to the front or goes behind. Gives a way to stop. */
+  onChange(listener: () => void): () => void;
+}
+
+/** The document in front, or behind another tab or window. */
+const THE_DOCUMENT: InFront = {
+  now: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  onChange: (listener) => {
+    if (typeof document === 'undefined') return () => undefined;
+    document.addEventListener('visibilitychange', listener);
+    return () => document.removeEventListener('visibilitychange', listener);
+  },
+};
 
 /** What the wire says in numbers: a socket that is open, and a message that is a picture. */
 const WIRE = { open: 1, picture: 1 } as const;
@@ -57,11 +75,19 @@ export class SocketConnection implements Connection {
   private readonly leaving = new Map<string, ReturnType<typeof setTimeout>>();
   /** Each finished step's picture, by step number. They outlive the live picture and a lost connection. */
   private readonly kept = new Map<number, string>();
+  private readonly inFront: InFront;
+  private stopSeeing: (() => void) | undefined;
 
   constructor(private readonly options: SocketOptions) {
     this.createSocket = options.createSocket ?? ((url) => new WebSocket(url) as unknown as SocketLike);
     this.reconnectMs = options.reconnectMs ?? DEFAULT_RECONNECT_MS;
     this.releaseAfterMs = options.releaseAfterMs ?? PAGE.releaseAfterMs;
+    this.inFront = options.inFront ?? THE_DOCUMENT;
+  }
+
+  /** Watch mode (spec 22.7): the service counts a page as watched only while it is in front. */
+  private sayWhetherSeen(): void {
+    this.send({ type: 'seen', visible: this.inFront.now() });
   }
 
   start(handlers: ConnectionHandlers): void {
@@ -69,6 +95,8 @@ export class SocketConnection implements Connection {
     this.closed = false;
     this.attempt = 0;
     handlers.onStatus('connecting');
+    this.stopSeeing?.();
+    this.stopSeeing = this.inFront.onChange(() => this.sayWhetherSeen());
     this.open();
   }
 
@@ -82,6 +110,8 @@ export class SocketConnection implements Connection {
 
   close(): void {
     this.closed = true;
+    this.stopSeeing?.();
+    this.stopSeeing = undefined;
     clearTimeout(this.retry);
     this.socket?.close();
     for (const [url, timer] of this.leaving) {
@@ -105,6 +135,7 @@ export class SocketConnection implements Connection {
       // What was on screen before the connection was lost says nothing about a step that finishes now.
       this.lastFrame = undefined;
       socket.send(JSON.stringify({ type: 'auth', token: this.options.token }));
+      this.sayWhetherSeen();
       this.handlers?.onStatus('connected');
     };
     socket.onmessage = (message) => this.receive(message.data);

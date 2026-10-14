@@ -13704,9 +13704,14 @@ with the engine, and nothing of the helper is open to the internet.</p>
 </thead>
 <tbody>
 <tr>
+<td>Tasks to start from</td>
+<td>Nothing</td>
+<td>While a chat is empty it offers a few sample tasks of the page's own kind: on a browser's page a demo site's check-in, a price comparison, a page summed up; on the computer page an app opened and a site searched in it, the apps that are open, a note written. One pressed is given to the agent at once, as if it had been typed and sent</td>
+</tr>
+<tr>
 <td>The page of computer use speaks of a desktop</td>
 <td>Nothing</td>
-<td>Every word the page shows of itself says "desktop" where a browser's page says "browser": the hints of its buttons, the name of its live picture, the leads of its Configuration and Evaluations. The words are one table of differences over the browser's words (<code>ON_A_DESKTOP</code> in <code>viewer/src/wording.ts</code>), given to every part of the page at once. The hint of the task box says that a new task carries on from where the last one ended</td>
+<td>It names itself "bap-browser · Computer use": in the window's bar, in the chat alone and in the window's title. Every word the page shows of itself says "desktop" where a browser's page says "browser": the hints of its buttons, the name of its live picture, the leads of its Configuration and Evaluations. The words are one table of differences over the browser's words (<code>ON_A_DESKTOP</code> in <code>viewer/src/wording.ts</code>), given to every part of the page at once. The hint of the task box says that a new task carries on from where the last one ended</td>
 </tr>
 <tr>
 <td>A Computer tab on the home page</td>
@@ -14038,6 +14043,7 @@ named and pressed as Hermes' tool does it.</p>
 <li>Three checks stand before any action: the tailnet's grant (only <code>tag:bap-vm</code> may reach that port), the caller's Tailscale identity as the helper is told it, and a pairing code the person reads from the helper and types into the window once.</li>
 <li>Screenshots and the element tree travel back in the capture results. Nothing else of the machine is sent.</li>
 <li>The person starts the helper and ends it. It shows what is being done, and a Stop control ends the session at once.</li>
+<li><strong>Take over through the helper.</strong> Where that machine's person switches it on (<code>computer.base.helper_hands</code>, off by default), a person who takes over on the engine's page uses that machine's mouse and keyboard: the engine opens the helper's <code>/hand</code> while they hold the session, sends where on the picture as a share of it, and closes it at Hand back. The same three checks stand before it. They are not held to the allowed apps, as the agent is, so it is for an engine that machine's person trusts. Built for macOS, where the program that runs the helper is allowed under Accessibility. The helper says when a hand is on the machine and when it is gone, never what was typed.</li>
 <li>When the driver's session is lost, as when a capture times out and the link's new process cannot revive the session the old one had, the call says so and the next call begins a fresh session with the driver. Nothing that runs on the person's machine is ended.</li>
 <li>This replaces today's token over HTTP and its <code>--host</code> flag, which could be bound beyond the machine's own address ahead of any tailnet design.</li>
 </ul>
@@ -14104,7 +14110,7 @@ named and pressed as Hermes' tool does it.</p>
 <tr>
 <td>Watch mode</td>
 <td>Ours, after OpenAI's Operator</td>
-<td>In the apps a person must watch (<code>computer.watch_apps</code>: mail, chat, passwords, the system's settings), the agent acts only while a person has the page open. It may still look. With nobody watching it waits up to <code>computer.watch_wait_s</code>, then stops the step and tells the model to say that the person must open the page. An app is matched by whole words of its name</td>
+<td>In the apps a person must watch (<code>computer.watch_apps</code>: mail, chat, passwords, the system's settings), the agent acts only while a person has the page open and in front: a page behind another tab or window is not watching. Each page says so when it connects and whenever that changes (<code>{"type": "seen", "visible": ...}</code>); a page that never says is taken as in front. It may still look. With nobody watching it waits up to <code>computer.watch_wait_s</code>, then stops the step and tells the model to say that the person must open the page. An app is matched by whole words of its name</td>
 </tr>
 <tr>
 <td>Hard-blocked keys</td>

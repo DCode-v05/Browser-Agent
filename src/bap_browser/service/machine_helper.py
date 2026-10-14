@@ -15,9 +15,11 @@ import asyncio
 import contextlib
 import hmac
 import json
+import math
 import os
 import secrets
 import subprocess
+import sys
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -38,6 +40,7 @@ from bap_browser.computer import allowed, driver
 from bap_browser.computer.hermes.computer_use.cua_backend_daemon import EmbeddedCuaDaemon
 from bap_browser.computer.seams.process import sanitize_subprocess_env, windows_hide_flags
 from bap_browser.config import Config
+from bap_browser.driver.mac_hand import MacHand, MacOS
 
 # What an engine may have the driver do besides the conversation itself: what it is, whether it is
 # ready, and single calls. Nothing that updates the driver, changes its settings or installs more.
@@ -80,6 +83,50 @@ def tailnet_names(address: str, timeout_s: float) -> set[str]:
     return {str(tag) for tag in tags} | ({str(login)} if login else set())
 
 
+class RemoteHand:
+    """A person's mouse and keyboard, from the engine's page, on this machine's own screen (spec
+    22.6.2). Where on the picture is given as a share of it, and made a place on this screen here.
+    Anything else that comes is dropped: the engine is elsewhere, and what it sends is checked."""
+
+    def __init__(self, macos: Any, hand: MacHand, *, key_chars: int) -> None:
+        self._macos = macos
+        self._hand = hand
+        self._key_chars = key_chars
+
+    def given(self, said: Any) -> None:
+        if not isinstance(said, dict):
+            return
+        kind = said.get("kind")
+        place = self._place(said)
+        if kind == "pointer" and place is not None:
+            action, button = said.get("action"), said.get("button")
+            if action in ("move", "down", "up") and button in ("left", "right", "middle"):
+                self._hand.pointer(action, *place, button)
+        elif kind == "key":
+            action, key = said.get("action"), said.get("key")
+            if action in ("down", "up") and isinstance(key, str) and 0 < len(key) <= self._key_chars:
+                self._hand.key(action, key)
+        elif kind == "wheel" and place is not None:
+            dx, dy = finite(said.get("dx")), finite(said.get("dy"))
+            if dx is not None and dy is not None:
+                self._hand.pointer("move", *place, "left")
+                self._hand.wheel(dx, dy)
+
+    def _place(self, said: dict[str, Any]) -> tuple[float, float] | None:
+        x, y = finite(said.get("x")), finite(said.get("y"))
+        if x is None or y is None:
+            return None
+        wide, high = self._macos.size()
+        return min(max(x, 0.0), 1.0) * wide, min(max(y, 0.0), 1.0) * high
+
+
+def finite(value: object) -> float | None:
+    """A number that is one: not a word, not true or false, not infinite."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return float(value)
+
+
 @dataclass
 class Helper:
     driver: Sequence[str]
@@ -98,6 +145,8 @@ class Helper:
     renew: Callable[[], str] | None = None
     """Starts that driver afresh and gives its new endpoint. A driver that has run a while refuses
     an app that was closed and opened again (seen on macOS), so each session of an engine gets one."""
+    hand: RemoteHand | None = None
+    """A person's mouse and keyboard from the engine's page, where this machine's person allows it."""
     stopped: bool = False
     running: list[subprocess.Popen[bytes]] = field(default_factory=list)
 
@@ -270,7 +319,30 @@ def helper_app(helper: Helper) -> Starlette:
             with contextlib.suppress(RuntimeError):
                 await socket.close()
 
-    return Starlette(routes=[Route("/run", run, methods=["POST"]), WebSocketRoute("/mcp", converse)])
+    async def lend_a_hand(socket: WebSocket) -> None:
+        """A person on the engine's page who has taken over: their mouse and keyboard, here."""
+        hand = helper.hand
+        if helper.refusal(socket) is not None or hand is None:
+            await socket.close(REFUSED_AT_THE_DOOR)
+            return
+        await socket.accept()
+        helper.say("A person on the engine's page has this machine's mouse and keyboard.")
+        try:
+            async for line in socket.iter_text():
+                with contextlib.suppress(ValueError):
+                    hand.given(json.loads(line))
+        except WebSocketDisconnect:
+            pass
+        finally:
+            helper.say("The person on the engine's page has let go of this machine's mouse and keyboard.")
+
+    return Starlette(
+        routes=[
+            Route("/run", run, methods=["POST"]),
+            WebSocketRoute("/mcp", converse),
+            WebSocketRoute("/hand", lend_a_hand),
+        ]
+    )
 
 
 @contextmanager
@@ -301,6 +373,29 @@ def holding_to_the_allowed_apps(config: Config, binary: Path) -> Iterator[Callab
                 last.stop()
 
 
+NO_HAND_HERE = (
+    "it is built for macOS, where the program that runs the helper is allowed under System Settings, "
+    "Privacy & Security, Accessibility."
+)
+
+
+def a_hand_here(config: Config) -> RemoteHand | None:
+    """A person's mouse and keyboard from the engine's page, where this machine's settings allow it
+    and macOS takes them from this program."""
+    computer_settings = config.computer
+    if not computer_settings.base.helper_hands or sys.platform != "darwin":
+        return None
+    macos = MacOS()
+    if not macos.allowed():
+        return None
+    hand = MacHand(
+        macos,
+        again_within_s=computer_settings.double_press_ms / 1000,
+        again_within_points=computer_settings.double_press_points,
+    )
+    return RemoteHand(macos, hand, key_chars=config.control.key_name_max_chars)
+
+
 def run_helper(config: Config, this_machine_alone: bool) -> int:
     """Runs the helper on this machine until the person ends it (spec 22.6.2). It listens on this
     machine's own address only; `tailscale serve` is what shows it to the tailnet."""
@@ -321,6 +416,7 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
         say=print,
         run_timeout_s=base.helper_run_timeout_s,
         message_bytes=base.helper_message_bytes,
+        hand=a_hand_here(config),
     )
     here = f"http://127.0.0.1:{port}"
     print(f"The helper is on this machine at {here}. An engine that has the pairing code can drive this")
@@ -329,6 +425,10 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
         # The code is for the person at this machine to read, here and nowhere else.
         print(f"Pairing code: {code}")
         print(f"Give it to the engine as {config.computer.helper_token_env}.")
+    if it.hand is not None:
+        print("A person who takes over on the engine's page may use this machine's mouse and keyboard.")
+    elif base.helper_hands:
+        print("A person on the engine's page cannot use this machine's mouse and keyboard: " + NO_HAND_HERE)
     if tailnet:
         print(f"It lets in, from your tailnet: {', '.join(base.helper_allow)}.")
         print(f"To show it to your tailnet and to nothing else: tailscale serve --bg --https={port} {here}")

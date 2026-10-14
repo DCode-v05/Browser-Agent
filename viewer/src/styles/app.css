@@ -1064,6 +1064,11 @@
   margin-top: var(--space-3);
 }
 
+/* In a pop-up that asks, setting the question aside is apart from the answers, at the start. */
+.popup-actions > :first-child {
+  margin-inline-end: auto;
+}
+
 .toasts {
   position: fixed;
   left: 50%;
@@ -1202,6 +1207,46 @@
 
 .chat-empty {
   color: var(--text-muted);
+}
+
+/* Tasks to start from: each a quiet card that puts its words in the box. */
+.chat-samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.chat-samples-lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-secondary);
+}
+
+.chat-sample {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-secondary);
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--duration-state);
+}
+
+.chat-sample:hover {
+  background: var(--surface-3);
+}
+
+.chat-sample:focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.talk-empty + .chat-samples {
+  margin-inline: var(--space-4);
 }
 
 .chat-message {
@@ -2266,6 +2311,17 @@
 .system-table th:first-child {
   text-align: left;
   font-family: var(--font-mono);
+}
+
+/* A table of words, not of numbers: read from the left, with only what is pressed at the right. */
+.system-table-words th,
+.system-table-words td {
+  text-align: left;
+}
+
+.system-table-words th:last-child,
+.system-table-words td:last-child {
+  text-align: right;
 }
 
 .system-table thead th,

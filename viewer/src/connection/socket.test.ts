@@ -104,8 +104,37 @@ describe('connecting', () => {
     expect(socket().url).toBe('ws://127.0.0.1:8765/api/sessions/default/ws');
     expect(socket().binaryType).toBe('arraybuffer');
     socket().open();
-    expect(socket().sent).toEqual([JSON.stringify({ type: 'auth', token: 'secret-token' })]);
+    expect(socket().sent[0]).toEqual(JSON.stringify({ type: 'auth', token: 'secret-token' }));
     expect(statuses).toEqual(['connecting', 'connected']);
+  });
+
+  it('says whether its page is the one in front, when it connects and whenever that changes', () => {
+    const page = { front: false, listeners: [] as (() => void)[] };
+    const sockets: FakeSocket[] = [];
+    const connection = new SocketConnection({
+      url: 'ws://127.0.0.1:8765/api/sessions/default/ws',
+      token: 'secret-token',
+      createSocket: (url) => {
+        sockets.push(new FakeSocket(url));
+        return sockets[sockets.length - 1];
+      },
+      inFront: {
+        now: () => page.front,
+        onChange: (listener) => {
+          page.listeners.push(listener);
+          return () => page.listeners.splice(page.listeners.indexOf(listener), 1);
+        },
+      },
+    });
+    connection.start({ onEvent: () => {}, onFrame: () => {}, onStatus: () => {}, onCaughtUp: () => {} });
+    sockets[0].open();
+    // Watch mode counts a page only while it is in front (spec 22.7).
+    expect(sockets[0].sent).toEqual([JSON.stringify({ type: 'auth', token: 'secret-token' }), JSON.stringify({ type: 'seen', visible: false })]);
+    page.front = true;
+    for (const listener of page.listeners) listener();
+    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({ type: 'seen', visible: true }));
+    connection.close();
+    expect(page.listeners).toEqual([]);
   });
 
   it('the token is never part of the address', () => {
@@ -247,7 +276,8 @@ describe('commands', () => {
     connection.send({ type: 'pause' });
     socket().open();
     connection.send({ type: 'approve', id: 'a1', scope: 'once' });
-    expect(socket().sent.slice(1)).toEqual([JSON.stringify({ type: 'approve', id: 'a1', scope: 'once' })]);
+    // After the token and whether the page is in front: the command.
+    expect(socket().sent.slice(2)).toEqual([JSON.stringify({ type: 'approve', id: 'a1', scope: 'once' })]);
   });
 });
 
@@ -278,7 +308,7 @@ describe('a lost connection', () => {
     socket().drop();
     vi.advanceTimersByTime(500);
     socket().open();
-    expect(socket().sent).toEqual([JSON.stringify({ type: 'auth', token: 'secret-token' })]);
+    expect(socket().sent[0]).toEqual(JSON.stringify({ type: 'auth', token: 'secret-token' }));
     expect(statuses.at(-1)).toBe('connected');
     socket().drop();
     vi.advanceTimersByTime(500);

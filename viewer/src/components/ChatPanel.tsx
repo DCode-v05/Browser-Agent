@@ -44,6 +44,21 @@ interface Props {
   onSend(text: string): void;
 }
 
+/** Tasks to start from, for someone who does not yet know what to ask: the page's own kind of task. */
+export function Samples({ onPick }: { onPick(task: string): void }) {
+  const L = useWords();
+  return (
+    <div className="chat-samples" role="group" aria-label={W.chat.samplesLead}>
+      <p className="chat-samples-lead">{W.chat.samplesLead}</p>
+      {Object.values(L.chat.samples).map((task) => (
+        <button key={task} type="button" className="chat-sample" aria-label={W.chat.sample(task)} title={W.chat.sampleHint} onClick={() => onPick(task)}>
+          {task}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props) {
   const L = useWords();
   const [draft, setDraft] = useState('');
@@ -81,6 +96,9 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
       <div className="chat-scroll">
         <div className="chat-messages" role="log" aria-label={W.chat.messages}>
           {count === 0 && <p className="chat-empty">{W.chat.empty}</p>}
+          {count === 0 && open && (
+            <Samples onPick={onSend} />
+          )}
           {chat.messages.map((message) => (
             <div key={message.id} className="chat-message" data-role={message.role} data-failed={message.failed || undefined}>
               <span className="chat-who">

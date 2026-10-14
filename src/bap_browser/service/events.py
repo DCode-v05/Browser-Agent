@@ -19,6 +19,9 @@ class Subscriber:
     """One viewer's queue. Events keep their order; a picture not sent yet is replaced by a newer one."""
 
     def __init__(self, limit: int | None) -> None:
+        # Whether the viewer's page is the one in front, as the page last said. A page says so when
+        # it connects and whenever that changes.
+        self.in_front = True
         self._items: deque[Item] = deque()
         self._limit = limit
         self._fell_behind = False
@@ -66,6 +69,11 @@ class EventHub:
     @property
     def viewers(self) -> int:
         return len(self._subscribers)
+
+    @property
+    def watching(self) -> int:
+        """The viewers whose page is the one in front: a page behind another tab is not watched."""
+        return sum(subscriber.in_front for subscriber in self._subscribers)
 
     def publish(self, event: Event, *, keep: bool = True) -> None:
         """Sends an event to every viewer. `keep=False` is for what means nothing to a later viewer."""

@@ -66,8 +66,8 @@ export function HelpPopup({ help, now, ownBrowser, onTakeOver, onCouldNot, onLat
         </p>
         <p className="confirm-consequence">{ownBrowser ? W.help.popup.hintOwnBrowser : W.help.popup.hint}</p>
         <p className="card-note">{W.help.left(timeLeft(help.expiresAt, now))}</p>
-        <div className="confirm-actions">
-          <Button hint={W.buttons.hint.lookFirst} onClick={onLater}>
+        <div className="confirm-actions popup-actions">
+          <Button kind="quiet" hint={W.buttons.hint.lookFirst} onClick={onLater}>
             {W.help.popup.later}
           </Button>
           <Button hint={W.buttons.hint.couldNot} onClick={onCouldNot}>

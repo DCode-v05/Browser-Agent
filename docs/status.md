@@ -1774,6 +1774,39 @@ in CI. The page now leaves first, and the sign-in page it goes to ends the visit
 Not done: a pass over the other pages the teammate's report lists (the chat's cards, the Systems
 page's overview, the sign-in pages). The ones seen on the way looked right and were left.
 
+### 1ba. Built on 2026-10-14: sample tasks, Take over through the helper, watch mode in front, a visual pass
+
+| Asked for | What was built |
+|---|---|
+| Sample prompts built into the page | While a chat is empty it offers three sample tasks of the page's kind. On the computer page: "Open Safari, go to amazon.in and find the best phone under ₹1 lakh", "Which apps are open on this computer?", a shopping list in the text editor. One pressed is given to the agent at once |
+| Take over the system from the engine's page | Where the helper's machine switches it on (`computer.base.helper_hands`, off by default), a person who takes over on the engine's page uses that machine's mouse and keyboard through the helper's `/hand`. Built for macOS |
+| "It shows bap-browser: mention Computer use" | The computer pages name themselves "bap-browser · Computer use": the window's bar, the chat alone, the window's title. Seen on the VM's page from the Mac over the tailnet. A browser's page still says "bap-browser" |
+| Watch mode pauses for a tab behind | A page tells the service whether it is in front, when it connects and whenever that changes. Only a page in front counts as watching |
+| The visual pass | The approval and help pop-ups: "Look first" quiet and apart, the three answers on one line (before, "Allow once" wrapped alone). The Systems overview: "The browsers and the desktop", a "System" column, read from the left. The sign-in pages were looked at and left |
+
+Seen: the unit tests of the hand through the helper, with a real helper served on a port and an
+engine reaching it as over the tailnet; the service test of a viewer behind another tab; pictures of
+the pop-up and the Systems page from the real-browser tests.
+
+Over the real tailnet, with the micro VM's image built again from this code and joined as
+`tag:bap-vm`, from the Mac's browser on the VM's page:
+
+- The Computer page offered "Open Safari, go to amazon.in and find the best phone under ₹1 lakh.",
+  "Which apps are open on this computer?" and the shopping list.
+- After Take over, the note to use the Mac's own mouse was not shown. The pointer at 0.3 and 0.6
+  of the picture put the Mac's real pointer at 0.30 and 0.60 of its screen, read back from macOS.
+  The first try put it at half that: the engine measured against the newest picture of the screen,
+  larger than the size the page was told. It now keeps the size it first told.
+- The helper on the Mac said "A person on the engine's page has this machine's mouse and
+  keyboard", and at Hand back "... has let go". Only moves were made: nothing was pressed or typed
+  on the person's screen.
+- `bap-browser computer chat` with the VM's viewer link opened the chat of the VM's Computer page
+  in the window above every app on the Mac, signed in: "shown: true; above the other apps: true".
+  Before, it dropped the link's token and opened on a sign-in page. The first sample on the VM's
+  page, pressed and sent, was done on the Mac in 85 s with one opening allowed: Safari opened in a
+  new tab, amazon.in was searched up to ₹1,00,000 sorted by customer review, and the answer named
+  the Samsung Galaxy S24 Ultra 5G at ₹99,999 (4.6 from about 9,300 reviews).
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

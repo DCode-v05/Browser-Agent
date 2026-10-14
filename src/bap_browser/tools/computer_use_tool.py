@@ -56,8 +56,8 @@ LOOK_AGAIN = " Capture to see what it changed."
 # Watch mode: what the agent is told when nobody came to watch an app a person must watch.
 UNWATCHED = (
     "{app} is an app the agent works in only while a person watches its page (watch mode). Nobody "
-    "opened the page in {waited} s, so this step was not done. Stop here, and say in your answer that "
-    "the person must open the page for you to go on in {app}."
+    "had the page open and in front for {waited} s, so this step was not done. Stop here, and say in "
+    "your answer that the person must have the page in front for you to go on in {app}."
 )
 NOT_A_WORD = re.compile(r"[^a-z0-9]+")
 # What Hermes' backend says when the driver has stopped answering, or its session is gone. Seen

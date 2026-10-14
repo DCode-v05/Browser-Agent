@@ -85,6 +85,13 @@ async def until_caught_up(socket: ClientConnection) -> list[Any]:
     return items
 
 
+async def until(holds: Callable[[], bool]) -> None:
+    """Waits for the service to have taken in what it was sent."""
+    async with asyncio.timeout(3):
+        while not holds():
+            await asyncio.sleep(0.01)
+
+
 async def closed_with(socket: ClientConnection) -> int | None:
     with pytest.raises(ConnectionClosed):
         await asyncio.wait_for(socket.recv(), 5)
@@ -202,6 +209,22 @@ async def test_what_happens_next_reaches_every_viewer(running: Running) -> None:
             assert (await received(socket))["label"] == 'Clicking "Go"'
             assert (await received(socket))["summary"] == 'Clicked "Go" (button)'
             assert await received(socket) == b"\x01\xff\xd8 next"
+
+
+async def test_a_viewer_behind_another_tab_is_not_watching(running: Running) -> None:
+    """Watch mode (spec 22.7): an open page counts only while it is the one in front, as in
+    OpenAI's Operator, which pauses when the person leaves the tab."""
+    service, session, _ = await running()
+    assert not session.browser.watched()
+    async with connect(socket_address(service)) as socket:
+        await sign_in(socket)
+        await until_caught_up(socket)
+        assert session.browser.watched()
+        await socket.send(json.dumps({"type": "seen", "visible": False}))
+        await until(lambda: not session.browser.watched())
+        await socket.send(json.dumps({"type": "seen", "visible": True}))
+        await until(session.browser.watched)
+    await until(lambda: not session.browser.watched())
 
 
 async def test_nothing_is_sent_before_the_token_and_a_wrong_one_closes_the_connection(

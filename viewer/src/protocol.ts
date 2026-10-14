@@ -147,6 +147,8 @@ export type ClientCommand =
   | { type: 'wheel'; x: number; y: number; dx: number; dy: number }
   | { type: 'select_tab'; id: string }
   | { type: 'task'; text: string }
+  /** Whether the page is the one in front (spec 22.7): watch mode counts only such a page as watched. */
+  | { type: 'seen'; visible: boolean }
   /** Ends the task the agent is on. The session goes on. */
   | { type: 'stop_task' }
   | { type: 'new_session' }

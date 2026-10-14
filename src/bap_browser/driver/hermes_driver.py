@@ -18,6 +18,9 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Any, Literal
 
+from websockets.asyncio.client import ClientConnection, connect
+from websockets.exceptions import WebSocketException
+
 from bap_browser import computer
 from bap_browser.computer import contained
 from bap_browser.config import Config
@@ -128,6 +131,10 @@ class HermesDriver(DesktopDriver):
         # On a Mac's own screen a person's hand on the picture is posted to macOS itself.
         self._macos: Any = None
         self._hand: MacHand | None = None
+        # On a machine elsewhere, the way to its helper's hand while a person has taken over.
+        self.far_hand: ClientConnection | None = None
+        # The size the page was first told, which it measures where a person points in.
+        self.page_size: tuple[int, int] | None = None
         if self._settings.runs == "machine" and (macos is not None or sys.platform == "darwin"):
             self._macos = (macos or MacOS)()
             self._hand = MacHand(
@@ -162,6 +169,7 @@ class HermesDriver(DesktopDriver):
 
     async def close(self) -> None:
         await self.stop_frames()
+        await self.let_go()
         base, self._base = self._base, None
         if base is not None:
             # Stopping the driver waits for it, so it is not done on the loop.
@@ -186,9 +194,15 @@ class HermesDriver(DesktopDriver):
             # that a place on the picture is that place on the screen.
             across, down = self._macos.size()
             return int(across), int(down)
-        if self._last is None:
-            return self._settings.screen_width, self._settings.screen_height
-        return self._last.width, self._last.height
+        if self.page_size is None:
+            # The page works in the size it is told at the start, whatever size a later picture is:
+            # what a person does on the picture is measured against it.
+            self.page_size = (
+                (self._settings.screen_width, self._settings.screen_height)
+                if self._last is None
+                else (self._last.width, self._last.height)
+            )
+        return self.page_size
 
     # What the agent does: one call of Hermes' tool.
 
@@ -198,7 +212,7 @@ class HermesDriver(DesktopDriver):
             raise BrowserError(
                 "The machine's screen is not being driven any more.", reason="the session ended"
             )
-        return await asyncio.to_thread(computer.computer_use, arguments, session or self._session)
+        return await asyncio.to_thread(computer.computer_use, arguments, session or self.session_name)
 
     # Where things are, on a desktop this engine itself started (spec 22.5).
 
@@ -287,7 +301,7 @@ class HermesDriver(DesktopDriver):
         return True
 
     @property
-    def _session(self) -> str:
+    def session_name(self) -> str:
         """The name the base knows the agent's session with the driver by."""
         return f"{self._name}.{self._afresh}" if self._afresh else self._name
 
@@ -335,7 +349,7 @@ class HermesDriver(DesktopDriver):
     async def open_named_app(self, name: str) -> bool:
         if self._base is None:
             return False
-        return await asyncio.to_thread(computer.open_app, name, self._session)
+        return await asyncio.to_thread(computer.open_app, name, self.session_name)
 
     # What a person sees: the whole screen. The viewer has a session of its own with the driver, so
     # that its looking never moves the window the agent is working in.
@@ -359,6 +373,45 @@ class HermesDriver(DesktopDriver):
         from it: on a real machine that gate follows the person's hand (spec 22.3.1)."""
         if self._base is not None:
             await asyncio.to_thread(computer.person_holds, state in A_PERSON_IS_AT_THE_SCREEN)
+        if self._settings.runs == "remote":
+            if state in A_PERSON_IS_AT_THE_SCREEN:
+                await self.reach_out()
+            else:
+                await self.let_go()
+
+    # A machine elsewhere: a person who has taken over on this engine's page uses its mouse and
+    # keyboard through the helper there, where that machine's person allows it (spec 22.6.2).
+
+    async def reach_out(self) -> None:
+        if self.far_hand is not None:
+            return
+        code = os.environ.get(self._settings.helper_token_env, "")
+        there = self._settings.helper_url.rstrip("/").replace("http", "ws", 1) + "/hand"
+        try:
+            self.far_hand = await connect(there, additional_headers={"Authorization": f"Bearer {code}"})
+        except (OSError, WebSocketException, TimeoutError):
+            # That machine's person has not allowed it: the page says to use that machine's own.
+            self.far_hand = None
+
+    async def let_go(self) -> None:
+        hand, self.far_hand = self.far_hand, None
+        if hand is not None:
+            with contextlib.suppress(OSError, WebSocketException):
+                await hand.close()
+
+    async def hand_over(self, what: dict[str, Any]) -> None:
+        """One thing a person did, sent to the machine elsewhere. Where on the picture is sent as a
+        share of it: that machine knows its own screen's size."""
+        hand = self.far_hand
+        if hand is None:
+            return
+        if "x" in what:
+            wide, high = await self.viewport()
+            what = {**what, "x": what["x"] / wide, "y": what["y"] / high}
+        try:
+            await hand.send(json.dumps(what))
+        except (OSError, WebSocketException):
+            self.far_hand = None
 
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         pause = max(self._settings.frame_ms / 1000, 1 / level.max_fps)
@@ -377,28 +430,38 @@ class HermesDriver(DesktopDriver):
     # posted to macOS, where the person allowed that. Anywhere else the person has the machine's own
     # mouse and keyboard, and nothing is sent.
 
-    def _is_its_own(self) -> bool:
+    def is_its_own(self) -> bool:
         return self._settings.runs in ("container", "here") or self._screen is not None
 
     def takes_a_hand(self) -> bool:
         """Whether what a person does on the picture reaches the screen."""
-        return self._is_its_own() or (self._hand is not None and bool(self._macos.allowed()))
+        return (
+            self.is_its_own()
+            or self.far_hand is not None
+            or (self._hand is not None and bool(self._macos.allowed()))
+        )
 
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
-        if self._is_its_own():
+        if self.is_its_own():
             await super().pointer(action, x, y, button)
+        elif self.far_hand is not None:
+            await self.hand_over({"kind": "pointer", "action": action, "x": x, "y": y, "button": button})
         elif self._hand is not None and self.takes_a_hand():
             self._hand.pointer(action, x, y, button)
 
     async def key(self, action: KeyAction, key: str) -> None:
-        if self._is_its_own():
+        if self.is_its_own():
             await super().key(action, key)
+        elif self.far_hand is not None:
+            await self.hand_over({"kind": "key", "action": action, "key": key})
         elif self._hand is not None and self.takes_a_hand():
             self._hand.key(action, key)
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
-        if self._is_its_own():
+        if self.is_its_own():
             await super().wheel(x, y, dx, dy)
+        elif self.far_hand is not None:
+            await self.hand_over({"kind": "wheel", "x": x, "y": y, "dx": dx, "dy": dy})
         elif self._hand is not None and self.takes_a_hand():
             self._hand.pointer("move", x, y, "left")
             self._hand.wheel(dx, dy)

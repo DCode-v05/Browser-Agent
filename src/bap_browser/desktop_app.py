@@ -100,7 +100,7 @@ class DesktopApp:
         """Opens the chat of one page of a service, by the service's address, in the window that
         stays above every other app, and waits until the person closes it. For a person whose
         engine runs elsewhere, in a micro VM: it is their own machine the window belongs on (spec
-        22.6). With no token in the address, the page asks them to sign in."""
+        22.6). The viewer's link signs the window in; with no token in it, the page asks them to sign in."""
         at = urlsplit(service)
         if at.scheme not in ("http", "https") or not at.hostname:
             raise BapError("Give the service's address, beginning with http:// or https://.")
@@ -108,6 +108,9 @@ class DesktopApp:
         if program is None:
             raise BapError("The desktop app is not installed. Run: npm --prefix desktop install")
         chat = f"{at.scheme}://{at.netloc}/?session={quote(page)}&beside"
+        if at.fragment.startswith("token="):
+            # The viewer's link: its token stays after the #, which no server is sent.
+            chat += f"#{at.fragment}"
         env = {name: value for name, value in os.environ.items() if name != RUN_AS_NODE}
         env |= {SIDE_CHAT: chat, SIDE_CHAT_WIDTH: str(width)}
         try:
