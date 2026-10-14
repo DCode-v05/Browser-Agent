@@ -739,7 +739,7 @@ async def test_what_the_agent_sees_and_its_pointer_are_chosen_on_the_computers_o
         pointer = computer.get_by_role("group", name="Show where the agent acts")
         await sees.wait_for()
         assert await sees.locator("input:checked").get_attribute("value") == "som"
-        assert await pointer.locator("input:checked").get_attribute("value") == "auto"
+        assert await pointer.locator("input:checked").get_attribute("value") == "off"
 
         # Every choice of the two is pressed, and each is what the service then holds.
         for group, setting, values in (
