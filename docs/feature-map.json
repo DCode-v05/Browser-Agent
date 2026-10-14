@@ -492,14 +492,19 @@
         "desktop/electron/side.cjs",
         "desktop/electron/side-place.cjs",
         "viewer/src/studio/beside.ts",
-        "viewer/src/studio/rooms.ts"
+        "viewer/src/studio/rooms.ts",
+        "desktop/electron/core-line.cjs",
+        "desktop/src/App.tsx",
+        "src/bap_browser/agent/studio.py"
       ],
       "tests": [
         "tests/unit/test_desktop_app.py",
         "tests/service/test_desktop_door.py",
         "desktop/electron/side-place.test.cjs",
         "viewer/src/studio/beside.test.ts",
-        "viewer/src/studio/rooms.test.ts"
+        "viewer/src/studio/rooms.test.ts",
+        "desktop/electron/core-line.test.cjs",
+        "tests/viewer/test_studio.py"
       ],
       "reach": "The button \"Open desktop app\" in the window's bar. The chat above every app: give a task on the Computer page of a real machine, or press \"Chat beside your screen\" there; from a machine whose engine is elsewhere, `uv run bap-browser computer chat <the service's address>`.",
       "addresses": [

@@ -22,6 +22,8 @@ interface Props {
   view: StateView;
   /** The longest task the service takes. */
   maxChars: number;
+  /** Shown inside another app's page, which has its own name: the chat drops the product's. */
+  embedded?: boolean;
   /** The step whose evidence is open. */
   selected: number | null;
   /** The cards that need a person: an approval, a request for help, a blocked page, the summary. */
@@ -61,7 +63,7 @@ function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number
   );
 }
 
-export function Conversation({ state, view, maxChars, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef }: Props) {
+export function Conversation({ state, view, maxChars, embedded = false, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef }: Props) {
   const L = useWords();
   const [draft, setDraft] = useState('');
   /** The groups of steps a person opened or closed by hand. The rest follow the work. */
@@ -147,9 +149,9 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
     <main className="talk">
       <section className="talk-body" aria-label={W.chat.title} data-status={status}>
       <header className="talk-head">
-        <span className="brand-mark" aria-hidden="true" />
+        {!embedded && <span className="brand-mark" aria-hidden="true" />}
         <h1 className="talk-title" tabIndex={-1} ref={titleRef}>
-          {W.product}
+          {embedded ? W.chat.title : W.product}
         </h1>
         <span className="agent-status" data-status={status} data-testid="agent-status">
           <span className="agent-status-dot" aria-hidden="true" />

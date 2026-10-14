@@ -3561,8 +3561,8 @@ window. Without either, every page is there, as before.</p>
 <li><strong>Where the browser is, said to the model.</strong> Each task from the chat is handed to the model with the
   address the browser is on, so "sign in on this page" means the page the person is looking at.</li>
 <li><strong>The desktop app, from the window.</strong> Where the desktop app of section 14.3 is installed beside the
-  service (<code>server.desktop_dir</code>: its packages are there and its shell is built), the bar has a button,
-  "Open desktop app". It asks the service to start the app (<code>POST /api/desktop</code>, with the token), which
+  service (<code>server.desktop_dir</code>: its packages are there and its shell is built), the row under the bar
+  has a button, "Open desktop app". It asks the service to start the app (<code>POST /api/desktop</code>, with the token), which
   opens in a window of its own with its own browser, its own agent core and its own chat. The app that is
   open is not started a second time; it is ended when the service stops. <code>GET /api/sessions</code> says whether
   there is an app to open (<code>desktop</code>), and the button is not shown when there is none.</li>
@@ -3584,7 +3584,9 @@ its value, and a user tightens it and never loosens it. The settings that are th
 browser's (Colour mode, Show where the agent is acting) are one for the window, whichever system's screen
 they are changed on.</p>
 <p>Who is signed in decides what the window has (section 4.11). The bar says who it is, "Admin" or "User",
-beside "Sign out".</p>
+beside "Sign out", at its end. What can be done from the page shown (Systems, Chat beside your screen,
+Open desktop app) is at the end of the row under the bar, beside that page's views: the bar keeps to
+the product, the pages and who is signed in, and fits on one line on a laptop's screen.</p>
 <p><strong>Each thing is in one place.</strong> What is one browser's is under that browser's tab, and nowhere else.
 What is not one browser's is on the Systems page, which is the admin's. Nothing is set in two places,
 and no screen opens over a page to set it.</p>
@@ -7027,7 +7029,7 @@ repository, is not packaged, and keeps the core on the same machine.</p>
 <tbody>
 <tr>
 <td>The app</td>
-<td>Electron, which ships its own Chromium: that Chromium is the agent's browser. One window: a rail at the left, the agent's browser in the middle, the chat at the right, with a divider that can be dragged</td>
+<td>Electron, which ships its own Chromium: that Chromium is the agent's browser. One window with two pages. The browser page: a rail at the left, the agent's browser in the middle, its chat at the right, with a divider that can be dragged. The computer page: the desktop the agent works on, with its chat, across the room of both</td>
 </tr>
 <tr>
 <td>The shell</td>
@@ -7039,15 +7041,15 @@ repository, is not packaged, and keeps the core on the same machine.</p>
 </tr>
 <tr>
 <td>The core</td>
-<td>Started by the app as a process of its own (<code>bap-browser agent --chat</code>). It attaches to the app's browser through the app's debugging port (<code>browser.cdp_url</code>) and drives the view whose address carries a mark (<code>browser.cdp_target</code>). Every tool, the safety policy and the approvals are the core's, as everywhere</td>
+<td>Started by the app as a process of its own: the studio with the app's two pages, <code>bap-browser studio --desktop --dev</code> (<code>--dev</code> because its token is the run's own, made by the app and shown to nobody). It attaches to the app's browser through the app's debugging port (<code>browser.cdp_url</code>) and drives the view whose address carries a mark (<code>browser.cdp_target</code>). Every tool, the safety policy and the approvals are the core's, as everywhere</td>
 </tr>
 <tr>
 <td>The chat</td>
-<td>The session's viewer, shown as the conversation of section 9.14</td>
+<td>Each page of the studio as a guest of the app: <code>?session=builtin&amp;embed=1</code> beside the browser, <code>?session=computer&amp;embed=1</code> for the computer</td>
 </tr>
 <tr>
 <td>Rail</td>
-<td>Opens the start page or one of the demo sites in the agent's browser, and shows whether the core is running. When the core stops, the chat's place says why in the core's own words, and offers to start it again</td>
+<td>Switches between the browser page and the computer page, opens one of the demo sites in the agent's browser, and shows whether the core is running. When the core stops, the chat's place says why in the core's own words, and offers to start it again</td>
 </tr>
 <tr>
 <td>Run</td>

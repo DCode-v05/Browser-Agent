@@ -649,6 +649,12 @@ describe('inside a client', () => {
     expect(screen.getByText('bap-browser')).toBeInTheDocument();
   });
 
+  it('drops it from the chat alone too, beside a browser another page shows', () => {
+    show('beside', { embedded: true });
+    expect(screen.queryByText('bap-browser')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Chat' })).toBeInTheDocument();
+  });
+
   it('names the agent and the browser in use', () => {
     show('agent');
     expect(screen.getByText('Claude Code')).toBeInTheDocument();

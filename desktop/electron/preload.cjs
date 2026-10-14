@@ -24,4 +24,8 @@ contextBridge.exposeInMainWorld('desktop', {
   startAgain() {
     ipcRenderer.send('start-again');
   },
+  /** Which page the window shows: the agent's browser and its chat, or the computer. */
+  show(page) {
+    ipcRenderer.send('show', page);
+  },
 });

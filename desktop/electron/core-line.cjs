@@ -16,11 +16,33 @@ function errorOf(line) {
 }
 
 /**
- * Where the chat is shown from: the viewer as a guest of the app, which drops its own product name.
- * The token stays in the fragment, which no server is sent.
+ * Where one page of the studio is shown from: its browser's chat, or the computer. It is the viewer as
+ * a guest of the app, which drops its own product name. The token stays in the fragment, which no
+ * server is sent.
  */
-function chatAddress(viewer) {
-  return `${viewer.origin}/?embed=1#token=${viewer.token}`;
+function chatAddress(viewer, page) {
+  return `${viewer.origin}/?session=${encodeURIComponent(page)}&embed=1#token=${viewer.token}`;
+}
+
+/**
+ * How the core is started: the studio with the desktop app's two pages (spec 14.3), its own browser,
+ * which the core drives by attaching to it, and the computer. `--dev`: the core's token is this run's
+ * own, made by the app and shown to nobody, so it stays the admin's after a password is set.
+ */
+function coreArguments(repository) {
+  return ['run', '--project', repository, 'bap-browser', 'studio', '--desktop', '--dev'];
+}
+
+/** The room two views take together, side by side: the computer is shown there. */
+function around(one, other) {
+  const x = Math.min(one.x, other.x);
+  const y = Math.min(one.y, other.y);
+  return {
+    x,
+    y,
+    width: Math.max(one.x + one.width, other.x + other.width) - x,
+    height: Math.max(one.y + one.height, other.y + other.height) - y,
+  };
 }
 
 /** A rectangle the app's window can place a view at: whole pixels, never negative. */
@@ -29,4 +51,10 @@ function placeable(rect) {
   return { x: whole(rect?.x), y: whole(rect?.y), width: whole(rect?.width), height: whole(rect?.height) };
 }
 
-module.exports = { viewerOf, errorOf, chatAddress, placeable };
+/** Whether the studio has a session on each of these pages, from its answer to `/api/sessions`. */
+function sessionsUp(answer, names) {
+  const sessions = Array.isArray(answer?.sessions) ? answer.sessions : [];
+  return names.every((name) => sessions.some((session) => session?.id === name));
+}
+
+module.exports = { viewerOf, errorOf, chatAddress, placeable, coreArguments, around, sessionsUp };

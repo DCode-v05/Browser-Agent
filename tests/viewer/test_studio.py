@@ -141,6 +141,20 @@ async def test_a_browser_alone_has_no_admin_tools_beside_its_pages(
         assert await page.get_by_role("button", name="Open desktop app").count() == 0
 
 
+async def test_the_desktop_apps_studio_runs_its_two_pages(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    """`studio --desktop`, which the desktop app starts (spec 14.3): its own browser and the computer,
+    and nothing else. Each runs; the studio does not stop for want of the other two."""
+    async with window(
+        make_config, tmp_path, browser, lambda: ScriptedModel([]), rooms_mode="desktop"
+    ) as opened:
+        rooms = await asyncio.to_thread(opened.rooms)
+        assert [room["id"] for room in rooms] == ["builtin", "computer"]
+        await opened.room("builtin", "agent")
+        assert not opened.running.done()
+
+
 async def test_the_window_has_a_page_for_each_browser(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
