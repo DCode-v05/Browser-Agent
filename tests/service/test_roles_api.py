@@ -126,11 +126,22 @@ class Window:
 
     async def signed_in(self, role: str) -> str:
         """Sets both passwords, as the admin would, and signs in as `role`."""
+        admin_token: str | None = OPERATOR
         for whose, password in (("admin", ADMINS), ("user", USERS)):
             if not self.accounts.has(whose):  # type: ignore[arg-type]
-                assert (await self.ask("POST", "/api/auth/password", {"role": whose, "password": password}))[
-                    0
-                ] == 200
+                assert (
+                    await self.ask(
+                        "POST", "/api/auth/password", {"role": whose, "password": password}, token=admin_token
+                    )
+                )[0] == 200
+                if whose == "admin":
+                    # Once the admin's password exists, the operator's token may no longer
+                    # speak for the admin (spec 4.11): sign in with the password just made.
+                    status, said = await self.ask(
+                        "POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None
+                    )
+                    assert status == 200
+                    admin_token = said["token"]
         password = ADMINS if role == "admin" else USERS
         status, said = await self.ask(
             "POST", "/api/auth/sign-in", {"role": role, "password": password}, token=None
@@ -184,7 +195,11 @@ async def window(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIte
     opened: list[Window] = []
 
     async def open_one(
-        *, with_accounts: bool = True, clock: Callable[[], float] | None = None, **sections: Any
+        *,
+        with_accounts: bool = True,
+        clock: Callable[[], float] | None = None,
+        dev: bool = False,
+        **sections: Any,
     ) -> Window:
         config = make_config(tmp_path, **sections)
         settings = SettingsStore(config)
@@ -205,6 +220,7 @@ async def window(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIte
             rooms=running.described,
             systems=running,
             accounts=accounts if with_accounts else None,
+            dev=dev,
         )
         await service.start()
         opened.append(Window(service, sessions, settings, accounts, running, config))
@@ -247,9 +263,32 @@ async def test_the_first_time_the_admins_password_is_made_with_the_services_own_
         200,
         {"admin_set": True, "user_set": False},
     )
+    # The password now exists: the operator's token no longer speaks for the admin.
+    status, said = await one.ask(
+        "POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None
+    )
+    assert status == 200
+    admin_token = said["token"]
     for not_a_request in ({"role": "owner", "password": ADMINS}, {"password": ADMINS}, None):
-        assert (await one.ask("POST", "/api/auth/password", not_a_request))[0] == 400
+        assert (await one.ask("POST", "/api/auth/password", not_a_request, token=admin_token))[0] == 400
         assert (await one.ask("POST", "/api/auth/sign-in", not_a_request, token=None))[0] == 400
+
+
+async def test_the_operators_token_stops_signing_in_as_admin_once_a_password_is_set(window: Open) -> None:
+    one = await window()
+    # Before a password exists, the operator's token is the only way in: it still works.
+    assert (await one.ask("GET", "/api/auth"))[1]["role"] == "admin"
+    await one.ask("POST", "/api/auth/password", {"role": "admin", "password": ADMINS})
+    # Once a real password is set, the operator's token no longer bypasses sign-in.
+    assert (await one.ask("GET", "/api/auth"))[1]["role"] is None
+    assert (await one.ask("GET", "/api/sessions"))[0] == 401
+
+
+async def test_dev_keeps_the_operators_bypass_after_a_password_is_set(window: Open) -> None:
+    one = await window(dev=True)
+    await one.ask("POST", "/api/auth/password", {"role": "admin", "password": ADMINS})
+    assert (await one.ask("GET", "/api/auth"))[1]["role"] == "admin"
+    assert (await one.ask("GET", "/api/sessions"))[0] == 200
 
 
 async def test_the_admin_and_the_user_each_sign_in_their_own_way(window: Open) -> None:
@@ -312,11 +351,12 @@ async def test_what_is_the_admins_alone_is_refused_to_a_user(window: Open) -> No
         assert (await one.ask(method, path, body, token=None))[0] == 401, path
     assert one.running.asked == [] and one.settings.user_sees("cost")
     assert one.accounts.sign_in("user", USERS), "the users' password is still the one the admin set"
-    # The admin may. So may whoever holds the service's own token.
-    for token in (admin, OPERATOR):
-        assert (await one.ask("GET", "/api/admin/policy", token=token))[0] == 200
-        assert (await one.ask("GET", "/api/evals", token=token))[1]["tasks"] == {"count": 3}
-        assert (await one.ask("GET", "/api/systems/cloud/log", token=token))[0] == 200
+    # The admin may.
+    assert (await one.ask("GET", "/api/admin/policy", token=admin))[0] == 200
+    assert (await one.ask("GET", "/api/evals", token=admin))[1]["tasks"] == {"count": 3}
+    assert (await one.ask("GET", "/api/systems/cloud/log", token=admin))[0] == 200
+    # The service's own token no longer speaks for the admin once a real password is set.
+    assert (await one.ask("GET", "/api/admin/policy", token=OPERATOR))[0] == 401
 
 
 async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Open) -> None:
@@ -355,7 +395,9 @@ async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Ope
 
 async def test_a_viewer_that_may_no_longer_be_on_a_browser_is_shown_out(window: Open) -> None:
     now = [1000.0]
-    one = await window(clock=lambda: now[0], auth={"session_hours": 1})
+    # --dev: this test's last check is that the service's own token has no session that times
+    # out, which only holds once a password is set when --dev keeps the bypass alive.
+    one = await window(clock=lambda: now[0], auth={"session_hours": 1}, dev=True)
     admin = await one.signed_in("admin")
 
     async def nothing() -> None:

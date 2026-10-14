@@ -269,6 +269,9 @@
       "source": [
         "src/bap_browser/service/accounts.py",
         "src/bap_browser/service/app.py",
+        "src/bap_browser/service/server.py",
+        "src/bap_browser/agent/window.py",
+        "src/bap_browser/cli.py",
         "viewer/src/auth/SignIn.tsx",
         "viewer/src/auth/api.ts",
         "viewer/src/systems/UserSettings.tsx"
@@ -278,7 +281,7 @@
         "tests/service/test_roles_api.py",
         "tests/viewer/test_roles.py"
       ],
-      "reach": "The admin at `<service>/admin`, a user at `<service>/`. The first time, the link the service prints makes the admin's password.",
+      "reach": "The admin at `<service>/admin`, a user at `<service>/`. The first time, the link the service prints makes the admin's password. `bap-browser studio --dev` keeps the service's own token admin after a password is set.",
       "addresses": [
         "/admin",
         "/api/auth",

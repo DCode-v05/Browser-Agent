@@ -1975,6 +1975,31 @@ lint`, `run test` (624 passed via `--pool=threads`; the default forks pool times
 Windows path, unrelated to this change) and `run build` all pass. The Studio page and the rest are not
 done in this pass.
 
+## Take-over UX on a person's own machine, checked
+
+Asked to fix three things for `computer_use` on a person's own machine: input taking over the
+person's pointer, and a task being refused while one runs. All three turned out already built, so
+nothing but a test was added.
+
+- Background delivery stays the default: `delivery_for()` (`tools/computer_use_tool.py`) sends
+  `auto` to the foreground only when nobody is at the screen (`runs` in `container`/`here`, or
+  `virtual_screen`), never for `runs == "machine"`. Already proven by
+  `test_input_is_in_the_background_only_where_a_person_is_at_the_screen`.
+- The working indicator (`.chat-working` in `ChatPanel.tsx`) sits inside the chat log, never over
+  the browser pane or a control, and `Studio.tsx` renders every room's chat through the same `App`,
+  so the Computer room gets it too.
+- A task sent while one runs was already accepted: `ServiceSession.give_task()` never checks
+  `busy`, and `next_task()` drains an `asyncio.Queue` one task at a time. The chat's placeholder
+  already reads "Add the next task" while the agent works. No test proved the mid-run case
+  directly, so `tests/unit/test_chat.py::test_a_task_sent_while_one_runs_is_accepted_and_queued`
+  was added; it passes without any production change.
+
+`uv run pytest tests/unit -q`: 1789 passed, 7 failed — the two known Windows-only failures
+(`test_accounts.py`, `test_evals.py`) plus five in `test_doctor.py` that are unrelated to this
+change (a browser-launch check this machine's doctor cannot pass) and untouched by the diff.
+`uv run ruff format --check src tests` and `uv run ruff check src tests`: both clean. The viewer
+was not touched, so its checks were not run.
+
 ## `studio --browser` and `studio --desktop`
 
 Added 2026-10-14. Two flags on `bap-browser studio` narrow which pages the window has, for a
@@ -1992,6 +2017,21 @@ core already does for `bap-browser agent --chat`. The app itself does not yet st
 show Computer as a second pane with a rail to switch to it — that is the desktop app's own piece of
 this work, not done yet. See `docs/plans/2026-10-14-production-ux-pass.md` for the fuller plan this
 is one piece of.
+
+## `studio --dev`
+
+Added 2026-10-14. The service's own operator token (printed at startup, or `BAP_BROWSER_TOKEN`)
+used to speak as the admin forever, even after a real admin password was set. Now it does so only
+until a password exists; after that, only a password signs in, unless the service was started with
+`--dev` (spec 4.11). `agent --chat` and plain `serve` have no accounts at all today (spec 4.11, "a
+service nobody signs in to"), so `--dev` was wired into `studio` alone, the one command that builds
+an `Accounts` and passes it to the service.
+
+Changed: `src/bap_browser/service/app.py` (`create_app`'s `role_of`), `src/bap_browser/service/server.py`
+and `src/bap_browser/agent/window.py` (both thread `dev` through), `src/bap_browser/cli.py` (the
+`--dev` flag). Tests: `tests/service/test_roles_api.py` gained two cases, for the default and for
+`--dev`, and its `signed_in` test helper now re-signs in as the admin once a password exists, since
+the operator token it used to reuse no longer qualifies.
 
 ## Documents
 
