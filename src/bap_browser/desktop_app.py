@@ -72,6 +72,24 @@ class DesktopApp:
             raise BapError(f"The desktop app could not be started: {failed}") from failed
         return True
 
+    def open_until_closed(self) -> int:
+        """Opens the app's window and waits until the person closes it: run directly, not from
+        inside the window of three browsers, so there is no other service's state file to keep
+        apart from."""
+        program = self.program()
+        if program is None or not self.there:
+            raise BapError(
+                "The desktop app is not installed. Run: npm --prefix desktop install, "
+                "then npm --prefix desktop run build"
+            )
+        env = {name: value for name, value in os.environ.items() if name != RUN_AS_NODE}
+        try:
+            return subprocess.run(
+                [str(program), str(self._folder)], cwd=self._folder, env=env, check=False
+            ).returncode
+        except OSError as failed:
+            raise BapError(f"The desktop app could not be started: {failed}") from failed
+
     def chat_beside(self, address: str, width: int) -> bool:
         """Opens the chat of one page in a narrow window that stays above every other app (spec
         22.3.1), at the right edge of the screen. `address` is that chat alone, signed in. False

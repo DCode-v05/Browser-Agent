@@ -96,6 +96,9 @@ function startCore() {
       BAP_BROWSER_TOKEN: crypto.randomBytes(24).toString('base64url'),
       BAP_BROWSER__BROWSER__CDP_URL: `http://127.0.0.1:${DEBUG_PORT}`,
       BAP_BROWSER__BROWSER__CDP_TARGET: AGENT_MARK,
+      // Marks this one as the app's own backend, so it serves the backend instead of opening
+      // the app a second time (cli.py's `_studio` checks for it).
+      BAP_BROWSER_DESKTOP_APP_CORE: '1',
     },
     stdio: ['ignore', 'ignore', 'pipe'],
     windowsHide: true,

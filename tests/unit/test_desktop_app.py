@@ -108,6 +108,42 @@ def test_closing_an_app_that_was_never_opened_does_nothing(tmp_path: Path) -> No
     app_in(tmp_path).close()
 
 
+# Stands in for the app when run directly, not beside an admin studio: no state file override,
+# and it ends on its own with a code of its own, instead of waiting to be closed.
+MAIN_THAT_ENDS = """
+import json, os, sys
+from pathlib import Path
+
+Path(__file__).parent.joinpath("started.json").write_text(
+    json.dumps({"as_node": os.environ.get("ELECTRON_RUN_AS_NODE"), "state_file": os.environ.get("BAP_BROWSER__SERVER__STATE_FILE")}),
+    encoding="utf-8",
+)
+sys.exit(7)
+"""
+
+
+def test_opening_the_app_by_itself_waits_for_it_and_gives_its_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Run directly (not opened from inside the window of three browsers), there is no other
+    service's state file to keep apart from: none is set for it."""
+    (tmp_path / "__main__.py").write_text(MAIN_THAT_ENDS, encoding="utf-8")
+    monkeypatch.setattr(DesktopApp, "program", lambda self: Path(sys.executable))
+    monkeypatch.setenv("ELECTRON_RUN_AS_NODE", "1")
+    app = app_in(tmp_path)
+
+    assert app.open_until_closed() == 7
+
+    told = started(tmp_path)
+    assert told["as_node"] is None, "with it, Electron would run as Node and open no window"
+    assert told["state_file"] is None
+
+
+def test_opening_the_app_by_itself_with_no_app_installed_says_how_to_install_it(tmp_path: Path) -> None:
+    with pytest.raises(BapError, match="npm --prefix desktop install"):
+        app_in(tmp_path, built=False).open_until_closed()
+
+
 # Stands in for the side chat: it says what it was started with, and stays open until it is ended.
 SIDE_STAND_IN = """
 import json, os, sys, threading
