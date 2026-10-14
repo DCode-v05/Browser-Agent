@@ -2243,6 +2243,27 @@ and `src/bap_browser/agent/window.py` (both thread `dev` through), `src/bap_brow
 `--dev`, and its `signed_in` test helper now re-signs in as the admin once a password exists, since
 the operator token it used to reuse no longer qualifies.
 
+## Arrangement D, the Windows side: a remote engine drives this machine
+
+Proven 2026-10-14, the piece the team box's own guide names as "a teammate's": a `bap-browser studio`
+run on the team box (`65.0.185.119`, a fresh instance, isolated in `~/win-arrangement-d`, no files of
+the box's own active work touched) drove this real Windows machine's own screen through
+`bap-browser computer helper --this-machine-alone`, reached over a reverse SSH tunnel
+(`ssh -R 8796:127.0.0.1:8796`) instead of Tailscale: the helper's own trust check already treats a
+caller whose connection looks like it came from `127.0.0.1` as local, which an SSH tunnel's far end
+genuinely is, so no tailnet key was needed on a box other people are actively using. No code changed;
+this was wiring already shipped (`computer.runs=remote`, the helper's `--this-machine-alone` flag).
+
+A real task, sent over the viewer's own WebSocket protocol (`{"type":"task","text":"..."}` after
+`{"type":"auth","token":...}`), ran end to end: the agent looked at the real screen, opened the text
+editor (failing once on "Notepad" before correcting itself to the app's own name, "Text editor"),
+typed `hello from the VM`, and said so. `tasklist` on this machine then showed a real `Notepad.exe`
+window. `computer.runs` reached `"agent"` in `/api/sessions` throughout.
+
+Not yet done: the same proof through the viewer's own UI rather than a raw WebSocket script (the
+Claude-in-Chrome extension was not connected this session); take-over with this machine's own hand,
+the way `computer.base.helper_hands` already does for the Mac.
+
 ## Documents
 
 | File | What it is |
