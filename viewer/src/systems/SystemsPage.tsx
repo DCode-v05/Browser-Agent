@@ -133,9 +133,11 @@ export function SystemPanel({ api, system: id, view, role, me, onPrefer, surface
         </p>
       )}
       {!system ? (
-        <p className="systems-note" role="status">
-          {failed ? W.systems.unreachable : W.systems.loading}
-        </p>
+        <div className="systems-empty">
+          <p className="systems-note" role="status">
+            {failed ? W.systems.unreachable : W.systems.loading}
+          </p>
+        </div>
       ) : (
         <div className="systems-grid" data-single="true">
           {view === 'evaluations' ? (
@@ -222,11 +224,21 @@ export function SystemsPage({ api, pollMs, wordFor, passwords, onOpen }: PagePro
         </div>
       </header>
       {systems === null ? (
-        <p className="systems-note" role="status">
-          {failed ? W.systems.unreachable : W.systems.loading}
-        </p>
+        <div className="systems-empty">
+          <p className="systems-note" role="status">
+            {failed ? W.systems.unreachable : W.systems.loading}
+          </p>
+        </div>
       ) : view === 'users' ? (
-        policy && <Access policy={policy} systems={systems} onPolicy={(changes) => void changePolicy(changes)} passwords={passwords} onOpen={(id) => onOpen(id, 'configuration')} />
+        policy ? (
+          <Access policy={policy} systems={systems} onPolicy={(changes) => void changePolicy(changes)} passwords={passwords} onOpen={(id) => onOpen(id, 'configuration')} />
+        ) : (
+          <div className="systems-empty">
+            <p className="systems-note" role="status">
+              {W.systems.loading}
+            </p>
+          </div>
+        )
       ) : (
         <>
           <BrowsersCard systems={systems} policy={policy} wordFor={wordFor} onOpen={onOpen} />
