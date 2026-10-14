@@ -9743,8 +9743,8 @@ reached, or a person stops the session. The answer is the only thing written to 
 | <code>--show-browser</code> | Runs the browser in a window on this screen (<code>browser.headless</code> off, the page as large as the window), so the agent is seen working in it. The viewer then shows no picture of the browser and becomes the chat beside it (section 9.14) |</p>
 <p>Without <code>--demo</code> the loop calls the hosted model named by <code>agent.provider</code>: OpenAI's over the
 Responses API (<code>openai</code>, the default, <code>gpt-5.6-luna</code>), or Anthropic's over the Messages API
-(<code>anthropic</code>), with the key read from <code>agent.api_key_env</code> (<code>OPENAI_API_KEY</code> or <code>CLAUDE_API_KEY</code>).
-Put a line <code>OPENAI_API_KEY=...</code> or <code>CLAUDE_API_KEY=...</code> in a file named <code>.env</code> in the folder the
+(<code>anthropic</code>), with the key read from <code>agent.api_key_env</code> (<code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>).
+Put a line <code>OPENAI_API_KEY=...</code> or <code>ANTHROPIC_API_KEY=...</code> in a file named <code>.env</code> in the folder the
 command is run from. With no key, the command says so and says how to set one. Nothing of the
 conversation is stored at either provider: OpenAI's calls go with <code>store: false</code> and the model's own
 reasoning comes back to it encrypted on each turn; Anthropic's calls send back every content block

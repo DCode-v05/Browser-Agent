@@ -150,10 +150,25 @@ Proven without a tailnet:
 - The engine drives a Mac through the helper on the same machine (`scripts/ladder.py --through-helper`).
 - The chat's window opens above every app on this Mac and says where it stands.
 
+Proven over a real tailnet on 2026-10-14, with the Mac alone on it:
+
+- The helper published with `tailscale serve --bg --http=8796 http://127.0.0.1:8796` answered at
+  the Mac's tailnet name. From the LAN address it did not answer at all.
+- Called by its tailnet name with the right pairing code, from a machine that is not `tag:bap-vm`,
+  it said "The helper does not allow this machine". Tailscale's own word of who called is what it
+  checked.
+- With the Mac's own login let in for the test, an engine with `computer.runs: remote` and
+  `helper_url` set to the tailnet name climbed the whole ladder: captures of TextEdit in three
+  modes, typing found in the app, Stickies (not allowed) refused, Take over held, 14 pictures of
+  the screen streamed.
+
 Not proven:
 
-- Anything over a real tailnet: the join, the grants, `tailscale serve` on the Mac, the HTTPS
-  certificate of the helper's name as the link sees it through the proxy.
+- The Linux box on the tailnet: its join in userspace mode, `tag:bap-vm`, the grant to port 8796,
+  and the link through its proxy over the real network.
+- HTTPS: the tailnet's HTTPS certificates are off, so the helper was published over HTTP. Inside
+  the tailnet that traffic is still encrypted by WireGuard. The viewer on the box needs them on
+  (`deploy/vm-start.sh` serves it with `--https=443`).
 - The speed of the live picture across the tailnet.
 - The Anthropic provider against the real service.
 - Take over from the viewer of a Mac reached through the helper. With the engine on the Mac itself

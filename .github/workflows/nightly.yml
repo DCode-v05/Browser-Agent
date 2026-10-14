@@ -1,8 +1,8 @@
 name: nightly task sets
 # The task sets of the browser, run with the model once a night (spec 12.7). They call a model and
 # cost money, so they are not run on every change: CI runs the reference solutions instead.
-# It needs the model's key as a secret of the repository, OPENAI_API_KEY. Without it, it says so and
-# runs nothing.
+# It runs on Claude, and needs the key as a secret of the repository, ANTHROPIC_API_KEY. Without it,
+# it says so and runs nothing.
 on:
   schedule:
     - cron: "30 1 * * *"
@@ -19,14 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      BAP_BROWSER__AGENT__PROVIDER: anthropic
+      BAP_BROWSER__AGENT__MODEL: claude-opus-5-5
+      BAP_BROWSER__AGENT__API_KEY_ENV: ANTHROPIC_API_KEY
+      BAP_BROWSER__AGENT__BASE_URL: https://api.anthropic.com/v1
       BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"
     steps:
       - name: Whether the key is set
         id: key
         run: |
-          if [ -n "$OPENAI_API_KEY" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else
-            echo "OPENAI_API_KEY is not a secret of this repository. Nothing is run."; fi
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else
+            echo "ANTHROPIC_API_KEY is not a secret of this repository. Nothing is run."; fi
       - uses: actions/checkout@v4
         if: steps.key.outputs.set == 'true'
       - uses: astral-sh/setup-uv@v6
