@@ -1860,6 +1860,12 @@ On the Mac, `bap-browser usage` said:
 | Computer use | 31 | 206 | 1,566,377 | 17,369 | $2.7768 * |
 | All four systems | 42 | 275 | 2,073,049 | 21,485 | $2.9830 * |
 
+Later that evening the same three tasks were run on My Chrome and the Built-in browser: 3 tasks,
+157,513 tokens in and $0.6613 on My Chrome; 3 tasks, 172,494 in and $0.7338 on the Built-in
+browser; $4.3781 for all four systems. The answers agreed, but the Built-in browser's agent later
+said it had made up a description that was right, and My Chrome flagged an ordinary Wikipedia
+article as holding hidden instructions (see `docs/reports/2026-10-14-mac-linux-four-arrangements.md`).
+
 The `*` is the 29 older tasks of `gpt-5.6-luna`, which has no price here. On the team box, the same
 sum over its records: the engine 4 tasks, 81,778 tokens in, $0.3545; the desktop 4 tasks, 238,174
 in, $0.9985.
