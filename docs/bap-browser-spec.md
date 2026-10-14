@@ -1651,6 +1651,20 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 | My Chrome | `takeover_chrome` | A tab of the person's own Chrome, through the extension (section 4.9) | Until the extension has dialled in: how to load it, with its folder to copy. Then the chat; the person watches the browser itself |
 | Built-in browser | `bundled_chromium` | A browser of the app's own that keeps its sign-ins in a profile of its own (`<data_dir>/built-in-browser`), apart from the other two | The live picture, the chat, the steps |
 
+A fourth page, Computer, is the contained desktop of computer use (section 21); it is on every
+window, and is driven the same way as a browser's own page.
+
+Two flags narrow which pages there are and switch off the admin's own tools (Systems,
+Configuration, Evaluations) beside them, for a deployment that is one kind alone:
+
+| Flag | Pages |
+|---|---|
+| `--browser` | The three browsers above and Computer. No admin tools, and no "Open desktop app" |
+| `--desktop` | The desktop app's own browser (`bundled_chromium`, attached to the window the app itself shows) and Computer alone. For the desktop app (section 14.3) to start as its own core; not meant to be opened by a person directly |
+
+Neither flag changes a page's own backend or behaviour; they only say which pages are on the
+window. Without either, every page is there, as before.
+
 - **The tabs.** A bar above the page has one tab for each browser, with a word and a colour for where it
   stands: Ready, Working, Needs you, You're in control, Paused, Stopped, and for a page with no session
   Starting, Not connected or Could not start. A page whose agent waits for the person says so on its tab,
@@ -1693,8 +1707,9 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 - The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (`/demo-site/members.html`).
 
-Not built yet: the same window inside the desktop app (it shows one browser of its own), and a micro VM
-for the cloud browser's page.
+`studio --desktop` serves what the desktop app's own window needs (its browser, attached by
+`cdp_url`, and Computer); the app itself showing both as panes of its own, with a rail to switch
+between them, is not built yet. Also not built yet: a micro VM for the cloud browser's page.
 
 ### 9.17 The three browsers as systems
 

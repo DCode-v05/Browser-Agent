@@ -3499,6 +3499,30 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 </tr>
 </tbody>
 </table></div>
+<p>A fourth page, Computer, is the contained desktop of computer use (section 21); it is on every
+window, and is driven the same way as a browser's own page.</p>
+<p>Two flags narrow which pages there are and switch off the admin's own tools (Systems,
+Configuration, Evaluations) beside them, for a deployment that is one kind alone:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Pages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--browser</code></td>
+<td>The three browsers above and Computer. No admin tools, and no "Open desktop app"</td>
+</tr>
+<tr>
+<td><code>--desktop</code></td>
+<td>The desktop app's own browser (<code>bundled_chromium</code>, attached to the window the app itself shows) and Computer alone. For the desktop app (section 14.3) to start as its own core; not meant to be opened by a person directly</td>
+</tr>
+</tbody>
+</table></div>
+<p>Neither flag changes a page's own backend or behaviour; they only say which pages are on the
+window. Without either, every page is there, as before.</p>
 <ul>
 <li><strong>The tabs.</strong> A bar above the page has one tab for each browser, with a word and a colour for where it
   stands: Ready, Working, Needs you, You're in control, Paused, Stopped, and for a page with no session
@@ -3542,8 +3566,9 @@ backends of section 4.3, side by side, each with a session and a chat of its own
 <li>The demo site has a page made for showing this: a members' area with a sign-in and a human check
   (<code>/demo-site/members.html</code>).</li>
 </ul>
-<p>Not built yet: the same window inside the desktop app (it shows one browser of its own), and a micro VM
-for the cloud browser's page.</p>
+<p><code>studio --desktop</code> serves what the desktop app's own window needs (its browser, attached by
+<code>cdp_url</code>, and Computer); the app itself showing both as panes of its own, with a rail to switch
+between them, is not built yet. Also not built yet: a micro VM for the cloud browser's page.</p>
 <h3 id="917-the-three-browsers-as-systems">9.17 The three browsers as systems</h3>
 <p>Each browser of the window is a <strong>system</strong>: it is set up by itself, managed by itself, writes a log of
 its own and keeps a record of its own tasks. The names are those of the pages: <code>cloud</code>, <code>chrome</code>,

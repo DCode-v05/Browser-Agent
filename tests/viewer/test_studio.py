@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from playwright.async_api import Browser, Locator, Page, async_playwright
@@ -92,6 +92,7 @@ async def window(
     tmp_path: Path,
     browser: Browser,
     model: Callable[[], Any],
+    rooms_mode: Literal["full", "browser", "desktop"] = "full",
     **sections: Any,
 ) -> AsyncIterator[Window]:
     folder = browser_extension.install(tmp_path / "state" / "extension")
@@ -99,7 +100,9 @@ async def window(
     # the developer may have running.
     config = make_config(tmp_path, server={"state_file": str(tmp_path / "service.json")}, **sections)
     running = asyncio.create_task(
-        run_studio(config, lambda service: model(), open_viewer=False, extension=folder)
+        run_studio(
+            config, lambda service: model(), open_viewer=False, extension=folder, rooms_mode=rooms_mode
+        )
     )
     state = Path(config.server.state_file)
     try:
@@ -110,8 +113,9 @@ async def window(
         viewer = json.loads(state.read_text(encoding="utf-8"))["viewer"]
         page = await browser.new_page(viewport={"width": 1360, "height": 850})
         opened = Window(viewer, viewer.split("#token=")[1], folder, page, running)
-        await opened.room("cloud", "agent")
-        await opened.room("builtin", "agent")
+        if rooms_mode != "desktop":
+            await opened.room("cloud", "agent")
+            await opened.room("builtin", "agent")
         await page.goto(viewer)
         await page.get_by_role("tablist", name="Where the agent works").wait_for()
         yield opened
@@ -119,6 +123,21 @@ async def window(
     finally:
         running.cancel()
         await asyncio.gather(running, return_exceptions=True)
+
+
+async def test_a_browser_alone_has_no_admin_tools_beside_its_pages(
+    make_config: Callable[..., Config], tmp_path: Path, browser: Browser
+) -> None:
+    """`studio --browser`: the three browsers and computer use, same as always, but none of the
+    admin's own tools, and no way to open the desktop app from inside it (spec 9.16)."""
+    async with window(
+        make_config, tmp_path, browser, lambda: ScriptedModel([]), rooms_mode="browser"
+    ) as opened:
+        rooms = await asyncio.to_thread(opened.rooms)
+        assert [room["id"] for room in rooms] == ["cloud", "chrome", "builtin", "computer"]
+        page = opened.page
+        assert await page.get_by_role("button", name="Systems").count() == 0
+        assert await page.get_by_role("button", name="Open desktop app").count() == 0
 
 
 async def test_the_window_has_a_page_for_each_browser(

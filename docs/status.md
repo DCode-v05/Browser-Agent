@@ -1879,6 +1879,24 @@ the team's Linux box with rootless Docker (no sudo, `get.docker.com/rootless`, `
 the desktop's `computer` room reaches `agent` with the terminal off, the default. The existing e2e
 test (`tests/e2e/test_computer.py`) and the unit tests pass unchanged on a real, rootful Docker too.
 
+## `studio --browser` and `studio --desktop`
+
+Added 2026-10-14. Two flags on `bap-browser studio` narrow which pages the window has, for a
+deployment that is a browser alone or the desktop app alone (spec 9.16):
+
+| Flag | Pages | Admin tools (Systems, Configuration, Evaluations) |
+|---|---|---|
+| (neither) | Cloud browser, My Chrome, Built-in browser, Computer | On, as before |
+| `--browser` | The same four | Off |
+| `--desktop` | Built-in browser (its `cdp_url` kept, so it attaches to a browser already running rather than starting its own) and Computer | Off |
+
+`--desktop` is for the desktop app's own core to start with, not for a person to open by hand: its
+browser attaches to whatever window the app itself shows, the way the app's current single-session
+core already does for `bap-browser agent --chat`. The app itself does not yet start this way, or
+show Computer as a second pane with a rail to switch to it — that is the desktop app's own piece of
+this work, not done yet. See `docs/plans/2026-10-14-production-ux-pass.md` for the fuller plan this
+is one piece of.
+
 ## Documents
 
 | File | What it is |

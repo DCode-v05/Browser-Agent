@@ -11,7 +11,7 @@ from pathlib import Path
 from bap_browser import browser_extension
 from bap_browser.agent.command import tell
 from bap_browser.agent.models import Model
-from bap_browser.agent.studio import Studio
+from bap_browser.agent.studio import RoomsMode, Studio
 from bap_browser.config import Config
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.service.accounts import Accounts
@@ -23,15 +23,23 @@ DESKTOP_STATE_FILE = "desktop-service.json"
 
 
 async def run_studio(
-    config: Config, model_for: Callable[[Service], Model], *, open_viewer: bool, extension: Path
+    config: Config,
+    model_for: Callable[[Service], Model],
+    *,
+    open_viewer: bool,
+    extension: Path,
+    rooms_mode: RoomsMode = "full",
 ) -> None:
-    """Serves the window and its three pages until the service is stopped (Ctrl+C), which raises
-    Interrupted. `extension` is the folder the extension was put in, for the person's own Chrome."""
+    """Serves the window and its pages until the service is stopped (Ctrl+C), which raises
+    Interrupted. `extension` is the folder the extension was put in, for the person's own Chrome.
+    `rooms_mode` says which pages there are, and whether the admin's own tools show beside them
+    (spec 9.16): `browser` and `desktop` are a deployment of one kind alone, with neither the
+    other's pages nor a way to open the desktop app a second time from inside it."""
     config = browser_extension.may_show_viewer(config)
-    desktop = desktop_app_of(config)
+    desktop = desktop_app_of(config) if rooms_mode == "full" else None
     settings = SettingsStore(config)
     accounts = Accounts(config.auth)
-    studio = Studio(config, settings, model_for, extension)
+    studio = Studio(config, settings, model_for, extension, rooms_mode)
 
     def serving(port: int | None) -> Service:
         return Service(
@@ -42,7 +50,7 @@ async def run_studio(
             rooms=studio.pages,
             desktop=desktop,
             settings=settings,
-            systems=studio,
+            systems=studio if rooms_mode == "full" else None,
             accounts=accounts,
         )
 
@@ -72,7 +80,8 @@ async def run_studio(
         await studio.run(service)
     finally:
         browser_extension.forget(extension)
-        await asyncio.to_thread(desktop.close)
+        if desktop is not None:
+            await asyncio.to_thread(desktop.close)
         await service.stop()
 
 
