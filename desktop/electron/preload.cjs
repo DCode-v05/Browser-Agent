@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld('desktop', {
   show(page) {
     ipcRenderer.send('show', page);
   },
+  /** Tells the window chrome which theme the shell is in, so its own title bar matches. */
+  theme(dark) {
+    ipcRenderer.send('theme', dark);
+  },
 });

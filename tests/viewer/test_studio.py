@@ -178,10 +178,13 @@ async def test_the_window_has_a_page_for_each_browser(
             "Built-in browser Ready",
             "Computer Could not start",
         ]
-        # The cloud browser's page: its picture, and its own chat.
+        # The cloud browser's page: its picture, and its own chat. A fresh session shows no page of
+        # its own until a task sends it somewhere: not the demo site.
         await page.get_by_label("Your task").wait_for()
-        await page.get_by_role("img", name="Live browser view: BAP Browser,").wait_for()
+        await page.get_by_role("img", name="Live browser view: untitled page, about:blank").wait_for()
         assert await page.get_by_title("Session", exact=True).inner_text() == "Session\ncloud"
+        log = (await opened.ask("GET", "/api/systems/cloud/log"))[1]
+        assert log["lines"] == []
 
         await opened.open("My Chrome")
         await page.get_by_role("heading", name="Connect your Chrome").wait_for()
@@ -373,11 +376,9 @@ async def test_the_persons_own_chrome_becomes_a_page_once_its_extension_dials_in
                 # The window's page turns from "connect" into the chat for that Chrome.
                 await page.get_by_label("Your task").wait_for(timeout=20_000)
                 assert await opened.tab("My Chrome") == "My Chrome Ready"
-                # The agent's tab in that Chrome is on the start page, and its side panel shows the same chat.
-                async with asyncio.timeout(20):
-                    while not any(tab.url.endswith("/demo-site/start.html") for tab in chrome.pages):
-                        await asyncio.sleep(0.1)
                 await panel.frame_locator("#viewer").get_by_label("Your task").wait_for(timeout=20_000)
+                # Nothing of the person's own browser is navigated until a task sends it somewhere.
+                assert not any(tab.url.endswith("/demo-site/start.html") for tab in chrome.pages)
             finally:
                 await chrome.close()
 
@@ -409,9 +410,9 @@ async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
         assert systems["cloud"]["log"] == str((tmp_path / "logs" / "cloud.jsonl").resolve())
         assert systems["builtin"]["log"] == str((tmp_path / "logs" / "builtin.jsonl").resolve())
         cloud_log = (await opened.ask("GET", "/api/systems/cloud/log"))[1]
-        assert [line["tool"] for line in cloud_log["lines"]] == ["browser_navigate", "browser_snapshot"]
+        assert [line["tool"] for line in cloud_log["lines"]] == ["browser_snapshot"]
         built_in_log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
-        assert [line["tool"] for line in built_in_log["lines"]] == ["browser_navigate"]
+        assert built_in_log["lines"] == []
         assert not (tmp_path / "events.jsonl").exists(), "nothing goes to the one log of a single session"
 
         # The task is on the record of the browser that did it, and of no other.
@@ -474,7 +475,7 @@ async def test_the_checklist_runs_real_steps_on_a_system(
             while not (await opened.room("builtin", "agent")):
                 await asyncio.sleep(0.1)
         log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
-        assert log["lines"][-1]["tool"] == "browser_navigate" and "start.html" in log["lines"][-1]["result"]
+        assert log["lines"][-1]["tool"] == "browser_navigate" and "about:blank" in log["lines"][-1]["result"]
         # What was typed in the check reached the page, and no log.
         assert "Ada Lovelace" not in json.dumps(log["lines"])
         # The result is kept, and shown with the rest of what is known of that browser.
@@ -518,7 +519,7 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         # The browser is back where it was, and what the run did is in its log like any step.
         await opened.room("builtin", "agent")
         log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
-        assert "start.html" in log["lines"][-1]["result"]
+        assert "about:blank" in log["lines"][-1]["result"]
         assert any("lab/reset.html" in line["result"] for line in log["lines"])
 
         # The same set done by the agent. This one's model answers at once and does nothing.
@@ -822,8 +823,8 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         # Its log is a file of its own, and its newest lines are read from here.
         await cloud.get_by_text(str((tmp_path / "logs" / "cloud.jsonl").resolve())).wait_for()
         await cloud.get_by_role("button", name="Show the log").click()
-        await cloud.get_by_text("The newest 2 lines, newest first").wait_for()
-        assert await cloud.locator(".system-log-tool").all_inner_texts() == ["snapshot", "navigate"]
+        await cloud.get_by_text("The newest line").wait_for()
+        assert await cloud.locator(".system-log-tool").all_inner_texts() == ["snapshot"]
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         SHOTS.mkdir(parents=True, exist_ok=True)
         await page.evaluate("document.querySelector('.systems').scrollTop = 0")

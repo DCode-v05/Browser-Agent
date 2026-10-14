@@ -140,6 +140,10 @@
   #root {
     height: 100%;
   }
+  #root {
+    display: flex;
+    flex-direction: column;
+  }
   body {
     @apply bg-background text-foreground;
     overflow: hidden;
@@ -150,4 +154,13 @@
   html {
     @apply font-sans;
   }
+}
+
+/* The strip that stands in for the title bar the OS no longer draws (frame: false, main.cjs):
+   the whole thing moves the window, except whatever is clickable inside it. */
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-drag button, .app-drag [role="button"] {
+  -webkit-app-region: no-drag;
 }

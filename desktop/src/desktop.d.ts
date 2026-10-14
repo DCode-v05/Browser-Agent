@@ -33,6 +33,7 @@ declare global {
       go(action: 'open', page: DemoPage): void;
       startAgain(): void;
       show(page: DesktopPage): void;
+      theme(dark: boolean): void;
     };
   }
 }

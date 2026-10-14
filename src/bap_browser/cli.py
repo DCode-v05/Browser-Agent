@@ -19,6 +19,10 @@ from bap_browser.config_doc import reference_markdown
 from bap_browser.env_file import apply_env_file
 from bap_browser.errors import BapError, ConfigError
 
+# Set by the desktop app's own core (desktop/electron/main.cjs) on the backend it starts beside
+# itself, so that invocation serves the backend instead of opening the app a second time.
+DESKTOP_APP_CORE_ENV = "BAP_BROWSER_DESKTOP_APP_CORE"
+
 STARTER: dict[str, Any] = {
     "browser": {"channel": "chromium", "headless": True},
     "safety": {"allowed_domains": [], "blocked_domains": []},
@@ -444,6 +448,20 @@ def _sets(args: argparse.Namespace) -> int:
 
 def _studio(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    rooms_mode = "browser" if args.browser else "desktop" if args.desktop else "full"
+    if rooms_mode == "desktop" and not os.environ.get(DESKTOP_APP_CORE_ENV):
+        # Run directly, not from inside the window of three browsers: this *is* the desktop app,
+        # so open its own window instead of serving a backend for a browser to show.
+        from bap_browser.desktop_app import DesktopApp
+
+        try:
+            return DesktopApp(
+                Path(config.server.desktop_dir).expanduser().resolve(),
+                Path(config.server.state_file).resolve(),
+                close_wait_s=config.server.desktop_close_wait_s,
+            ).open_until_closed()
+        except BapError as wrong:
+            raise ConfigError(str(wrong)) from wrong
     key = _key_for_the_model(config)
     # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser import browser_extension
@@ -460,7 +478,6 @@ def _studio(args: argparse.Namespace) -> int:
         return OpenAIModel(config.agent, client)
 
     extension = browser_extension.install(extension_folder(config))
-    rooms_mode = "browser" if args.browser else "desktop" if args.desktop else "full"
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(Interrupted, KeyboardInterrupt):
         asyncio.run(

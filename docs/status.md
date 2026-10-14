@@ -2288,6 +2288,36 @@ Not done: a notification of our own, the way Claude's desktop app gives one. Tha
 dependency or a Windows-only `powershell.exe` call with no package added — a choice for you, not mine
 to make silently.
 
+## `studio --desktop`, run directly, opens the app itself
+
+Found 2026-10-14: running `bap-browser studio --desktop` from a terminal only served the backend the
+desktop app starts beside itself, with no window to show it. A person had to separately know to run
+`npm --prefix desktop run start`. Now the bare command opens the app's own window
+(`DesktopApp.open_until_closed`, `src/bap_browser/desktop_app.py`); the app's own core still gets
+served, not opened a second time, because it marks the backend it starts
+(`BAP_BROWSER_DESKTOP_APP_CORE`, `desktop/electron/main.cjs`) and `cli.py`'s `_studio` checks for
+that mark before deciding which of the two to do.
+
+## A fresh session starts on nothing, not the demo site
+
+Found 2026-10-14, looking at the production UI pass: opening Cloud browser or Built-in browser, or
+pairing My Chrome, auto-navigated to `/demo-site/start.html` before any task was given, which read as
+a fixture left showing, not a real browser. `_own_browser` and `_persons_chrome`
+(`src/bap_browser/agent/studio.py`) no longer call `browser_navigate` on session start; a fresh
+session now shows its own first page (`about:blank`) until a task sends it somewhere. The demo site
+is unaffected as a destination: tasks, the checklist and the task sets still reach it by name.
+
+## The desktop app's own title bar, not the OS's
+
+Also found 2026-10-14: the desktop app's window kept the plain OS title bar above its content, which
+is the other thing that read as a prototype rather than a finished app (production UI pass). It is
+frameless now (`desktop/electron/main.cjs`): a slim drag strip of our own, with the OS's own
+minimize/maximize/close drawn over it on Windows and Linux (`titleBarOverlay`, told the shell's theme
+over a new `theme` IPC call so its colours follow light/dark); macOS keeps its own inset traffic
+lights and needs none of this. Not done: the rest of the structural pass (the top bar's own weight,
+the browser view's chrome) that was asked for alongside it — this piece alone was large enough to
+check in on first.
+
 ## Documents
 
 | File | What it is |

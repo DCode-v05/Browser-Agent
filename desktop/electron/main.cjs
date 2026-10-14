@@ -5,7 +5,7 @@
 
 'use strict';
 
-const { app, BrowserWindow, WebContentsView, ipcMain, session, shell } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, nativeTheme, session, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -22,6 +22,10 @@ const DEBUG_PORT = Number(process.env.BAP_DESKTOP_DEBUG_PORT) || 19200 + crypto.
 // The pages of the demo site the shell may open in the agent's browser.
 const DEMO_PAGES = { start: 'start.html', checkin: 'checkin.html', signup: 'signup.html' };
 const CORNER = 12;
+// The window's own chrome, drawn by the OS on Windows and Linux (spec 9.16's look, section 14.3):
+// no title bar of its own, a slim overlay instead, coloured to match the shell's theme.
+const OVERLAY_HEIGHT = 36;
+const overlayOf = (dark) => ({ color: dark ? '#1E1E1E' : '#F5F4F2', symbolColor: dark ? '#E9EBDF' : '#1A1714', height: OVERLAY_HEIGHT });
 // The studio's pages the app shows, and how long it waits for them once the core has started.
 const PAGES = ['builtin', 'computer'];
 const PAGES_WAIT_MS = 90000;
@@ -96,6 +100,9 @@ function startCore() {
       BAP_BROWSER_TOKEN: crypto.randomBytes(24).toString('base64url'),
       BAP_BROWSER__BROWSER__CDP_URL: `http://127.0.0.1:${DEBUG_PORT}`,
       BAP_BROWSER__BROWSER__CDP_TARGET: AGENT_MARK,
+      // Marks this one as the app's own backend, so it serves the backend instead of opening
+      // the app a second time (cli.py's `_studio` checks for it).
+      BAP_BROWSER_DESKTOP_APP_CORE: '1',
     },
     stdio: ['ignore', 'ignore', 'pipe'],
     windowsHide: true,
@@ -149,7 +156,10 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 640,
     title: 'BAP Browser',
-    backgroundColor: '#ffffff',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#151515' : '#ffffff',
+    frame: false,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    ...(process.platform === 'darwin' ? {} : { titleBarOverlay: overlayOf(nativeTheme.shouldUseDarkColors) }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -216,6 +226,11 @@ ipcMain.on('place', (event, rects) => {
   agentView.setBounds(placeable(rects.agent));
   chatView.setBounds(placeable(rects.chat));
   computerView.setBounds(placeable(around(placeable(rects.agent), placeable(rects.chat))));
+});
+
+ipcMain.on('theme', (event, dark) => {
+  if (!fromShell(event) || typeof dark !== 'boolean' || process.platform === 'darwin') return;
+  win?.setTitleBarOverlay(overlayOf(dark));
 });
 
 ipcMain.on('show', (event, page) => {

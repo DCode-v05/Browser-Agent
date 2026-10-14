@@ -70,11 +70,6 @@ class Running:
         groups = (await self.ask("GET", f"/api/settings?system={system}", token=token))["groups"]
         return next(one["value"] for group in groups for one in group["settings"] if one["id"] == setting)
 
-    async def navigations(self, system: str) -> int:
-        """How many times this browser opened its first page: once for each session it has had."""
-        lines = (await self.ask("GET", f"/api/systems/{system}/log"))["lines"]
-        return sum(line["tool"] == "browser_navigate" for line in lines)
-
 
 @asynccontextmanager
 async def studio(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIterator[Running]:
@@ -313,12 +308,9 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             await admin_view.shot("admin-evaluations")
 
             # The browser a user prefers is started for them when it has stopped.
-            sessions = await running.navigations("builtin")
             await admin.get_by_role("tab", name="Configuration").click()
             await built_in.get_by_role("button", name="Stop").click()
-            async with asyncio.timeout(30):
-                while await running.navigations("builtin") == sessions:
-                    await asyncio.sleep(0.1)
+            await running.room("builtin", "ended")
             await running.room("builtin", "agent")
             await user.get_by_role("tab", name="Browser and chat").click()
             await user.get_by_label("Your task").wait_for(timeout=20_000)

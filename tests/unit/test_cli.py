@@ -144,6 +144,40 @@ def test_the_extension_goes_with_the_chat(capsys: pytest.CaptureFixture[str], tm
     assert "Use --extension together with --chat" in capsys.readouterr().err
 
 
+def test_studio_desktop_opens_the_app_itself_when_run_directly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Run from a terminal, `studio --desktop` is the desktop app, not its backend alone: it opens
+    the app's own window instead of serving one for a browser to show. With none installed here,
+    it says how to install it, the same as any other use of the desktop app."""
+    from bap_browser.cli import main
+
+    assert main(["studio", "--desktop"]) == 2
+    assert "npm --prefix desktop install" in capsys.readouterr().err
+
+
+def test_studio_desktop_serves_the_backend_when_the_app_itself_started_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The app's own core sets the marker when it starts its backend (desktop/electron/main.cjs):
+    that invocation must not try to open the app a second time, but serve it, as before."""
+    import bap_browser.agent.window as window
+    from bap_browser.cli import DESKTOP_APP_CORE_ENV, main
+
+    served = []
+
+    async def fake_run_studio(*args: object, **kwargs: object) -> None:
+        served.append(kwargs.get("rooms_mode"))
+
+    monkeypatch.setattr(window, "run_studio", fake_run_studio)
+    monkeypatch.setenv(DESKTOP_APP_CORE_ENV, "1")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    assert main(["studio", "--desktop", "--dev"]) == 130
+    assert served == ["desktop"]
+    assert "npm --prefix desktop install" not in capsys.readouterr().err
+
+
 def test_serve_is_a_command_with_the_browser_shown_or_not() -> None:
     from bap_browser.cli import build_parser
 
