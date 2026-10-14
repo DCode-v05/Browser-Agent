@@ -45,9 +45,40 @@ async def test_a_set_that_does_not_exist_is_named_before_anything_is_started(
 def test_the_command_says_how_each_set_went(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     config = tmp_path / "config.json"
     config.write_text(
-        json.dumps({"data_dir": str(tmp_path), "evals": {"dir": str(tmp_path / "evals")}}), encoding="utf-8"
+        json.dumps(
+            {
+                "data_dir": str(tmp_path),
+                "evals": {"dir": str(tmp_path / "evals")},
+                "server": {"state_file": str(tmp_path / "service.json")},
+            }
+        ),
+        encoding="utf-8",
     )
 
     assert main(["sets", "long", "--reference", "--config", str(config)]) == 0
 
     assert capsys.readouterr().out.strip() == "long: 4 of 4 tries passed (100%)."
+
+
+def test_the_sets_leave_the_address_of_a_window_that_is_open_as_it_was(tmp_path: Path) -> None:
+    """The sets show no viewer. A window started from the same folder keeps its address, for its
+    person to open it again."""
+    studio = tmp_path / "service.json"
+    studio.write_text(json.dumps({"viewer": "http://127.0.0.1:8765/#token=the-window"}), encoding="utf-8")
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "data_dir": str(tmp_path),
+                "evals": {"dir": str(tmp_path / "evals")},
+                "server": {"state_file": str(studio)},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["sets", "long", "--reference", "--config", str(config)]) == 0
+
+    assert json.loads(studio.read_text(encoding="utf-8")) == {
+        "viewer": "http://127.0.0.1:8765/#token=the-window"
+    }

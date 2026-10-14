@@ -1875,6 +1875,10 @@ The four arrangements were run again the same evening, both ways; every one pass
   the new one.
 - The container keeps its task records inside itself: `deploy/box-desktop.sh` removes the container
   and them with it.
+- `bap-browser sets`, run from the folder of an open window, wrote its own address over the window's
+  in `.bap-browser/service.json` and removed the file as it ended: the window could not be found
+  again. A test of the sets did the same to a developer's window, on every run of the gate. The
+  sets show no viewer, and their service now leaves that file alone.
 
 ## How to go on
 

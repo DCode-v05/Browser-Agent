@@ -48,6 +48,7 @@ class Service:
         systems: Systems | None = None,
         accounts: Accounts | None = None,
         dev: bool = False,
+        opened: bool = True,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
         server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
@@ -56,8 +57,10 @@ class Service:
         the settings screen; with it, the service has the settings API (spec 10.2). `systems` is
         whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
         may sign in as the admin or as a user (spec 4.11). `dev` keeps the service's own token
-        signing in as the admin even once a real password is set."""
+        signing in as the admin even once a real password is set. `opened` says a person opens its
+        viewer: only then does it write where it is, in `server.state_file`, where another may be."""
         self._config = config
+        self._opened = opened
         self._sessions = sessions
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
         # Each request stands by itself: an agent keeps no connection that could be lost.
@@ -170,7 +173,8 @@ class Service:
                 await self._serving
             await asyncio.sleep(0)
         # Files are written off the event loop, which is busy with sessions.
-        await asyncio.to_thread(self._write_state)
+        if self._opened:
+            await asyncio.to_thread(self._write_state)
         self._forgetting = asyncio.create_task(self._forget_what_is_old())
 
     async def _forget_what_is_old(self) -> None:
@@ -202,7 +206,8 @@ class Service:
             self._mcp_over.set()
             await self._mcp_running
             self._mcp_running = None
-        await asyncio.to_thread(self._remove_state)
+        if self._opened:
+            await asyncio.to_thread(self._remove_state)
 
     def _remove_state(self) -> None:
         Path(self._config.server.state_file).unlink(missing_ok=True)

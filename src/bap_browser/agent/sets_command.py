@@ -58,7 +58,7 @@ async def run_sets(
         raise ConfigError(f"A task is tried between 1 and {config.evals.suite_max_trials} times.")
     given = cloud_config(config)
     session = ServiceSession(given, name=SYSTEM, backend=BACKEND)
-    service = Service(given, {session.name: session}, port=0)
+    service = Service(given, {session.name: session}, port=0, opened=False)
     recorder, kept = suite_recorder(config.evals, SYSTEM, BACKEND), Reports(config.evals, SYSTEM)
     reports: list[dict[str, Any]] = []
     await session.start()
