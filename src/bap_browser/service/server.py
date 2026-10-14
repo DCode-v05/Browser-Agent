@@ -47,6 +47,7 @@ class Service:
         settings: SettingsStore | None = None,
         systems: Systems | None = None,
         accounts: Accounts | None = None,
+        dev: bool = False,
     ) -> None:
         """`port` 0 means any free port; None means the configured one. `mcp` is the tools as an MCP
         server: with it, the service also offers them over HTTP at `mcp.http_path`. `bridge` adds
@@ -54,7 +55,8 @@ class Service:
         the desktop app, for the window to open (spec 9.16). `settings` holds what a person chose in
         the settings screen; with it, the service has the settings API (spec 10.2). `systems` is
         whoever runs the browsers of a window that has several (spec 9.17). `accounts` holds who
-        may sign in as the admin or as a user (spec 4.11)."""
+        may sign in as the admin or as a user (spec 4.11). `dev` keeps the service's own token
+        signing in as the admin even once a real password is set."""
         self._config = config
         self._sessions = sessions
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
@@ -74,6 +76,7 @@ class Service:
             settings,
             systems,
             accounts,
+            dev,
         )
         self._wanted_port = config.server.port if port is None else port
         self.shutdown_wait_s = config.server.shutdown_wait_s

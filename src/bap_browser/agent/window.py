@@ -29,12 +29,14 @@ async def run_studio(
     open_viewer: bool,
     extension: Path,
     rooms_mode: RoomsMode = "full",
+    dev: bool = False,
 ) -> None:
     """Serves the window and its pages until the service is stopped (Ctrl+C), which raises
     Interrupted. `extension` is the folder the extension was put in, for the person's own Chrome.
     `rooms_mode` says which pages there are, and whether the admin's own tools show beside them
     (spec 9.16): `browser` and `desktop` are a deployment of one kind alone, with neither the
-    other's pages nor a way to open the desktop app a second time from inside it."""
+    other's pages nor a way to open the desktop app a second time from inside it. `dev` keeps the
+    service's own token signing in as the admin once a real admin password exists (spec 4.11)."""
     config = browser_extension.may_show_viewer(config)
     desktop = desktop_app_of(config) if rooms_mode == "full" else None
     settings = SettingsStore(config)
@@ -52,6 +54,7 @@ async def run_studio(
             settings=settings,
             systems=studio if rooms_mode == "full" else None,
             accounts=accounts,
+            dev=dev,
         )
 
     # The configured port, so that the two sign-in pages keep their addresses from one start to
