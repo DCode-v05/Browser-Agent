@@ -78,6 +78,19 @@ async def test_a_task_from_the_viewer_reaches_the_agent_and_is_shown_to_every_vi
         await session.close()
 
 
+async def test_a_task_sent_while_one_runs_is_accepted_and_queued(make_config, tmp_path: Path) -> None:
+    session, tasks = await chat_session(make_config, tmp_path)
+    try:
+        session.working(True, "First task")
+        await session.handle({"type": "task", "text": "Second task"})
+        assert tasks == ["Second task"], "a task sent while the agent works is held, not refused"
+        assert [message["text"] for message in chat(session) if message["type"] == "message"] == [
+            "Second task"
+        ]
+    finally:
+        await session.close()
+
+
 async def test_what_is_not_a_task_is_not_taken(make_config, tmp_path: Path) -> None:
     session, tasks = await chat_session(make_config, tmp_path, agent={"max_task_chars": 10})
     for text in ("", "   ", None, 7, ["a"], "x" * 11):
