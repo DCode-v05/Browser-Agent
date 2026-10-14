@@ -5791,7 +5791,7 @@ Hermes' settings come over under our `computer` section, each in `config.py`; th
 | `computer.permission_mode` | `permission_mode` | `bounded` (Hermes: `standard`) | no: the allowlist stays on |
 | `computer.apps.*`, `computer.any_app` | ours | terminal off, any app off | Yes, as today |
 | `computer.ask_before_apps` | ours | off | Yes, as today |
-| `computer.no_overlay` | `no_overlay` | auto | Show where the agent acts |
+| `computer.no_overlay` | `no_overlay` | off | Show where the agent acts |
 | `computer.native_wayland` | `native_wayland` | false | no |
 | `computer.driver_telemetry` | `cua_telemetry` | false | no |
 | `computer.allow_unsigned_driver` | `allow_unsigned_driver` | false | no |

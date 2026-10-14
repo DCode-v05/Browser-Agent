@@ -84,8 +84,11 @@ class Base(Section):
         "How long the driver may stand unused before that list ends, such as `2h`. A new session starts it again",
     )
     no_overlay: Literal["auto", "on", "off"] = setting(
-        "auto",
-        "Whether the driver's pointer overlay is left out. `auto` decides by the system, as Hermes does",
+        "off",
+        "Whether the driver's pointer overlay is left out. Off by default everywhere: on a person's own "
+        "machine a visible overlay is drawn over whatever else is on the screen, including a video call "
+        "someone else is watching. `auto` decides by the system, as Hermes does, which still shows it on "
+        "Windows and Wayland",
     )
     native_wayland: bool = setting(False, "On Linux: whether the driver uses a Wayland session directly")
     driver_telemetry: bool = setting(False, "Whether the driver may send its makers anonymous usage figures")

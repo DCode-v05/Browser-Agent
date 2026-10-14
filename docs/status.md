@@ -2265,6 +2265,23 @@ Not yet done: the same proof through the viewer's own UI rather than a raw WebSo
 Claude-in-Chrome extension was not connected this session); take-over with this machine's own hand,
 the way `computer.base.helper_hands` already does for the Mac.
 
+## The driver's pointer overlay, off by default
+
+Found 2026-10-14, watching computer use on a person's own Windows machine over a screen share: the
+driver drew its own visible overlay on the real screen for as long as a session ran, which looked
+wrong in a Google Meet call someone else was watching, where a person expects only their own cursor.
+Compared this against how Claude's own desktop computer-use tells a person it is in control: a brief
+system notification ("Claude is using your computer · press Esc to stop"), not a persistent overlay.
+
+`computer.no_overlay` (ours, `src/bap_browser/config_computer.py`) now defaults to `off` instead of
+`auto`: Hermes' own auto-detection already hides the overlay on macOS and most of Linux, but shows it
+on Windows and Wayland, which is exactly backwards for a person whose screen might be watched. A
+person who wants to see exactly where the agent is clicking can still set it to `on`.
+
+Not done: a notification of our own, the way Claude's desktop app gives one. That needs either a new
+dependency or a Windows-only `powershell.exe` call with no package added — a choice for you, not mine
+to make silently.
+
 ## Documents
 
 | File | What it is |
