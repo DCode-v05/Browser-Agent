@@ -94,7 +94,16 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider defaultOpen={false}>
+      {/* The OS draws no title bar of its own (frame: false): this strip is dragged instead, and
+          leaves its right edge to the window controls the OS overlays on top of it. */}
+      <div className="app-drag flex h-9 shrink-0 items-center gap-2 pl-3 text-sm font-medium">
+        <span className="size-4 shrink-0 rounded-sm" style={{ background: 'var(--brand-gradient)' }} aria-hidden="true" />
+        <span className="truncate">{W.product}</span>
+      </div>
+      {/* The sidebar below positions itself `fixed`, which is otherwise relative to the window, not
+          to this strip's height: `contain: layout` gives it this box as its containing block instead. */}
+      <div className="min-h-0 flex-1" style={{ contain: 'layout' }}>
+      <SidebarProvider defaultOpen={false} className="h-full min-h-0">
         <Sidebar collapsible="icon">
           <SidebarHeader>
             <SidebarMenu>
@@ -154,7 +163,7 @@ export function App() {
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset className="h-svh min-w-0">
+        <SidebarInset className="h-full min-w-0">
           <header className="flex h-14 shrink-0 items-center gap-1 px-3">
             <SidebarTrigger />
             {onTheComputer ? (
@@ -210,6 +219,7 @@ export function App() {
           </ResizablePanelGroup>
         </SidebarInset>
       </SidebarProvider>
+      </div>
     </TooltipProvider>
   );
 }
