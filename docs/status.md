@@ -1682,6 +1682,25 @@ Claude, checked on 2026-10-14 once the person put `ANTHROPIC_API_KEY` in `.env`:
   after, "*Untitled 1 - Mousepad". The editor's text was not read back by the check.
 - The nightly run now uses Claude and the repository secret `ANTHROPIC_API_KEY`.
 
+### 1ay. Built on 2026-10-14: a driver session lost over the tailnet is begun afresh
+
+Asked for: "it should open all the apps and do all the given tasks, such as open Safari, go to
+Amazon and find the best phone under 1 lakh", from the engine in the VM on the person's Mac.
+
+| Found | What was done |
+|---|---|
+| The agent named only the contained desktop's three apps | Not a fault: "Let the agent work in any app on the machine" was off. It was turned on in the VM's Computer page and for the helper on the Mac |
+| After a capture of Safari timed out, every call was refused: "session ... has ended" | The base tried to revive the old session over the link's new process, which did not know it. Now a lost session, on any desktop, is followed by a fresh one; on a person's machine nothing is ended |
+
+Seen, with the engine in the micro VM's image in Docker joined to the tailnet as `tag:bap-vm`:
+
+- Before the fix: Safari opened on the Mac and an Amazon.in search was typed, then the driver's
+  session was lost and every later call refused.
+- After the fix, the same task from the Mac's browser: in 105 s and with one opening allowed, the
+  answer was "the Samsung Galaxy S24 Ultra 5G ... ₹99,999 ... 4.6 stars from about 9,300 ratings",
+  found by searching Amazon.in up to ₹1,00,000 sorted by customer review. No timeout happened in
+  that run, so the new recovery was not needed there: the unit tests hold it.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

@@ -51,12 +51,13 @@ NOT_ON_THE_SCREEN = (
     "button. Click its menu to open it, capture again, and act on what the capture names."
 )
 LOOK_AGAIN = " Capture to see what it changed."
-# What Hermes' backend says when the driver has stopped answering. Seen under a model on Linux:
-# after it, every call failed the same way until the session ended.
-STOPPED_ANSWERING = ("timed out", "never reached ready")
+# What Hermes' backend says when the driver has stopped answering, or its session is gone. Seen
+# under a model on Linux, where every call then failed the same way until the session ended; and
+# over the tailnet, where the link's new process could not revive the session the old one had.
+STOPPED_ANSWERING = ("timed out", "never reached ready", "has ended", "not available to this transport")
 STARTED_AGAIN = (
-    "The desktop stopped answering and was put right: its driver was started again. What you asked "
-    "for may or may not have been done. Capture again to see the desktop as it is."
+    "The desktop stopped answering and was put right: a fresh session with its driver was begun. What "
+    "you asked for may or may not have been done. Capture again to see the desktop as it is."
 )
 # The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})

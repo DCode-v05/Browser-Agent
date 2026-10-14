@@ -14034,6 +14034,7 @@ named and pressed as Hermes' tool does it.</p>
 <li>Three checks stand before any action: the tailnet's grant (only <code>tag:bap-vm</code> may reach that port), the caller's Tailscale identity as the helper is told it, and a pairing code the person reads from the helper and types into the window once.</li>
 <li>Screenshots and the element tree travel back in the capture results. Nothing else of the machine is sent.</li>
 <li>The person starts the helper and ends it. It shows what is being done, and a Stop control ends the session at once.</li>
+<li>When the driver's session is lost, as when a capture times out and the link's new process cannot revive the session the old one had, the call says so and the next call begins a fresh session with the driver. Nothing that runs on the person's machine is ended.</li>
 <li>This replaces today's token over HTTP and its <code>--host</code> flag, which could be bound beyond the machine's own address ahead of any tailnet design.</li>
 </ul>
 <p>The helper is the same program on Windows, macOS and Linux. It starts the driver for that system exactly as arrangement A does, and Tailscale and <code>tailscale serve</code> run on all three. Today's helper works on a Mac only.</p>
