@@ -3613,8 +3613,8 @@ reached, or a person stops the session. The answer is the only thing written to 
 
 Without `--demo` the loop calls the hosted model named by `agent.provider`: OpenAI's over the
 Responses API (`openai`, the default, `gpt-5.6-luna`), or Anthropic's over the Messages API
-(`anthropic`), with the key read from `agent.api_key_env` (`OPENAI_API_KEY` or `CLAUDE_API_KEY`).
-Put a line `OPENAI_API_KEY=...` or `CLAUDE_API_KEY=...` in a file named `.env` in the folder the
+(`anthropic`), with the key read from `agent.api_key_env` (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`).
+Put a line `OPENAI_API_KEY=...` or `ANTHROPIC_API_KEY=...` in a file named `.env` in the folder the
 command is run from. With no key, the command says so and says how to set one. Nothing of the
 conversation is stored at either provider: OpenAI's calls go with `store: false` and the model's own
 reasoning comes back to it encrypted on each turn; Anthropic's calls send back every content block

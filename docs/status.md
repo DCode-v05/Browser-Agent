@@ -1668,7 +1668,16 @@ Not done, and not checked:
   on a desktop nobody sits at.
 - **A click by a coordinate asks whenever the screen holds a grave control**, wherever the click
   is: a mail window with "Send" in it asks on every such click. A click by number does not.
-- **Still waiting on the person**: the model's key (no call to Anthropic has been made), and a tailnet.
+- **Still waiting on the person**: a tailnet.
+
+Claude, checked on 2026-10-14 once the person put `ANTHROPIC_API_KEY` in `.env`:
+
+- One real call through the system's own provider: `claude-opus-5-5` said "Ok." (21 tokens in, 6 out).
+- On the contained desktop, two tasks in one chat. "Open the text editor." opened Mousepad. Then
+  "now writ helo wrld in it, dont open a new one": the model said it took "helo wrld" to mean
+  "hello world" and typed it into "Untitled 1", the document already open. One window was open
+  after, "*Untitled 1 - Mousepad". The editor's text was not read back by the check.
+- The nightly run now uses Claude and the repository secret `ANTHROPIC_API_KEY`.
 
 ## How to go on
 
