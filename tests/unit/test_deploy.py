@@ -57,6 +57,9 @@ def test_the_vm_joins_a_tailnet_only_when_it_is_given_a_key_and_then_forgets_the
     # The key's value is never written out: not echoed, not logged.
     assert not [line for line in START.splitlines() if "echo" in line and "$TS_AUTHKEY" in line]
     assert "--state=mem:" in START, "the VM's node is ephemeral: it leaves the tailnet when the VM ends"
+    # With its state in memory a node has no folder for the HTTPS certificate `tailscale serve`
+    # fetches: without one, every HTTPS call to the viewer fails with "no TailscaleVarRoot".
+    assert '--statedir="$certs"' in START and "certs=$(mktemp -d)" in START
 
 
 def test_the_image_with_a_desktop_installs_the_pinned_driver_and_names_no_version_of_it() -> None:

@@ -137,6 +137,8 @@ async def test_the_admin_sets_the_system_up_and_a_user_works_inside_what_the_adm
             assert await admin.evaluate("sessionStorage.getItem('bap-browser.token')") is None
             admins_visit = await admin.evaluate(VISIT)
             assert admins_visit and admins_visit != running.token
+            # Once a password is set, the operator's token is no admin's: the test asks as the admin.
+            running.token = admins_visit
             assert await tabs(admin, "What to show of Cloud browser") == [
                 "Browser and chat",
                 "Configuration",

@@ -58,9 +58,12 @@ ITS_OWN = "cuadriver"
 ROLES = {
     "checkbox": ("checkbox", "togglebutton", "switch"),
     "radio": ("radio",),
-    "textbox": ("text", "entry", "edit", "document", "combobox", "searchfield"),
+    "textbox": ("text", "entry", "edit", "document", "combobox", "searchfield", "password"),
     "link": ("link",),
 }
+# The roles of a field what is typed into is hidden in, and of one that holds many lines.
+SECRET = ("secure", "password")
+MANY_LINES = ("textarea", "textview", "document")
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
@@ -118,6 +121,10 @@ class HermesDriver(DesktopDriver):
         self._named: dict[int, tuple[str, str]] = {}
         # How many times the driver's session was lost and begun afresh: each is a session of its own.
         self._afresh = 0
+        # The element the agent last pressed by its number, which has the focus, and the app it
+        # last named: what a key, typing and watch mode are judged by (spec 22.7).
+        self._focus: int | None = None
+        self.working_in = ""
         # On a Mac's own screen a person's hand on the picture is posted to macOS itself.
         self._macos: Any = None
         self._hand: MacHand | None = None
@@ -205,6 +212,24 @@ class HermesDriver(DesktopDriver):
         self._named = {
             int(one["index"]): (str(one.get("role", "")), str(one.get("label", ""))) for one in elements
         }
+
+    def pressed_on(self, element: int | None) -> None:
+        """The element a press went to, which then has the focus. None for a press by its place."""
+        self._focus = element
+
+    async def locate_focus(self) -> Located | None:
+        if self._focus is None or self._focus not in self._named:
+            return None
+        role, name = self._named[self._focus]
+        plain = NOT_A_LETTER.sub("", role.lower()).removeprefix("ax")
+        return Located(
+            as_a_page_names(role),
+            name,
+            None,
+            secret=any(sign in plain for sign in SECRET),
+            multiline=any(sign in plain for sign in MANY_LINES),
+            kind="text" if as_a_page_names(role) == "textbox" else "other",
+        )
 
     async def locate(self, ref: str, *, press: bool = False) -> Located:
         """An element of the newest capture, by its number, as the check judges a press (spec 18.4):

@@ -16,9 +16,9 @@ def test_the_desktop_has_sets_of_its_own() -> None:
     assert DESKTOP_SETS == ("short", "long", "attack", "infeasible", "confirm")
     assert {name: described(name, "desktop")["tasks"] for name in DESKTOP_SETS} == {
         "short": 4,
-        "long": 2,
-        "attack": 4,
-        "infeasible": 3,
+        "long": 3,
+        "attack": 5,
+        "infeasible": 4,
         "confirm": 4,
     }
 

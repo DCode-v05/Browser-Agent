@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -51,6 +53,13 @@ NOT_ON_THE_SCREEN = (
     "button. Click its menu to open it, capture again, and act on what the capture names."
 )
 LOOK_AGAIN = " Capture to see what it changed."
+# Watch mode: what the agent is told when nobody came to watch an app a person must watch.
+UNWATCHED = (
+    "{app} is an app the agent works in only while a person watches its page (watch mode). Nobody "
+    "opened the page in {waited} s, so this step was not done. Stop here, and say in your answer that "
+    "the person must open the page for you to go on in {app}."
+)
+NOT_A_WORD = re.compile(r"[^a-z0-9]+")
 # What Hermes' backend says when the driver has stopped answering, or its session is gone. Seen
 # under a model on Linux, where every call then failed the same way until the session ended; and
 # over the tailnet, where the link's new process could not revive the session the old one had.
@@ -193,6 +202,27 @@ def plain(answer: dict[str, Any]) -> str:
     return "\n".join(lines) or json.dumps(answer)
 
 
+def must_be_watched(app: str, listed: Sequence[str]) -> bool:
+    """Whether an app is one of the apps a person must watch: a listed name is whole words of its name."""
+    named = f" {NOT_A_WORD.sub(' ', app.lower())} "
+    return any(f" {NOT_A_WORD.sub(' ', one.lower()).strip()} " in named for one in listed if one.strip())
+
+
+async def watched_if_it_must_be(session: BrowserSession, app: str) -> None:
+    """Watch mode (spec 22.7), as in OpenAI's Operator: in an app a person must watch, the agent
+    acts only while a person has the page open. It waits for one, and stops when nobody comes."""
+    settings = session.config.computer
+    if not app or not must_be_watched(app, settings.watch_apps):
+        return
+    ends = asyncio.get_running_loop().time() + settings.watch_wait_s
+    while not session.watched():
+        if asyncio.get_running_loop().time() >= ends:
+            raise BrowserError(
+                UNWATCHED.format(app=app, waited=round(settings.watch_wait_s)), reason="nobody watches"
+            )
+        await asyncio.sleep(settings.app_poll_ms / 1000)
+
+
 async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | Shown:
     driver = await session.driver(may_restart=True)
     if not isinstance(driver, HermesDriver):
@@ -200,6 +230,12 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     asked = args.model_dump(exclude_none=True)
     if args.action == "capture":
         asked.setdefault("mode", session.config.computer.base.capture_mode)
+    if args.app:
+        driver.working_in = args.app
+    if args.action in DELIVERED:
+        await watched_if_it_must_be(session, driver.working_in)
+    if args.action in PRESSES:
+        driver.pressed_on(args.element if args.coordinate is None else None)
     how = delivery_for(session.config.computer)
     in_front = how == "foreground"
     if how and args.action in DELIVERED and "delivery_mode" not in asked:

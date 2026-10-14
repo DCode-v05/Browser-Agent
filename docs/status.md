@@ -1682,6 +1682,37 @@ Claude, checked on 2026-10-14 once the person put `ANTHROPIC_API_KEY` in `.env`:
   after, "*Untitled 1 - Mousepad". The editor's text was not read back by the check.
 - The nightly run now uses Claude and the repository secret `ANTHROPIC_API_KEY`.
 
+### 1ax. Built on 2026-10-14: watch mode, keys and passwords on a desktop, more tasks, the box in one command
+
+| Asked for | What was built |
+|---|---|
+| Safeguards for computer use, done properly | Enter, Control+Enter or Command+Enter in a box a message is written in waits for a person's yes, as in a browser; Enter in a search field does not. Typing into a password field is a person's step. "Move to Trash", "Empty Trash", "Move to Wastebasket", "Send to Recycle Bin" now count as deleting: before, they were pressed without asking |
+| Take over the system as OpenAI's agent does | Watch mode, after OpenAI's Operator and ChatGPT Atlas: in mail, chat, password and settings apps (`computer.watch_apps`) the agent acts only while a person has the page open, and may still look. Take over, Hand back, asking for a sign-in or a payment, and asking before a step that sends or deletes were there already |
+| Evals for computer use | Three more desktop tasks: adding up a file's numbers (`long`), an instruction planted in a file's name (`attack`), printing with no printer (`infeasible`). The desktop has 20 tasks |
+| Keep the box ready for when it has hours | `deploy/box-up.sh`: one command on a Linux machine with no root. And a Linux VM in Docker on the Mac, `bap-browser-vm:tailnet`, built, which needs no box |
+
+Seen:
+
+- In a real container, all 13 desktop tests by reference solutions, the new tasks among them: passed in 155 s.
+- `deploy/box-up.sh` on a Linux machine as a plain user: it fetched Tailscale 1.104.1, checked it
+  against the published checksum, and stopped with "TS_AUTHKEY is not set, and there is nobody to
+  type it". With no address it said which address to give.
+- The unit tests of the new safeguards (`tests/unit/test_desktop_safeguards.py`): a press of Enter
+  in a message box and typing into a password field each asked a person, and with the answer no
+  nothing reached the app; the password itself was in no result.
+
+Not done, and not checked:
+
+- **Watch mode counts a person as watching while the page is open**, in a tab in front or not.
+  Operator also pauses when the person leaves the tab; this does not yet.
+- **A desktop app's Enter is judged only after a press by number**: after a press by its place,
+  or when the app had the focus before the agent came, nothing is known to have the focus.
+- **The new tasks were run by their reference solutions, not by Claude.**
+- **The team box has not joined the tailnet**: it has no hours left. The micro VM's image, in
+  Docker on the Mac, did: it reached the helper and no other port of the Mac, its viewer opened over
+  HTTPS from the Mac, and Claude in it did a task on the Mac (see the plan). The fix this needed is
+  in `deploy/vm-start.sh`: a folder for the HTTPS certificate.
+
 ### 1ay. Built on 2026-10-14: a driver session lost over the tailnet is begun afresh
 
 Asked for: "it should open all the apps and do all the given tasks, such as open Safari, go to

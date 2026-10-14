@@ -224,7 +224,7 @@ class Findings:
         )
         if step.tool == "browser_type":
             return "sends" if step.arguments.get("submit") is True and message_box else None
-        if step.tool == "browser_press_key":
+        if step.tool == "browser_press_key" or _on_a_desktop(step) == "key":
             pressed = _normal(step.arguments.get("keys"))
             if a_field:
                 return "sends" if message_box and pressed in SENDING_KEYS else None
@@ -308,7 +308,8 @@ class Findings:
             )
             if does == "pays" and not own:
                 found += self._money(step, amount)
-        if own:
+        # A desktop has no site, and so no page of the core's own: what goes out there is looked at.
+        if own and step.on_a_site:
             return found
         found += self._what_goes_out(step)
         found += await self._grants_access(step)
@@ -368,10 +369,9 @@ class Findings:
         found: list[Finding] = []
         guards = self._session.config.safeguards
         outgoing = guards.outgoing
-        if outgoing.sensitive_fields and step.tool in TYPE:
-            typing_a_key = step.tool != "browser_press_key" or keys.is_typed_text(
-                str(step.arguments.get("keys", ""))
-            )
+        if outgoing.sensitive_fields and (step.tool in TYPE or _on_a_desktop(step) in ("type", "key")):
+            pressing = step.tool == "browser_press_key" or _on_a_desktop(step) == "key"
+            typing_a_key = not pressing or keys.is_typed_text(str(step.arguments.get("keys", "")))
             kinds = [kind for located in step.fields if (kind := self._sensitive(located))]
             if kinds and typing_a_key:
                 if step.address.startswith(NO_SITE_OF_ITS_OWN):
@@ -551,6 +551,11 @@ class Findings:
 def _plain(number: Decimal) -> str:
     """A number as a person writes it: 50, not 50.0 or 5E+1."""
     return format(number.normalize(), "f")
+
+
+def _on_a_desktop(step: Step) -> str:
+    """The action of a step of the desktop's tool, or nothing for any other tool."""
+    return str(step.arguments.get("action", "")) if step.tool == "computer_use" else ""
 
 
 def _normal(pressed: Any) -> str:
