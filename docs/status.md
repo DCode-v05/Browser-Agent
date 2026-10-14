@@ -1807,6 +1807,38 @@ Over the real tailnet, with the micro VM's image built again from this code and 
   new tab, amazon.in was searched up to ₹1,00,000 sorted by customer review, and the answer named
   the Samsung Galaxy S24 Ultra 5G at ₹99,999 (4.6 from about 9,300 reviews).
 
+### 1bb. Built on 2026-10-14: the four arrangements both ways, the Mac and the team box
+
+| Arrangement | Team box → Mac | Mac → team box |
+|---|---|---|
+| 1. The engine on the system it drives | The engine in the box's desktop (`bap-desk`) worked its own Linux desktop: the calculator showed 408 for 12 times 34 | The engine on the Mac works the Mac (built before) |
+| 2. A remote engine reaches the person's data over Tailscale | The box's own browser read the Mac's private page: "BLUE-HERON-42" | The Mac's own browser read the box's private page: "RED-KESTREL-17" |
+| 3. A remote engine takes over the other system | The engine on the box listed the Mac's apps; Take over from its page put the Mac's pointer at 0.40 for 0.4 | The engine on the Mac opened Mousepad on the box's desktop and typed "hello from the Mac" |
+| 4. The system streamed to the remote side | The Mac's screen, 1280 by 800, in the box's page | The box's desktop, 1280 by 800, in the Mac's page |
+
+Built on the way:
+
+- **The team box with no root**: Python 3.12 by uv; Chromium with 33 system libraries unpacked
+  from Amazon Linux's own packages into the home folder and named by `LD_LIBRARY_PATH`; rootless
+  Docker 27.3.1 without its bridge network, since the box has no `iptables`; `buildx` for BuildKit.
+- **`deploy/box-desktop.sh`**: the box's Linux desktop in rootless Docker, a tailnet node of its own,
+  with its engine and a helper beside it for the logins named.
+- **`computer.base.tailscale_socket`**: where Tailscale listens, for a helper on a machine with no root.
+- **The driven system, not the engine's**: an engine on the Mac driving a Linux desktop named the
+  apps as macOS does ("TextEdit") and told the model the machine was a Mac. It now asks the helper,
+  whose driver's own program says the system, and names apps and keys by that.
+- **Each computer page says where it works**: "Engine on bap-desk → Works on the engine's own Linux
+  desktop"; "Engine on this computer → Works on bap-desk, a machine elsewhere, through its helper".
+
+Added after, on the same day:
+
+- **Take over of a Linux desktop elsewhere**: the helper's hand on Linux gives a person's pointer,
+  keys and wheel to the X screen as xdotool's commands (`driver/x11_hand.py`). From the Mac's page,
+  the pointer at 0.3 and 0.7 of the picture put the box desktop's own pointer at 0.30 and 0.70, read
+  back with xdotool; the note to use the machine's own mouse was not shown.
+- **The box's built-in browser**: the full Chromium lacked three more libraries (cairo, cups, pango).
+  Linked from the home folder, with 51 in all; the page started again without the engine restarting.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

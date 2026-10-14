@@ -18,6 +18,7 @@ import json
 import math
 import os
 import secrets
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Iterator, Sequence
@@ -41,6 +42,7 @@ from bap_browser.computer.hermes.computer_use.cua_backend_daemon import Embedded
 from bap_browser.computer.seams.process import sanitize_subprocess_env, windows_hide_flags
 from bap_browser.config import Config
 from bap_browser.driver.mac_hand import MacHand, MacOS
+from bap_browser.driver.x11_hand import X11Hand, XScreen
 
 # What an engine may have the driver do besides the conversation itself: what it is, whether it is
 # ready, and single calls. Nothing that updates the driver, changes its settings or installs more.
@@ -63,12 +65,13 @@ STOPPED, NO_CODE, NOT_ALLOWED, BAD = (
 REFUSED_AT_THE_DOOR = status.WS_1008_POLICY_VIOLATION
 
 
-def tailnet_names(address: str, timeout_s: float) -> set[str]:
+def tailnet_names(address: str, timeout_s: float, socket: str = "") -> set[str]:
     """Who Tailscale says an address of the tailnet is: the node's tags and its owner's login.
-    Nobody, when Tailscale is not here or does not know the address."""
+    Nobody, when Tailscale is not here or does not know the address. `socket` is where Tailscale
+    listens, where it is not its own place: on a machine with no root, in userspace mode."""
     try:
         asked = subprocess.run(
-            ["tailscale", "whois", "--json", address],
+            ["tailscale", *([f"--socket={socket}"] if socket else []), "whois", "--json", address],
             capture_output=True,
             text=True,
             timeout=timeout_s,
@@ -88,8 +91,8 @@ class RemoteHand:
     22.6.2). Where on the picture is given as a share of it, and made a place on this screen here.
     Anything else that comes is dropped: the engine is elsewhere, and what it sends is checked."""
 
-    def __init__(self, macos: Any, hand: MacHand, *, key_chars: int) -> None:
-        self._macos = macos
+    def __init__(self, screen: Any, hand: MacHand | X11Hand, *, key_chars: int) -> None:
+        self._screen = screen
         self._hand = hand
         self._key_chars = key_chars
 
@@ -116,7 +119,7 @@ class RemoteHand:
         x, y = finite(said.get("x")), finite(said.get("y"))
         if x is None or y is None:
             return None
-        wide, high = self._macos.size()
+        wide, high = self._screen.size()
         return min(max(x, 0.0), 1.0) * wide, min(max(y, 0.0), 1.0) * high
 
 
@@ -375,15 +378,20 @@ def holding_to_the_allowed_apps(config: Config, binary: Path) -> Iterator[Callab
 
 NO_HAND_HERE = (
     "it is built for macOS, where the program that runs the helper is allowed under System Settings, "
-    "Privacy & Security, Accessibility."
+    "Privacy & Security, Accessibility, and for Linux, where xdotool and a screen (DISPLAY) are."
 )
 
 
 def a_hand_here(config: Config) -> RemoteHand | None:
-    """A person's mouse and keyboard from the engine's page, where this machine's settings allow it
-    and macOS takes them from this program."""
+    """A person's mouse and keyboard from the engine's page, where this machine's settings allow it:
+    on macOS where the system takes them from this program, on Linux where xdotool and a screen are."""
     computer_settings = config.computer
-    if not computer_settings.base.helper_hands or sys.platform != "darwin":
+    if not computer_settings.base.helper_hands:
+        return None
+    if sys.platform.startswith("linux") and shutil.which("xdotool") and os.environ.get("DISPLAY"):
+        screen = XScreen()
+        return RemoteHand(screen, X11Hand(screen), key_chars=config.control.key_name_max_chars)
+    if sys.platform != "darwin":
         return None
     macos = MacOS()
     if not macos.allowed():
@@ -412,7 +420,7 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
         code=code,
         allowed=tuple(base.helper_allow),
         tailnet=tailnet,
-        who=lambda address: tailnet_names(address, base.whois_timeout_s),
+        who=lambda address: tailnet_names(address, base.whois_timeout_s, base.tailscale_socket),
         say=print,
         run_timeout_s=base.helper_run_timeout_s,
         message_bytes=base.helper_message_bytes,

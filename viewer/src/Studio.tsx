@@ -14,6 +14,7 @@ import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
 import type { Passwords } from './systems/Access';
 import { openingTheChatWithATask } from './studio/beside';
+import { WhereLine } from './studio/WhereLine';
 import type { Me, SystemsApi } from './systems/api';
 import { SystemPanel, SystemsPage } from './systems/SystemsPage';
 import { MachineSetup } from './MachineSetup';
@@ -297,6 +298,9 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         )}
         {side}
       </nav>
+      {room.backend === 'contained_desktop' && hasSession(room) && !showingSystems && (
+        <WhereLine runs={room.runs} settings={systems?.settings(room.id)} surface={surface} />
+      )}
       {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
         // Where the picture cannot be driven, the person at the machine has their own hands.
         <p className="system-note studio-own-hands" role="status">

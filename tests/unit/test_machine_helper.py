@@ -20,7 +20,7 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 from tailnet_proxy import a_tailnet_proxy
 
-from bap_browser.service.machine_helper import Helper, helper_app
+from bap_browser.service.machine_helper import Helper, helper_app, tailnet_names
 
 CODE = "the-pairing-code"
 FROM_THE_VM = "100.64.0.7"
@@ -350,3 +350,28 @@ def test_where_tailscale_gives_a_proxy_the_link_reaches_the_helper_through_it(
     assert json.loads(asked.stdout)["binary_version"] == "0.21.0"
     assert conversed.stdout.splitlines() == ['back: {"id": 1}'], conversed.stderr
     assert names == [ON_THE_TAILNET, ON_THE_TAILNET]
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the stand-in tailscale is a script Windows does not start"
+)
+def test_the_helper_asks_tailscale_on_the_socket_it_is_told(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On a machine with no root, Tailscale runs in userspace mode and listens on a socket of its
+    own: the helper asks who a caller is there, or Tailscale's own place when none is named."""
+    asked = tmp_path / "asked.txt"
+    program = tmp_path / "tailscale"
+    program.write_text(
+        f'#!/bin/sh\necho "$@" >> {asked}\necho \'{{"Node": {{"Tags": ["tag:bap-vm"]}}}}\'\n',
+        encoding="utf-8",
+    )
+    program.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+
+    assert tailnet_names(FROM_THE_VM, 5, socket="/tmp/tailscaled.sock") == {"tag:bap-vm"}
+    assert tailnet_names(FROM_THE_VM, 5) == {"tag:bap-vm"}
+    assert asked.read_text(encoding="utf-8").splitlines() == [
+        f"--socket=/tmp/tailscaled.sock whois --json {FROM_THE_VM}",
+        f"whois --json {FROM_THE_VM}",
+    ]

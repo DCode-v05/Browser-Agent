@@ -22,7 +22,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import WebSocketException
 
 from bap_browser import computer
-from bap_browser.computer import contained
+from bap_browser.computer import contained, remote
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
 from bap_browser.driver.base import KeyAction, Located, MouseButton, PointerAction, QualityLevel, Shot
@@ -135,6 +135,8 @@ class HermesDriver(DesktopDriver):
         self.far_hand: ClientConnection | None = None
         # The size the page was first told, which it measures where a person points in.
         self.page_size: tuple[int, int] | None = None
+        # The system of the machine driven: this one's, or what a machine elsewhere says it runs.
+        self.system_driven = sys.platform
         if self._settings.runs == "machine" and (macos is not None or sys.platform == "darwin"):
             self._macos = (macos or MacOS)()
             self._hand = MacHand(
@@ -166,6 +168,15 @@ class HermesDriver(DesktopDriver):
         # The engine's own check has judged a call, and asked a person where the settings say so,
         # before it reaches the tool (spec 22.3.1). The tool's own question is answered by that.
         computer.ask_with(lambda action, about: True)
+        if self._settings.runs == "remote":
+            code = os.environ.get(self._settings.helper_token_env, "")
+            said = await asyncio.to_thread(
+                remote.system_of_the_machine,
+                self._settings.helper_url,
+                code,
+                self._settings.base.helper_run_timeout_s,
+            )
+            self.system_driven = said or self.system_driven
 
     async def close(self) -> None:
         await self.stop_frames()
@@ -343,7 +354,7 @@ class HermesDriver(DesktopDriver):
             # In its container the desktop starts its own apps, and only those a person allowed.
             await self.desktop.start_app(app)
             return True
-        named = NAMED.get(sys.platform, {}).get(app.id, app.command)
+        named = NAMED.get(self.system_driven, {}).get(app.id, app.command)
         return await self.open_named_app(named)
 
     async def open_named_app(self, name: str) -> bool:
