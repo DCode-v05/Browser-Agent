@@ -24,6 +24,8 @@ jobs:
       BAP_BROWSER__AGENT__MODEL: claude-opus-5-5
       BAP_BROWSER__AGENT__API_KEY_ENV: ANTHROPIC_API_KEY
       BAP_BROWSER__AGENT__BASE_URL: https://api.anthropic.com/v1
+      BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION: "4"
+      BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION: "20"
       BAP_BROWSER__BROWSER__CHROMIUM_SANDBOX: "false"
     steps:
       - name: Whether the key is set

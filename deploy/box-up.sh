@@ -71,4 +71,7 @@ export BAP_BROWSER__AGENT__PROVIDER=anthropic
 export BAP_BROWSER__AGENT__MODEL=${BAP_BROWSER__AGENT__MODEL:-claude-opus-5-5}
 export BAP_BROWSER__AGENT__API_KEY_ENV=ANTHROPIC_API_KEY
 export BAP_BROWSER__AGENT__BASE_URL=https://api.anthropic.com/v1
+# Claude Opus 5.5's price, so that each task's cost is kept (spec 12.6).
+export BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION=${BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION:-4}
+export BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION=${BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION:-20}
 exec sh deploy/vm-start.sh uv run bap-browser studio

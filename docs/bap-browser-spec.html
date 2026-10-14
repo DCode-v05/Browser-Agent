@@ -6604,6 +6604,14 @@ admin's policy lets through. What is kept back is taken out by the service, not 
 that.</p>
 <p>Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
 section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.</p>
+<h4 id="what-the-models-use-came-to">What the model's use came to</h4>
+<p>Every task a system keeps carries its model calls, its input and output tokens and, where the model
+has a price (<code>agent.input_price_per_million</code>, <code>agent.output_price_per_million</code>; Claude Opus 5.5 is
+$4 and $20), its cost. As each task ends the backend adds the four systems' records up again into
+one file beside them, <code>.bap-browser/evals/usage.json</code>: for Remote use (Cloud browser), Browser use (My
+Chrome), the Built-in browser and Computer use, each and in all, with the tokens and cost of each
+model. A task kept before its model had a price is costed at today's price for that model; one whose
+model has no price is counted in tokens and said to be uncosted. <code>bap-browser usage</code> shows it.</p>
 <h3 id="127-task-sets">12.7 Task sets</h3>
 <p>Section 12.6 says what a browser's tasks took. This section says whether the agent does a task
 right: tasks with a known right end, done on a practice site and graded by code. Built on

@@ -328,6 +328,7 @@
       "source": [
         "src/bap_browser/evals/record.py",
         "src/bap_browser/evals/summary.py",
+        "src/bap_browser/evals/usage.py",
         "src/bap_browser/evals/checks.py",
         "src/bap_browser/agent/timed.py",
         "src/bap_browser/private_file.py",
@@ -335,9 +336,10 @@
       ],
       "tests": [
         "tests/unit/test_evals.py",
+        "tests/unit/test_usage.py",
         "tests/viewer/test_studio.py"
       ],
-      "reach": "A browser's tab \"Evaluations\": the facts, \"Run the checklist\", and the tasks with \"Good\", \"Bad\" and \"Show the trace\".",
+      "reach": "A browser's tab \"Evaluations\": the facts, \"Run the checklist\", and the tasks with \"Good\", \"Bad\" and \"Show the trace\". `uv run bap-browser usage` prints the four systems' model calls, tokens and cost, kept in `.bap-browser/evals/usage.json`.",
       "addresses": [
         "/api/evals",
         "/api/systems/{system}/evals",

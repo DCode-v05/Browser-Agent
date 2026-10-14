@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from bap_browser.config import Agent, Evals
+from bap_browser.evals.usage import keep_usage
 from bap_browser.private_file import add_line, write_json
 from bap_browser.results import ToolResult
 
@@ -114,6 +115,8 @@ class Recorder:
         if not self.settings.enabled:
             return
         add_line(self.folder / TASKS, json.dumps(asdict(record), ensure_ascii=False))
+        # The four systems' use, added up again with this task in it (spec 12.6).
+        keep_usage(Path(self.settings.dir))
 
     def tasks(self) -> list[dict[str, Any]]:
         """The newest records, oldest first. A line that cannot be read is passed over."""

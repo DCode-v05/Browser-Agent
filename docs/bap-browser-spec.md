@@ -2785,6 +2785,16 @@ that.
 Not in this section: a judgement of an answer by another model, and the eight task-level scenarios of
 section 11.8. Outcome quality here is how the tasks ended and what the person said of the answers.
 
+#### What the model's use came to
+
+Every task a system keeps carries its model calls, its input and output tokens and, where the model
+has a price (`agent.input_price_per_million`, `agent.output_price_per_million`; Claude Opus 5.5 is
+$4 and $20), its cost. As each task ends the backend adds the four systems' records up again into
+one file beside them, `.bap-browser/evals/usage.json`: for Remote use (Cloud browser), Browser use (My
+Chrome), the Built-in browser and Computer use, each and in all, with the tokens and cost of each
+model. A task kept before its model had a price is costed at today's price for that model; one whose
+model has no price is counted in tokens and said to be uncosted. `bap-browser usage` shows it.
+
 ### 12.7 Task sets
 
 Section 12.6 says what a browser's tasks took. This section says whether the agent does a task

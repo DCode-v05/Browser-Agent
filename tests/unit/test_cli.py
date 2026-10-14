@@ -167,3 +167,44 @@ def test_the_chat_above_every_app_is_a_command_and_a_wrong_address_is_said(
     os.chdir(tmp_path)
     assert main(["computer", "chat", "vm.tail1234.ts.net"]) == 2
     assert "http:// or https://" in capsys.readouterr().err
+
+
+def test_usage_says_what_the_model_cost_for_each_system_and_in_all(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    evals = tmp_path / "evals"
+    (evals / "computer").mkdir(parents=True)
+    record = {
+        "id": "t1",
+        "system": "computer",
+        "model": "claude-opus-5-5",
+        "model_calls": 4,
+        "input_tokens": 250_000,
+        "output_tokens": 10_000,
+        "tokens_known": True,
+        "cost_usd": None,
+    }
+    (evals / "computer" / "tasks.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "evals": {"dir": str(evals)},
+                "agent": {
+                    "provider": "anthropic",
+                    "model": "claude-opus-5-5",
+                    "api_key_env": "ANTHROPIC_API_KEY",
+                    "input_price_per_million": 4,
+                    "output_price_per_million": 20,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["usage", "--config", str(config)]) == 0
+
+    shown = capsys.readouterr().out
+    assert "Computer use" in shown and "250,000" in shown and "$1.2000" in shown
+    assert "Remote use (Cloud browser)" in shown and "All four systems" in shown
+    assert json.loads((evals / "usage.json").read_text(encoding="utf-8"))["total"]["cost_usd"] == 1.2
