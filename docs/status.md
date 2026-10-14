@@ -1668,7 +1668,10 @@ Not done, and not checked:
   on a desktop nobody sits at.
 - **A click by a coordinate asks whenever the screen holds a grave control**, wherever the click
   is: a mail window with "Send" in it asks on every such click. A click by number does not.
-- **Still waiting on the person**: a tailnet.
+- **Over a real tailnet, the Mac half is proven**: the helper published by `tailscale serve`
+  refused a machine that is not `tag:bap-vm`, and with the Mac's own login let in for the test an
+  engine climbed the whole ladder through the Mac's tailnet name (spec 22.6.2). The Linux box has
+  not joined the tailnet, and its HTTPS certificates are off.
 
 Claude, checked on 2026-10-14 once the person put `ANTHROPIC_API_KEY` in `.env`:
 
