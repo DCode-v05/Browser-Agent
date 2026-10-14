@@ -569,8 +569,6 @@ class Studio:
     async def _own_browser(self, room: Room) -> None:
         """A page whose browser this process starts itself. Each time a person asks for a new
         session, a new browser is started for it."""
-        assert self.service is not None
-        service = self.service
         while True:
             await self._wanted(room)
             room.phase, room.note = "starting", ""
@@ -594,7 +592,6 @@ class Studio:
                 await self._asked_again(room)
                 continue
             self._take_place(room, session)
-            await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
             await self._talk(room, tasks, session)
             await self._asked_again(room)
 
@@ -644,7 +641,6 @@ class Studio:
             # The side panel in that Chrome shows this page's chat.
             panel = f"{service.address}/?session={room.id}#token={service.token}"
             browser_extension.announce(self._extension, panel, bridge=service.bridge_address)
-            await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
             await self._talk(room, tasks, session)
             await self._asked_again(room)
 
