@@ -240,6 +240,8 @@
       "spec": "9.16, 9.17",
       "source": [
         "src/bap_browser/agent/studio.py",
+        "src/bap_browser/agent/window.py",
+        "src/bap_browser/agent/room_configs.py",
         "src/bap_browser/service/systems.py",
         "viewer/src/Studio.tsx",
         "viewer/src/studio/rooms.ts",
@@ -249,9 +251,10 @@
       "tests": [
         "tests/viewer/test_studio.py",
         "tests/service/test_systems_api.py",
-        "tests/unit/test_studio_parts.py"
+        "tests/unit/test_studio_parts.py",
+        "tests/unit/test_room_configs.py"
       ],
-      "reach": "`uv run bap-browser studio --open`. Tabs \"Cloud browser\", \"My Chrome\", \"Built-in browser\"; under each, \"Browser and chat\", \"Configuration\", \"Evaluations\". The button \"Systems\" opens what is not one browser's.",
+      "reach": "`uv run bap-browser studio --open`. Tabs \"Cloud browser\", \"My Chrome\", \"Built-in browser\"; under each, \"Browser and chat\", \"Configuration\", \"Evaluations\". The button \"Systems\" opens what is not one browser's. `--browser` (the three browsers and computer use, no admin tools) and `--desktop` (the desktop app's own browser and computer use alone, for the desktop app to start) narrow which pages there are.",
       "addresses": [
         "/api/systems",
         "/api/systems/{system}/{action}",
