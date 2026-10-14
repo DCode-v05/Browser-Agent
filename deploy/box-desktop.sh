@@ -50,8 +50,10 @@ export BAP_BROWSER_HELPER_TOKEN
 docker rm -f bap-desk >/dev/null 2>&1 || true
 # In the container: the engine's studio starts the desktop's own screen, and once that screen is
 # there, the helper drives it for an engine elsewhere. Tailscale's userspace socket is named, so
-# that the helper can ask who a caller is.
+# that the helper can ask who a caller is. What it writes in /data (its task records, settings and
+# sign-ins) is kept in a volume of its own, which the next container finds again.
 docker run -d --name bap-desk --network host \
+  -v bap-desk-data:/data \
   -e TS_AUTHKEY -e ANTHROPIC_API_KEY -e BAP_BROWSER_HELPER_TOKEN \
   -e TS_HOSTNAME="${BAP_DESK_NAME:-bap-desk}" \
   -e BAP_BROWSER__COMPUTER__RUNS=here \

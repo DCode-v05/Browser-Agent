@@ -1,8 +1,13 @@
 """The container image and its configuration (spec 17.2). The image is not built here: these keep the
 files that make it in step with the rest."""
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from bap_browser.config import load_config
 
@@ -76,3 +81,39 @@ def test_the_vm_gives_its_desktop_a_session_bus_when_it_has_one_to_give() -> Non
     """The driver finds a Linux app's elements on the session's bus. Without a desktop there is none."""
     assert "dbus-run-session" in START
     assert START.rstrip().splitlines()[-1].startswith("exec ")
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the script is for a Linux box, and the stand-in docker is a script"
+)
+def test_the_box_desktop_keeps_what_it_wrote_when_its_container_is_made_again(tmp_path: Path) -> None:
+    """`deploy/box-desktop.sh` removes the old container and starts a new one. The desktop's task
+    records, its settings and sign-ins stay in a volume that outlives both."""
+    home, bin_dir = tmp_path / "home", tmp_path / "bin"
+    (home / ".bap-box").mkdir(parents=True)
+    (home / ".bap-box" / "docker-env").write_text("", encoding="utf-8")
+    bin_dir.mkdir()
+    asked = tmp_path / "docker-asked.txt"
+    docker = bin_dir / "docker"
+    docker.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> {asked}\n', encoding="utf-8")
+    docker.chmod(0o755)
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "TS_AUTHKEY": "stand-in",
+        "ANTHROPIC_API_KEY": "stand-in",
+    }
+
+    for _ in range(2):
+        subprocess.run(
+            ["bash", str(ROOT / "deploy" / "box-desktop.sh"), "you@example.com"],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=True,
+        )
+
+    runs = [line for line in asked.read_text(encoding="utf-8").splitlines() if line.startswith("run ")]
+    assert len(runs) == 2
+    assert all("-v bap-desk-data:/data " in run for run in runs), runs

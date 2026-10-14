@@ -1873,8 +1873,9 @@ The four arrangements were run again the same evening, both ways; every one pass
 - The desktop's container joins the tailnet with an ephemeral key, so after a restart it is a new
   node (`bap-desk-2`) until the old one is dropped. An engine pointed at the old name must be given
   the new one.
-- The container keeps its task records inside itself: `deploy/box-desktop.sh` removes the container
-  and them with it.
+- The container kept its task records inside itself: `deploy/box-desktop.sh` removed the container
+  and them with it. Its `/data` is now the volume `bap-desk-data`. On the box, a record written in
+  one container was read by the next after `docker rm -f`, and the desktop's 4 records were copied in.
 - `bap-browser sets`, run from the folder of an open window, wrote its own address over the window's
   in `.bap-browser/service.json` and removed the file as it ended: the window could not be found
   again. A test of the sets did the same to a developer's window, on every run of the gate. The
