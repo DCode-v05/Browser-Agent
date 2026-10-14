@@ -352,6 +352,9 @@ def test_where_tailscale_gives_a_proxy_the_link_reaches_the_helper_through_it(
     assert names == [ON_THE_TAILNET, ON_THE_TAILNET]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="the stand-in tailscale is a script Windows does not start"
+)
 def test_the_helper_asks_tailscale_on_the_socket_it_is_told(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
