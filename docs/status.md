@@ -1879,6 +1879,20 @@ the team's Linux box with rootless Docker (no sudo, `get.docker.com/rootless`, `
 the desktop's `computer` room reaches `agent` with the terminal off, the default. The existing e2e
 test (`tests/e2e/test_computer.py`) and the unit tests pass unchanged on a real, rootful Docker too.
 
+## Visual pass on the Systems page
+
+2026-10-14: the Systems page's own card (a browser's configuration, or a user's settings for one) had
+its sections running together — the gap between "This browser", "For users" and "Log" was barely more
+than a row has from its own label — and the loading/unreachable state was a stray line of muted text
+with no visual weight. Fixed within the existing tokens, no new ones: `.system-card` padding and
+`.system-section` spacing moved from `--space-4`/`--space-2`/`--space-3` to `--space-5`/`--space-4`,
+the card gained the existing `--shadow-float` token so it reads as raised, and a `.systems-empty` class
+holds the place for a loading or unreachable state (and for the admin's users view, which rendered
+nothing while the policy had not yet loaded — same fix). `npm --prefix viewer run typecheck`, `run
+lint`, `run test` (624 passed via `--pool=threads`; the default forks pool times out on this long
+Windows path, unrelated to this change) and `run build` all pass. The Studio page and the rest are not
+done in this pass.
+
 ## Documents
 
 | File | What it is |
