@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sys
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -109,6 +110,12 @@ ACTIONS = ("start", "stop", "restart", "install", "allow")
 STOPPED = "You stopped this browser from the Systems page."
 TURNED_OFF = "This browser was turned off."
 RESTARTED = "It was ended to start a new session."
+
+
+def driven(session: ServiceSession) -> str:
+    """The system of the machine a session's desktop driver works on."""
+    driver = session.browser.started_driver
+    return driver.system_driven if isinstance(driver, HermesDriver) else sys.platform
 
 
 @dataclass
@@ -418,7 +425,7 @@ class Studio:
             # Each task starts with nothing remembered of the one before it: a conversation of its
             # own, and a model client of its own, which keeps the turns of one conversation.
             # The desktop's own instructions, as in its chat: a run measures what a person would get.
-            system = instructions_for(session.config) if room.backend == DESKTOP else SYSTEM
+            system = instructions_for(session.config, driven(session)) if room.backend == DESKTOP else SYSTEM
             return await do_task(
                 words, session, self._model_for(service), session.config, [], recorder, system
             )
@@ -519,7 +526,9 @@ class Studio:
             if task is None:
                 return
             async with room.turn:
-                system = instructions_for(session.config) if room.backend == DESKTOP else SYSTEM
+                system = (
+                    instructions_for(session.config, driven(session)) if room.backend == DESKTOP else SYSTEM
+                )
                 await do_task(task, session, model, session.config, history, self._recorders[room.id], system)
 
     async def _own_desktop(self, room: Room) -> None:

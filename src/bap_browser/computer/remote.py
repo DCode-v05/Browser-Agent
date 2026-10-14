@@ -3,9 +3,11 @@ where the helper is and the pairing code in a file only the engine's user can re
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
+import urllib.request
 from pathlib import Path
 
 from bap_browser import private_file
@@ -39,3 +41,26 @@ def forget(home: Path) -> None:
     """The work has ended: the code is kept nowhere."""
     (home / TOLD).unlink(missing_ok=True)
     os.environ.pop(FILE, None)
+
+
+def system_of_the_machine(url: str, code: str, timeout_s: float) -> str | None:
+    """Which system the machine elsewhere runs, as its driver's own program says: an app bundle is
+    macOS, a program ending in .exe is Windows, any other is Linux. None when the helper does not say."""
+    asked = urllib.request.Request(
+        f"{url.rstrip('/')}/run",
+        data=json.dumps({"argv": ["manifest"]}).encode(),
+        headers={"Authorization": f"Bearer {code}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(asked, timeout=timeout_s) as answer:
+            said = json.loads(json.loads(answer.read()).get("stdout") or "{}")
+    except (OSError, ValueError, AttributeError):
+        return None
+    path = str(said.get("binary_path", ""))
+    if not path:
+        return None
+    if ".app/Contents/" in path:
+        return "darwin"
+    if path.lower().endswith(".exe"):
+        return "win32"
+    return "linux"
