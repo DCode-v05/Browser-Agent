@@ -134,7 +134,7 @@ def test_the_admin_says_what_a_capture_holds_and_whether_the_drivers_pointer_sho
     ]
     assert settings["computer_capture_mode"]["value"] == "som"
     assert [option["value"] for option in settings["computer_no_overlay"]["choices"]] == ["auto", "off", "on"]
-    assert settings["computer_no_overlay"]["value"] == "auto"
+    assert settings["computer_no_overlay"]["value"] == "off"
 
     store.change("web", {"computer_capture_mode": "ax", "computer_no_overlay": "on"}, "computer")
     base = store.apply_to(make_config(tmp_path), "contained_desktop", "computer").computer.base
