@@ -2301,6 +2301,17 @@ a fixture left showing, not a real browser. `_own_browser` and `_persons_chrome`
 session now shows its own first page (`about:blank`) until a task sends it somewhere. The demo site
 is unaffected as a destination: tasks, the checklist and the task sets still reach it by name.
 
+## The desktop app's own title bar, not the OS's
+
+Also found 2026-10-14: the desktop app's window kept the plain OS title bar above its content, which
+is the other thing that read as a prototype rather than a finished app (production UI pass). It is
+frameless now (`desktop/electron/main.cjs`): a slim drag strip of our own, with the OS's own
+minimize/maximize/close drawn over it on Windows and Linux (`titleBarOverlay`, told the shell's theme
+over a new `theme` IPC call so its colours follow light/dark); macOS keeps its own inset traffic
+lights and needs none of this. Not done: the rest of the structural pass (the top bar's own weight,
+the browser view's chrome) that was asked for alongside it — this piece alone was large enough to
+check in on first.
+
 ## Documents
 
 | File | What it is |
