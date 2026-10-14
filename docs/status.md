@@ -1961,6 +1961,31 @@ the team's Linux box with rootless Docker (no sudo, `get.docker.com/rootless`, `
 the desktop's `computer` room reaches `agent` with the terminal off, the default. The existing e2e
 test (`tests/e2e/test_computer.py`) and the unit tests pass unchanged on a real, rootful Docker too.
 
+## Take-over UX on a person's own machine, checked
+
+Asked to fix three things for `computer_use` on a person's own machine: input taking over the
+person's pointer, and a task being refused while one runs. All three turned out already built, so
+nothing but a test was added.
+
+- Background delivery stays the default: `delivery_for()` (`tools/computer_use_tool.py`) sends
+  `auto` to the foreground only when nobody is at the screen (`runs` in `container`/`here`, or
+  `virtual_screen`), never for `runs == "machine"`. Already proven by
+  `test_input_is_in_the_background_only_where_a_person_is_at_the_screen`.
+- The working indicator (`.chat-working` in `ChatPanel.tsx`) sits inside the chat log, never over
+  the browser pane or a control, and `Studio.tsx` renders every room's chat through the same `App`,
+  so the Computer room gets it too.
+- A task sent while one runs was already accepted: `ServiceSession.give_task()` never checks
+  `busy`, and `next_task()` drains an `asyncio.Queue` one task at a time. The chat's placeholder
+  already reads "Add the next task" while the agent works. No test proved the mid-run case
+  directly, so `tests/unit/test_chat.py::test_a_task_sent_while_one_runs_is_accepted_and_queued`
+  was added; it passes without any production change.
+
+`uv run pytest tests/unit -q`: 1789 passed, 7 failed — the two known Windows-only failures
+(`test_accounts.py`, `test_evals.py`) plus five in `test_doctor.py` that are unrelated to this
+change (a browser-launch check this machine's doctor cannot pass) and untouched by the diff.
+`uv run ruff format --check src tests` and `uv run ruff check src tests`: both clean. The viewer
+was not touched, so its checks were not run.
+
 ## Documents
 
 | File | What it is |
