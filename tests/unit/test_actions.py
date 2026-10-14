@@ -144,3 +144,20 @@ def test_a_box_that_is_ticked_sends_nothing_though_its_name_says_send(role: str)
     # What it would pay for, delete or give access to is still asked about.
     assert class_of("Delete my account when I sign out", ACTIONS, role=role) == "deletes"
     assert class_of("Send me the newsletter", ACTIONS) == "sends"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Move to Trash",
+        "Empty Trash",
+        "Move to Wastebasket",
+        "Send to Recycle Bin",
+        "Move to Bin",
+        "Empty Bin",
+    ],
+)
+def test_what_a_desktop_calls_throwing_away_deletes(name: str) -> None:
+    """On a desktop a file is thrown away into the Trash (macOS, Linux), the Recycle Bin (Windows)
+    or the Bin: emptying it, or moving a file there, deletes (spec 22.7)."""
+    assert class_of(name, ACTIONS) == "deletes"

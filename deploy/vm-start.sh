@@ -11,7 +11,9 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
   fi
   sock=/tmp/tailscaled.sock
   proxy=localhost:1055
-  tailscaled --tun=userspace-networking --state=mem: --socket="$sock" \
+  # The node's state is kept in memory. Its HTTPS certificate needs a folder: one that goes with the VM.
+  certs=$(mktemp -d)
+  tailscaled --tun=userspace-networking --state=mem: --statedir="$certs" --socket="$sock" \
     --outbound-http-proxy-listen="$proxy" --socks5-server="$proxy" >/tmp/tailscaled.log 2>&1 &
   if ! tailscale --socket="$sock" up --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-bap-browser}" --timeout=60s >&2; then
     echo "The VM could not join the tailnet with the key it was given. The key must be reusable, ephemeral, tagged and not expired." >&2
