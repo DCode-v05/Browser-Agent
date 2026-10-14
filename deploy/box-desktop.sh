@@ -61,6 +61,8 @@ docker run -d --name bap-desk --network host \
   -e BAP_BROWSER__AGENT__MODEL="${BAP_BROWSER__AGENT__MODEL:-claude-opus-5-5}" \
   -e BAP_BROWSER__AGENT__API_KEY_ENV=ANTHROPIC_API_KEY \
   -e BAP_BROWSER__AGENT__BASE_URL=https://api.anthropic.com/v1 \
+  -e BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION="${BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION:-4}" \
+  -e BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION="${BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION:-20}" \
   "$image" sh -c '
     tailscale --socket=/tmp/tailscaled.sock serve --bg --https=8796 http://127.0.0.1:8796 >&2
     uv run --project /app --no-sync bap-browser studio --dev &

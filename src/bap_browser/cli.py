@@ -176,6 +176,12 @@ def build_parser() -> argparse.ArgumentParser:
     sets.add_argument("--config", help="path of config.json")
     sets.set_defaults(run=_sets)
 
+    usage = commands.add_parser(
+        "usage", help="what the model's use came to for each of the four systems: tasks, tokens and cost"
+    )
+    usage.add_argument("--config", help="path of config.json")
+    usage.set_defaults(run=_usage)
+
     agent = commands.add_parser(
         "agent", help="run the reference agent on a task, with the viewer to watch and control it"
     )
@@ -382,6 +388,30 @@ def _key_for_the_model(config: Config) -> str:
             "in the environment. To try without a model: bap-browser agent --demo"
         )
     return key
+
+
+def _usage(args: argparse.Namespace) -> int:
+    """Adds up the tasks the four systems kept, writes the file of it beside them, and shows it."""
+    from bap_browser.evals.usage import keep_usage
+
+    config = load_config(args.config)
+    used = keep_usage(Path(config.evals.dir), config.agent)
+    rows = [(one["name"], one) for one in used["systems"].values()] + [("All four systems", used["total"])]
+    print(
+        f"{'System':<28} {'Tasks':>6} {'Model calls':>12} {'Input tokens':>14} {'Output tokens':>14} {'Cost':>11}"
+    )
+    for name, one in rows:
+        cost = f"${one['cost_usd']:.4f}" + (" *" if one["cost_unknown"] else "")
+        print(
+            f"{name:<28} {one['tasks']:>6} {one['model_calls']:>12,} {one['input_tokens']:>14,} "
+            f"{one['output_tokens']:>14,} {cost:>11}"
+        )
+    if used["total"]["cost_unknown"]:
+        print(
+            "* Some tasks have no cost: their model has no price in agent.input_price_per_million and agent.output_price_per_million."
+        )
+    print(f"Kept in {Path(config.evals.dir) / 'usage.json'}")
+    return 0
 
 
 def _sets(args: argparse.Namespace) -> int:

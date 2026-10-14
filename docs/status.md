@@ -1839,6 +1839,43 @@ Added after, on the same day:
 - **The box's built-in browser**: the full Chromium lacked three more libraries (cairo, cups, pango).
   Linked from the home folder, with 51 in all; the page started again without the engine restarting.
 
+### 1bc. Built on 2026-10-14: what the model's use came to, for the four systems
+
+Every task a system keeps already carried its model calls, tokens and, with a price set, its cost.
+The backend now adds the four systems' records up again as each task ends, into
+`.bap-browser/evals/usage.json`: Remote use (Cloud browser), Browser use (My Chrome), the Built-in
+browser and Computer use, each and in all, with each model's share (`evals/usage.py`).
+`bap-browser usage` prints it. Claude Opus 5.5's price, $4 and $20 a million tokens in and out, is
+set by `deploy/box-up.sh`, `deploy/box-desktop.sh` and the nightly run. A task kept before its model
+had a price is costed at today's price for that model; one whose model has no price is counted in
+tokens and marked uncosted.
+
+On the Mac, `bap-browser usage` said:
+
+| System | Tasks | Model calls | Input tokens | Output tokens | Cost |
+|---|---:|---:|---:|---:|---:|
+| Remote use (Cloud browser) | 11 | 69 | 506,672 | 4,116 | $0.2063 * |
+| Browser use (My Chrome) | 0 | 0 | 0 | 0 | $0.0000 |
+| Built-in browser | 0 | 0 | 0 | 0 | $0.0000 |
+| Computer use | 31 | 206 | 1,566,377 | 17,369 | $2.7768 * |
+| All four systems | 42 | 275 | 2,073,049 | 21,485 | $2.9830 * |
+
+The `*` is the 29 older tasks of `gpt-5.6-luna`, which has no price here. On the team box, the same
+sum over its records: the engine 4 tasks, 81,778 tokens in, $0.3545; the desktop 4 tasks, 238,174
+in, $0.9985.
+
+The four arrangements were run again the same evening, both ways; every one passed. Found on the way:
+
+- An engine started from code older than the driven-system change named the box's desktop a Mac,
+  asked for captures it cannot give there, and could not use the text editor. The Mac's engine had
+  been restarted from a branch without that change. Started again on `main`, the same task was done
+  in 20 s.
+- The desktop's container joins the tailnet with an ephemeral key, so after a restart it is a new
+  node (`bap-desk-2`) until the old one is dropped. An engine pointed at the old name must be given
+  the new one.
+- The container keeps its task records inside itself: `deploy/box-desktop.sh` removes the container
+  and them with it.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
