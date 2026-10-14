@@ -724,24 +724,58 @@ async def test_a_driver_that_stops_answering_on_the_engines_own_desktop_is_start
     assert [command[-1] for command in own.ran] == ["import", "cua-driver"]
 
 
-async def test_on_a_persons_machine_a_driver_that_stops_answering_is_left_alone(
-    make_config, tmp_path: Path
+class Gone(WithAMenu):
+    """A driver session on a machine elsewhere that is gone, and says so as it did over the tailnet
+    after a capture timed out: the link's new process did not know it, and could not revive it."""
+
+    def __init__(self, said: str, failed: list[str]) -> None:
+        super().__init__()
+        self.said, self.failed = said, failed
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        if app == "screen":
+            return super().capture(mode, app, pid, window_id)
+        self.failed.append(self.said)
+        raise RuntimeError(self.said)
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "cua-driver MCP call get_window_state timed out; the action outcome is unknown",
+        "cua-driver list_windows failed: session 'hermes-e58d2fa1a04f' has ended; tool call 'list_windows' was rejected.",
+    ],
+)
+async def test_on_a_persons_machine_a_lost_driver_session_is_begun_afresh_and_nothing_there_is_ended(
+    make_config, tmp_path: Path, said: str
 ) -> None:
+    """The person's own programs are theirs: nothing is ended on their machine. The next call goes
+    to a session of its own, which the driver starts for it, instead of the one that is gone."""
     config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    failed: list[str] = []
+
+    def a_backend() -> WithAMenu:
+        # The driver's sessions begun before the loss are gone; one begun after it answers.
+        return WithAMenu() if failed else Gone(said, failed)
+
     session = ServiceSession(
         config,
-        HermesDriver(config, backend=Stalled),
+        HermesDriver(config, backend=a_backend),
         name="computer",
         backend="contained_desktop",
         tools=computer_tools_for,
     )
     await session.start()
     try:
-        seen = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        lost = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        again = await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
     finally:
         await session.close()
 
-    assert seen.is_error and "stopped answering" not in seen.text
+    assert lost.is_error and "Capture again" in lost.text and "has ended" not in lost.text
+    assert not again.is_error and "#1 push button 'Save'" in again.text
 
 
 async def captured(make_config, tmp_path: Path, asked: dict[str, Any], **base: Any) -> dict[str, Any]:

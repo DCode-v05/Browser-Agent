@@ -119,6 +119,8 @@ class HermesDriver(DesktopDriver):
         self._screen: ScreenHere | None = None
         self._placed: dict[int, tuple[int, int, int, int]] = {}
         self._named: dict[int, tuple[str, str]] = {}
+        # How many times the driver's session was lost and begun afresh: each is a session of its own.
+        self._afresh = 0
         # The element the agent last pressed by its number, which has the focus, and the app it
         # last named: what a key, typing and watch mode are judged by (spec 22.7).
         self._focus: int | None = None
@@ -196,7 +198,7 @@ class HermesDriver(DesktopDriver):
             raise BrowserError(
                 "The machine's screen is not being driven any more.", reason="the session ended"
             )
-        return await asyncio.to_thread(computer.computer_use, arguments, session or self._name)
+        return await asyncio.to_thread(computer.computer_use, arguments, session or self._session)
 
     # Where things are, on a desktop this engine itself started (spec 22.5).
 
@@ -284,16 +286,23 @@ class HermesDriver(DesktopDriver):
             return False
         return True
 
+    @property
+    def _session(self) -> str:
+        """The name the base knows the agent's session with the driver by."""
+        return f"{self._name}.{self._afresh}" if self._afresh else self._name
+
     async def started_again(self) -> bool:
-        """Puts right a desktop that has stopped answering, where this engine itself started the
-        desktop. On Linux the driver pictures a window with a program of its own, and when the window
-        has gone that program waits for ever with the screen held: nothing else is answered, a fresh
-        driver neither. It is ended, and the driver with it, so that the next call starts a fresh
-        one. The desktop's apps are left as they are. False on a person's own machine: what runs
-        there is theirs."""
+        """Puts right a desktop that has stopped answering. The next call goes to a session of its
+        own: one that is gone, as over a link whose new process does not know it, is not revived.
+        Where this engine itself started the desktop, more is done. On Linux the driver pictures a
+        window with a program of its own, and when the window has gone that program waits for ever
+        with the screen held: nothing else is answered, a fresh driver neither. It is ended, and the
+        driver with it. The desktop's apps are left as they are. On a person's own machine nothing
+        is ended: what runs there is theirs."""
+        self._afresh += 1
         own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
         if own is None:
-            return False
+            return True
         for program in (ITS_PICTURES, THE_DRIVER):
             with contextlib.suppress(BapError):
                 # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
@@ -326,7 +335,7 @@ class HermesDriver(DesktopDriver):
     async def open_named_app(self, name: str) -> bool:
         if self._base is None:
             return False
-        return await asyncio.to_thread(computer.open_app, name, self._name)
+        return await asyncio.to_thread(computer.open_app, name, self._session)
 
     # What a person sees: the whole screen. The viewer has a session of its own with the driver, so
     # that its looking never moves the window the agent is working in.
