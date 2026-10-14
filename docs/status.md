@@ -2292,6 +2292,15 @@ served, not opened a second time, because it marks the backend it starts
 (`BAP_BROWSER_DESKTOP_APP_CORE`, `desktop/electron/main.cjs`) and `cli.py`'s `_studio` checks for
 that mark before deciding which of the two to do.
 
+## A fresh session starts on nothing, not the demo site
+
+Found 2026-10-14, looking at the production UI pass: opening Cloud browser or Built-in browser, or
+pairing My Chrome, auto-navigated to `/demo-site/start.html` before any task was given, which read as
+a fixture left showing, not a real browser. `_own_browser` and `_persons_chrome`
+(`src/bap_browser/agent/studio.py`) no longer call `browser_navigate` on session start; a fresh
+session now shows its own first page (`about:blank`) until a task sends it somewhere. The demo site
+is unaffected as a destination: tasks, the checklist and the task sets still reach it by name.
+
 ## Documents
 
 | File | What it is |
