@@ -6,7 +6,7 @@ import { preferencesFrom } from './preferences';
 import { authFrom, type AuthState, type Role } from './auth/api';
 import { SignIn } from './auth/SignIn';
 import { Studio } from './Studio';
-import { desktopOpener, factsFrom, NO_FACTS, roomsFrom } from './studio/rooms';
+import { besideOpener, desktopOpener, factsFrom, NO_FACTS, roomsFrom } from './studio/rooms';
 import { systemsFrom, type Me } from './systems/api';
 import { PAGE } from './options';
 import { W } from './wording';
@@ -174,8 +174,10 @@ const loadRooms = live && !query.has('session') ? roomsFrom(location.href, live,
 const rooms = loadRooms ? facts.rooms : null;
 const openDesktop = rooms && live && facts.desktop ? desktopOpener(location.href, live) : undefined;
 /** The chat of one page alone, in a narrow window to keep beside the machine's own screen. */
-const openBeside = (room: string) =>
+const besideInTheBrowser = (room: string) =>
   void window.open(`?session=${encodeURIComponent(room)}&beside`, `bap-browser-chat-${room}`, `popup,width=${PAGE.besideWidth},height=${PAGE.besideHeight}`);
+const askForBeside = live ? besideOpener(location.href, live, besideInTheBrowser) : undefined;
+const openBeside = (room: string) => void (askForBeside ? askForBeside(room) : besideInTheBrowser(room));
 const systems = rooms && live && facts.systems ? systemsFrom(location.href, live, W.systems.unreachable) : undefined;
 // Who is signed in, and what they may use and see.
 const me: Me | null = systems && signsIn ? await systems.me() : null;

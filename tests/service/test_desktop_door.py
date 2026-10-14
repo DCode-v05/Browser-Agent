@@ -25,6 +25,7 @@ class AppThatCounts(DesktopApp):
         super().__init__(tmp_path, tmp_path / "desktop-service.json", close_wait_s=1)
         self._there = there
         self.asked = 0
+        self.beside: list[tuple[str, int]] = []
 
     @property
     def there(self) -> bool:
@@ -35,6 +36,12 @@ class AppThatCounts(DesktopApp):
             raise BapError("The desktop app is not installed.")
         self.asked += 1
         return self.asked == 1
+
+    def chat_beside(self, address: str, width: int) -> bool:
+        if not self._there:
+            raise BapError("The desktop app is not installed.")
+        self.beside.append((address, width))
+        return len(self.beside) == 1
 
 
 def ask(url: str, *, method: str = "GET", token: str | None = None) -> tuple[int, bytes]:
@@ -110,6 +117,58 @@ async def test_a_service_with_no_app_has_none_to_open(
         assert (await asyncio.to_thread(ask, f"{service.address}/api/desktop", method="POST", token=TOKEN))[
             0
         ] == 404
+    finally:
+        await service.stop()
+        await session.close()
+
+
+async def test_a_person_at_this_machine_opens_the_chat_above_the_other_apps(
+    make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    """The chat of a page, in a window that stays above every app (spec 22.3.1). It is signed in as
+    whoever asked for it, and shows that page's chat alone."""
+    app = AppThatCounts(tmp_path)
+    service, session = await served(make_config, tmp_path, app)
+    try:
+        door = f"{service.address}/api/sessions/default/beside"
+        assert (await asyncio.to_thread(ask, door, method="POST"))[0] == 401
+        assert (await asyncio.to_thread(ask, door, token=TOKEN))[0] in (404, 405)
+        assert app.beside == []
+
+        status, body = await asyncio.to_thread(ask, door, method="POST", token=TOKEN)
+        assert (status, json.loads(body)) == (200, {"state": "opened"})
+        assert app.beside == [(f"{service.address}/?session=default&beside#token={TOKEN}", 400)]
+        status, body = await asyncio.to_thread(ask, door, method="POST", token=TOKEN)
+        assert (status, json.loads(body)) == (200, {"state": "open"})
+
+        nowhere = f"{service.address}/api/sessions/no-such-page/beside"
+        assert (await asyncio.to_thread(ask, nowhere, method="POST", token=TOKEN))[0] == 404
+    finally:
+        await service.stop()
+        await session.close()
+
+
+async def test_a_person_elsewhere_is_not_given_a_window_on_this_machine(
+    make_config: Callable[..., Config], tmp_path: Path
+) -> None:
+    """A window opened here is of no use to somebody at another machine, and is signed in as them."""
+    app = AppThatCounts(tmp_path)
+    service, session = await served(make_config, tmp_path, app)
+    try:
+        door = f"{service.address}/api/sessions/default/beside"
+        request = urllib.request.Request(
+            door, method="POST", headers={"Authorization": f"Bearer {TOKEN}", "X-Forwarded-For": "100.64.0.7"}
+        )
+
+        def asked() -> int:
+            try:
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    return response.status
+            except urllib.error.HTTPError as refused:
+                return refused.code
+
+        assert await asyncio.to_thread(asked) == 404
+        assert app.beside == []
     finally:
         await service.stop()
         await session.close()

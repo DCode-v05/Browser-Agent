@@ -15,6 +15,7 @@ import { agentStatus } from './ChatPanel';
 import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 import { richText } from './richText';
+import { useWords } from '../words';
 
 interface Props {
   state: ViewerState;
@@ -61,6 +62,7 @@ function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number
 }
 
 export function Conversation({ state, view, maxChars, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef }: Props) {
+  const L = useWords();
   const [draft, setDraft] = useState('');
   /** The groups of steps a person opened or closed by hand. The rest follow the work. */
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -113,13 +115,13 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
         );
       case 'take_over':
         return (
-          <Button key={name} kind="quiet" icon="hand" hint={W.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
+          <Button key={name} kind="quiet" icon="hand" hint={L.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
             {W.buttons.takeOver}
           </Button>
         );
       case 'hand_back':
         return (
-          <Button key={name} kind="person" hint={W.buttons.hint.handBack} onClick={onHandBack}>
+          <Button key={name} kind="person" hint={L.buttons.hint.handBack} onClick={onHandBack}>
             {W.buttons.handBack}
           </Button>
         );
@@ -159,7 +161,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           {null}
         </Button>
         {view.controls.includes('stop') && (
-          <Button kind="quiet" icon="close" onClick={onStopSession} ref={stopRef} label={W.buttons.stop} hint={W.buttons.hint.stop}>
+          <Button kind="quiet" icon="close" onClick={onStopSession} ref={stopRef} label={W.buttons.stop} hint={L.buttons.hint.stop}>
             {null}
           </Button>
         )}
@@ -227,7 +229,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           disabled={!open}
           placeholder={open ? (onATask ? W.chat.placeholderWorking : W.chat.placeholder) : W.chat.closed}
           aria-label={W.chat.inputLabel}
-          title={W.buttons.hint.task}
+          title={L.buttons.hint.task}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKey}
         />
@@ -235,7 +237,7 @@ export function Conversation({ state, view, maxChars, selected, cards, drawer, o
           {view.controls.map(control)}
           <span className="top-bar-space" />
           {onATask && !task ? (
-            <Button icon="stop" onClick={() => onCommand({ type: 'stop_task' })} label={W.chat.stopTask} hint={W.buttons.hint.stopTask}>
+            <Button icon="stop" onClick={() => onCommand({ type: 'stop_task' })} label={W.chat.stopTask} hint={L.buttons.hint.stopTask}>
               {null}
             </Button>
           ) : (

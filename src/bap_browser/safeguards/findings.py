@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal
@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 from bap_browser import keys
 from bap_browser.address import site_pattern
+from bap_browser.config import Config
 from bap_browser.driver.base import Located
 from bap_browser.driver.session import BrowserSession
 from bap_browser.errors import BapError
@@ -49,6 +50,10 @@ AutoState = Literal["off", "on", "paused", "waiting_for_task", "unavailable"]
 
 # The tools that press a control, whose name can say what pressing it does.
 PRESS = frozenset({"browser_click", "browser_set_checked", "browser_select_option"})
+# The same on a desktop: the tool, and its actions that press one element (spec 22.7).
+PRESS_ON_A_DESKTOP = frozenset(
+    ("computer_use", action) for action in ("click", "double_click", "right_click", "middle_click")
+)
 # The tools that put text into a field.
 TYPE = frozenset({"browser_type", "browser_fill_form", "browser_press_key"})
 # The keys that press the control that has the focus.
@@ -77,6 +82,20 @@ A_SITE_FOR = {
     "government": "a government site",
     "more": "a sensitive site",
 }
+
+
+def gravest_of(controls: Sequence[Located], config: Config) -> Located | None:
+    """Among the controls a screen holds, one whose press pays, sends, deletes or gives access. A
+    click by its place names no element (spec 22.7): where the screen holds such a control the
+    click may be on it, and is judged as a press of it."""
+    words = config.permissions.consequential_words
+    for control in controls:
+        if (
+            class_of(control.name, config.safeguards.actions, words, role=control.role)
+            in NEVER_ON_A_MODELS_WORD
+        ):
+            return control
+    return None
 
 
 @dataclass(frozen=True)
@@ -211,7 +230,7 @@ class Findings:
                 return "sends" if message_box and pressed in SENDING_KEYS else None
             if pressed not in PRESSING_KEYS:
                 return None
-        elif step.tool not in PRESS:
+        elif step.tool not in PRESS and (step.tool, step.arguments.get("action")) not in PRESS_ON_A_DESKTOP:
             return None
         named = control.name
         chosen = step.arguments.get("values")

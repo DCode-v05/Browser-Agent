@@ -10,6 +10,7 @@ import type { ControlName, StateKey, StateView } from '../state/view';
 import { W } from '../wording';
 import { Icon, type IconName } from './Icon';
 import { trapTab } from './focus';
+import { useWords } from '../words';
 
 const STATE_ICON: Record<StateKey, IconName> = {
   no_agent: 'plug',
@@ -79,10 +80,11 @@ interface Props {
 }
 
 export function StatusPanel({ view, now, layout, options, onCommand, onStop, onHandBack, primaryRef, stopRef, onShowSplit, titleRef, working }: Props) {
+  const L = useWords();
   const driving = view.key === 'person';
   const title = driving && layout === 'bar' ? W.takeover.bar : view.status;
   // The reason a session ended is told once, in the summary.
-  const detail = view.key === 'ended' ? '' : driving && layout === 'bar' ? W.takeover.release(options.releaseChord) : view.detail;
+  const detail = view.key === 'ended' ? '' : driving && layout === 'bar' ? L.takeover.release(options.releaseChord) : view.detail;
 
   const control = (name: ControlName): ReactNode => {
     switch (name) {
@@ -100,13 +102,13 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
         );
       case 'take_over':
         return (
-          <Button key={name} icon="hand" busy={working === name} hint={W.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
+          <Button key={name} icon="hand" busy={working === name} hint={L.buttons.hint.takeOver} onClick={() => onCommand({ type: 'take_over' })}>
             {working === name ? W.buttons.takingOver : W.buttons.takeOver}
           </Button>
         );
       case 'hand_back':
         return (
-          <Button key={name} kind="person" busy={working === name} hint={W.buttons.hint.handBack} onClick={onHandBack} ref={primaryRef}>
+          <Button key={name} kind="person" busy={working === name} hint={L.buttons.hint.handBack} onClick={onHandBack} ref={primaryRef}>
             {working === name ? W.buttons.handingBack : W.buttons.handBack}
           </Button>
         );
@@ -124,7 +126,7 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
         );
       case 'stop':
         return (
-          <Button key={name} icon="stop" kind="danger" hint={W.buttons.hint.stop} onClick={onStop} ref={stopRef}>
+          <Button key={name} icon="stop" kind="danger" hint={L.buttons.hint.stop} onClick={onStop} ref={stopRef}>
             {W.buttons.stop}
           </Button>
         );
@@ -152,7 +154,7 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
         <div className="status-controls">
           {view.controls.map(control)}
           {onShowSplit && !driving && (
-            <Button kind="quiet" icon="collapse" onClick={onShowSplit} label={W.buttons.showSplit}>
+            <Button kind="quiet" icon="collapse" onClick={onShowSplit} label={L.buttons.showSplit}>
               {null}
             </Button>
           )}

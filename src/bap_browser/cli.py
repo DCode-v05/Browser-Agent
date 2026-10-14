@@ -17,7 +17,7 @@ from bap_browser import __version__
 from bap_browser.config import Config, defaults, load_config, load_config_with_sources
 from bap_browser.config_doc import reference_markdown
 from bap_browser.env_file import apply_env_file
-from bap_browser.errors import ConfigError
+from bap_browser.errors import BapError, ConfigError
 
 STARTER: dict[str, Any] = {
     "browser": {"channel": "chromium", "headless": True},
@@ -90,6 +90,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     studio.add_argument("--config", help="path of config.json")
     studio.add_argument("--open", action="store_true", help="open the window in your browser")
+    only = studio.add_mutually_exclusive_group()
+    only.add_argument(
+        "--browser",
+        action="store_true",
+        help="only the three browsers and computer use, with none of the admin's own tools",
+    )
+    only.add_argument(
+        "--desktop",
+        action="store_true",
+        help="only the desktop app's own browser and computer use, for the desktop app itself to start",
+    )
     studio.set_defaults(run=_studio)
 
     computer = commands.add_parser(
@@ -120,6 +131,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="take calls from this machine only, not from the tailnet",
     )
     its_helper.set_defaults(run=_computer)
+    its_chat = computer_commands.add_parser(
+        "chat",
+        help="on a person's own machine: keep the chat of a service above every other app, at the screen's edge",
+    )
+    its_chat.add_argument("service", help="the service's address, for example https://vm.your-tailnet.ts.net")
+    its_chat.add_argument("--page", default="computer", help="the page whose chat it is (default: computer)")
+    its_chat.add_argument("--config", help="path of config.json")
+    its_chat.set_defaults(run=_computer)
 
     doctor = commands.add_parser(
         "doctor", help="check that this machine has what bap-browser needs, and which browsers launch here"
@@ -260,6 +279,17 @@ def _computer(args: argparse.Namespace) -> int:
         return commands.install(config)
     if args.computer_command == "doctor":
         return commands.doctor(config, as_json=args.json)
+    if args.computer_command == "chat":
+        from bap_browser.agent.window import desktop_app_of
+
+        try:
+            return desktop_app_of(config).chat_beside_until_closed(
+                args.service, args.page, config.server.side_chat_width
+            )
+        except BapError as wrong:
+            raise ConfigError(str(wrong)) from wrong
+        except KeyboardInterrupt:
+            return 0
     if args.computer_command == "helper":
         # Imported here: only the helper needs the web server.
         from bap_browser.service.machine_helper import run_helper
@@ -394,6 +424,7 @@ def _studio(args: argparse.Namespace) -> int:
         return OpenAIModel(config.agent, client)
 
     extension = browser_extension.install(extension_folder(config))
+    rooms_mode = "browser" if args.browser else "desktop" if args.desktop else "full"
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(Interrupted, KeyboardInterrupt):
         asyncio.run(
@@ -402,6 +433,7 @@ def _studio(args: argparse.Namespace) -> int:
                 hosted,
                 open_viewer=args.open,
                 extension=extension,
+                rooms_mode=rooms_mode,
             )
         )
     # It runs until it is interrupted, so that is how it always ends.

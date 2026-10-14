@@ -16,6 +16,8 @@ export interface Room {
   extension?: string;
   /** For the desktop of computer use: where it works, the contained desktop or the person's own Mac. */
   runs?: string;
+  /** For a real machine: whether what a person does on its picture reaches its screen. */
+  hand?: boolean;
 }
 
 const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium', 'contained_desktop']);
@@ -26,7 +28,7 @@ export const hasSession = (room: Pick<Room, 'state'>): boolean => !NO_SESSION.ha
 
 function roomOf(given: unknown): Room | null {
   if (typeof given !== 'object' || given === null) return null;
-  const { id, backend, state, attention, working, note, extension, runs } = given as Record<string, unknown>;
+  const { id, backend, state, attention, working, note, extension, runs, hand } = given as Record<string, unknown>;
   if (typeof id !== 'string' || typeof backend !== 'string' || !BACKENDS.has(backend) || typeof state !== 'string') return null;
   return {
     id,
@@ -37,6 +39,7 @@ function roomOf(given: unknown): Room | null {
     note: typeof note === 'string' ? note : undefined,
     extension: typeof extension === 'string' ? extension : undefined,
     runs: typeof runs === 'string' ? runs : undefined,
+    hand: hand === true ? true : undefined,
   };
 }
 
@@ -96,6 +99,23 @@ export function desktopOpener(pageAddress: string, token: string): OpenDesktop {
     } catch {
       return false;
     }
+  };
+}
+
+/**
+ * Opens the chat of one page beside the machine's own screen (spec 22.3.1). The service on this
+ * machine is asked for a window of its own, which stays above every other app. Where it has none to
+ * give (it runs elsewhere, or its desktop app is not installed) the chat opens `inTheBrowser`.
+ */
+export function besideOpener(pageAddress: string, token: string, inTheBrowser: (room: string) => void): (room: string) => Promise<void> {
+  return async (room) => {
+    const address = new URL(`api/sessions/${encodeURIComponent(room)}/beside`, pageAddress).href;
+    try {
+      if ((await fetch(address, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })).ok) return;
+    } catch {
+      // The service does not answer just now: the browser's own window still can.
+    }
+    inTheBrowser(room);
   };
 }
 

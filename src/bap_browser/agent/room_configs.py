@@ -16,13 +16,16 @@ def cloud_config(config: Config) -> Config:
     return config.model_copy(update={"browser": browser})
 
 
-def built_in_config(config: Config) -> Config:
+def built_in_config(config: Config, *, keep_cdp: bool = False) -> Config:
     """The app's own browser: it keeps its sign-ins, apart from the person's own browser and from
-    the cloud browser."""
+    the cloud browser. `keep_cdp` is for the desktop app's shell (spec 14.3): its browser is a real
+    window the app itself shows, so the room attaches to it by the deployment's own `cdp_url`
+    instead of starting one of its own."""
     profile = Path(config.data_dir).expanduser() / BUILT_IN_PROFILE
-    browser = config.browser.model_copy(
-        update={"headless": True, "user_data_dir": str(profile), "cdp_url": None}
-    )
+    update: dict[str, object] = {"headless": True, "user_data_dir": str(profile)}
+    if not keep_cdp:
+        update["cdp_url"] = None
+    browser = config.browser.model_copy(update=update)
     return config.model_copy(update={"browser": browser})
 
 

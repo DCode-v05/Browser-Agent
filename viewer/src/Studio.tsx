@@ -13,10 +13,12 @@ import type { Connection } from './connection/connection';
 import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
 import type { Passwords } from './systems/Access';
+import { openingTheChatWithATask } from './studio/beside';
 import type { Me, SystemsApi } from './systems/api';
 import { SystemPanel, SystemsPage } from './systems/SystemsPage';
 import { MachineSetup } from './MachineSetup';
 import { W } from './wording';
+import { TheWords, wordsFor } from './words';
 
 const BACKEND_ICON: Record<Backend, IconName> = {
   remote_headless: 'globe',
@@ -148,7 +150,11 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     };
   }, [loadRooms, pollMs, follows, systems, settings, surface, prefers]);
 
-  const createConnection = useCallback(() => connectionFor(roomId), [connectionFor, roomId]);
+  const followsTheTask = Boolean(openBeside && room && onAMachine(room));
+  const createConnection = useCallback(
+    () => (followsTheTask && openBeside ? openingTheChatWithATask(connectionFor(roomId), () => openBeside(roomId)) : connectionFor(roomId)),
+    [connectionFor, roomId, followsTheTask, openBeside],
+  );
   const open = (id: string) => {
     setOnSystems(false);
     setChosen(id);
@@ -269,7 +275,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
                 role="tab"
                 className="systems-view"
                 aria-selected={view === name}
-                title={W.studio.hint.view[name]}
+                title={wordsFor(room.backend).studio.hint.view[name]}
                 onClick={() => {
                   // Back on the browser's own page, it shows where the browser stands now.
                   if (name === 'agent') void refresh();
@@ -282,9 +288,16 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           </div>
         </nav>
       )}
+      {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
+        // Where the picture cannot be driven, the person at the machine has their own hands.
+        <p className="system-note studio-own-hands" role="status">
+          {W.studio.beside.yourOwnHands}
+        </p>
+      )}
       {/* The window has the page's one bar, its heading and its main part: what is drawn in it has none of its own. */}
       <main className="studio-page">
        <div className="studio-panel" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
+        <TheWords.Provider value={wordsFor(showingSystems ? undefined : room.backend)}>
         {showingSystems ? (
           <SystemsPage
             api={systems}
@@ -331,6 +344,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             onManage={systems && role === 'admin' ? (step) => systems.manage(room.id, step) : undefined}
           />
         )}
+        </TheWords.Provider>
        </div>
       </main>
     </div>

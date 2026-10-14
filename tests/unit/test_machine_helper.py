@@ -4,6 +4,7 @@ tailnet (spec 22.6.2): who it lets in, what it passes on, and what it says of it
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -17,6 +18,7 @@ import pytest
 import uvicorn
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
+from tailnet_proxy import a_tailnet_proxy
 
 from bap_browser.service.machine_helper import Helper, helper_app
 
@@ -277,7 +279,26 @@ def served(tmp_path: Path, said: list[str]) -> Iterator[str]:
     thread.join(timeout=10)
 
 
-def the_link(tmp_path: Path, address: str, code: str, *argv: str, typed: str = "") -> Any:
+# The Mac's name on the tailnet: nothing on the engine's machine knows it but Tailscale's proxy.
+ON_THE_TAILNET = "the-mac.tailnet.invalid"
+
+
+def through(proxy: str | None) -> dict[str, str]:
+    """The environment of a machine where Tailscale has no network device and gives a proxy instead."""
+    if proxy is None:
+        return {}
+    return {
+        "HTTP_PROXY": proxy,
+        "HTTPS_PROXY": proxy,
+        "http_proxy": proxy,
+        "https_proxy": proxy,
+        "NO_PROXY": "",
+    }
+
+
+def the_link(
+    tmp_path: Path, address: str, code: str, *argv: str, typed: str = "", proxy: str | None = None
+) -> Any:
     file = tmp_path / "link.json"
     file.write_text(json.dumps({"url": address, "code": code}), encoding="utf-8")
     return subprocess.run(
@@ -286,7 +307,7 @@ def the_link(tmp_path: Path, address: str, code: str, *argv: str, typed: str = "
         capture_output=True,
         text=True,
         timeout=30,
-        env={**__import__("os").environ, "BAP_BROWSER_LINK_FILE": str(file)},
+        env={**os.environ, "BAP_BROWSER_LINK_FILE": str(file), **through(proxy)},
         check=False,
     )
 
@@ -315,3 +336,17 @@ def test_the_link_with_a_wrong_code_says_so_and_does_nothing(tmp_path: Path, ser
     assert ran.returncode != 0
     assert "pairing code" in ran.stderr
     assert "a guess" not in ran.stderr
+
+
+def test_where_tailscale_gives_a_proxy_the_link_reaches_the_helper_through_it(
+    tmp_path: Path, served: str
+) -> None:
+    by_its_name = served.replace("127.0.0.1", ON_THE_TAILNET)
+    with a_tailnet_proxy() as (proxy, names):
+        asked = the_link(tmp_path, by_its_name, CODE, "manifest", proxy=proxy)
+        conversed = the_link(tmp_path, by_its_name, CODE, "mcp", typed='{"id": 1}\n', proxy=proxy)
+
+    assert asked.returncode == 0, asked.stderr
+    assert json.loads(asked.stdout)["binary_version"] == "0.21.0"
+    assert conversed.stdout.splitlines() == ['back: {"id": 1}'], conversed.stderr
+    assert names == [ON_THE_TAILNET, ON_THE_TAILNET]

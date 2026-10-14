@@ -207,6 +207,7 @@
         "viewer/src/components/BrowserPane.tsx",
         "viewer/src/components/Timeline.tsx",
         "viewer/src/wording.ts",
+        "viewer/src/words.ts",
         "viewer/src/tokens.css",
         "src/bap_browser/service/events.py",
         "src/bap_browser/service/app.py",
@@ -239,6 +240,8 @@
       "spec": "9.16, 9.17",
       "source": [
         "src/bap_browser/agent/studio.py",
+        "src/bap_browser/agent/window.py",
+        "src/bap_browser/agent/room_configs.py",
         "src/bap_browser/service/systems.py",
         "viewer/src/Studio.tsx",
         "viewer/src/studio/rooms.ts",
@@ -248,9 +251,10 @@
       "tests": [
         "tests/viewer/test_studio.py",
         "tests/service/test_systems_api.py",
-        "tests/unit/test_studio_parts.py"
+        "tests/unit/test_studio_parts.py",
+        "tests/unit/test_room_configs.py"
       ],
-      "reach": "`uv run bap-browser studio --open`. Tabs \"Cloud browser\", \"My Chrome\", \"Built-in browser\"; under each, \"Browser and chat\", \"Configuration\", \"Evaluations\". The button \"Systems\" opens what is not one browser's.",
+      "reach": "`uv run bap-browser studio --open`. Tabs \"Cloud browser\", \"My Chrome\", \"Built-in browser\"; under each, \"Browser and chat\", \"Configuration\", \"Evaluations\". The button \"Systems\" opens what is not one browser's. `--browser` (the three browsers and computer use, no admin tools) and `--desktop` (the desktop app's own browser and computer use alone, for the desktop app to start) narrow which pages there are.",
       "addresses": [
         "/api/systems",
         "/api/systems/{system}/{action}",
@@ -480,15 +484,24 @@
       "spec": "14",
       "source": [
         "src/bap_browser/desktop_app.py",
-        "desktop/package.json"
+        "src/bap_browser/service/desktop_door.py",
+        "desktop/package.json",
+        "desktop/electron/side.cjs",
+        "desktop/electron/side-place.cjs",
+        "viewer/src/studio/beside.ts",
+        "viewer/src/studio/rooms.ts"
       ],
       "tests": [
         "tests/unit/test_desktop_app.py",
-        "tests/service/test_desktop_door.py"
+        "tests/service/test_desktop_door.py",
+        "desktop/electron/side-place.test.cjs",
+        "viewer/src/studio/beside.test.ts",
+        "viewer/src/studio/rooms.test.ts"
       ],
-      "reach": "The button \"Open desktop app\" in the window's bar.",
+      "reach": "The button \"Open desktop app\" in the window's bar. The chat above every app: give a task on the Computer page of a real machine, or press \"Chat beside your screen\" there; from a machine whose engine is elsewhere, `uv run bap-browser computer chat <the service's address>`.",
       "addresses": [
-        "/api/desktop"
+        "/api/desktop",
+        "/api/sessions/{name}/beside"
       ],
       "tools": []
     },
@@ -551,6 +564,7 @@
         "src/bap_browser/evals/sets/desktop/short.json",
         "src/bap_browser/evals/sets/desktop/long.json",
         "src/bap_browser/evals/sets/desktop/attack.json",
+        "src/bap_browser/evals/sets/desktop/confirm.json",
         "src/bap_browser/driver/screen_here.py",
         "deploy/Dockerfile",
         "deploy/config.vm.json",
@@ -599,6 +613,7 @@
         "src/bap_browser/computer/commands.py",
         "scripts/ladder.py",
         "src/bap_browser/driver/hermes_driver.py",
+        "src/bap_browser/driver/mac_hand.py",
         "src/bap_browser/tools/computer_use_tool.py",
         "src/bap_browser/service/machine_helper.py",
         "src/bap_browser/computer/link.py",

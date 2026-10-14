@@ -10,6 +10,7 @@ import { W } from '../wording';
 import type { Overall, Policy, PolicyChange, PolicyLine, SystemInfo } from './api';
 import { count, dollars, percent, spanOf } from './format';
 import { BACKEND_ICON, NOT_RUNNING, SwitchRow, TableScroll } from './parts';
+import { useWords } from '../words';
 
 /** Sets a password: the admin's own, or the one users sign in with. */
 export interface Passwords {
@@ -192,8 +193,9 @@ export function BrowsersCard({ systems, policy, wordFor, onOpen }: BrowsersProps
 
 /** The tasks of every system as one, with a line for each system: the admin's view of the whole (spec 12.6). */
 export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall | null; nameOf(system: string): string; onRefresh(): void }) {
+  const L = useWords();
   const O = W.systems.overall;
-  const E = W.systems.evals;
+  const E = L.systems.evals;
   return (
     <article className="system-card" aria-label={O.title} data-wide="true">
       <header className="system-head">

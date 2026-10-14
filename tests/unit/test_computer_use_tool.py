@@ -11,7 +11,8 @@ from typing import Any
 
 import pytest
 
-from bap_browser.agent.loop import instructions_for
+from bap_browser.agent.command import as_it_begins
+from bap_browser.agent.loop import SYSTEM, instructions_for
 from bap_browser.computer.hermes.computer_use.backend import (
     ActionResult,
     CaptureResult,
@@ -573,12 +574,15 @@ class ItsOwnDesktop:
     def __init__(self) -> None:
         self.sent: list[str] = []
         self.ran: list[tuple[str, ...]] = []
+        self.given: list[bytes] = []
 
     async def send(self, line: str) -> None:
         self.sent.append(line)
 
     async def run(self, *command: str, stdin: bytes | None = None) -> bytes:
         self.ran.append(command)
+        if stdin is not None:
+            self.given.append(stdin)
         return b""
 
 
@@ -770,3 +774,207 @@ async def test_a_capture_holds_the_mode_the_model_names_whatever_the_admin_chose
     make_config, tmp_path: Path
 ) -> None:
     assert (await captured(make_config, tmp_path, {"mode": "vision"}, capture_mode="ax"))["mode"] == "vision"
+
+
+class AMailApp(Desk):
+    """A window of a mail app: a field, a button that sends, one that deletes, and one that is harmless."""
+
+    def capture(
+        self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
+    ) -> CaptureResult:
+        self.done.append(("capture", {"mode": mode, "app": app}))
+        elements = [
+            UIElement(index=1, role="AXTextArea", label="Send a message to Ada", bounds=(10, 10, 300, 120)),
+            UIElement(index=2, role="AXButton", label="Send", bounds=(10, 140, 80, 24)),
+            UIElement(index=3, role="push button", label="Delete account", bounds=(100, 140, 120, 24)),
+            UIElement(index=4, role="AXButton", label="Show the sidebar", bounds=(230, 140, 120, 24)),
+            UIElement(index=5, role="AXCheckBox", label="Send me the newsletter", bounds=(10, 180, 200, 24)),
+        ]
+        return CaptureResult(mode=mode, width=800, height=600, elements=elements, app="Mail")
+
+
+async def presses(
+    make_config, tmp_path: Path, answer: str, *elements: int
+) -> tuple[list[Any], AMailApp, list[bool]]:
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    desk = AMailApp()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    asked: list[Any] = []
+
+    async def a_person(question: Any) -> Any:
+        asked.append(question)
+        return answer
+
+    await session.start()
+    session.browser.ask_approval = a_person
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        failed = [
+            (await session.toolkit.call("computer_use", {"action": "click", "element": one})).is_error
+            for one in elements
+        ]
+    finally:
+        await session.close()
+    return asked, desk, failed
+
+
+async def test_a_press_that_sends_or_deletes_on_a_desktop_asks_a_person_first(
+    make_config, tmp_path: Path
+) -> None:
+    """As in a browser (spec 18.4): what a button does is told by its name, and a button that sends
+    or deletes is pressed only after a person's yes."""
+    asked, desk, failed = await presses(make_config, tmp_path, "allowed", 2, 3)
+
+    assert [question.tool for question in asked] == ["computer_use", "computer_use"]
+    assert failed == [False, False]
+    assert [how["element"] for how in did(desk, "click")] == [2, 3]
+
+
+async def test_a_press_a_person_says_no_to_is_not_done(make_config, tmp_path: Path) -> None:
+    asked, desk, failed = await presses(make_config, tmp_path, "denied", 3)
+
+    assert len(asked) == 1 and failed == [True]
+    assert did(desk, "click") == []
+
+
+async def test_a_harmless_press_a_field_and_a_ticked_box_ask_nobody(make_config, tmp_path: Path) -> None:
+    """A field is typed into and is not judged by its name, and a box that is ticked sends nothing."""
+    asked, desk, failed = await presses(make_config, tmp_path, "denied", 4, 1, 5)
+
+    assert asked == [] and failed == [False, False, False]
+    assert [how["element"] for how in did(desk, "click")] == [4, 1, 5]
+
+
+class WithWindows(Desk):
+    """A desktop that shows a window for each app that was opened on it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.opened: list[str] = []
+
+    def list_windows(self) -> list[dict[str, Any]]:
+        return [{"title": f"Untitled 1 - {name}", "app_name": name, "pid": 7} for name in self.opened]
+
+
+async def test_a_task_on_a_desktop_is_given_with_what_is_open_so_that_it_carries_on_from_there(
+    make_config, tmp_path: Path
+) -> None:
+    """ "Open Chrome", then "search for the weather": the second task begins where the first ended."""
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    desk = WithWindows()
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    await session.start()
+    try:
+        # A desktop with nothing open adds nothing.
+        assert await as_it_begins("Open Chrome", session) == "Open Chrome"
+        desk.opened.append("Google Chrome")
+        assert await as_it_begins("search for the weather", session) == (
+            "search for the weather\n\n[Open on the screen now: Untitled 1 - Google Chrome. This task follows "
+            "what was done before: carry on from the screen as it is. Capture before you act, and do not "
+            "open again an app that is already open.]"
+        )
+    finally:
+        await session.close()
+
+
+@pytest.mark.parametrize("runs", ["machine", "container"])
+def test_the_model_is_told_to_read_past_a_slip_of_typing(make_config, tmp_path: Path, runs: str) -> None:
+    for told in (instructions_for(make_config(tmp_path, computer={"runs": runs})), SYSTEM):
+        assert "read past a slip of spelling" in told
+        assert "ask only when two readings would do different things" in told
+
+
+async def by_a_place(make_config, tmp_path: Path, desk: Desk, answer: str) -> tuple[list[Any], bool]:
+    """A click by pixels on the desktop, after a capture of it. Who was asked, and whether it failed."""
+    config = make_config(tmp_path, computer={"runs": "machine", "base": {"home": str(tmp_path / "home")}})
+    session = ServiceSession(
+        config,
+        HermesDriver(config, backend=lambda: desk),
+        name="computer",
+        backend="contained_desktop",
+        tools=computer_tools_for,
+    )
+    asked: list[Any] = []
+
+    async def a_person(question: Any) -> Any:
+        asked.append(question)
+        return answer
+
+    await session.start()
+    session.browser.ask_approval = a_person
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        done = await session.toolkit.call("computer_use", {"action": "click", "coordinate": [40, 150]})
+    finally:
+        await session.close()
+    return asked, done.is_error
+
+
+async def test_a_click_by_a_place_waits_for_a_person_where_the_screen_holds_a_press_that_sends_or_deletes(
+    make_config, tmp_path: Path
+) -> None:
+    """A click by pixels names no element, so it cannot be told that it is not on "Send"."""
+    desk = AMailApp()
+    asked, failed = await by_a_place(make_config, tmp_path, desk, "denied")
+
+    assert len(asked) == 1 and failed
+    assert did(desk, "click") == []
+
+
+async def test_a_click_by_a_place_asks_nobody_where_the_screen_holds_no_such_press(
+    make_config, tmp_path: Path
+) -> None:
+    desk = Desk()
+    asked, failed = await by_a_place(make_config, tmp_path, desk, "denied")
+
+    assert asked == [] and not failed
+    assert len(did(desk, "click")) == 1
+
+
+async def test_where_nobody_sits_plain_text_is_typed_with_the_desktops_own_keyboard(
+    make_config, tmp_path: Path
+) -> None:
+    """As a person's typing does, it takes the place of what is selected. The driver's own typing
+    puts text in beside a selection: "old", Select All, "new" gave "newold" (seen in a container)."""
+    session, desk, own = where_nobody_sits(make_config, tmp_path)
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        typed = await session.toolkit.call("computer_use", {"action": "type", "text": "new ~/a.txt"})
+        other = await session.toolkit.call("computer_use", {"action": "type", "text": "caf\u00e9"})
+    finally:
+        await session.close()
+
+    assert not typed.is_error and "keyboard typed" in typed.text
+    assert "new ~/a.txt" not in typed.text
+    # The text goes to the keyboard's program as its input, never as a word of its command.
+    assert own.given == [b"new ~/a.txt"]
+    assert all("new" not in word for command in own.ran for word in command)
+    # Letters this keyboard does not have are typed the driver's own way.
+    assert not other.is_error and [how.get("text") for how in did(desk, "type")] == ["caf\u00e9"]
+
+
+async def test_on_a_persons_own_machine_the_drivers_typing_is_left_as_it_is(
+    make_config, tmp_path: Path
+) -> None:
+    session, desk = on_a_machine(make_config, tmp_path)
+    await session.start()
+    try:
+        await session.toolkit.call("computer_use", {"action": "capture", "mode": "ax"})
+        await session.toolkit.call("computer_use", {"action": "type", "text": "new"})
+    finally:
+        await session.close()
+
+    assert [how.get("text") for how in did(desk, "type")] == ["new"]

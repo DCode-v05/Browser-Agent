@@ -12,6 +12,7 @@ import { Icon } from './Icon';
 import { AddressField, SiteList } from './SettingFields';
 import { Button, Confirm } from './StatusPanel';
 import { isShown, trapTab } from './focus';
+import { useWords } from '../words';
 
 interface Props {
   source: SettingsSource;
@@ -394,6 +395,7 @@ export function SettingRow({ setting, status, source, onSave, onAct, onToast, lo
 }
 
 function About({ setting, source, onToast }: { setting: Setting; source: SettingsSource; onToast(text: string): void }) {
+  const L = useWords();
   const [config, setConfig] = useState<ConfigAnswer | null>(null);
   useEffect(() => {
     let current = true;
@@ -404,7 +406,7 @@ function About({ setting, source, onToast }: { setting: Setting; source: Setting
   }, [source]);
 
   const asText = config
-    ? [`${W.settings.about.version}: ${config.version}`, `${W.settings.about.browser}: ${config.browser}`, ...config.changed.map((item) => `${item.key} = ${item.value} (${item.source})`)].join('\n')
+    ? [`${W.settings.about.version}: ${config.version}`, `${L.settings.about.browser}: ${config.browser}`, ...config.changed.map((item) => `${item.key} = ${item.value} (${item.source})`)].join('\n')
     : '';
 
   return (
@@ -419,7 +421,7 @@ function About({ setting, source, onToast }: { setting: Setting; source: Setting
               <dd>{config.version}</dd>
             </div>
             <div className="fact">
-              <dt>{W.settings.about.browser}</dt>
+              <dt>{L.settings.about.browser}</dt>
               <dd>{config.browser}</dd>
             </div>
           </dl>
@@ -441,7 +443,7 @@ function About({ setting, source, onToast }: { setting: Setting; source: Setting
           )}
           <Button
             icon="copy"
-            hint={W.buttons.hint.copyConfig}
+            hint={L.buttons.hint.copyConfig}
             onClick={() => {
               void navigator.clipboard?.writeText(asText);
               onToast(W.settings.about.copied);

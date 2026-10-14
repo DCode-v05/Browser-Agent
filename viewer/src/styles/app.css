@@ -1922,6 +1922,12 @@
   overflow-x: auto;
 }
 
+/* What a person is told once they have taken over a real machine. */
+.studio-own-hands {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+}
+
 /* The Systems page (spec 9.17, 12.6): the three browsers side by side, each a card. */
 
 .systems {

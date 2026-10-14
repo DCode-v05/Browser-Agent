@@ -22,9 +22,10 @@ from bap_browser import computer
 from bap_browser.computer import contained
 from bap_browser.config import Config
 from bap_browser.config_computer import Computer
-from bap_browser.driver.base import KeyAction, MouseButton, PointerAction, QualityLevel, Shot
+from bap_browser.driver.base import KeyAction, Located, MouseButton, PointerAction, QualityLevel, Shot
 from bap_browser.driver.contained_desktop import App, ContainedDesktop
 from bap_browser.driver.desktop_driver import DesktopDriver
+from bap_browser.driver.mac_hand import MacHand, MacOS
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
 from bap_browser.results import Picture
@@ -52,12 +53,27 @@ THE_DRIVER = "cua-driver"
 ITS_PICTURES = "import"
 NOT_A_LETTER = re.compile(r"[^a-z]")
 ITS_OWN = "cuadriver"
+# A role of a page, and what a desktop's own name for it holds. A box that is ticked and a field that
+# is typed into are not judged as a button is (spec 18.4).
+ROLES = {
+    "checkbox": ("checkbox", "togglebutton", "switch"),
+    "radio": ("radio",),
+    "textbox": ("text", "entry", "edit", "document", "combobox", "searchfield"),
+    "link": ("link",),
+}
 # How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
 # The states of a session in which a person is at the screen.
 A_PERSON_IS_AT_THE_SCREEN = ("person", "person_requested")
+
+
+def as_a_page_names(role: str) -> str:
+    """What an element of a desktop is, in the words the check knows from a page. Each system has
+    its own: `AXCheckBox`, `check box`, `CheckBox`. What is none of these is a button: it is pressed."""
+    plain = NOT_A_LETTER.sub("", role.lower()).removeprefix("ax")
+    return next((known for known, signs in ROLES.items() if any(sign in plain for sign in signs)), "button")
 
 
 def as_shot(result: Any) -> Shot | None:
@@ -86,7 +102,11 @@ async def own_screen(settings: Computer) -> ScreenHere:
 
 class HermesDriver(DesktopDriver):
     def __init__(
-        self, config: Config, name: str = "computer", backend: Callable[[], Any] | None = None
+        self,
+        config: Config,
+        name: str = "computer",
+        backend: Callable[[], Any] | None = None,
+        macos: Callable[[], Any] | None = None,
     ) -> None:
         super().__init__(config, name)
         self._name = name
@@ -95,6 +115,17 @@ class HermesDriver(DesktopDriver):
         self._last: Shot | None = None
         self._screen: ScreenHere | None = None
         self._placed: dict[int, tuple[int, int, int, int]] = {}
+        self._named: dict[int, tuple[str, str]] = {}
+        # On a Mac's own screen a person's hand on the picture is posted to macOS itself.
+        self._macos: Any = None
+        self._hand: MacHand | None = None
+        if self._settings.runs == "machine" and (macos is not None or sys.platform == "darwin"):
+            self._macos = (macos or MacOS)()
+            self._hand = MacHand(
+                self._macos,
+                again_within_s=self._settings.double_press_ms / 1000,
+                again_within_points=self._settings.double_press_points,
+            )
 
     # The session.
 
@@ -141,6 +172,11 @@ class HermesDriver(DesktopDriver):
         return "A machine elsewhere" if self._settings.runs == "remote" else "This machine's own screen"
 
     async def viewport(self) -> tuple[int, int]:
+        if self._hand is not None:
+            # A Mac's screen in the points its events are placed by: the page works in them, so
+            # that a place on the picture is that place on the screen.
+            across, down = self._macos.size()
+            return int(across), int(down)
         if self._last is None:
             return self._settings.screen_width, self._settings.screen_height
         return self._last.width, self._last.height
@@ -164,6 +200,25 @@ class HermesDriver(DesktopDriver):
             for one in elements
             for x, y, wide, high in [one.get("bounds") or (0, 0, 0, 0)]
         }
+        self._named = {
+            int(one["index"]): (str(one.get("role", "")), str(one.get("label", ""))) for one in elements
+        }
+
+    async def locate(self, ref: str, *, press: bool = False) -> Located:
+        """An element of the newest capture, by its number, as the check judges a press (spec 18.4):
+        by what it is and what it is called."""
+        named = self._named.get(int(ref)) if ref.isdigit() else None
+        if named is None:
+            self._no_page()
+        role, name = named
+        return Located(as_a_page_names(role), name, None)
+
+    def on_screen(self) -> list[Located]:
+        return [
+            Located(as_a_page_names(role), name, None)
+            for number, (role, name) in self._named.items()
+            if all(self._placed.get(number, (0, 0, 0, 0))[2:])
+        ]
 
     async def press(self, element: int, action: str) -> Literal["pressed", "nowhere"] | None:
         """Presses an element with the desktop's own pointer, at its middle on the screen. "nowhere"
@@ -187,6 +242,22 @@ class HermesDriver(DesktopDriver):
         button, times = PRESSED[action]
         await own.send(f"mousemove {x + wide // 2} {y + high // 2} click --repeat {times} {button}")
         return "pressed"
+
+    async def typed(self, text: str) -> bool:
+        """Types text with the desktop's own keyboard, where this engine itself started the desktop.
+        As a person's typing does, it takes the place of what is selected; the driver's own typing
+        puts text in beside a selection. That keyboard has the letters of plain text on one line:
+        False for any other text, and where the keyboard could not type, and the driver types it."""
+        own = self._screen or (self.desktop if self._settings.runs in ("container", "here") else None)
+        if own is None or not (text.isascii() and text.isprintable()):
+            return False
+        gap = str(self._settings.key_gap_ms)
+        try:
+            # The text is the program's input and no word of its command: a command can be listed.
+            await own.run("xdotool", "type", "--delay", gap, "--file", "-", stdin=text.encode())
+        except BapError:
+            return False
+        return True
 
     async def started_again(self) -> bool:
         """Puts right a desktop that has stopped answering, where this engine itself started the
@@ -267,23 +338,36 @@ class HermesDriver(DesktopDriver):
                     on_frame(sent)
             await asyncio.sleep(pause)
 
-    # A person at their own machine has their own mouse and keyboard: nothing is sent for them. On a
-    # desktop nobody sits at, the contained one and the micro VM's, their hand in the viewer is sent.
+    # What a person does on the picture while they are in control. On a desktop nobody sits at, the
+    # contained one and the micro VM's, it is sent to that desktop. On a Mac's own screen it is
+    # posted to macOS, where the person allowed that. Anywhere else the person has the machine's own
+    # mouse and keyboard, and nothing is sent.
 
-    def _has_a_hand_to_send(self) -> bool:
+    def _is_its_own(self) -> bool:
         return self._settings.runs in ("container", "here") or self._screen is not None
 
+    def takes_a_hand(self) -> bool:
+        """Whether what a person does on the picture reaches the screen."""
+        return self._is_its_own() or (self._hand is not None and bool(self._macos.allowed()))
+
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
-        if self._has_a_hand_to_send():
+        if self._is_its_own():
             await super().pointer(action, x, y, button)
+        elif self._hand is not None and self.takes_a_hand():
+            self._hand.pointer(action, x, y, button)
 
     async def key(self, action: KeyAction, key: str) -> None:
-        if self._has_a_hand_to_send():
+        if self._is_its_own():
             await super().key(action, key)
+        elif self._hand is not None and self.takes_a_hand():
+            self._hand.key(action, key)
 
     async def wheel(self, x: float, y: float, dx: float, dy: float) -> None:
-        if self._has_a_hand_to_send():
+        if self._is_its_own():
             await super().wheel(x, y, dx, dy)
+        elif self._hand is not None and self.takes_a_hand():
+            self._hand.pointer("move", x, y, "left")
+            self._hand.wheel(dx, dy)
 
     async def change_mark(self) -> str | None:
         """Whether the screen changed is told by the tool's own results, not by a mark of ours."""
