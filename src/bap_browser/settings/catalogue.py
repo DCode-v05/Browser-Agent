@@ -40,6 +40,7 @@ ENABLED = Enabled(
     title="Use this browser",
     description="Turns this browser on or off in the window. Turning it off ends its session.",
     on_the_desktop="Turns the desktop on or off in the window. Turning it off ends its session.",
+    titled_on_the_desktop="Use this desktop",
     per_system=True,
     only_per_system=True,
 )

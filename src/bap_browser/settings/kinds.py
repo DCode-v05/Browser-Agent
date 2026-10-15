@@ -77,8 +77,16 @@ class Entry:
     on_the_desktop: str | None = None
     """The description on the page of computer use, where it differs: a desktop is no browser."""
 
+    titled_on_the_desktop: str | None = None
+    """The title on the page of computer use, where it differs."""
+
     def described_for(self, backend: str | None) -> str:
         return self.on_the_desktop if backend == COMPUTER and self.on_the_desktop else self.description
+
+    def titled_for(self, backend: str | None) -> str:
+        return (
+            self.titled_on_the_desktop if backend == COMPUTER and self.titled_on_the_desktop else self.title
+        )
 
     only_per_system: bool = False
     """It is a setting of one browser among several, and of nothing else: it is not there for a

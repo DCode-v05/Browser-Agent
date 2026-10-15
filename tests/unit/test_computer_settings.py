@@ -159,3 +159,6 @@ def test_a_setting_both_have_is_described_for_the_desktop_on_its_page_and_as_it_
     )
     assert "How sharp the live picture of the browser is." in " ".join(of_a_browser.values())
     assert "How sharp the live picture of the desktop is." in " ".join(of_the_desktop.values())
+    titles = {name: setting["title"] for name, setting in drawn(store).items()}
+    assert titles["system_enabled"] == "Use this desktop"
+    assert not [title for title in titles.values() if "browser" in title.lower()]

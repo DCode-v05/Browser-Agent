@@ -1903,6 +1903,14 @@ Every switch, choice, list and button of the computer page's configuration was a
 real Chrome and read back from the settings: each saved, showed, and was put back. Stop gives Start;
 Start and Restart bring the desktop back to ready.
 
+The Settings window of a page's chat alone was wired to the browsers' general settings, not the
+page's own: on the Computer chat box it showed Safety, Sites and Files, and a change there did not
+reach computer use. It now has the page's own settings, with its Computer section. Its first switch
+said "Use this browser" on the desktop; it says "Use this desktop" there. Walked in a real Chrome,
+section by section, each change kept across a reload and put back: 13 switches, 7 choices, 4 selects
+and Copy as text on the Computer chat box, all as wired; the browsers' window too, its two site lists
+included.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

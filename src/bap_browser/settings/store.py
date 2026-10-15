@@ -207,7 +207,7 @@ class SettingsStore:
                     locked = self._locked_for_users(entry, above)
                 setting: dict[str, Any] = {
                     "id": entry.id,
-                    "title": entry.title,
+                    "title": entry.titled_for(self.backends.get(system or "")),
                     "description": entry.described_for(self.backends.get(system or "")),
                     "control": entry.control,
                     **drawn.described(above),

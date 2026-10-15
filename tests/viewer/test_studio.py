@@ -279,6 +279,13 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
                 where
                 == f"Engine on this computer ({system}) → Controls the engine's own {system} machine: its real screen"
             )
+            # Its settings are the computer's own, not a browser's.
+            await chat.get_by_role("button", name="Open settings").click()
+            sections = chat.get_by_role("dialog", name="Settings").get_by_role("tab")
+            await sections.first.wait_for()
+            named = [" ".join(text.split()) for text in await sections.all_inner_texts()]
+            assert "Computer" in named and "Sites" not in named, named
+            await chat.keyboard.press("Escape")
             assert await chat.get_by_role("tablist", name="Where the agent works").count() == 0
             assert await chat.locator("canvas, .live-view img").count() == 0
             assert await chat.evaluate("innerWidth") <= 420
