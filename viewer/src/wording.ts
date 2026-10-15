@@ -257,11 +257,13 @@ export const W = {
     /** Where the computer page's engine runs, and what it works on (spec 22.6): said on the page. */
     where: {
       engine: 'Engine on',
-      worksOn: 'Works on',
+      worksOn: 'Controls',
       thisComputer: 'this computer',
       container: 'a Linux desktop of its own, in a container beside the engine',
       here: "the engine's own Linux desktop",
-      machine: "the engine's own machine: its real screen",
+      machine: (system?: string) => (system ? `the engine's own ${system} machine: its real screen` : "the engine's own machine: its real screen"),
+      /** The systems, by the names Python gives them. */
+      systems: { darwin: 'macOS', linux: 'Linux', win32: 'Windows' } as Record<string, string>,
       remote: 'a machine elsewhere, through its helper',
       remoteNamed: (machine: string) => `${machine}, a machine elsewhere, through its helper`,
     },

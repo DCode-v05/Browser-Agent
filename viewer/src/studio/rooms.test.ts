@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { besideOpener } from './rooms';
+import { besideOpener, roomsIn } from './rooms';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -35,5 +35,13 @@ describe('the chat beside the screen', () => {
     await besideOpener('http://127.0.0.1:8765/', 'a-visit', inTheBrowser)('computer');
 
     expect(inTheBrowser).toHaveBeenCalledWith('computer');
+  });
+});
+
+describe('the pages the service has', () => {
+  it('say the system of the engine and of the machine the desktop controls', () => {
+    const [desktop] = roomsIn({ rooms: [{ id: 'computer', backend: 'contained_desktop', state: 'agent', runs: 'remote', engine_system: 'linux', driven_system: 'darwin' }] }) ?? [];
+
+    expect(desktop).toMatchObject({ engineSystem: 'linux', drivenSystem: 'darwin' });
   });
 });

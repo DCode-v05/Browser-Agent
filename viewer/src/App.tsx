@@ -14,14 +14,14 @@ import { Icon } from './components/Icon';
 import { SettingsScreen } from './components/SettingsScreen';
 import { Button, Confirm, StatusPanel } from './components/StatusPanel';
 import { StepDrawer, Timeline } from './components/Timeline';
-import type { Connection } from './connection/connection';
-import { DEFAULT_OPTIONS, type ViewerOptions } from './options';
-import type { ClientCommand, Surface } from './protocol';
+import type { AppProps } from './AppProps';
+export type { AppProps } from './AppProps';
+import { DEFAULT_OPTIONS } from './options';
+import type { ClientCommand } from './protocol';
 import { initialState, reduce, unseenNotices } from './state/reducer';
 import { lookOf, tellPanel, type Look } from './state/look';
 import { describeState, type ControlName, type StateKey } from './state/view';
 import { DEFAULT_PREFERENCES, preferencesFrom, type Preferences } from './preferences';
-import type { SettingsSource } from './settings/types';
 import { W } from './wording';
 import { TheWords, wordsFor } from './words';
 import { type Toast, toastFor } from './state/toasts';
@@ -29,26 +29,7 @@ import { type Toast, toastFor } from './state/toasts';
 /** The commands that take hold only when the agent's action in progress has finished. */
 const TAKES_A_MOMENT: Partial<Record<ClientCommand['type'], ControlName>> = { pause: 'pause', resume: 'resume', take_over: 'take_over', hand_back: 'hand_back' };
 
-export interface AppProps {
-  /** Opens the session's connection. Called once. */
-  createConnection: () => Connection;
-  settings: SettingsSource;
-  surface?: Surface;
-  /** Shown inside a UI client, which has its own header. */
-  embedded?: boolean;
-  options?: ViewerOptions;
-  preferences?: Preferences;
-  /** The page around the app has the settings of this browser on a page of its own (spec 9.17). The
-   *  settings button goes there; and that page keeps the colour mode and what the person prefers,
-   *  so that they hold on its other pages too. */
-  onOpenSettings?: () => void;
-  /** Drawn as one page of the window of several browsers (spec 9.16). That window has the page's
-   *  bar, its heading and its main part: the app is then none of them a second time. */
-  inWindow?: boolean;
-  beside?: boolean;
-}
-
-export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false, beside: chatAlone = false }: AppProps) {
+export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false, beside: chatAlone = false, where }: AppProps) {
   const hosted = onOpenSettings !== undefined;
   // A page has one bar that is its banner and one main part. In the window, those are the window's.
   const Bar = inWindow ? 'div' : 'header';
@@ -339,6 +320,7 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
           titleRef={statusTitle}
           settingsRef={settingsButton}
           stopRef={stopButton}
+          where={where}
         />
       ) : (
         <>

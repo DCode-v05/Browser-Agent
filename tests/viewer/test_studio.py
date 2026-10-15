@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from collections.abc import AsyncIterator, Callable
@@ -271,6 +272,20 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
             task = chat.get_by_label("Your task")
             await task.wait_for()
             assert await chat.get_by_role("region", name="Chat").count() == 1
+            # The chat says which machine its engine is on and which it controls, with their systems.
+            where = " ".join((await chat.get_by_test_id("where-it-works").inner_text()).split())
+            system = {"darwin": "macOS", "linux": "Linux", "win32": "Windows"}[sys.platform]
+            assert (
+                where
+                == f"Engine on this computer ({system}) → Controls the engine's own {system} machine: its real screen"
+            )
+            # Its settings are the computer's own, not a browser's.
+            await chat.get_by_role("button", name="Open settings").click()
+            sections = chat.get_by_role("dialog", name="Settings").get_by_role("tab")
+            await sections.first.wait_for()
+            named = [" ".join(text.split()) for text in await sections.all_inner_texts()]
+            assert "Computer" in named and "Sites" not in named, named
+            await chat.keyboard.press("Escape")
             assert await chat.get_by_role("tablist", name="Where the agent works").count() == 0
             assert await chat.locator("canvas, .live-view img").count() == 0
             assert await chat.evaluate("innerWidth") <= 420

@@ -205,6 +205,10 @@ class Studio:
                 # Whether what a person does on the picture reaches the screen (spec 22.3.1).
                 driver = room.session.browser.started_driver if room.session is not None else None
                 page["hand"] = isinstance(driver, HermesDriver) and driver.takes_a_hand()
+                # Which system the engine runs, and which the machine it controls: said on the page.
+                page["engine_system"] = sys.platform
+                if isinstance(driver, HermesDriver) and driver.system_known is not None:
+                    page["driven_system"] = driver.system_known
         return told
 
     def described(self) -> list[dict[str, Any]]:

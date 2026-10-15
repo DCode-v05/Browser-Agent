@@ -17,4 +17,16 @@ describe('where the computer page works, said on the page', () => {
     expect(whereItWorks('container', '127.0.0.1', '').target).toBe('a Linux desktop of its own, in a container beside the engine');
     expect(whereItWorks('remote', '127.0.0.1', '').target).toBe('a machine elsewhere, through its helper');
   });
+
+  it('names the system of the engine and of the machine it controls, both ways', () => {
+    expect(whereItWorks('remote', 'bap-desk.tail4d0a18.ts.net', 'https://sharans-macbook-pro.tail4d0a18.ts.net:8796', { engine: 'linux', driven: 'darwin' })).toEqual({
+      engine: 'bap-desk (Linux)',
+      target: 'sharans-macbook-pro (macOS), a machine elsewhere, through its helper',
+    });
+    expect(whereItWorks('remote', '127.0.0.1', 'https://bap-desk.tail4d0a18.ts.net:8796', { engine: 'darwin', driven: 'linux' })).toEqual({
+      engine: 'this computer (macOS)',
+      target: 'bap-desk (Linux), a machine elsewhere, through its helper',
+    });
+    expect(whereItWorks('machine', '127.0.0.1', '', { engine: 'win32', driven: 'win32' }).target).toBe("the engine's own Windows machine: its real screen");
+  });
 });

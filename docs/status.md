@@ -1887,6 +1887,30 @@ The four arrangements were run again the same evening, both ways; every one pass
   again. A test of the sets did the same to a developer's window, on every run of the gate. The
   sets show no viewer, and their service now leaves that file alone.
 
+### 1bd. Built on 2026-10-15: each page names the engine's machine and the one it controls
+
+Asked for: say which is the Linux engine and which the Mac it controls, on the page and in the chat
+box. Every computer page's line, and now the chat alone beside a screen, reads "Engine on bap-desk
+(Linux) → Controls sharans-macbook-pro (macOS), a machine elsewhere, through its helper". The
+service tells each page the engine's system and the controlled machine's, as its driver said it. A
+machine elsewhere whose helper did not answer is named without a system: before, the engine took it
+to run its own, and the page said the box's Linux desktop ran macOS.
+
+Seen on the Mac's studio, with the box off: the page and its chat box both said "Engine on this
+computer (macOS) → Controls bap-desk, a machine elsewhere, through its helper".
+
+Every switch, choice, list and button of the computer page's configuration was also pressed in a
+real Chrome and read back from the settings: each saved, showed, and was put back. Stop gives Start;
+Start and Restart bring the desktop back to ready.
+
+The Settings window of a page's chat alone was wired to the browsers' general settings, not the
+page's own: on the Computer chat box it showed Safety, Sites and Files, and a change there did not
+reach computer use. It now has the page's own settings, with its Computer section. Its first switch
+said "Use this browser" on the desktop; it says "Use this desktop" there. Walked in a real Chrome,
+section by section, each change kept across a reload and put back: 13 switches, 7 choices, 4 selects
+and Copy as text on the Computer chat box, all as wired; the browsers' window too, its two site lists
+included.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

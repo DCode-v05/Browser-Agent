@@ -6,6 +6,7 @@ import { preferencesFrom } from './preferences';
 import { authFrom, type AuthState, type Role } from './auth/api';
 import { SignIn } from './auth/SignIn';
 import { Studio } from './Studio';
+import { WhereLine } from './studio/WhereLine';
 import { besideOpener, desktopOpener, factsFrom, NO_FACTS, roomsFrom } from './studio/rooms';
 import { systemsFrom, type Me } from './systems/api';
 import { PAGE } from './options';
@@ -164,7 +165,11 @@ const facts = live ? await factsFrom(location.href, live) : NO_FACTS;
 
 // A live session's settings are the service's. A recorded one plays with settings of its own, and a
 // service that has none to give leaves the viewer the two that are the viewer's.
-let settings: SettingsSource = recorded ? createDemoSettings() : live && facts.settings ? settingsFrom(location.href, live) : createDemoSettings(KEPT_BY_THE_VIEWER);
+// A page's chat alone has that page's own settings, where the service has them by system.
+const sessionNamed = query.get('session');
+const ownSettings = (token: string): SettingsSource =>
+  sessionNamed && facts.systems ? systemsFrom(location.href, token, W.systems.unreachable).settings(sessionNamed) : settingsFrom(location.href, token);
+let settings: SettingsSource = recorded ? createDemoSettings() : live && facts.settings ? ownSettings(live) : createDemoSettings(KEPT_BY_THE_VIEWER);
 let loaded: SettingsAnswer;
 try {
   loaded = await settings.load(surface);
@@ -192,6 +197,10 @@ const systems = rooms && live && facts.systems ? systemsFrom(location.href, live
 // Who is signed in, and what they may use and see.
 const me: Me | null = systems && signsIn ? await systems.me() : null;
 
+// The chat of a desktop's page, alone beside the screen, says which machine its engine is on and which it controls.
+const chatOf = query.has('beside') ? facts.rooms?.find((room) => room.id === query.get('session') && room.backend === 'contained_desktop') : undefined;
+const whereOfTheChat = chatOf ? <WhereLine runs={chatOf.runs} settings={facts.systems ? settings : undefined} surface={surface} systems={{ engine: chatOf.engineSystem, driven: chatOf.drivenSystem }} /> : undefined;
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {signInPage ? (
@@ -216,7 +225,7 @@ createRoot(document.getElementById('root')!).render(
         preferences={preferences}
       />
     ) : (
-      <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} beside={query.has('beside')} />
+      <App createConnection={createConnection} settings={settings} surface={surface} embedded={query.has('embed')} preferences={preferences} beside={query.has('beside')} where={whereOfTheChat} />
     )}
   </StrictMode>,
 );

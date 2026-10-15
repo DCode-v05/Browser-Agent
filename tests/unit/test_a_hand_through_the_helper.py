@@ -231,3 +231,30 @@ async def test_a_machine_elsewhere_is_worked_on_as_its_own_system_says(
     assert desk.opened == ["mousepad"]
     told = instructions_for(config, system=driver.system_driven)
     assert "runs Linux" in told and "macOS" not in told.split("THEIR_MANUAL")[0].split("Use this system")[0]
+
+
+async def test_a_machine_elsewhere_that_does_not_say_its_system_is_not_given_one(
+    make_config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Where the helper's driver says nothing of itself, the engine does not take the machine to run
+    its own system: the page is told no system for it."""
+    program = tmp_path / "driver.py"
+    program.write_text("import sys\n", encoding="utf-8")
+    served = a_helper(tmp_path, [], None)
+    served.tailnet = False
+    served.driver = [sys.executable, str(program)]
+    with a_helper_on_a_port(served) as address:
+        monkeypatch.setenv("BAP_BROWSER_HELPER_TOKEN", CODE)
+        config = make_config(
+            tmp_path,
+            computer={"runs": "remote", "helper_url": address, "base": {"home": str(tmp_path / "home")}},
+        )
+        driver = HermesDriver(config, backend=lambda: Desk())
+        session = ServiceSession(
+            config, driver, name="computer", backend="contained_desktop", tools=computer_tools_for
+        )
+        await session.start()
+        try:
+            assert driver.system_known is None
+        finally:
+            await session.close()
