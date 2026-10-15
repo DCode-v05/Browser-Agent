@@ -11,9 +11,18 @@ function shortName(host: string): string {
   return host.split('.')[0] ?? host;
 }
 
-export function whereItWorks(runs: string | undefined, pageHost: string, helperUrl: string): { engine: string; target: string } {
+/** The systems a page was told: the engine's own, and the machine's it controls. */
+export interface Systems {
+  engine?: string;
+  driven?: string;
+}
+
+export function whereItWorks(runs: string | undefined, pageHost: string, helperUrl: string, systems: Systems = {}): { engine: string; target: string } {
   const words = W.studio.where;
-  const engine = THIS_COMPUTER.has(pageHost) ? words.thisComputer : shortName(pageHost);
+  const engineSystem = systems.engine ? words.systems[systems.engine] : undefined;
+  const drivenSystem = systems.driven ? words.systems[systems.driven] : undefined;
+  const withSystem = (name: string, system: string | undefined) => (system ? `${name} (${system})` : name);
+  const engine = withSystem(THIS_COMPUTER.has(pageHost) ? words.thisComputer : shortName(pageHost), engineSystem);
   let helper = '';
   try {
     helper = helperUrl ? shortName(new URL(helperUrl).hostname) : '';
@@ -23,12 +32,12 @@ export function whereItWorks(runs: string | undefined, pageHost: string, helperU
   const target =
     runs === 'remote'
       ? helper && !THIS_COMPUTER.has(helper)
-        ? words.remoteNamed(helper)
+        ? words.remoteNamed(withSystem(helper, drivenSystem))
         : words.remote
       : runs === 'here'
         ? words.here
         : runs === 'machine'
-          ? words.machine
+          ? words.machine(drivenSystem)
           : words.container;
   return { engine, target };
 }

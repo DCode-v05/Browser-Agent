@@ -38,6 +38,8 @@ interface Props {
   titleRef?: Ref<HTMLHeadingElement>;
   settingsRef?: Ref<HTMLButtonElement>;
   stopRef?: Ref<HTMLButtonElement>;
+  /** Which machine the engine is on and which it controls, where the chat is of a real machine's desktop. */
+  where?: ReactNode;
 }
 
 function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number | null; onOpen(step: number): void }) {
@@ -63,7 +65,7 @@ function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number
   );
 }
 
-export function Conversation({ state, view, maxChars, embedded = false, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef }: Props) {
+export function Conversation({ state, view, maxChars, embedded = false, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef, where }: Props) {
   const L = useWords();
   const [draft, setDraft] = useState('');
   /** The groups of steps a person opened or closed by hand. The rest follow the work. */
@@ -168,6 +170,7 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
           </Button>
         )}
       </header>
+      {where}
       <TaskLine task={state.task} onDrop={(host) => onCommand({ type: 'drop_site', host })} />
 
       <div className="talk-scroll">

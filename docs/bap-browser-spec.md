@@ -5700,6 +5700,8 @@ The same Hermes-based engine runs in four arrangements. Two are local and need n
 | C | A remote micro VM | The VM's contained desktop, reaching the person's private data | A Linux VM | Tailscale: the VM joins the person's tailnet |
 | D | A remote micro VM | The person's own local machine | Windows, macOS, Linux | Tailscale: the VM reaches a helper on that machine, which returns the screenshots |
 
+Every computer page, and its chat when it is open alone beside a screen, says which machine its engine is on and which machine it controls, each with its system: "Engine on bap-desk (Linux) → Controls sharans-macbook-pro (macOS), a machine elsewhere, through its helper". The engine's system is its own. The controlled machine's is what its driver said; a machine elsewhere that has not said is named without one, never given the engine's.
+
 #### 22.6.1 Arrangement C: a remote engine that reaches the person's data
 
 ```

@@ -137,6 +137,8 @@ class HermesDriver(DesktopDriver):
         self.page_size: tuple[int, int] | None = None
         # The system of the machine driven: this one's, or what a machine elsewhere says it runs.
         self.system_driven = sys.platform
+        # The same, where it is known: a machine elsewhere that does not say has none.
+        self.system_known: str | None = None if self._settings.runs == "remote" else sys.platform
         if self._settings.runs == "machine" and (macos is not None or sys.platform == "darwin"):
             self._macos = (macos or MacOS)()
             self._hand = MacHand(
@@ -177,6 +179,7 @@ class HermesDriver(DesktopDriver):
                 self._settings.base.helper_run_timeout_s,
             )
             self.system_driven = said or self.system_driven
+            self.system_known = said
 
     async def close(self) -> None:
         await self.stop_frames()

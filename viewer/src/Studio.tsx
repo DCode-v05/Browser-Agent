@@ -299,7 +299,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         {side}
       </nav>
       {room.backend === 'contained_desktop' && hasSession(room) && !showingSystems && (
-        <WhereLine runs={room.runs} settings={systems?.settings(room.id)} surface={surface} />
+        <WhereLine runs={room.runs} settings={systems?.settings(room.id)} surface={surface} systems={{ engine: room.engineSystem, driven: room.drivenSystem }} />
       )}
       {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
         // Where the picture cannot be driven, the person at the machine has their own hands.

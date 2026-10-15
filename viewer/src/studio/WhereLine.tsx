@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react';
 import type { Surface } from '../protocol';
 import type { SettingsSource } from '../settings/types';
 import { W } from '../wording';
-import { whereItWorks } from './where';
+import { type Systems, whereItWorks } from './where';
 
-export function WhereLine({ runs, settings, surface }: { runs: string | undefined; settings: SettingsSource | undefined; surface: Surface }) {
+export function WhereLine({ runs, settings, surface, systems }: { runs: string | undefined; settings: SettingsSource | undefined; surface: Surface; systems?: Systems }) {
   const [helperUrl, setHelperUrl] = useState('');
   useEffect(() => {
     if (runs !== 'remote' || !settings) return;
@@ -23,7 +23,7 @@ export function WhereLine({ runs, settings, surface }: { runs: string | undefine
       current = false;
     };
   }, [runs, settings, surface]);
-  const { engine, target } = whereItWorks(runs, location.hostname, helperUrl);
+  const { engine, target } = whereItWorks(runs, location.hostname, helperUrl, systems);
   return (
     <p className="studio-where" data-testid="where-it-works">
       <span>

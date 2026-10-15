@@ -18,6 +18,10 @@ export interface Room {
   runs?: string;
   /** For a real machine: whether what a person does on its picture reaches its screen. */
   hand?: boolean;
+  /** For the desktop of computer use: the system the engine runs, as Python names it (`darwin`, `linux`, `win32`). */
+  engineSystem?: string;
+  /** For the desktop of computer use: the system of the machine it controls, once its driver has started. */
+  drivenSystem?: string;
 }
 
 const BACKENDS = new Set<string>(['remote_headless', 'takeover_chrome', 'bundled_chromium', 'contained_desktop']);
@@ -28,7 +32,7 @@ export const hasSession = (room: Pick<Room, 'state'>): boolean => !NO_SESSION.ha
 
 function roomOf(given: unknown): Room | null {
   if (typeof given !== 'object' || given === null) return null;
-  const { id, backend, state, attention, working, note, extension, runs, hand } = given as Record<string, unknown>;
+  const { id, backend, state, attention, working, note, extension, runs, hand, engine_system: engineSystem, driven_system: drivenSystem } = given as Record<string, unknown>;
   if (typeof id !== 'string' || typeof backend !== 'string' || !BACKENDS.has(backend) || typeof state !== 'string') return null;
   return {
     id,
@@ -40,6 +44,8 @@ function roomOf(given: unknown): Room | null {
     extension: typeof extension === 'string' ? extension : undefined,
     runs: typeof runs === 'string' ? runs : undefined,
     hand: hand === true ? true : undefined,
+    engineSystem: typeof engineSystem === 'string' ? engineSystem : undefined,
+    drivenSystem: typeof drivenSystem === 'string' ? drivenSystem : undefined,
   };
 }
 
