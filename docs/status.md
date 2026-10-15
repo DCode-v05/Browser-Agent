@@ -1922,6 +1922,9 @@ Controls sharans-macbook-pro (macOS)"; a browser's chat alone, with the mark.
 Seen over the tailnet, on the box's page and the Mac's, each on its Cloud browser tab and in its
 computer chat: the four read as above.
 
+A desktop of its own, the contained one or the micro VM's screen, was reported to run the engine's
+system: on the Mac, the contained Linux desktop was said to run macOS. It is now said to run Linux.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,
