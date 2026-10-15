@@ -78,3 +78,14 @@ def test_nothing_of_this_machine_is_lacking_for_a_desktop_in_a_container(tmp_pat
 )
 def test_the_page_says_which_desktop_the_agent_works_on(runs: str, said: str, tmp_path: Path) -> None:
     assert desktop_driver_for(a_config(tmp_path, runs)).description() == said
+
+
+@pytest.mark.parametrize("runs", ["container", "here"])
+def test_a_desktop_of_its_own_is_said_to_run_linux_whatever_the_engine_runs(
+    runs: str, tmp_path: Path
+) -> None:
+    """The contained desktop and the micro VM's own screen are Linux desktops: the page is told so,
+    not the system of the machine the engine runs on."""
+    driver = desktop_driver_for(a_config(tmp_path, runs))
+    assert isinstance(driver, HermesDriver)
+    assert driver.system_known == "linux"

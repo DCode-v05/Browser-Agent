@@ -137,8 +137,15 @@ class HermesDriver(DesktopDriver):
         self.page_size: tuple[int, int] | None = None
         # The system of the machine driven: this one's, or what a machine elsewhere says it runs.
         self.system_driven = sys.platform
-        # The same, where it is known: a machine elsewhere that does not say has none.
-        self.system_known: str | None = None if self._settings.runs == "remote" else sys.platform
+        # The same, where it is known: a machine elsewhere that does not say has none, and a desktop
+        # of its own (a container, the micro VM's screen) is Linux whatever runs the engine.
+        self.system_known: str | None = (
+            None
+            if self._settings.runs == "remote"
+            else "linux"
+            if self._settings.runs in ("container", "here")
+            else sys.platform
+        )
         if self._settings.runs == "machine" and (macos is not None or sys.platform == "darwin"):
             self._macos = (macos or MacOS)()
             self._hand = MacHand(
