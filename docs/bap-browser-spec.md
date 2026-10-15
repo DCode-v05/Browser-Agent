@@ -5702,6 +5702,8 @@ The same Hermes-based engine runs in four arrangements. Two are local and need n
 
 Every computer page, and its chat when it is open alone beside a screen, says which machine its engine is on and which machine it controls, each with its system: "Engine on bap-desk (Linux) → Controls sharans-macbook-pro (macOS), a machine elsewhere, through its helper". The engine's system is its own. The controlled machine's is what its driver said; a machine elsewhere that has not said is named without one, never given the engine's.
 
+Every page of the window, whichever browser it shows, has a mark beside the product's name saying which machine its engine is on, with its system: "Engine on bap-desk (Linux)". A chat alone carries the same at its top, and a computer page's chat carries the whole line as a badge. With several windows and chats open on one screen, each says whose it is.
+
 #### 22.6.1 Arrangement C: a remote engine that reaches the person's data
 
 ```

@@ -1911,6 +1911,17 @@ section by section, each change kept across a reload and put back: 13 switches, 
 and Copy as text on the Computer chat box, all as wired; the browsers' window too, its two site lists
 included.
 
+### 1be. Built on 2026-10-15: a mark of the engine's machine on every page and chat
+
+Asked for: with the Linux engine's page and its chat both open on the Mac, say on each which is the
+Linux engine and what it controls. Every page now has a mark beside the product's name, on every
+tab: "Engine on bap-desk-3 (Linux)" on the box's page, "Engine on this computer (macOS)" on the
+Mac's. A computer page's chat alone opens with its line as a badge: "Engine on bap-desk-3 (Linux) →
+Controls sharans-macbook-pro (macOS)"; a browser's chat alone, with the mark.
+
+Seen over the tailnet, on the box's page and the Mac's, each on its Cloud browser tab and in its
+computer chat: the four read as above.
+
 ## How to go on
 
 The list under "Not started", in the order the spec gives: the settings API, the address policy at the network layer,

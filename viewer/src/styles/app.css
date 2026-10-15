@@ -2005,6 +2005,39 @@
   font-weight: var(--weight-emphasis);
 }
 
+/* In a chat alone, the line is a badge at its top: which engine this chat is, and what it controls. */
+.talk .studio-where {
+  margin: var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--agent-tint);
+  color: var(--agent);
+}
+
+.talk .studio-where b {
+  color: var(--agent);
+}
+
+/* The mark beside the product's name on every page, and atop a browser's chat: where the engine is. */
+.engine-mark {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--agent-tint);
+  color: var(--agent);
+  font-size: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.engine-mark b {
+  font-weight: var(--weight-emphasis);
+}
+
+.talk .engine-mark {
+  align-self: flex-start;
+  margin: var(--space-2) var(--space-4) 0;
+}
+
 /* What a person is told once they have taken over a real machine. */
 .studio-own-hands {
   margin: 0;

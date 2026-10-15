@@ -14,7 +14,7 @@ import type { Backend } from './protocol';
 import { hasSession, type LoadRooms, type OpenDesktop, type Room } from './studio/rooms';
 import type { Passwords } from './systems/Access';
 import { openingTheChatWithATask } from './studio/beside';
-import { WhereLine } from './studio/WhereLine';
+import { EngineMark, WhereLine } from './studio/WhereLine';
 import type { Me, SystemsApi } from './systems/api';
 import { SystemPanel, SystemsPage } from './systems/SystemsPage';
 import { MachineSetup } from './MachineSetup';
@@ -247,6 +247,7 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-name">{named}</span>
         </h1>
+        <EngineMark system={room.engineSystem} />
         <div className="studio-tabs" role="tablist" aria-label={W.studio.pages}>
           {rooms.map((one) => (
             <button

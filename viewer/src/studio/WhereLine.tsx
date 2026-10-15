@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import type { Surface } from '../protocol';
 import type { SettingsSource } from '../settings/types';
 import { W } from '../wording';
-import { type Systems, whereItWorks } from './where';
+import { engineName, type Systems, whereItWorks } from './where';
 
 export function WhereLine({ runs, settings, surface, systems }: { runs: string | undefined; settings: SettingsSource | undefined; surface: Surface; systems?: Systems }) {
   const [helperUrl, setHelperUrl] = useState('');
@@ -33,6 +33,15 @@ export function WhereLine({ runs, settings, surface, systems }: { runs: string |
       <span>
         {W.studio.where.worksOn} <b>{target}</b>
       </span>
+    </p>
+  );
+}
+
+/** The mark on every page and chat: which machine the engine is on, whatever the page drives. */
+export function EngineMark({ system }: { system: string | undefined }) {
+  return (
+    <p className="engine-mark" data-testid="engine-mark">
+      {W.studio.where.engine} <b>{engineName(location.hostname, system)}</b>
     </p>
   );
 }

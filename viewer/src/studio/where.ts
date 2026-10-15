@@ -17,12 +17,19 @@ export interface Systems {
   driven?: string;
 }
 
+/** The engine's machine, as the mark on every page names it: by the page's address, with its system. */
+export function engineName(pageHost: string, system: string | undefined): string {
+  const words = W.studio.where;
+  const named = system ? words.systems[system] : undefined;
+  const machine = THIS_COMPUTER.has(pageHost) ? words.thisComputer : shortName(pageHost);
+  return named ? `${machine} (${named})` : machine;
+}
+
 export function whereItWorks(runs: string | undefined, pageHost: string, helperUrl: string, systems: Systems = {}): { engine: string; target: string } {
   const words = W.studio.where;
-  const engineSystem = systems.engine ? words.systems[systems.engine] : undefined;
   const drivenSystem = systems.driven ? words.systems[systems.driven] : undefined;
   const withSystem = (name: string, system: string | undefined) => (system ? `${name} (${system})` : name);
-  const engine = withSystem(THIS_COMPUTER.has(pageHost) ? words.thisComputer : shortName(pageHost), engineSystem);
+  const engine = engineName(pageHost, systems.engine);
   let helper = '';
   try {
     helper = helperUrl ? shortName(new URL(helperUrl).hostname) : '';
