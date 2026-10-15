@@ -302,6 +302,9 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
 
         # The contained desktop has its picture on the page alone: no such window is offered for it.
         await opened.open("Cloud browser")
+        # Every page says which machine its engine is on, not only the computer's.
+        mark = " ".join((await page.get_by_test_id("engine-mark").inner_text()).split())
+        assert mark == f"Engine on this computer ({system})"
         assert await page.get_by_role("button", name="Chat beside your screen").count() == 0
 
 

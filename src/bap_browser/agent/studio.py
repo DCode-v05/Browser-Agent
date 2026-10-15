@@ -200,13 +200,14 @@ class Studio:
         """The pages of the window, for its tabs (spec 9.16). The desktop's says where it works."""
         told = [room.described(self._extension) for room in self.rooms]
         for page, room in zip(told, self.rooms, strict=True):
+            # Which system the engine runs: each page says where it is hosted.
+            page["engine_system"] = sys.platform
             if room.backend == DESKTOP:
                 page["runs"] = self._configured(room).computer.runs
                 # Whether what a person does on the picture reaches the screen (spec 22.3.1).
                 driver = room.session.browser.started_driver if room.session is not None else None
                 page["hand"] = isinstance(driver, HermesDriver) and driver.takes_a_hand()
-                # Which system the engine runs, and which the machine it controls: said on the page.
-                page["engine_system"] = sys.platform
+                # Which system the machine it controls runs: said on the page.
                 if isinstance(driver, HermesDriver) and driver.system_known is not None:
                     page["driven_system"] = driver.system_known
         return told

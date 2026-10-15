@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { whereItWorks } from './where';
+import { engineName, whereItWorks } from './where';
 
 describe('where the computer page works, said on the page', () => {
   it('names the engine by the machine that served the page, and this computer when it is this one', () => {
@@ -28,5 +28,11 @@ describe('where the computer page works, said on the page', () => {
       target: 'bap-desk (Linux), a machine elsewhere, through its helper',
     });
     expect(whereItWorks('machine', '127.0.0.1', '', { engine: 'win32', driven: 'win32' }).target).toBe("the engine's own Windows machine: its real screen");
+  });
+
+  it('names the engine for the mark on every page, whatever the page drives', () => {
+    expect(engineName('bap-desk-2.tail4d0a18.ts.net', 'linux')).toBe('bap-desk-2 (Linux)');
+    expect(engineName('127.0.0.1', 'darwin')).toBe('this computer (macOS)');
+    expect(engineName('localhost', undefined)).toBe('this computer');
   });
 });
