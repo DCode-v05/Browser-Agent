@@ -2,7 +2,7 @@
 
 A browser that AI agents use through MCP tools and that a person watches and controls.
 The spec is the source of truth: `docs/bap-browser-spec.md`. Update it first when requirements
-change, then regenerate `docs/bap-browser-spec.html`. Plans are in `docs/plans/`.
+change, then regenerate `docs/bap-browser-spec.html`.
 
 ## Commands
 - Install: `uv sync`, then `uv run playwright install chromium`

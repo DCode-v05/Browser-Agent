@@ -563,7 +563,6 @@ against its documentation for the pinned version before it is used. The stack is
     bap-browser-spec.html      the same, as a page
     browser-agent-perception.html   how agents see pages
     adr/                       short decision records
-    plans/                     implementation plans
     research/                  research reports behind this spec
   perf/budget.json             the performance budget as data
   deploy/
@@ -9886,7 +9885,7 @@ the same file stands in for it.</p>
 and any credential.</p>
 <h2 id="18-auto-mode-and-safeguards-milestone-5">18. Auto Mode and safeguards (milestone 5)</h2>
 <p>Specified on 2026-10-07, and changed the same day after a review of it. <strong>Being built</strong>: the order is
-in 18.14, and <code>docs/plans/2026-10-07-auto-mode-and-safeguards.md</code> says how far it is. This section is
+in 18.14. This section is
 written to be built from: it gives the order of every decision, the rules, the words a model is given,
 every setting with its default, what a person sees, the tests and the order of building. The research behind it is in <code>docs/research/</code>:
 <code>auto-mode.md</code>, <code>prompt-injection.md</code>, <code>web-threats.md</code>, <code>fallbacks.md</code>, <code>safeguards-map.md</code>,
@@ -14524,7 +14523,7 @@ named and pressed as Hermes' tool does it.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Each pass is recorded in <code>docs/status.md</code> with the system and its version, the driver version and the date. The grades are read from one file beside the driver's lock, so a grade changes by a pull request that carries its proof. At the first release the expected grades are: the contained desktop and macOS proven; Windows early until a person has run it on a real machine; a person's Linux X11 desktop early; Wayland not offered.</p>
+<p>Each pass is recorded with the system and its version, the driver version and the date. The grades are read from one file beside the driver's lock, so a grade changes by a pull request that carries its proof. At the first release the expected grades are: the contained desktop and macOS proven; Windows early until a person has run it on a real machine; a person's Linux X11 desktop early; Wayland not offered.</p>
 <h3 id="2211-order-of-work">22.11 Order of work</h3>
 <p>Eight units, each one pull request ending in a check that passes. Today's computer use keeps working until unit 4 removes it. Units 2, 5 and 8 need a real Windows machine and a real Linux desktop as well as this Mac.</p>
 <div class="tw"><table>

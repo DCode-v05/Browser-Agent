@@ -167,7 +167,7 @@
         "tests/e2e/test_attacks.py",
         "tests/e2e/test_loops.py"
       ],
-      "reach": "Always on, in every session: `uv run bap-browser serve`, then any tool call. The pages that attack an agent are in `tests/site/attacks/`; `docs/auto-mode-safeguards-status.md` says what is built and what was seen when it was run.",
+      "reach": "Always on, in every session: `uv run bap-browser serve`, then any tool call. The pages that attack an agent are in `tests/site/attacks/`;",
       "addresses": [
         "/api/tools"
       ],

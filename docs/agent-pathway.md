@@ -19,7 +19,7 @@ copy, and the worse one spreads as fast as the better.
 | 5 | **Build** | The smallest change that passes it, on the paved road below | The new test passes |
 | 6 | **Gate** | `uv run python scripts/gate.py` | It prints "The gate is passed" |
 | 7 | **Evidence** | See the change work where a person would: the table below | You have seen the output yourself, and can quote it |
-| 8 | **Record** | `docs/status.md`: what was built, what was not, what it found. Add the feature to `docs/feature-map.json` | The status page would not surprise the next reader |
+| 8 | **Record** | Add the feature to `docs/feature-map.json` | The feature map would not surprise the next reader |
 | 9 | **Ship** | Commit (one short imperative subject), push, pull request, wait for CI, merge, `git switch main && git pull --ff-only` | CI is green and `main` holds the change |
 | 10 | **Garden** | For each thing that went wrong on the way: put the correction at the highest layer that holds it (`docs/bad-patterns.md`) | No correction lives only in a chat |
 

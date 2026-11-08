@@ -1,7 +1,6 @@
 # bap-browser: what is built, and how to show it
 
-Written on 2026-10-06 for `main`. The longer record, with every decision and finding, is
-`docs/status.md`; the design is `docs/bap-browser-spec.md`.
+Written on 2026-10-06 for `main`. The design is `docs/bap-browser-spec.md`.
 
 ## In one paragraph
 
@@ -201,7 +200,7 @@ Say these plainly if asked.
 | An installer for the desktop app | It runs from this folder |
 | The micro VM image | Written, never built or started |
 | The code tool `browser_run` on by default | Built: one call runs a short script of several steps. Off until the core runs in its micro VM; `{"code": {"enabled": true}}` turns it on |
-| One tool slower than its target | A click by point takes 17 ms against a target of 5: the browser hands a mouse press to the page with its next frame. See `docs/status.md` |
+| One tool slower than its target | A click by point takes 17 ms against a target of 5: the browser hands a mouse press to the page with its next frame. |
 
 ## Numbers you can quote
 

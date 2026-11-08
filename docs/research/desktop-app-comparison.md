@@ -324,7 +324,7 @@ The comparison counts only what a person reaches from the desktop app. Our Syste
 **Limits.**
 
 - The verdicts judge the code at the commits above. Hermes and the SDK change every day.
-- Code was read, not run. A feature that exists in code may still fail in use. Our own open findings are in `docs/auto-mode-safeguards-status.md`.
+- Code was read, not run. A feature that exists in code may still fail in use.
 - Line counts include blank lines and comments, so they overstate the code of all three alike.
 - Three points are not confirmed from code. The first is whether Our System notices a person who clicks into the desktop view without pressing **Take over** (E6). The second is whether Hermes' main chat turn supports structured output (F4). The third is the absence of an ask-the-person tool and of action classes in the SDK, which rests on targeted searches rather than a full reading (G3, H4).
 - The research notes behind this page were kept outside the repository and are not part of it.
@@ -405,7 +405,7 @@ Paths for Hermes are relative to the `hermes-agent` repository, and paths for th
 | **H5** | `src/bap_browser/policy/redaction.py:13-27`, `docs/bap-browser-spec.md:4493-4496` | `agent/redact.py:97,887-951`, `tools/environments/local_env_policy.py:1-50` | `src/agents/_debug.py:12-28`, `src/agents/run_config.py:53-56` |
 | **H6** | `desktop/electron/main.cjs:80`, `src/bap_browser/config.py:419-422` | `agent/vault_backends/local.py:1-20`, `hermes_cli/auth.py:793-797`, `apps/desktop/electron/hardening.ts:156-236` | `src/agents/_config.py:13-17` |
 | **H7** | `src/bap_browser/policy/url_policy.py:7-8,27-30,112-144` | `tools/url_safety.py:96-137,339-429`, `tools/browser_tool.py:88` | `src/agents/tool.py:1332-1374` |
-| **H8** | `src/bap_browser/safeguards/lookalikes.py`, `docs/auto-mode-safeguards-status.md:50` | `tools/url_safety.py:70-93` | Absent |
+| **H8** | `src/bap_browser/safeguards/lookalikes.py` | `tools/url_safety.py:70-93` | Absent |
 | **H9** | `docs/bap-browser-spec.md:4302-4317` | `website/docs/user-guide/features/browser.md` | `src/agents/run_config.py:48-50` |
 | **H10** | `docs/feature-map.json` ("code-tool") | `SECURITY.md:48-75`, `agent/terminal_env_registry.py:27` | `docs/sandbox/guide.md:67-73`, `git log --oneline -30 -- src/agents/sandbox` |
 | **H11** | `desktop/electron/main.cjs:118-168`, `desktop/index.html:1-13` | `apps/desktop/electron/window-open-policy.ts:1-94`, `apps/desktop/electron/main.ts:13581-13588`, `apps/desktop/electron/windows-sandbox-fallback.ts:1-20`, `apps/desktop/index.html` | Not applicable |
@@ -414,7 +414,7 @@ Paths for Hermes are relative to the `hermes-agent` repository, and paths for th
 | **H14** | Absent: no telemetry code in `src`, `desktop` or `viewer/src`, `docs/bap-browser-spec.md:4498-4500` | `hermes_cli/config_defaults.py:2329-2342,2545-2547` | `src/agents/tracing/processors.py:46`, `src/agents/run_config.py:53-56` |
 | **H15** | `src/bap_browser/config_safeguards.py:458-471`, `src/bap_browser/safeguards/limits.py:56-170` | `hermes_cli/config_defaults.py:78,1361`, `agent/repetition_guard.py:16-57`, `agent/tool_guardrails.py:36-45`, `hermes_cli/model_cost_guard.py:12-13` | `src/agents/run_config.py:45`, `src/agents/tool.py:514-519` |
 | **H16** | Absent: no `SECURITY.md` | `SECURITY.md:1-20,76-100,320-335` | `SECURITY.md:1-44` |
-| **H17** | `docs/bap-browser-spec.md:4483-4500`, `docs/auto-mode-safeguards-status.md:68` | `hermes_state_timeline.py`, `hermes_cli/dashboard_auth/audit.py:1-33` | `src/agents/result.py:369,374` |
+| **H17** | `docs/bap-browser-spec.md:4483-4500` | `hermes_state_timeline.py`, `hermes_cli/dashboard_auth/audit.py:1-33` | `src/agents/result.py:369,374` |
 | **I1** | `src/bap_browser/tools/event_log.py:1-35`, `src/bap_browser/cli.py:245` | `hermes_logging.py:1-17` | `src/agents/_debug.py:12-28` |
 | **I2** | Absent | `agent/monitoring/otlp_exporter.py:1-7`, `plugins/observability/langfuse/__init__.py:1-7` | `src/agents/tracing/processors.py:28-903` |
 | **I3** | `src/bap_browser/evals/record.py:1-7`, `docs/bap-browser-spec.md:2980` | `mini_swe_runner.py:1-9`, `batch_runner.py:2-6` | `docs/testing.md:3-6` |

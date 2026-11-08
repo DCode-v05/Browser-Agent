@@ -129,7 +129,6 @@ against its documentation for the pinned version before it is used. The stack is
     bap-browser-spec.html      the same, as a page
     browser-agent-perception.html   how agents see pages
     adr/                       short decision records
-    plans/                     implementation plans
     research/                  research reports behind this spec
   perf/budget.json             the performance budget as data
   deploy/
@@ -3711,7 +3710,7 @@ and any credential.
 ## 18. Auto Mode and safeguards (milestone 5)
 
 Specified on 2026-10-07, and changed the same day after a review of it. **Being built**: the order is
-in 18.14, and `docs/plans/2026-10-07-auto-mode-and-safeguards.md` says how far it is. This section is
+in 18.14. This section is
 written to be built from: it gives the order of every decision, the rules, the words a model is given,
 every setting with its default, what a person sees, the tests and the order of building. The research behind it is in `docs/research/`:
 `auto-mode.md`, `prompt-injection.md`, `web-threats.md`, `fallbacks.md`, `safeguards-map.md`,
@@ -5878,7 +5877,7 @@ CI today runs on Linux only. This spec adds a Windows and a macOS runner for the
 | Early | The ladder passed only automatically, or only in a virtual machine | Use it, with a sentence saying so |
 | Not offered | The ladder has not passed | Not choose it; the tab says why and offers the contained desktop |
 
-Each pass is recorded in `docs/status.md` with the system and its version, the driver version and the date. The grades are read from one file beside the driver's lock, so a grade changes by a pull request that carries its proof. At the first release the expected grades are: the contained desktop and macOS proven; Windows early until a person has run it on a real machine; a person's Linux X11 desktop early; Wayland not offered.
+Each pass is recorded with the system and its version, the driver version and the date. The grades are read from one file beside the driver's lock, so a grade changes by a pull request that carries its proof. At the first release the expected grades are: the contained desktop and macOS proven; Windows early until a person has run it on a real machine; a person's Linux X11 desktop early; Wayland not offered.
 
 ### 22.11 Order of work
 
