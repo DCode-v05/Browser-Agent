@@ -36,3 +36,13 @@ dist/
 .playwright-mcp/
 # What macOS leaves in a folder it has shown.
 .DS_Store
+# Editors, OS junk and logs
+.idea/
+.vscode/
+Thumbs.db
+*.log
+*.tsbuildinfo
+.next/
+.mypy_cache/
+venv/
+.ipynb_checkpoints/
