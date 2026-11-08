@@ -1,125 +1,168 @@
-# bap-browser
+# Browser Agent (bap-browser)
 
-A browser that AI agents can use and that a person can watch and control.
-Agents call its tools over MCP. The full description is in `docs/bap-browser-spec.md`.
-What is built and how to show it: `docs/demo-guide.md`.
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=flat&logo=python&logoColor=white) ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat&logo=playwright&logoColor=white) ![MCP](https://img.shields.io/badge/MCP-000000?style=flat&logo=anthropic&logoColor=white) ![Starlette](https://img.shields.io/badge/Starlette-4B8BBE?style=flat&logo=python&logoColor=white) ![React](https://img.shields.io/badge/React_19-20232A?style=flat&logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white) ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat&logo=electron&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-06B6D4?style=flat&logo=tailwindcss&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)
 
-## Install
+## Overview
+
+AI agents can drive a browser, but the person they work for usually cannot see what they are doing or step in. And a web page can plant text that tricks an agent into paying, sending or deleting something nobody asked for.
+
+bap-browser is a browser that AI agents use and that a person can watch and control. Agents call its tools over MCP (Model Context Protocol). A live viewer shows every step, and the person can pause the agent, take over the browser, hand it back or stop it. Every step the agent asks for is checked by safeguards before it runs.
+
+It ships as a Python service with a CLI, a React viewer, a browser extension, an Electron desktop app and a container image. The full design is in [`docs/bap-browser-spec.md`](docs/bap-browser-spec.md).
+
+## Key Features
+
+- **Browser tools over MCP** — navigate, snapshot, find, click, type, fill forms, scroll, tabs, screenshots, downloads and more — over stdio or HTTP.
+- **Live viewer** with a picture of the page, a timeline of steps, and Pause, Take over, Hand back and Stop.
+- **Chat mode.** Give tasks one after another; the agent works in a window you watch, or in your browser's side panel.
+- **Take-over mode.** The agent works in a tab of your own Chrome through an extension.
+- **Always-on safeguards.** Paying, sending, deleting, giving access, or typing a password, card number or one-time code asks the person first.
+- **Prompt-injection defence.** Page text reaches the agent between `<<page …>>` marks; text addressed to an AI is withheld and hidden text is dropped.
+- **Cross-site guard.** Text read on one site is not sent to another without a yes; a look-alike of a known site asks first.
+- **Auto Mode** (off by default). A model decides the steps the rules are unsure of, judged against the task the agent declared — but never paying, sending, deleting or giving access.
+- **Evaluations.** 159 tasks with a known right end, run on a practice site and checked by code.
+- **Help from a person.** The agent can ask for a sign-in, a CAPTCHA or a code, and wait.
+
+## How It Works
+
+### Three ways in
+
+1. **MCP over stdio** — an agent such as Claude Code starts `bap-browser mcp` as a process.
+2. **MCP over HTTP** — `bap-browser serve` exposes the same tools on port 8765 with a bearer token, plus the viewer, for an agent elsewhere.
+3. **The built-in agent** — `bap-browser agent` runs a reference agent loop, either a scripted demo with no key or a hosted model.
+
+### Every step is checked
+
+An agent calls a tool. Before the driver runs it, the safeguards look at the action, the site and the text involved. The step is allowed, asked of the person, or denied. Limits stop a task at 500 steps or 60 minutes, and a step repeated on a page that does not change is not run a sixth time. An MCP client first states its task with `browser_begin_task`, so Auto Mode can judge each step against it.
+
+### Driving the browser
+
+Playwright drives Chromium. The driver can also attach to a browser that is already running, or to your own Chrome through the extension and Chrome's debugger.
+
+## Results / Highlights
+
+- **All 28 milestone-1 browser tools** built and tested.
+- **958 tests passed** on `main` (macOS, Python 3.12.5, 2026-10-06), and CI passed.
+- **159 evaluation tasks** that measure task completion, whether a person is asked before ordering, sending or deleting, and how often planted text hijacks the agent.
+- A performance budget (`perf/budget.json`) timed by `bap-browser bench`.
+- One gate script (`scripts/gate.py`) runs every check in order and stops at the first failure.
+
+## Tech Stack
+
+- **Language:** Python 3.12, TypeScript
+- **Browser automation:** Playwright (Chromium)
+- **Agent protocol:** MCP (stdio and HTTP)
+- **Service:** Starlette, Uvicorn, WebSockets, Pydantic v2
+- **Viewer:** React 19, Vite
+- **Desktop app:** Electron, React, Tailwind CSS, shadcn/ui
+- **Models:** OpenAI (`gpt-5.6-luna` by default)
+- **Deployment:** Docker
+- **Tooling:** uv, Ruff, Pyright, pytest, npm
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12 and [uv](https://docs.astral.sh/uv/)
+- Node.js and npm (for the viewer and the desktop app)
+- An OpenAI API key for real tasks (the demo needs none)
+
+### Installation
 
 ```bash
+git clone https://github.com/DCode-v05/Browser-Agent.git
+cd Browser-Agent
 uv sync
 uv run playwright install chromium
 npm --prefix viewer install
-npm --prefix viewer run build      # the viewer, which the service serves
+npm --prefix viewer run build
 ```
 
-## Run
+For real tasks, copy `.env.example` to `.env` and set `OPENAI_API_KEY`.
+
+### Running
 
 ```bash
-uv run bap-browser studio --open          # one window, three browsers: the cloud browser, your own Chrome, the built-in browser
-uv run bap-browser agent --demo --open    # watch a scripted agent sign up on the built-in demo site
-uv run bap-browser agent "Find the price of ..." --open   # a real task, done by GPT-5.6 Luna
-uv run bap-browser agent --chat --show-browser --open     # the agent works in a browser window you watch; you talk to it in the chat
-uv run bap-browser agent --chat --extension               # the same, with the chat in the browser's own side panel
-uv run bap-browser agent --chat --takeover                # the agent works in a tab of your own Chrome (load the extension it names, once)
-uv run bap-browser mcp                    # an MCP server over stdio, for an agent to start
-uv run bap-browser serve                  # the same tools over MCP on HTTP (port 8765), with the viewer, for an agent elsewhere
-uv run bap-browser doctor                 # which browsers launch here, and whether everything needed is in place
-uv run bap-browser bench                  # time each line of the performance budget (perf/budget.json)
-uv run bap-browser config show --sources  # the effective configuration
-uv run bap-browser config init            # write a starter config.json
+uv run bap-browser agent --demo --open    # a scripted agent signs up on the demo site; no key needed
+uv run bap-browser studio --open          # one window, three browsers
+uv run bap-browser doctor                 # check that everything needed is in place
 ```
 
-Connect Claude Code: `claude mcp add bap-browser -- uv run bap-browser mcp`
+## Usage
 
-`bap-browser agent --demo` needs no model key. It starts a browser, the service and the viewer,
-prints the viewer's address, and runs a fixed script through the same tools a real agent uses.
-In the viewer you can pause it, take over the browser, hand it back, and stop it. `--open` opens
-the viewer in your browser and waits for it; `--exit-when-done` ends the process after the run;
-`--pace 0.5` changes how long each step waits.
-
-A real task needs a model key. Copy `.env.example` to `.env` and put your key on the
-`OPENAI_API_KEY=` line; `.env` is never committed. The model is `gpt-5.6-luna` unless
-`agent.model` in `config.json` says otherwise. The answer is printed when the task is done.
-
-## Safeguards and Auto Mode
-
-Every step an agent asks for is checked before it runs (spec section 18). The checks are always on:
-
-- A step that pays, sends, deletes or gives an app access, and typing a password, a card number or a
-  one-time code, asks the person first.
-- What a page wrote reaches the agent between `<<page …>>` marks. Text addressed to an AI agent is
-  withheld, text no person can see is left out, and the person is told about the page.
-- Text read on one site is not typed or sent to another without a yes. A look-alike of a known site
-  asks first.
-- A program that arrives as a download is never kept. An archive is kept only with a yes.
-- A task stops at 500 steps or 60 minutes (`limits`), and a step repeated on a page that does not
-  change is not run a sixth time.
-
-**Auto Mode** lets a model decide the steps the rules are unsure of, so the person is asked less. It
-is off until a deployment turns it on:
-
-```json
-{ "safety": { "auto_mode": { "offered": true }, "ask_before": "auto" } }
+```bash
+uv run bap-browser agent "Find the price of ..." --open    # a real task
+uv run bap-browser agent --chat --show-browser --open      # chat while you watch the browser
+uv run bap-browser agent --chat --extension                # chat in the browser's side panel
+uv run bap-browser agent --chat --takeover                 # the agent works in your own Chrome
+uv run bap-browser mcp                                     # MCP server over stdio
+uv run bap-browser serve                                   # MCP over HTTP (port 8765) with the viewer
+uv run bap-browser bench                                   # time the performance budget
+uv run bap-browser config show --sources                   # show the effective configuration
 ```
 
-With `offered` alone, a person chooses "Auto" in the settings screen. Paying, sending, deleting and
-giving access never run on a model's word. It uses the model key of `.env`.
+Connect Claude Code:
 
-**An agent that connects over MCP** states its task first, once: `browser_begin_task` with the task
-in the person's words and the sites it needs. Auto Mode judges each step against that task; without
-one, a step it is unsure of asks the person. A client can pin the tools it was offered:
-`GET /api/tools` on the service, or `uv run bap-browser config show --tools`, give one value that
-changes when any tool's name, description or arguments change.
+```bash
+claude mcp add bap-browser -- uv run bap-browser mcp
+```
 
-What is built and what is not: `docs/auto-mode-safeguards-status.md`.
-## Working on it
-
-There is one way to make a change here, for a person and for an agent: `docs/agent-pathway.md`.
-`uv run python scripts/gate.py` runs every check in one order and stops at the first that fails.
-The patterns that must not spread are in `docs/bad-patterns.md`, and `scripts/patterns.py` holds
-ten of them. `docs/feature-map.json` says where each feature is.
-
-For Claude Code there is a plugin: `claude --plugin-dir plugin` adds the browser's tools and a
-skill for using them.
-
-## Evaluations
-
-In `bap-browser studio`, each browser's page has an Evaluations view: what its tasks took and cost,
-a checklist of real steps, and **task sets**: 159 tasks with a known right end, done on a practice
-site and checked by code. They measure how many small and long tasks the agent finishes, whether a
-person is asked before a step that orders, sends or deletes, and how often text planted in a page
-makes the agent do what nobody asked for. A set is run with the agent, or by its reference
-solutions with no model. `docs/systems-guide.md`, Part 2, says how.
-
-## Desktop app
+Desktop app:
 
 ```bash
 npm --prefix desktop install
-npm --prefix desktop start      # one window: the agent's browser on the left, the chat on the right
+npm --prefix desktop start
 ```
 
-The app is Electron with a shadcn/ui shell. Its own Chromium is the agent's browser; it starts the
-agent's core itself, so the model's key must be in `.env`. Checks: `npm --prefix desktop run typecheck`,
-`run test`, `run build`.
-
-## In a container
+In a container:
 
 ```bash
 docker build -f deploy/Dockerfile -t bap-browser .
 docker run --rm -p 8765:8765 -e BAP_BROWSER_TOKEN=<a long random string> bap-browser
 ```
 
-The container runs `bap-browser serve` as an unprivileged user with `deploy/config.vm.json`: the
-viewer is at `http://127.0.0.1:8765/#token=<the token>` and the tools over MCP at
-`http://127.0.0.1:8765/mcp`. For a machine others reach, set `BAP_BROWSER__SERVER__PUBLIC_URL` to the
-address they use.
-
-## Test
+Run the checks:
 
 ```bash
-uv run pytest                                      # needs the built viewer
-uv run ruff format --check . && uv run ruff check .
-uv run pyright
-npm --prefix viewer run typecheck && npm --prefix viewer run lint && npm --prefix viewer run test
+uv run python scripts/gate.py
 ```
+
+## Project Structure
+
+```
+Browser-Agent/
+├── src/bap_browser/
+│   ├── cli.py            # The bap-browser command
+│   ├── tools/            # The browser tools agents call
+│   ├── mcp/              # MCP server (stdio and HTTP)
+│   ├── driver/           # Playwright browser driver
+│   ├── agent/            # Reference agent loop
+│   ├── safeguards/       # Step checks, approvals, injection defence
+│   ├── policy/           # Address and action policies
+│   ├── service/          # HTTP service behind the viewer
+│   ├── extension/        # Browser extension (side panel, take-over)
+│   ├── evals/            # Evaluation task sets
+│   ├── demo_site/        # Practice site for the demo and evals
+│   └── computer/         # Driver link and dock
+├── viewer/               # React viewer
+├── desktop/              # Electron desktop app
+├── deploy/               # Dockerfiles and VM config
+├── plugin/               # Claude Code plugin
+├── scripts/              # gate.py, patterns.py and other checks
+├── perf/                 # Performance budget
+├── docs/                 # Spec, demo guide, systems guide, status, ADRs
+├── tests/
+└── pyproject.toml
+```
+
+---
+
+## Contact
+
+<table>
+  <tr><td><b>Portfolio:</b> <a href="https://www.denistan.me">Denistan</a></td><td><b>LinkedIn:</b> <a href="https://www.linkedin.com/in/denistanb">denistanb</a></td></tr>
+  <tr><td><b>GitHub:</b> <a href="https://github.com/DCode-v05">DCode-v05</a></td><td><b>LeetCode:</b> <a href="https://leetcode.com/u/Denistan_B">Denistan_B</a></td></tr>
+  <tr><td colspan="2" align="center"><b>Email:</b> <a href="mailto:denistanb05@gmail.com">denistanb05@gmail.com</a></td></tr>
+</table>
+
+Made with ❤️ by **Denistan B**
