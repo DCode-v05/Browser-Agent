@@ -1,8 +1,3 @@
-// The desktop app (spec 14.3): one window with two pages. The browser page has the agent's browser
-// on the left and its chat on the right; the browser is this app's own Chromium. The computer page is
-// the desktop the agent works on, with its chat. The agent's core is the studio, running beside the
-// app as its own process: it drives the app's browser by attaching to it.
-
 'use strict';
 
 const { app, BrowserWindow, WebContentsView, ipcMain, nativeTheme, session, shell } = require('electron');
@@ -13,23 +8,14 @@ const readline = require('node:readline');
 
 const { viewerOf, errorOf, chatAddress, placeable, coreArguments, around, sessionsUp } = require('./core-line.cjs');
 
-// The core finds the page it is to drive by this mark in the page's address.
 const AGENT_MARK = '#bap-agent';
 const REPOSITORY = path.join(__dirname, '..', '..');
-// The core attaches through this app's debugging port, which listens on this machine only. The
-// port is taken from a range of its own, afresh each time the app starts, unless one is named.
 const DEBUG_PORT = Number(process.env.BAP_DESKTOP_DEBUG_PORT) || 19200 + crypto.randomInt(700);
-// The pages of the demo site the shell may open in the agent's browser.
 const DEMO_PAGES = { start: 'start.html', checkin: 'checkin.html', signup: 'signup.html' };
 const CORNER = 12;
-// The window's own chrome, drawn by the OS on Windows and Linux (spec 9.16's look, section 14.3):
-// no title bar of its own, a slim overlay instead, coloured to match the shell's theme.
 const OVERLAY_HEIGHT = 36;
 const overlayOf = (dark) => ({ color: dark ? '#1E1E1E' : '#F5F4F2', symbolColor: dark ? '#E9EBDF' : '#1A1714', height: OVERLAY_HEIGHT });
-// A view with nothing loaded in it yet (the agent's, before the core attaches) is this colour
-// instead of a flash of white: the shell's own secondary surface, not a blank page's default.
 const paneBackgroundOf = (dark) => (dark ? '#1E1E1E' : '#F5F4F2');
-// The studio's pages the app shows, and how long it waits for them once the core has started.
 const PAGES = ['builtin', 'computer'];
 const PAGES_WAIT_MS = 90000;
 const PAGES_POLL_MS = 500;
@@ -41,22 +27,18 @@ let agentView = null;
 let chatView = null;
 let computerView = null;
 let core = null;
-/** Where the core's service is, once it has said so. */
 let service = '';
 let lastError = '';
 
 const state = {
-  /** starting: the core is coming up. running: the chat is live. stopped: the core is gone. */
   core: 'starting',
   message: '',
   address: '',
   canGoBack: false,
   canGoForward: false,
-  /** browser: the agent's browser and its chat. computer: the desktop the agent works on. */
   page: 'browser',
 };
 
-/** Shows the page the person chose, once the core is there to show it. */
 function showPage() {
   const running = state.core === 'running';
   agentView.setVisible(state.page === 'browser');
@@ -79,7 +61,6 @@ function stopCore() {
   core = null;
   running.removeAllListeners('exit');
   if (process.platform === 'win32') {
-    // The core is a command that starts another: both go, and whatever they started.
     spawnSync('taskkill', ['/pid', String(running.pid), '/T', '/F']);
   } else {
     running.kill('SIGTERM');
@@ -95,16 +76,12 @@ function startCore() {
   tellShell();
 
   core = spawn('uv', coreArguments(REPOSITORY), {
-    // The project's folder, where the file with the model's key is.
     cwd: REPOSITORY,
     env: {
       ...process.env,
-      // A token of this run's own, so that the app knows the chat's address without being told it.
       BAP_BROWSER_TOKEN: crypto.randomBytes(24).toString('base64url'),
       BAP_BROWSER__BROWSER__CDP_URL: `http://127.0.0.1:${DEBUG_PORT}`,
       BAP_BROWSER__BROWSER__CDP_TARGET: AGENT_MARK,
-      // Marks this one as the app's own backend, so it serves the backend instead of opening
-      // the app a second time (cli.py's `_studio` checks for it).
       BAP_BROWSER_DESKTOP_APP_CORE: '1',
     },
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -118,9 +95,6 @@ function startCore() {
     const viewer = viewerOf(line);
     if (!viewer || service) return;
     service = viewer.origin;
-    // The core says where it is before it has found the app's browser: the first page keeps the mark
-    // it finds that browser by, same as before the core was there to say anything (a blank page, not
-    // the demo site: a fresh session shows nothing until a task sends it somewhere).
     agentView.webContents.loadURL(`about:blank${AGENT_MARK}`);
     void showWhenReady(viewer);
   });
@@ -133,7 +107,6 @@ function startCore() {
   });
 }
 
-/** Shows the studio's pages once it has a session on each: a page opened before has none to show. */
 async function showWhenReady(viewer) {
   const ends = Date.now() + PAGES_WAIT_MS;
   while (core && Date.now() < ends) {
@@ -141,7 +114,6 @@ async function showWhenReady(viewer) {
       const answer = await fetch(`${viewer.origin}/api/sessions`, { headers: { Authorization: `Bearer ${viewer.token}` } });
       if (answer.ok && sessionsUp(await answer.json(), PAGES)) break;
     } catch {
-      // The service is still starting.
     }
     await new Promise((resolve) => setTimeout(resolve, PAGES_POLL_MS));
   }
@@ -172,13 +144,10 @@ function createWindow() {
     },
   });
   win.setMenuBarVisibility(false);
-  // The shell is one page from this app's own files, and stays that.
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
-  // The agent's browser keeps its sign-ins between runs, apart from everything else in the app.
   const agentSession = session.fromPartition('persist:agent');
-  // A page the agent visits is given nothing it asks the person's machine for.
   agentSession.setPermissionRequestHandler((_contents, _permission, answer) => answer(false));
   const paneBackground = paneBackgroundOf(nativeTheme.shouldUseDarkColors);
   agentView = new WebContentsView({ backgroundColor: paneBackground, webPreferences: { session: agentSession, sandbox: true, contextIsolation: true, nodeIntegration: false } });
@@ -188,21 +157,17 @@ function createWindow() {
     view.setBorderRadius(CORNER);
     win.contentView.addChildView(view);
   }
-  // A view that has loaded nothing does not answer a debugger, and whoever attaches to the app's
-  // browser would wait for it for ever. Each is given an empty page from the start.
   for (const view of [chatView, computerView]) {
     view.setVisible(false);
     view.webContents.loadURL('about:blank');
   }
 
   const page = agentView.webContents;
-  // A page that opens a new window gets it in the same place: the agent drives one page.
   page.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) page.loadURL(url);
     return { action: 'deny' };
   });
   for (const event of ['did-navigate', 'did-navigate-in-page', 'did-finish-load']) page.on(event, tellShell);
-  // A link in the agent's answer opens in the person's own browser, not over the chat.
   for (const view of [chatView, computerView]) {
     view.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/.test(url)) shell.openExternal(url);
@@ -210,7 +175,6 @@ function createWindow() {
     });
   }
 
-  // The core is started once the marked page is there for it to find.
   page.once('did-finish-load', startCore);
   page.loadURL(`about:blank${AGENT_MARK}`);
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -219,7 +183,6 @@ function createWindow() {
   });
 }
 
-/** Only the app's own shell may ask for anything. */
 const fromShell = (event) => win !== null && event.sender === win.webContents;
 
 ipcMain.on('ready', (event) => {
@@ -258,7 +221,6 @@ ipcMain.on('go', (event, action, name) => {
 
 ipcMain.on('start-again', (event) => {
   if (!fromShell(event) || state.core !== 'stopped') return;
-  // The core looks for the marked page again.
   agentView.webContents.once('did-finish-load', startCore);
   agentView.webContents.loadURL(`about:blank${AGENT_MARK}`);
 });

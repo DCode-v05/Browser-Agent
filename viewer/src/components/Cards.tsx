@@ -1,6 +1,3 @@
-// The cards pinned above the timeline: an approval, a request for help, a page dialog, a blocked
-// page, and the summary when a session ends. Each asks rarely and clearly (spec 9.1).
-
 import type { Ref } from 'react';
 
 import type { Approval, HelpRequest, PageDialog, ViewerState } from '../state/reducer';
@@ -18,7 +15,6 @@ interface ApprovalProps {
   approval: Approval;
   now: number;
   onAnswer(answer: 'once' | 'site' | 'deny'): void;
-  /** Where the A key lands. The card never takes the focus by itself. */
   firstRef: Ref<HTMLButtonElement>;
 }
 
@@ -89,7 +85,6 @@ export function BlockedNotice({ url, reason }: { url: string; reason: string }) 
   );
 }
 
-/** An approval that was denied because nobody was watching stays until the person has seen it. */
 export function UnwatchedNotice({ onDismiss }: { onDismiss(): void }) {
   return (
     <div className="card" data-tone="waiting" role="group" aria-label={W.approval.title}>

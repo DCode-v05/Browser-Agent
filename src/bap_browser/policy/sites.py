@@ -75,7 +75,7 @@ def registrable_name(host: str) -> str:
     labels = host.split(".")
     ascii_labels = [_ascii_form(label) for label in labels]
     rules, exceptions = _rules()
-    suffix_start = len(labels) - 1  # the implicit `*` rule: the last label, when nothing else matches
+    suffix_start = len(labels) - 1
     for i in range(len(labels)):
         candidate = ".".join(ascii_labels[i:])
         if candidate in exceptions:

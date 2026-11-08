@@ -14,21 +14,15 @@ from typing import Protocol
 
 from bap_browser.driver.base import KeyAction, MouseButton, PointerAction
 
-# macOS's own numbers, which are fixed: the event of a pointer that moved; where an event is posted
-# so that it is taken as the machine's own; the field that counts presses; a wheel told in pixels.
 MOVED, AS_THE_MACHINES_OWN, THE_PRESS_COUNT, IN_PIXELS = 5, 0, 1, 0
-# The kinds of event a mouse makes, as macOS numbers them, by button: down, up, moved while held.
 OF_A_BUTTON: dict[MouseButton, tuple[int, int, int]] = {
     "left": (1, 2, 6),
     "right": (3, 4, 7),
     "middle": (25, 26, 27),
 }
 BUTTON_NUMBER: dict[MouseButton, int] = {"left": 0, "right": 1, "middle": 2}
-# The keys that change what another key means, and the flag each sets on the events after it.
 HOLDING = {"Shift": (56, 0x20000), "Control": (59, 0x40000), "Alt": (58, 0x80000), "Meta": (55, 0x100000)}
-# With one of these held, a letter is a command (cmd+c), and is sent as its key, not as a character.
 COMMANDING = 0x40000 | 0x100000
-# The keys with a name, by the number of the key on a Mac's keyboard.
 NAMED = {
     "Enter": 36,
     "Tab": 48,
@@ -45,7 +39,6 @@ NAMED = {
     "ArrowDown": 125,
     "ArrowUp": 126,
 }
-# The keys of letters, digits and signs, on the keyboard macOS takes commands by.
 LETTERS = dict(
     zip(
         "asdfhgzxcv" + "bqweryt123465=97-80]ou[ip" + "lj'k;\\,/nm.`",
@@ -78,7 +71,6 @@ class MacHand:
 
     def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
         if action == "move":
-            # A move with a button held drags what was pressed.
             held = next(iter(self._held), None)
             self._posts.mouse(OF_A_BUTTON[held][2] if held else MOVED, x, y, BUTTON_NUMBER[held or "left"], 0)
             return
@@ -88,7 +80,6 @@ class MacHand:
             self._last_press = (time.monotonic(), x, y, self._presses_in_a_row(x, y))
         else:
             self._held.discard(button)
-        # macOS tells a double press by a count on the events, not by their times.
         self._posts.mouse(down if action == "down" else up, x, y, BUTTON_NUMBER[button], self._last_press[3])
 
     def _presses_in_a_row(self, x: float, y: float) -> int:
@@ -107,11 +98,9 @@ class MacHand:
         elif len(key) == 1 and self._flags & COMMANDING and key.lower() in LETTERS:
             self._posts.key(LETTERS[key.lower()], down, self._flags, "")
         elif len(key) == 1:
-            # A character, whatever keyboard the Mac has: the system is given the character itself.
             self._posts.key(0, down, self._flags, key)
 
     def wheel(self, dx: float, dy: float) -> None:
-        # A page's wheel counts down and right; macOS counts up and left.
         if dx or dy:
             self._posts.scroll(-int(dy), -int(dx))
 
@@ -156,7 +145,6 @@ class MacOS:
         )
         its.CGEventSetIntegerValueField.argtypes = (ref, ctypes.c_uint32, ctypes.c_int64)
         its.CGEventSetFlags.argtypes = (ref, ctypes.c_uint64)
-        # The characters go as UTF-16, which is what the system's own strings are.
         its.CGEventKeyboardSetUnicodeString.argtypes = (ref, ctypes.c_ulong, ctypes.c_char_p)
         its.CGEventPost.argtypes = (ctypes.c_uint32, ref)
         its.CFRelease.argtypes = (ref,)

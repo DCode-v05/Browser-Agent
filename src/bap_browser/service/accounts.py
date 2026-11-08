@@ -23,7 +23,6 @@ from bap_browser.private_file import write_json
 Role = Literal["admin", "user"]
 ROLES: tuple[Role, ...] = get_args(Role)
 
-# How the hash is made (scrypt). A password that is guessed must cost the guesser at each try.
 COST, BLOCK, PARALLEL, LENGTH = 2**14, 8, 1, 32
 
 
@@ -49,9 +48,7 @@ class Accounts:
         self._path = Path(settings.file)
         self._clock = clock
         self._kept = _read(self._path)
-        # A token of a visit, the role it was given for, and when it runs out.
         self._visits: dict[str, tuple[Role, float]] = {}
-        # Wrong passwords in a row for a role, and until when no further try is taken.
         self._wrong: dict[Role, int] = {}
         self._locked_until: dict[Role, float] = {}
 

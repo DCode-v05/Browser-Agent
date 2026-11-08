@@ -55,7 +55,6 @@ def test_a_press_and_a_release_are_the_mouses_own_and_a_second_press_at_once_is_
         ("mouse", 2, 100, 50, 0, 1),
         ("mouse", 1, 100, 50, 0, 2),
         ("mouse", 2, 100, 50, 0, 2),
-        # Somewhere else, with another button: a first press again.
         ("mouse", 3, 400, 50, 1, 1),
     ]
 
@@ -87,7 +86,6 @@ def test_a_character_is_given_as_itself_and_a_command_as_its_key() -> None:
         ("key", 0, True, 0, "é"),
         ("key", 36, True, 0, ""),
         ("key", 55, True, 0x100000, ""),
-        # cmd+c: the key of C, with the command held, so that the app copies.
         ("key", 8, True, 0x100000, ""),
         ("key", 8, False, 0x100000, ""),
         ("key", 55, False, 0, ""),
@@ -167,7 +165,6 @@ def test_macos_itself_moves_the_pointer_where_it_is_told() -> None:
     before = macos.pointer_at()
     try:
         MacHand(macos, again_within_s=0.5, again_within_points=4).pointer("move", 200, 200, "left")
-        # macOS takes an event in its own time.
         ends = time.monotonic() + 2
         while [round(value) for value in macos.pointer_at()] != [200, 200] and time.monotonic() < ends:
             time.sleep(0.02)

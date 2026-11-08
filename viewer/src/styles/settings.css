@@ -1,5 +1,3 @@
-/* The settings screen (spec 9.12). Tokens only. */
-
 .settings {
   display: flex;
   flex-direction: column;
@@ -97,8 +95,6 @@
   padding-bottom: var(--space-2);
   border-bottom: var(--border-width) solid var(--border);
 }
-
-/* One setting: its name, one line saying what it does, its control. */
 
 .setting {
   display: flex;
@@ -218,7 +214,6 @@
   transition: transform var(--duration-state) var(--ease);
 }
 
-/* One of the two places the brand's gradient appears. It runs under the edge too, so no seam shows. */
 .switch[aria-checked='true']::before {
   border-color: transparent;
   background: var(--brand-gradient) border-box;
@@ -229,7 +224,6 @@
   transform: translateX(calc(var(--switch-width) - var(--switch-height)));
 }
 
-/* The word says the state too, so nothing depends on colour alone. */
 .switch-word {
   min-width: var(--space-5);
   color: var(--text-muted);
@@ -288,7 +282,6 @@
   resize: vertical;
 }
 
-/* One line, where a list of sites has several. */
 .sites.one-line {
   min-height: var(--target-min);
   resize: none;
@@ -302,7 +295,6 @@
   font-size: var(--text-secondary);
 }
 
-/* Who else a setting reaches: every browser, the users. */
 .setting-note {
   display: flex;
   align-items: flex-start;
@@ -317,7 +309,6 @@
   margin-top: var(--space-1);
 }
 
-/* What a setting is held at, where it is said in words and not drawn as a control. */
 .setting-value {
   flex: none;
   max-width: 50%;
@@ -374,8 +365,6 @@
   color: var(--text-muted);
   font-family: var(--font-ui);
 }
-
-/* Below 700 px the groups become a list, and choosing one shows its settings on a screen of their own. */
 
 @media (max-width: 699px) {
   .settings {

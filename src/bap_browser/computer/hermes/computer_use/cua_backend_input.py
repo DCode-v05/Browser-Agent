@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend_input.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Input side of the cua-driver backend: delivery-mode handling and the pointer / keyboard /
 value-setter methods (mixed into ``CuaDriverBackend``)."""
@@ -15,8 +14,6 @@ _BTF_UNSUPPORTED_MSG = "The connected cua-driver does not advertise the standalo
 _FOREGROUND_UNSUPPORTED_MSG = ("The connected cua-driver action schema does not accept delivery_mode, so foreground "
                                "delivery is unavailable. Use another verified rung without assuming the reported "
                                "package version describes the live schema.")
-# (what, extra args) pointer addressing form; ``extra`` is None when the caller did not supply that form and
-# may be a callable when computing it has side effects (capability probes) that must follow the refusal checks.
 _Variant = tuple[str, None | dict[str, Any] | Callable[[], dict[str, Any]]]
 
 def _refuse(action: str, message: str, **fields: Any) -> ActionResult:
@@ -94,12 +91,6 @@ class _InputMixin:
         refusal, args = self._target_args("click")
         if refusal is not None:
             return refusal
-        # Tool is chosen by click_count only; `button` goes through click's enum (the driver rejects unknown
-        # buttons). `right_click` / `middle_click` MCP tools are deprecated aliases and never invoked here.
-        # Choose tool by click_count only — single-vs-double — and pass the button through to `click`'s
-        # `button` enum (Surface 5 of NousResearch/hermes-agent#47072). cua-driver-rs gained an explicit
-        # `button: "left"|"right"|"middle"` arg on `click` in trycua/cua#1961 which rejects unknown buttons;
-        # before that, `middle` was silently mapped to a left-click via name-routing through `right_click`.
         button_norm = (button or "left").lower()
         if button_norm not in {"left", "right", "middle"}:
             return _refuse("click", f"unknown button {button!r} — expected left, right, middle.")
@@ -134,10 +125,6 @@ class _InputMixin:
         if refusal is not None:
             return refusal
         args.update(direction=direction, amount=max(1, min(50, amount)))
-        # An element without a known window_id is not an addressing form here; scrolling then falls through
-        # to the coordinate form or the bare window. Some driver schemas reject x/y on scroll: only send
-        # coordinates when the driver advertises support; otherwise it scrolls the targeted window
-        # (window_id is still sent for routing).
         xy = lambda: ({"x": x, "y": y}
                       if self._session.supports_capability("input.scroll.coordinates", tool="scroll") else {})
         refusal = self._pointer_args("scroll", args, (
@@ -159,7 +146,7 @@ class _InputMixin:
         key_name, modifiers = _parse_key_combo(keys)
         if not key_name:
             return _refuse("key", f"Could not parse key from '{keys}'.")
-        if modifiers:  # hotkey requires at least one modifier + one key
+        if modifiers:
             return self._run_input_action("hotkey", {**args, "keys": modifiers + [key_name]}, delivery_mode, bring_to_front)
         return self._run_input_action("press_key", {**args, "key": key_name}, delivery_mode, bring_to_front)
 

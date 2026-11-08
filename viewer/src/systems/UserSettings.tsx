@@ -1,7 +1,3 @@
-// A user's own settings for one browser (spec 4.11): which browser they prefer, and every setting
-// the admin lets users have, each with what it does and a control that works. What the admin holds
-// is said in words, not drawn as a control that does nothing.
-
 import { useId, useState } from 'react';
 
 import { Button } from '../components/StatusPanel';
@@ -14,17 +10,13 @@ import { SettingsList } from './SettingsList';
 
 interface Props {
   system: SystemInfo;
-  /** The browsers this person may use, to choose the preferred one among. */
   systems: SystemInfo[];
   api: SystemsApi;
   surface: Surface;
   word: string;
   me: Me;
-  /** Goes up when the service has been asked again: what the admin changed since shows then. */
   version: number;
-  /** The person chose the browser their window opens on. */
   onPrefer(system: string): void;
-  /** Told what the settings are after one was changed here. */
   onSettings?(answer: SettingsAnswer): void;
   onToast(text: string): void;
 }

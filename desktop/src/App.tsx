@@ -1,8 +1,3 @@
-// The app's shell: a rail at the left, then one of two pages. The browser page has the agent's
-// browser in the middle and its chat at the right; the computer page is the desktop the agent works
-// on, with its chat, across both. They are views of the desktop app laid over the empty frames drawn
-// here; the shell tells the app where those frames are.
-
 import { ArrowLeft, ArrowRight, Globe, Lock, Monitor, MonitorSmartphone, PlaneTakeoff, ReceiptText, RotateCw } from 'lucide-react';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 
@@ -56,13 +51,11 @@ function rectOf(element: HTMLElement | null): Rect {
   return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : { x: 0, y: 0, width: 0, height: 0 };
 }
 
-/** Tells the desktop app where the two frames are, now and whenever either moves or changes size. */
 function usePlacing(agent: RefObject<HTMLDivElement | null>, chat: RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const place = () => window.desktop.place({ agent: rectOf(agent.current), chat: rectOf(chat.current) });
     const watching = new ResizeObserver(place);
     for (const frame of [agent.current, chat.current, document.body]) if (frame) watching.observe(frame);
-    // The rail opening or closing moves the frames without changing the window.
     const moving = new MutationObserver(place);
     moving.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-state'] });
     window.addEventListener('transitionend', place);
@@ -83,12 +76,10 @@ export function App() {
   usePlacing(agentFrame, chatFrame);
 
   const running = state.core === 'running';
-  // Nothing of a task sent the agent's browser anywhere yet: there is no real address to show.
   const hasPage = state.address !== '' && state.address !== 'about:blank';
   const secure = state.address.startsWith('https://');
   const onTheComputer = state.page === 'computer';
   const show = (page: DesktopPage) => window.desktop.show(page);
-  // A page of the demo site is in the browser: the browser's page is shown with it.
   const open = (page: 'start' | 'checkin' | 'signup') => {
     show('browser');
     window.desktop.go('open', page);
@@ -96,14 +87,10 @@ export function App() {
 
   return (
     <TooltipProvider>
-      {/* The OS draws no title bar of its own (frame: false): this strip is dragged instead, and
-          leaves its right edge to the window controls the OS overlays on top of it. */}
       <div className="app-drag flex h-9 shrink-0 items-center gap-2 pl-3 text-sm font-medium">
         <span className="size-4 shrink-0 rounded-sm" style={{ background: 'var(--brand-gradient)' }} aria-hidden="true" />
         <span className="truncate">{W.product}</span>
       </div>
-      {/* The sidebar below positions itself `fixed`, which is otherwise relative to the window, not
-          to this strip's height: `contain: layout` gives it this box as its containing block instead. */}
       <div className="min-h-0 flex-1" style={{ contain: 'layout' }}>
       <SidebarProvider defaultOpen={false} className="h-full min-h-0">
         <Sidebar collapsible="icon">

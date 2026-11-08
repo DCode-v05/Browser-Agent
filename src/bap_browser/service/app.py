@@ -103,8 +103,6 @@ def create_app(
     def sees(role: Role, what: str) -> bool:
         return role == "admin" or (settings is not None and settings.user_sees(what))
 
-    # The viewers connected now: the token each came with, the browser each is on, and the way to
-    # end the connection. A person is let in when they connect; this is how they stop being let in.
     watching: dict[WebSocket, tuple[Any, str, asyncio.Future[int]]] = {}
 
     def must_leave(given: Any, name: str) -> int | None:
@@ -141,31 +139,22 @@ def create_app(
             ]
         }
         if rooms is not None:
-            # One window, several browsers: each is a page of it (spec 9.16). A user is shown
-            # those the admin lets users use.
             listed["rooms"] = [room for room in rooms() if may_use(role, room["id"])]
         if desktop is not None and role == "admin":
-            # Whether the window has a desktop app to open (spec 9.16).
             listed["desktop"] = desktop.there
         if settings is not None:
-            # The settings screen is this service's to draw (spec 10.2).
             listed["settings"] = True
         if systems is not None:
-            # Its browsers are systems to set up, manage and evaluate (spec 9.17).
             listed["systems"] = True
         if accounts is not None:
-            # People sign in, as the admin or as a user (spec 4.11).
             listed["role"] = role
         return JSONResponse(listed)
 
-    # Signing in (spec 4.11).
 
     async def auth_state(request: Request) -> Response:
         """What a sign-in page needs before anyone has signed in: whether there is a password to
         sign in with, and who the page's own token speaks for, when it has one."""
         if accounts is None:
-            # Nobody signs in to this service: its own token is the one way in. It says so rather
-            # than refuse the question, so that the page that asked shows no error for it.
             return JSONResponse({"accounts": False})
         given = bearer(request)
         return JSONResponse(
@@ -174,7 +163,6 @@ def create_app(
                 "admin_set": accounts.has("admin"),
                 "user_set": accounts.has("user"),
                 "role": role_of(given),
-                # The link the service printed when it started: it creates the admin's password.
                 "operator": signed_in(given),
             }
         )
@@ -189,7 +177,6 @@ def create_app(
         if not accounts.has(role):
             return JSONResponse({"error": "not_set"}, status_code=409)
         try:
-            # The hash is made slow on purpose: it is not made on the loop that runs the sessions.
             visit = await asyncio.to_thread(accounts.sign_in, role, asked.get("password"))
         except LockedOut as locked:
             return JSONResponse({"error": "locked", "wait_s": math.ceil(locked.wait_s)}, status_code=429)
@@ -210,11 +197,9 @@ def create_app(
         if whose not in ROLES or asked is None:
             return Response(status_code=400)
         try:
-            # The admin who changes their own password stays signed in.
             await asyncio.to_thread(accounts.set_password, whose, asked.get("password"), bearer(request))
         except BadPassword as bad:
             return JSONResponse({"error": str(bad)}, status_code=400)
-        # Everyone who signed in with the old one signs in again: their open pages are closed too.
         show_out()
         return JSONResponse({"admin_set": accounts.has("admin"), "user_set": accounts.has("user")})
 
@@ -229,7 +214,6 @@ def create_app(
         assert settings is not None
         return {
             "role": role,
-            # The browsers this person may use, and the one their window opens on.
             "systems": settings.allowed_systems(role),
             "preferred": settings.preferred(role),
             "sees": {what: sees(role, what) for what in SEES},
@@ -281,14 +265,11 @@ def create_app(
             settings.change_policy(asked)
         except Refused as no_change:
             return JSONResponse({"setting": no_change.setting, "reason": no_change.reason}, status_code=409)
-        # A setting users may no longer change falls back to the admin's value at once.
         for session in list(sessions.values()):
             await session.settings_changed({})
-        # And a user on a browser that users may no longer use is no longer on it.
         show_out()
         return JSONResponse(settings.policy())
 
-    # Settings (spec 10.2).
 
     def a_system_or_none(role: Role, system: Any) -> bool:
         """Whether a request names no system, or one of the browsers this person may use."""
@@ -329,17 +310,14 @@ def create_app(
         try:
             changed = settings.change(surface, changes, system, role)
         except Refused as no_change:
-            # Nothing was changed: one refused change refuses them all.
             return JSONResponse({"setting": no_change.setting, "reason": no_change.reason}, status_code=409)
         if changed:
             for session in list(sessions.values()):
                 await session.settings_changed(changed)
             if systems is not None and system is not None:
-                # A browser that was turned on or off is started or ended.
                 await systems.settings_changed(system)
         return JSONResponse(settings.answer(surface, system, role))
 
-    # The browsers as systems (spec 9.17, 12.6).
 
     def a_system(request: Request, *roles: Role) -> tuple[Role, str] | Response:
         """Who asks and the system they name; or the refusal, for a system there is none of, or
@@ -379,7 +357,6 @@ def create_app(
         assert systems is not None
         action = request.path_params["action"]
         if role != "admin" and action != "start":
-            # A user starts the browser they prefer when it has stopped. Stopping one is the admin's.
             return Response(status_code=403)
         why_not = await systems.manage(system, action)
         if why_not is not None:
@@ -550,7 +527,6 @@ def create_app(
 
     async def viewer_socket(socket: WebSocket) -> None:
         origin = socket.headers.get("origin")
-        # A browser always says which page opened the connection. Only the viewer's own page may.
         own = {f"http://{socket.headers.get('host', '')}", f"https://{socket.headers.get('host', '')}"}
         if origin is not None and origin not in own | origins:
             await socket.close(Close.NOT_THE_VIEWERS_ORIGIN)
@@ -566,7 +542,6 @@ def create_app(
             await socket.close(Close.REFUSED)
             return
         name = socket.path_params["name"]
-        # A browser the admin keeps from users is, for a user, not there.
         session = sessions.get(name) if may_use(role, name) else None
         if session is None:
             await socket.close(Close.NO_SUCH_SESSION)
@@ -585,7 +560,6 @@ def create_app(
                 subscriber,
                 config.server.command_backlog,
                 door,
-                # A visit also ends by itself, when its time is up: nothing it asks for is done then.
                 lambda: must_leave(given, name),
             )
         except WebSocketDisconnect:
@@ -606,7 +580,6 @@ def create_app(
                 first = command_of(await socket.receive())
         except (TimeoutError, WebSocketDisconnect):
             first = None
-        # A pairing token lets it in once; the key it is given then lets it come back after a cut.
         admitted = bridge.admit(first) if first and first.get("type") == "auth" else None
         if admitted is None or first is None:
             await socket.close(Close.REFUSED)

@@ -1,6 +1,3 @@
-// The viewer's icons: simple strokes on a 16 by 16 grid, coloured by the text around them.
-// Every state has an icon and a label as well as a colour (spec 9.9).
-
 const PATHS = {
   agent: 'M8 1.5v2M4.5 4.5h7a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 11V6a1.5 1.5 0 0 1 1.5-1.5ZM6 8v1M10 8v1M1.5 8v2M14.5 8v2',
   person: 'M8 8a2.75 2.75 0 1 0 0-5.5A2.75 2.75 0 0 0 8 8ZM2.75 13.5a5.25 5.25 0 0 1 10.5 0',

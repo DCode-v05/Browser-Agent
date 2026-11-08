@@ -53,7 +53,6 @@ async def scripts(make_config: MakeConfig, tmp_path: Path) -> AsyncIterator[Open
 
     yield open_one
     for one in opened:
-        # Ending the session ends the worker with it.
         await one.session.close()
 
 
@@ -83,18 +82,14 @@ async def test_a_script_does_several_steps_in_one_call(scripts: Open) -> None:
     )
     assert not result.is_error
     lines = result.text.splitlines()
-    # What came of it is the first line. What the script printed can hold anything a page says.
     assert lines[0] == "Ran the script: 4 steps."
     assert "Printed:\nTrue" in result.text and 'Value: [1, "two"]' in result.text
     steps = lines[lines.index("Steps (4):") + 1 :][:4]
     assert [step.split(": ")[0] for step in steps] == ["1. ok", "2. ok", "3. ok", "4. ok"]
     assert steps[0] == "1. ok: Navigated to https://example.com/orders"
-    # find="…" looks the words up first, and acts on the best match.
-    # Opening a page reads it, as the single tool does.
     assert one.did() == ["navigate", "snapshot", "snapshot", "find", "click"]
     assert one.driver.calls[3][0] == "find" and one.driver.calls[3][1]["query"] == "Go"
     assert result.text.rstrip().splitlines()[-1].startswith("[tabs]")
-    # What a script keeps is there for the next script of the session.
     assert "Value: 2" in (await one.run("state['visited'] + 1")).text
 
 
@@ -105,7 +100,6 @@ async def test_each_step_is_logged_as_the_call_it_is_and_the_script_is_never_kep
     )
     logged = one.logged()
     assert [line["tool"] for line in logged] == ["browser_navigate", "browser_type", "browser_run"]
-    # The script holds what it types. Only how much was typed is ever kept, as for a single call.
     assert logged[-1]["args"] == {"code": "<str>"}
     assert logged[-1]["result"] == "Ran the script: 2 steps."
     assert "hunter2-secret" not in json.dumps(logged)
@@ -123,10 +117,8 @@ async def test_a_step_that_fails_stops_the_script_and_says_what_was_done(scripts
         "Earlier steps were carried out and are not undone."
     )
     assert "never" not in result.text
-    # The words were looked up, which is a step of its own, and nothing was clicked.
     assert "1. ok: Navigated to " in result.text and "3. FAILED: Nothing on the page" in result.text
     assert "click" not in one.did()
-    # A script that expects the failure goes on.
     caught = await one.run(
         "try:\n    await browser.click(find='no such thing')\nexcept StepError as failed:\n    print('went on')"
     )
@@ -170,10 +162,8 @@ async def test_a_step_in_a_script_is_checked_like_a_single_call(scripts: Open) -
     denied = await one.run("await browser.click(ref='e1')")
     assert denied.is_error and "not allowed on this deployment" in denied.text
     assert one.did() == []
-    # A tool the deployment does not offer is no method of `browser`.
     absent = await one.run("await browser.evaluate('1')")
     assert absent.is_error and "has no attribute 'evaluate'" in absent.text
-    # And a script cannot run a script.
     nested = await one.run("await browser.run('1')")
     assert nested.is_error and "has no attribute 'run'" in nested.text
 
@@ -197,7 +187,6 @@ async def test_a_script_that_computes_too_long_is_stopped_and_the_next_one_start
         "The script stopped: it computed for longer than 1 s and was stopped. "
         "Earlier steps were carried out and are not undone."
     )
-    # The worker was ended. A new one has nothing of what the scripts before it kept, and says so.
     again = await one.run("len(state)")
     assert not again.is_error and "Value: 0" in again.text
     assert "The worker was started again since the last script, so `state` was empty." in again.text
@@ -209,7 +198,6 @@ async def test_a_script_cannot_flood_the_core(scripts: Open) -> None:
     result = await one.run("await browser.type(ref='e1', text='a' * 100000)")
     assert result.is_error and "handed over more at once than is taken" in result.text
     assert one.did() == []
-    # What it prints, and its value, are cut.
     cut = await one.run("print('b' * 50000)\n'c' * 50000")
     assert not cut.is_error and len(cut.text) < 5000 and "[cut" in cut.text
     assert not (await one.run("1")).is_error
@@ -231,11 +219,9 @@ async def test_the_worker_is_handed_nothing_of_the_cores(
     one = scripts()
     assert "Value: 2" in (await one.run("1 + 1")).text
     assert len(started) == 1
-    # Isolated, and without the site packages: the worker is the standard library alone.
     assert started[0]["command"][1:3] == ("-I", "-S")
     assert set(started[0]["env"]) <= {"SYSTEMROOT"}
     assert "secret" not in json.dumps(started[0]["env"])
-    # The worker is used again, not started for each script.
     await one.run("2")
     assert len(started) == 1
     assert {name for name in os.environ if "SECRET" in name.upper()} == set()
@@ -260,7 +246,6 @@ async def test_a_person_pauses_between_two_steps_of_a_script(make_config: MakeCo
         async with asyncio.timeout(10):
             while ("navigate", "https://example.com/") not in driver.calls:
                 await asyncio.sleep(0.01)
-        # The script is computing. A person's Pause takes hold at once, not when the script ends.
         await asyncio.wait_for(session.handle({"type": "pause"}), 2)
         assert session.control == "paused"
         await asyncio.sleep(0.5)
@@ -268,7 +253,6 @@ async def test_a_person_pauses_between_two_steps_of_a_script(make_config: MakeCo
         await session.handle({"type": "resume"})
         result = await asyncio.wait_for(script, 20)
         assert not result.is_error and 'Value: "done"' in result.text
-        # A person watching sees the script, and each step of it, as steps.
         told = [item for item in session.hub.subscribe()[0] if isinstance(item, dict)]
         started = [(event["tool"], event["label"]) for event in told if event["type"] == "step_started"]
         assert started[0] == ("browser_run", "Running a script")

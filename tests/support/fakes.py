@@ -137,7 +137,6 @@ class FakeDriver:
         self._dialog_open.clear()
         self.calls.append(("answer_dialog", {"accept": accept, "text": text}))
         if self.hold is not None:
-            # The page goes on with what the dialog had interrupted.
             self.hold.set()
         return answered
 

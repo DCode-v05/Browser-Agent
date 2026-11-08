@@ -37,7 +37,6 @@ async def test_finding_an_element_does_not_move_the_page(driver: PlaywrightDrive
     last = ref_of(await read(driver), 'button "Item 300"')
     located = await driver.locate(last)
     assert (located.role, located.name) == ("button", "Item 300")
-    # It is below what the picture shows, so there is nothing to outline yet.
     assert located.box is None
     assert await driver.page.evaluate("scrollY") == 0
 

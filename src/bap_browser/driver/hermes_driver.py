@@ -33,8 +33,6 @@ from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BapError, BrowserError
 from bap_browser.results import Picture
 
-# What each app the settings can allow is called on each system. On Linux it is the program the
-# contained desktop starts.
 NAMED = {
     "darwin": {
         "text_editor": "TextEdit",
@@ -49,29 +47,21 @@ NAMED = {
         "terminal": "Terminal",
     },
 }
-# The driver's own program. Among the windows it is named `cua-driver.exe` on Windows and
-# `Cua Driver` on macOS: with what is no letter taken out, both begin alike.
 THE_DRIVER = "cua-driver"
-# The program the driver pictures a window with on Linux (ImageMagick's).
 ITS_PICTURES = "import"
 NOT_A_LETTER = re.compile(r"[^a-z]")
 ITS_OWN = "cuadriver"
-# A role of a page, and what a desktop's own name for it holds. A box that is ticked and a field that
-# is typed into are not judged as a button is (spec 18.4).
 ROLES = {
     "checkbox": ("checkbox", "togglebutton", "switch"),
     "radio": ("radio",),
     "textbox": ("text", "entry", "edit", "document", "combobox", "searchfield", "password"),
     "link": ("link",),
 }
-# The roles of a field what is typed into is hidden in, and of one that holds many lines.
 SECRET = ("secure", "password")
 MANY_LINES = ("textarea", "textview", "document")
-# How the desktop's own pointer does each press: the button, and how many times.
 PRESSED = {"click": (1, 1), "double_click": (1, 2), "right_click": (3, 1), "middle_click": (2, 1)}
 A_PICTURE = "data:"
 PNG = b"\x89PNG"
-# The states of a session in which a person is at the screen.
 A_PERSON_IS_AT_THE_SCREEN = ("person", "person_requested")
 
 
@@ -122,23 +112,14 @@ class HermesDriver(DesktopDriver):
         self._screen: ScreenHere | None = None
         self._placed: dict[int, tuple[int, int, int, int]] = {}
         self._named: dict[int, tuple[str, str]] = {}
-        # How many times the driver's session was lost and begun afresh: each is a session of its own.
         self._afresh = 0
-        # The element the agent last pressed by its number, which has the focus, and the app it
-        # last named: what a key, typing and watch mode are judged by (spec 22.7).
         self._focus: int | None = None
         self.working_in = ""
-        # On a Mac's own screen a person's hand on the picture is posted to macOS itself.
         self._macos: Any = None
         self._hand: MacHand | None = None
-        # On a machine elsewhere, the way to its helper's hand while a person has taken over.
         self.far_hand: ClientConnection | None = None
-        # The size the page was first told, which it measures where a person points in.
         self.page_size: tuple[int, int] | None = None
-        # The system of the machine driven: this one's, or what a machine elsewhere says it runs.
         self.system_driven = sys.platform
-        # The same, where it is known: a machine elsewhere that does not say has none, and a desktop
-        # of its own (a container, the micro VM's screen) is Linux whatever runs the engine.
         self.system_known: str | None = (
             None
             if self._settings.runs == "remote"
@@ -154,10 +135,8 @@ class HermesDriver(DesktopDriver):
                 again_within_points=self._settings.double_press_points,
             )
 
-    # The session.
 
     async def start(self) -> None:
-        # With a backend named in the driver's place there is no driver to lack.
         lacking = None if self._stand_in else await asyncio.to_thread(computer.lacks, self._config)
         if lacking is not None:
             raise BrowserError(lacking.said, reason=f"the machine lacks: {lacking.what}")
@@ -174,8 +153,6 @@ class HermesDriver(DesktopDriver):
             container = self.desktop.container
         self._base = computer.base(self._config, backend=self._stand_in, container=container)
         self._base.__enter__()
-        # The engine's own check has judged a call, and asked a person where the settings say so,
-        # before it reaches the tool (spec 22.3.1). The tool's own question is answered by that.
         computer.ask_with(lambda action, about: True)
         if self._settings.runs == "remote":
             code = os.environ.get(self._settings.helper_token_env, "")
@@ -193,7 +170,6 @@ class HermesDriver(DesktopDriver):
         await self.let_go()
         base, self._base = self._base, None
         if base is not None:
-            # Stopping the driver waits for it, so it is not done on the loop.
             await asyncio.to_thread(base.__exit__, None, None, None)
         screen, self._screen = self._screen, None
         if screen is not None:
@@ -211,13 +187,9 @@ class HermesDriver(DesktopDriver):
 
     async def viewport(self) -> tuple[int, int]:
         if self._hand is not None:
-            # A Mac's screen in the points its events are placed by: the page works in them, so
-            # that a place on the picture is that place on the screen.
             across, down = self._macos.size()
             return int(across), int(down)
         if self.page_size is None:
-            # The page works in the size it is told at the start, whatever size a later picture is:
-            # what a person does on the picture is measured against it.
             self.page_size = (
                 (self._settings.screen_width, self._settings.screen_height)
                 if self._last is None
@@ -225,7 +197,6 @@ class HermesDriver(DesktopDriver):
             )
         return self.page_size
 
-    # What the agent does: one call of Hermes' tool.
 
     async def use(self, arguments: dict[str, Any], session: str | None = None) -> Any:
         """One call of `computer_use`. Text as a JSON string, or a dictionary that holds a picture."""
@@ -235,7 +206,6 @@ class HermesDriver(DesktopDriver):
             )
         return await asyncio.to_thread(computer.computer_use, arguments, session or self.session_name)
 
-    # Where things are, on a desktop this engine itself started (spec 22.5).
 
     def saw(self, elements: list[dict[str, Any]]) -> None:
         """Keeps where each element of the newest capture is on the screen, by its number."""
@@ -315,7 +285,6 @@ class HermesDriver(DesktopDriver):
             return False
         gap = str(self._settings.key_gap_ms)
         try:
-            # The text is the program's input and no word of its command: a command can be listed.
             await own.run("xdotool", "type", "--delay", gap, "--file", "-", stdin=text.encode())
         except BapError:
             return False
@@ -340,11 +309,9 @@ class HermesDriver(DesktopDriver):
             return True
         for program in (ITS_PICTURES, THE_DRIVER):
             with contextlib.suppress(BapError):
-                # It answers nothing, so it is not asked: it is ended. None left to end is no failure.
                 await own.run("pkill", "-9", "-x", program)
         return True
 
-    # What the two tools kept from before ask.
 
     async def windows(self) -> list[str]:
         """The titles of the windows that are open."""
@@ -353,7 +320,6 @@ class HermesDriver(DesktopDriver):
         titles = [
             str(window.get("title") or window.get("app_name") or "")
             for window in answer.get("windows", [])
-            # The driver draws the agent's pointer in windows of its own: nothing to work in.
             if not NOT_A_LETTER.sub("", str(window.get("app_name", "")).lower()).startswith(ITS_OWN)
         ]
         kept = [title[: self._settings.window_title_chars] for title in titles if title.strip()]
@@ -361,7 +327,6 @@ class HermesDriver(DesktopDriver):
 
     async def open_app(self, app: App) -> bool:
         if isinstance(self.desktop, ContainedDesktop) and self._settings.runs == "container":
-            # In its container the desktop starts its own apps, and only those a person allowed.
             await self.desktop.start_app(app)
             return True
         named = NAMED.get(self.system_driven, {}).get(app.id, app.command)
@@ -372,8 +337,6 @@ class HermesDriver(DesktopDriver):
             return False
         return await asyncio.to_thread(computer.open_app, name, self.session_name)
 
-    # What a person sees: the whole screen. The viewer has a session of its own with the driver, so
-    # that its looking never moves the window the agent is working in.
 
     async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
         if self._base is None:
@@ -400,8 +363,6 @@ class HermesDriver(DesktopDriver):
             else:
                 await self.let_go()
 
-    # A machine elsewhere: a person who has taken over on this engine's page uses its mouse and
-    # keyboard through the helper there, where that machine's person allows it (spec 22.6.2).
 
     async def reach_out(self) -> None:
         if self.far_hand is not None:
@@ -411,7 +372,6 @@ class HermesDriver(DesktopDriver):
         try:
             self.far_hand = await connect(there, additional_headers={"Authorization": f"Bearer {code}"})
         except (OSError, WebSocketException, TimeoutError):
-            # That machine's person has not allowed it: the page says to use that machine's own.
             self.far_hand = None
 
     async def let_go(self) -> None:
@@ -440,16 +400,11 @@ class HermesDriver(DesktopDriver):
         while self._base is not None:
             with contextlib.suppress(BapError):
                 shot = await self.screenshot(full_page=False, annotate=False)
-                # A screen that stands still is sent once.
                 if shot.picture.data != sent:
                     sent = shot.picture.data
                     on_frame(sent)
             await asyncio.sleep(pause)
 
-    # What a person does on the picture while they are in control. On a desktop nobody sits at, the
-    # contained one and the micro VM's, it is sent to that desktop. On a Mac's own screen it is
-    # posted to macOS, where the person allowed that. Anywhere else the person has the machine's own
-    # mouse and keyboard, and nothing is sent.
 
     def is_its_own(self) -> bool:
         return self._settings.runs in ("container", "here") or self._screen is not None

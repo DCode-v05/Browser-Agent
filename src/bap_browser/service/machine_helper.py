@@ -44,17 +44,13 @@ from bap_browser.config import Config
 from bap_browser.driver.mac_hand import MacHand, MacOS
 from bap_browser.driver.x11_hand import X11Hand, XScreen
 
-# What an engine may have the driver do besides the conversation itself: what it is, whether it is
-# ready, and single calls. Nothing that updates the driver, changes its settings or installs more.
 RUNS = frozenset({"manifest", "--help", "--version", "status", "doctor", "call", "stop"})
 PERMISSIONS = ("permissions", frozenset({"status", "grant"}))
 THE_CONVERSATION = "mcp"
 WITH_IT = frozenset({"--no-overlay"})
 STOPS_IT = "stop"
-# What is asked of a driver that is running, and so of the one that holds the engine.
 OF_THE_RUNNING_ONE = frozenset({"status", "call"})
 THIS_MACHINE = frozenset({"127.0.0.1", "::1", "localhost"})
-# Sent by the link when the engine has no more to say.
 NO_MORE = ""
 STOPPED, NO_CODE, NOT_ALLOWED, BAD = (
     HTTPStatus.LOCKED,
@@ -160,7 +156,6 @@ class Helper:
         scheme, _, given = caller.headers.get("authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not hmac.compare_digest(given.encode(), self.code.encode()):
             return NO_CODE
-        # `tailscale serve` passes a call on from this machine, and says where it came from.
         came_from = caller.headers.get("x-forwarded-for", "").split(",")[0].strip()
         if not self.tailnet:
             here = caller.client is not None and caller.client.host in THIS_MACHINE
@@ -250,7 +245,6 @@ def helper_app(helper: Helper) -> Starlette:
         except (ValueError, AttributeError):
             argv = None
         if argv is not None and helper.endpoint and argv[0] == STOPS_IT:
-            # The driver that holds the engine is the helper's to stop, and the person's.
             argv = None
         if argv is None:
             return JSONResponse({"error": "The helper does not run that of the driver."}, status_code=BAD)
@@ -284,11 +278,7 @@ def helper_app(helper: Helper) -> Starlette:
             return
         await socket.accept()
         helper.say("An engine has started working on this machine.")
-        # An ordinary process with its pipes, read on a thread: it is ended at once and for certain
-        # when the engine goes away, whatever the loop is doing.
         if helper.renew is not None and not helper.running:
-            # No conversation is under way: this one begins a session, which gets a fresh driver. A
-            # second conversation of the session, the viewer's beside the agent's, shares it.
             helper.endpoint = await asyncio.to_thread(helper.renew)
         driver = await asyncio.to_thread(helper.start_driver, with_it)
         assert driver.stdin is not None and driver.stdout is not None
@@ -308,7 +298,6 @@ def helper_app(helper: Helper) -> Starlette:
 
         outward, inward = asyncio.create_task(answers()), asyncio.create_task(requests())
         try:
-            # The driver ending ends the conversation. So does the engine going away.
             await asyncio.wait({outward, inward}, return_when=asyncio.FIRST_EXCEPTION)
             await outward
         except (WebSocketDisconnect, ConnectionError, RuntimeError, OSError):
@@ -430,7 +419,6 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
     print(f"The helper is on this machine at {here}. An engine that has the pairing code can drive this")
     print("machine through it. It tells you here what is done. Press Ctrl+C to end it.")
     if not given:
-        # The code is for the person at this machine to read, here and nowhere else.
         print(f"Pairing code: {code}")
         print(f"Give it to the engine as {config.computer.helper_token_env}.")
     if it.hand is not None:
@@ -446,7 +434,6 @@ def run_helper(config: Config, this_machine_alone: bool) -> int:
         with holding_to_the_allowed_apps(config, binary) as afresh:
             it.renew = afresh
             if afresh is not None:
-                # Started now, so that a driver that cannot be started is known before an engine calls.
                 it.endpoint = afresh()
             print(
                 "The engine is held to the apps you allow in the settings."

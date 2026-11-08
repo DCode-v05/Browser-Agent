@@ -20,13 +20,10 @@ def test_the_budget_file_holds_the_lines_of_the_spec() -> None:
     lines = runner.load_budget(BUDGET)
     ids = [line.id for line in lines]
     assert len(ids) == len(set(ids)) == 41
-    # The code tool is of milestone 4. Its lines are with those of the next steps (spec 11.4).
     known = {tool.name for tool in TOOLS} - {"browser_run"}
     assert {line.tool for line in lines} <= known
-    # Every tool of milestone 1 has at least one line.
     assert {line.tool for line in lines} == known
     assert all(0 < line.target_ms < line.fail_ms for line in lines)
-    # A scenario times a line of the budget, and nothing else.
     assert set(SCENARIOS) <= set(ids)
 
 
@@ -43,12 +40,10 @@ def test_a_budget_file_that_cannot_be_read_stops_the_bench(tmp_path: Path) -> No
     [
         ([4.0] * 30, "OK"),
         ([5.0] * 30, "OK"),
-        # Within five in a hundred above the target still counts as OK.
         ([5.25] * 30, "OK"),
         ([5.3] * 30, "WARN"),
         ([15.0] * 30, "WARN"),
         ([15.1] * 30, "FAIL"),
-        # The median is fine, but the slow runs are at twice the fail limit.
         ([4.0] * 27 + [30.0] * 3, "FAIL"),
         ([4.0] * 29 + [30.0], "OK"),
     ],
@@ -89,14 +84,11 @@ def test_a_failure_counts_once_it_is_seen_in_two_runs_one_after_the_other(tmp_pa
     before = runner.failed_before(tmp_path)
     assert before == {("snapshot.small", "chromium")}
     assert runner.blocking([slow, fine], before) == [slow]
-    # The same line on another browser failed for the first time: it does not count yet.
     elsewhere = runner.judge(LINE, "msedge", [20.0] * 30, Bench())
     assert runner.blocking([elsewhere], before) == []
 
 
 async def test_lines_are_timed_in_a_real_browser_and_none_is_left_out(make_config, tmp_path: Path) -> None:
-    # The configuration is read as a command reads it: a machine that runs the tests may have to
-    # start the browser in its own way.
     bench = {"runs": 3, "warmup": 1, "results_dir": str(tmp_path / "bench")}
     config: Config = make_config(tmp_path, bench=bench)
     lines = [
@@ -110,7 +102,6 @@ async def test_lines_are_timed_in_a_real_browser_and_none_is_left_out(make_confi
     for timed in ("snapshot.small", "fill_form.per_field", "tabs.switch"):
         assert by_line[timed].state in ("OK", "WARN", "FAIL"), by_line[timed]
         assert (by_line[timed].median_ms or 0) > 0
-    # A line with no scenario yet is said to be not run. It is not passed over, and it does not pass.
     assert (by_line["drag.refs"].state, by_line["drag.refs"].note) == ("NOT RUN", "no scenario yet")
 
     only = await runner.run(config, runner.load_budget(BUDGET), ["chromium"], only=["console.read"])

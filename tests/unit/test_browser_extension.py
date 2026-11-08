@@ -15,11 +15,6 @@ def test_the_extension_is_copied_to_where_a_browser_loads_it(tmp_path: Path) -> 
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 3
     assert manifest["side_panel"] == {"default_path": "panel.html"}
-    # The side panel for the chat; the debugger, the tabs and their groups for take-over Chrome,
-    # where the extension attaches to the one tab it opened for the agent. No site is named:
-    # it reads no page by itself.
-    # Storage keeps the sites the person allowed, on their own machine; the alarm lets the background
-    # look for a session while no panel is open.
     assert manifest["permissions"] == ["sidePanel", "debugger", "tabs", "tabGroups", "storage", "alarms"]
     assert "host_permissions" not in manifest
     named = [
@@ -54,8 +49,6 @@ def test_a_configuration_with_the_extension_loads_it_and_lets_it_show_the_viewer
         f"--disable-extensions-except={folder}",
         f"--load-extension={folder}",
     ]
-    # Not under the project folder: on Windows the browser gives up on a profile whose files have
-    # paths longer than 260 characters, and a project folder can be deep.
     assert config.browser.user_data_dir == str(Path.home() / ".bap-browser" / "browser-profile")
     elsewhere = make_config(tmp_path, browser={"kept_profile_dir": str(tmp_path / "kept")})
     assert browser_extension.with_extension(elsewhere, folder).browser.user_data_dir == str(tmp_path / "kept")
@@ -81,14 +74,12 @@ def test_a_session_is_made_known_to_the_extension_and_forgotten_again(tmp_path: 
     assert not (folder / "session.json").exists()
     browser_extension.forget(folder)
 
-    # For take-over Chrome it is also told where to dial in, and with which token.
     browser_extension.announce(folder, bridge="ws://127.0.0.1:8123/bridge", token="abc")
     assert json.loads((folder / "session.json").read_text(encoding="utf-8")) == {
         "bridge": "ws://127.0.0.1:8123/bridge",
         "token": "abc",
     }
 
-    # Installing again never leaves an old session's address behind.
     browser_extension.announce(folder, "http://127.0.0.1:8123/#token=abc")
     browser_extension.install(folder)
     assert not (folder / "session.json").exists()

@@ -19,9 +19,7 @@ from bap_browser.settings.kinds import CLOUD
 from bap_browser.settings.store import SettingsStore
 
 CLEAR = "clear_browsing_data"
-# What the summary of an ended session says, in place of "You stopped it."
 ENDED_TO_CLEAR = "It was ended to clear the browsing data."
-# What a Chromium profile holds. A folder with neither is not one, and is left alone.
 MARKS_OF_A_PROFILE = ("Local State", "Default")
 
 
@@ -35,14 +33,12 @@ async def clear_browsing_data(
     config: Config, sessions: Mapping[str, ServiceSession], settings: SettingsStore
 ) -> dict[str, Any]:
     """Ends the cloud browser's sessions and deletes its kept profile. Says what was done."""
-    # The profile a new session of the cloud browser would use, whether or not one is open now.
     kept = {settings.apply_to(config, CLOUD).browser.user_data_dir}
     ended = 0
     for session in list(sessions.values()):
         if session.backend != CLOUD or session.control == "ended":
             continue
         kept.add(session.config.browser.user_data_dir)
-        # The browser has closed, and let go of its profile, when this returns.
         await session.close("person", ENDED_TO_CLEAR)
         ended += 1
     cleared = [named for named in kept if named and await asyncio.to_thread(_delete, named)]

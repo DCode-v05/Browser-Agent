@@ -20,15 +20,10 @@ from bap_browser.evals.suite import EvalTask, LostStep, own_call
 from bap_browser.service.session import ServiceSession
 
 PRACTICE = "Practice"
-# The steps a reference solution of the desktop is written in.
 STEPS = frozenset({"app", "page", "press", "type", "submit", "key", "wait"})
 THE_TOOL = "computer_use"
-# A line of a capture that names a place text goes into: its number.
 A_PAGE = re.compile(r"#(\d+) \S*(?:text|Edit|edit|entry|Document|document|AXTextArea)\S*")
-# A line of a capture that names a control: its number, what it is, and its name in quotes. A menu
-# pads the names of its items with spaces.
 A_CONTROL = r"#(\d+) [a-z ]+ '{name} *'"
-# The keys a solution names, as Hermes' tool names them.
 THEIR_KEYS = {"control": "ctrl", "enter": "return"}
 
 
@@ -83,15 +78,10 @@ class Desk:
         return folder
 
     async def ready(self, task: EvalTask) -> None:
-        # The apps are closed first: none holds a file of the last task open.
         names = " ".join(app.command for app in APPS)
-        # Each is waited for until it is gone. An app that is opened while its last run is still
-        # ending hands its window to that run over the session's bus, and then there is none. One
-        # that does not end when asked, as an app left with a box open can, is ended by force.
         settings = self._session.config.computer
         looks = max(1, int(settings.app_close_wait_s * 1000 / settings.app_poll_ms))
         pause = settings.app_poll_ms / 1000
-        # A picture of a window that has gone is not waited for either: it holds the whole screen.
         gone = (
             f"pkill -9 -x import; for app in {names}; do pkill -x $app; n=0; while pgrep -x $app >/dev/null; do "
             f"n=$((n+1)); [ $n -ge {looks} ] && pkill -9 -x $app; sleep {pause}; done; done; true"
@@ -151,11 +141,9 @@ class Desk:
                     await self._do("computer_open_app", {"app": rest[0]})
                     app = next(one.command for one in APPS if one.name == rest[0])
                 case "page":
-                    # The place the text goes: found among the app's elements, and clicked by its number.
                     found = await self._the_page(app)
                     await self._do(THE_TOOL, {"action": "click", "element": int(found.group(1))})
                 case "press":
-                    # As an agent presses it: by the number its name has in the newest capture.
                     await self._do(
                         THE_TOOL, {"action": "click", "element": await self._the_control(app, rest[0])}
                     )
@@ -163,8 +151,6 @@ class Desk:
                     await self._look(app)
                     await self._do(THE_TOOL, {"action": "type", "text": rest[0]})
                     if kind == "submit":
-                        # A box that completes what is typed takes Enter for itself while it is still
-                        # working. It is given a moment, and looked at again, before Enter.
                         settle = self._session.config.computer.settle_ms / 1000
                         await self._do(THE_TOOL, {"action": "wait", "seconds": settle})
                         await self._look(app)

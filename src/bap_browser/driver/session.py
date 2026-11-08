@@ -85,9 +85,7 @@ class BrowserSession:
         self.on_event: Callable[[Happened], None] | None = None
         """Set by whoever shows the session to a person. It is told at once what happens in the browser
         by itself: a tab that opens, a dialog, a file that was saved."""
-        # What must end with the session, besides the browser: told when the session closes.
         self._closers: list[Callable[[], Awaitable[None]]] = []
-        # The same, kept for the agent until its next result.
         self._news: deque[Happened] = deque(maxlen=config.browser.capture.max_state_events)
         self.own_machine = False
         """Whether the browser is on the person's own machine, where a file that arrives lands among
@@ -156,7 +154,6 @@ class BrowserSession:
         if self._started and not self._driver.is_alive():
             await self._stop()
             self._lost = True
-            # The agent is told that the browser closed. That its tabs closed with it is no news.
             kept = [event for event in self._news if event.kind != "tab_closed"]
             self._news.clear()
             self._news.extend(kept)
@@ -169,7 +166,6 @@ class BrowserSession:
             await self._driver.start()
             self._started, self._lost = True, False
             if self._closed:
-                # The session was ended while the browser was starting.
                 await self._stop()
                 raise BrowserError(SESSION_ENDED, reason="the session ended")
         return self._driver

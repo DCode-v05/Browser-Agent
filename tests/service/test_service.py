@@ -155,7 +155,6 @@ async def test_the_tools_on_offer_are_listed_with_one_value_that_stands_for_them
     assert status == 200
     assert offered["tools"] == [tool.name for tool in session.toolkit.definitions()]
     assert offered["hash"] == tools_hash(session.toolkit.definitions())
-    # The same tools give the same value again: a client that kept it sees nothing has changed.
     assert (
         json.loads((await get(tools, Authorization=f"Bearer {TOKEN}"))[2])["sessions"]["default"] == offered
     )
@@ -192,7 +191,6 @@ async def test_a_viewer_that_signs_in_is_sent_what_happened_then_the_picture_the
         "picture",
         "caught_up",
     ]
-    # A picture is one type byte and then the JPEG.
     assert items[5] == b"\x01\xff\xd8 a picture"
     assert before <= items[6]["ts"] <= time.time()
 
@@ -294,8 +292,6 @@ async def test_a_persons_commands_act_on_the_session(running: Running) -> None:
         await socket.send(json.dumps({"type": "take_over"}))
         assert (await received(socket))["state"] == "person"
         await socket.send(json.dumps({"type": "pointer", "action": "down", "x": 40, "y": 30, "button": 0}))
-        # Stop is done at once and does not wait for what was sent before it. The press is seen to
-        # reach the page first; sent straight after it, Stop would sometimes overtake it.
         async with asyncio.timeout(3):
             while ("pointer", ("down", 40, 30, "left")) not in driver.calls:
                 await asyncio.sleep(0.01)
@@ -314,7 +310,6 @@ async def test_stop_is_done_at_once_even_with_a_pause_ahead_of_it_that_is_still_
         async with connect(socket_address(service)) as socket:
             await sign_in(socket)
             await until_caught_up(socket)
-            # The pause begins when the click has finished, and this click does not finish.
             await socket.send(json.dumps({"type": "pause"}))
             await socket.send(json.dumps({"type": "stop"}))
             async with asyncio.timeout(3):

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_lease.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop invariants: the byte-level RFB input gate follows the lease, and computer_use refuses
 every action (capture included) while a human holds the screen."""
@@ -13,13 +12,12 @@ from bap_browser.computer.hermes.bot_desktop import lease
 from bap_browser.computer.hermes.bot_desktop.rfb_filter import RfbClientFilter
 
 _HANDSHAKE = b"RFB 003.008\n" + b"\x01" + b"\x00"
-_KEY = b"\x04\x01\x00\x00\x00\x00\x00\x61"          # KeyEvent 'a' down
-# QEMU Extended KeyEvent (type 255, sub 0): what noVNC sends once Xvnc advertises the pseudo-encoding.
+_KEY = b"\x04\x01\x00\x00\x00\x00\x00\x61"
 _QEMU_KEY = bytes([255, 0, 0, 1]) + (0x65).to_bytes(4, "big") + (0x12).to_bytes(4, "big")
-_POINTER = b"\x05\x01\x00\x10\x00\x10"              # PointerEvent, button 1
-_CUT = b"\x06\x00\x00\x00\x00\x00\x00\x02hi"        # ClientCutText "hi"
-_FBUR = b"\x03\x00" + b"\x00" * 8                   # FramebufferUpdateRequest
-_SETENC = b"\x02\x00\x00\x02" + b"\x00\x00\x00\x07" + b"\xff\xff\xff\x21"  # SetEncodings x2
+_POINTER = b"\x05\x01\x00\x10\x00\x10"
+_CUT = b"\x06\x00\x00\x00\x00\x00\x00\x02hi"
+_FBUR = b"\x03\x00" + b"\x00" * 8
+_SETENC = b"\x02\x00\x00\x02" + b"\x00\x00\x00\x07" + b"\xff\xff\xff\x21"
 
 
 @pytest.fixture(autouse=True)
@@ -38,7 +36,6 @@ def test_rfb_filter_forwards_input_only_from_the_lease_holder_across_arbitrary_c
     head = f.feed(_HANDSHAKE)
     assert head[-1:] == b"\x01", "ClientInit is forced shared so a viewer never kicks the agent's watcher"
 
-    # Agent holds: read-only messages pass, input is dropped, even when split byte by byte.
     stream = _KEY + _FBUR + _POINTER + _SETENC + _CUT + _QEMU_KEY
     out = b"".join(f.feed(stream[i:i + 1]) for i in range(len(stream)))
     assert out == _FBUR + _SETENC
@@ -46,7 +43,7 @@ def test_rfb_filter_forwards_input_only_from_the_lease_holder_across_arbitrary_c
     lease.acquire("v1")
     assert f.feed(_KEY + _POINTER + _QEMU_KEY) == _KEY + _POINTER + _QEMU_KEY
 
-    lease.acquire("v2")  # last writer wins: v1 is evicted from input on the very next message
+    lease.acquire("v2")
     assert f.feed(_KEY) == b""
     assert lease.release("v1").holder == lease.HUMAN, "a stale viewer's release must not yank control from v2"
     assert lease.release("v2").holder == lease.AGENT
@@ -93,8 +90,8 @@ def test_takeover_during_an_admitted_action_discards_its_result(monkeypatch):
     monkeypatch.setattr(tool, "_new_backend", lambda mode: tool._NoopBackend())
 
     def _dispatch_then_takeover(backend, action, args, **_):
-        lease.acquire("human")  # a whole take-over / hand-back cycle inside the driver call:
-        lease.release("human")  # control is back, but the frame is still the human's turn
+        lease.acquire("human")
+        lease.release("human")
         return json.dumps({"ok": True, "action": action, "png_b64": "SECRET"})
 
     monkeypatch.setattr(tool, "_dispatch", _dispatch_then_takeover)
@@ -141,10 +138,9 @@ def test_unreadable_lease_file_fails_closed_and_takeover_keeps_the_agents_reason
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{ torn", encoding="utf-8")
     assert lease.get(profile_key=home).holder == lease.HUMAN
-    lease.release(profile_key=home)  # a successful write repairs it
+    lease.release(profile_key=home)
     assert lease.get(profile_key=home).holder == lease.AGENT
 
-    # Valid JSON of the wrong shape is just as untrustworthy as torn JSON: never read it as "agent holds".
     for wrong_shape in ("[]", "null", "5", "{}", '{"holder": "root"}'):
         path.write_text(wrong_shape, encoding="utf-8")
         assert lease.get(profile_key=home).holder == lease.HUMAN, wrong_shape
@@ -153,7 +149,7 @@ def test_unreadable_lease_file_fails_closed_and_takeover_keeps_the_agents_reason
 
     held = lease.acquire("desk-1", reason="log in to the bank, 2FA on your phone", profile_key=home)
     assert held.reason == "log in to the bank, 2FA on your phone"
-    assert hermes_home_key(home)  # sanity: the key derivation used by the bridge is available
+    assert hermes_home_key(home)
 
 
 def test_lease_works_without_fcntl(tmp_path):
@@ -210,4 +206,4 @@ def test_no_op_transitions_do_not_bump_the_epoch():
     assert got.epoch == e0 + 1
     again = lease.acquire("v1")
     assert again.epoch == got.epoch and again.reason == "log in please" and again.since == got.since
-    assert lease.acquire("v2").epoch == got.epoch + 1  # a different viewer IS a transition
+    assert lease.acquire("v2").epoch == got.epoch + 1

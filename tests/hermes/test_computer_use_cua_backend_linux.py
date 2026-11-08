@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_cua_backend_linux.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Regression tests for Linux/X11 capture target selection (#58026, #54173)."""
 
@@ -8,7 +7,6 @@ from unittest.mock import patch
 
 import pytest
 
-# Tied z_index=0 fixture from #58026 (ding ahead of real terminals).
 ISSUE_58026_WINDOWS = [
     {
         "app_name": "ding",
@@ -44,8 +42,6 @@ ISSUE_58026_WINDOWS = [
     },
 ]
 
-# Linux metadata-quirk fixture from #54173 (null is_on_screen, GNOME Shell
-# @!x,y;BDHF backdrop helper ahead of real app windows).
 LINUX_LIST_WINDOWS = [
     {
         "app_name": "",
@@ -122,8 +118,6 @@ def test_default_capture_skips_desktop_helper_when_active_window_unknown():
     ):
         target = _select_capture_target(windows, app_requested=False)
 
-    # "Desktop Icons 1" is a shell helper window that captures as empty; with
-    # the active window unknown, the first REAL app window wins list order.
     assert target["window_id"] == 60817412
     assert target["title"] == "zcode"
 

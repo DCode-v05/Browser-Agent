@@ -50,13 +50,11 @@ def test_four_tools_exist_only_where_their_feature_is_on() -> None:
 
     everything = {tool.name for tool in TOOLS}
     assert len(everything) == 30
-    # A script in the page, and a script of the agent's own, are off unless a deployment turns them on.
     assert everything - offered() == {"browser_evaluate", "browser_run"}
     assert "browser_run" in {tool.name for tool in tools_for(Config(code=Code(enabled=True)))}
     assert "browser_evaluate" in offered(javascript={"allow_evaluate": True})
     assert "browser_downloads" not in offered(downloads={"enabled": False})
     assert "browser_upload_file" not in offered(uploads={"enabled": False})
-    # With no folder to upload from, no upload could ever be allowed.
     assert "browser_upload_file" not in offered(uploads={"allowed_dirs": []})
 
 

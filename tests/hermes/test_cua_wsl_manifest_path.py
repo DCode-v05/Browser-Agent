@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_cua_wsl_manifest_path.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 from __future__ import annotations
 
@@ -15,10 +14,6 @@ def test_wsl_windows_manifest_path_translates_to_drvfs():
         assert cua_backend_driver._wsl_windows_path_to_posix(
             r"C:\Users\Fernando\AppData\Local\cua-driver\cua-driver.exe"
         ) == "/mnt/c/Users/Fernando/AppData/Local/cua-driver/cua-driver.exe"
-
-
-
-
 
 
 def test_resolve_mcp_invocation_normalizes_windows_manifest_command_in_wsl():

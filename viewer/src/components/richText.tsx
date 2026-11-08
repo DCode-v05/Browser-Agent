@@ -1,11 +1,6 @@
-// What a model writes, shown the way it meant it: **bold**, `code`, [named](links) and bare
-// addresses. Nothing else is interpreted, and no HTML in the text is ever used as HTML.
-
 import type { ReactNode } from 'react';
 
-// In order: a named link, a bare address, bold, code.
 const PARTS = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+)|\*\*([^*\n]+)\*\*|`([^`\n]+)`/g;
-// A full stop or a bracket that ends the sentence is not part of the address before it.
 const AFTER_AN_ADDRESS = /[.,;:!?)\]]+$/;
 
 function link(address: string, text: string, key: number): ReactNode {

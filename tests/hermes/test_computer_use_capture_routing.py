@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_capture_routing.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """End-to-end regression for #24015 — capture routing via auxiliary.vision.
 
@@ -30,17 +29,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-# ---------------------------------------------------------------------------
-# Fixtures / helpers
-# ---------------------------------------------------------------------------
-
-# 8×8 PNG (transparent) — minimal provider-acceptable bytes that decode cleanly.
 _PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAADUlEQVR4nG"
     "NgGAUgAAABCAABgukLHQAAAABJRU5ErkJggg=="
 )
 
-# 1×1 JPEG — used to verify mime detection works for either stream type.
 _JPEG_B64 = (
     "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEB"
     "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/"
@@ -96,10 +89,6 @@ def _stub_aux_analysis(text: str):
     return json.dumps({"success": True, "analysis": text})
 
 
-# ---------------------------------------------------------------------------
-# _capture_response: routing OFF (current/native behaviour)
-# ---------------------------------------------------------------------------
-
 class TestCaptureResponseDefaultPath:
     """When routing helper says 'native', the existing multimodal envelope wins."""
 
@@ -113,7 +102,6 @@ class TestCaptureResponseDefaultPath:
 
         assert isinstance(resp, dict)
         assert resp.get("_multimodal") is True
-        # Image part must use image/png MIME for a PNG payload.
         image_part = next(
             p for p in resp["content"] if p.get("type") == "image_url"
         )
@@ -121,10 +109,6 @@ class TestCaptureResponseDefaultPath:
         assert url.startswith("data:image/png;base64,")
         assert "vision_analysis" not in resp
 
-
-# ---------------------------------------------------------------------------
-# _capture_response: routing ON (the #24015 fix)
-# ---------------------------------------------------------------------------
 
 class TestCaptureResponseRoutedToAuxVision:
     """When routing helper says 'aux', the PNG is pre-analysed and a text
@@ -146,8 +130,6 @@ class TestCaptureResponseRoutedToAuxVision:
                 "in' button and a 'username' text field."
             )
 
-        # vision_analyze_tool is async; force a sync MagicMock so we can
-        # assert positional args without dealing with awaitables.
         fake_vat = MagicMock(return_value="<coro>")
 
         with patch.object(cu_tool, "_should_route_through_aux_vision",
@@ -157,9 +139,6 @@ class TestCaptureResponseRoutedToAuxVision:
                    new_callable=lambda: fake_vat):
             resp = cu_tool._capture_response(cap)
 
-        # Must be a JSON string, NOT a multimodal envelope. This is exactly
-        # the contract that prevents #24015's HTTP 404 from firing on the
-        # next agent turn.
         assert isinstance(resp, str)
         assert "data:image" not in resp and "image_url" not in resp
         body = json.loads(resp)
@@ -167,20 +146,13 @@ class TestCaptureResponseRoutedToAuxVision:
         assert body["app"] == "Safari"
         assert "Sign in" in body["vision_analysis"]
         assert body["vision_analysis_routed_via"] == "auxiliary.vision"
-        # The original AX-only metadata (window title, element index, app)
-        # is preserved alongside the new vision analysis so the agent loses
-        # no context vs the multimodal path.
         assert body["window_title"] == "GitHub – Issue #24015"
         assert len(body["elements"]) == 2
 
         assert captured_calls.get("called") is True
-        # vision_analyze_tool was invoked with a path under the patched cache
-        # and a non-empty prompt.
         args, _kwargs = fake_vat.call_args
         path_arg, prompt_arg = args[0], args[1]
         assert str(tmp_cache_dir) in path_arg
-        # AX summary is included so the aux model can ground its description
-        # against the same set-of-mark index the agent will see.
         assert "Sign in" in prompt_arg
 
 
@@ -190,7 +162,7 @@ class TestCaptureResponseRoutedToAuxVision:
         cap = _make_capture(mode="som")
 
         def _fake_run_async(_coro):
-            return 1234  # not a string at all
+            return 1234
 
         fake_vat = MagicMock(return_value="<coro>")
 
@@ -205,10 +177,6 @@ class TestCaptureResponseRoutedToAuxVision:
         body = json.loads(resp)
         assert body.get("vision_unavailable") is True
 
-
-# ---------------------------------------------------------------------------
-# _should_route_through_aux_vision: end-to-end with real config plumbing
-# ---------------------------------------------------------------------------
 
 class TestRoutingDecisionWiring:
     """Verify _should_route_through_aux_vision wires the right config + helper."""

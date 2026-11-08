@@ -71,7 +71,6 @@ async def test_an_agent_with_the_token_is_offered_the_tools_and_a_person_sees_wh
             assert not read.is_error and read.content[0].text.startswith("Page: ")  # type: ignore[union-attr]
             bad = await client.call_tool("browser_click", {"ref": "not a ref"})
             assert bad.is_error
-        # The same session a person is watching: each call was a step in the viewer.
         told: list[Any] = [item for item in session.hub.subscribe()[0] if isinstance(item, dict)]
         steps = [event for event in told if event["type"] == "step_finished"]
         assert [step["ok"] for step in steps] == [True, False]
@@ -85,8 +84,6 @@ async def test_nothing_is_offered_without_the_token(
         assert await asyncio.to_thread(post, service.mcp_address, Authorization="Bearer not-the-token") == 401
         assert await asyncio.to_thread(post, service.mcp_address, Authorization=f"Basic {TOKEN}") == 401
         assert await asyncio.to_thread(post, service.mcp_address, Authorization=f"Bearer {TOKEN}") == 200
-        # A web page that is not the viewer's own has no business with the tools, whatever token it
-        # holds (spec 18.9). A browser says which page sends a request; an agent says nothing.
         held = {"Authorization": f"Bearer {TOKEN}"}
         assert (
             await asyncio.to_thread(post, service.mcp_address, Origin="https://evil.example", **held) == 403
@@ -125,5 +122,4 @@ async def test_people_and_agents_are_given_the_address_they_can_reach(
     async with serving(make_config(tmp_path, server=public)) as (service, _):
         assert service.viewer_address == f"https://vm-7.example.app/browser/#token={TOKEN}"
         assert service.mcp_address == "https://vm-7.example.app/browser/mcp"
-        # Where it listens is still this machine's own address.
         assert service.address.startswith("http://127.0.0.1:")

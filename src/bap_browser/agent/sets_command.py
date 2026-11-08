@@ -68,7 +68,6 @@ async def run_sets(
 
             async def do(words: str) -> Any:
                 assert model_for is not None
-                # Each task is a conversation of its own, with a model client of its own.
                 return await do_task(words, session, model_for(service), session.config, [], recorder)
 
             report = await run_set(

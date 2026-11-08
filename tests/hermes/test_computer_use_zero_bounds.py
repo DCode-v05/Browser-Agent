@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_zero_bounds.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Zero-rect AX bounds must read as 'unknown', never as a clickable position.
 
@@ -22,7 +21,7 @@ def test_malformed_bounds_fail_open():
 def test_json_bounds_nulled_for_zero_rect():
     out = _element_to_dict(_el((0, 0, 0, 0)))
     assert out["bounds"] is None
-    assert out["index"] == 2  # index targeting stays intact
+    assert out["index"] == 2
 
 def test_json_bounds_preserved_for_real_rect():
     out = _element_to_dict(_el((10, 20, 30, 40)))

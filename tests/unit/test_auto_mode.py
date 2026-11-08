@@ -147,7 +147,6 @@ async def test_a_step_with_no_finding_runs_and_no_model_is_asked(auto) -> None:
 
 @pytest.mark.parametrize("category", ["none", "pays"])
 async def test_a_paying_step_is_never_run_on_the_models_word(auto, category: str) -> None:
-    # The model was talked round: it calls a payment harmless, twice.
     on = await auto(rated("low", "exactly", category, "The person wants this."), rated("low", "no", category))
     request, paid = await on.answer(asyncio.create_task(on.click("e7")), "deny")
     assert request["why"] == ["this step pays for or orders something"]
@@ -180,7 +179,6 @@ async def test_a_step_the_task_did_not_ask_for_is_refused_and_a_person_can_allow
     ) in told_so.text
     assert not (await on.click("e20")).is_error
     assert len(on.model.requests) == 1, "the allowed step was not rated again"
-    # It was allowed once.
     on.model.replies.append(rated("high", "no", "sends"))
     assert (await on.click("e20")).is_error
 
@@ -192,7 +190,6 @@ async def test_after_refusals_in_a_row_auto_pauses_until_a_person_resumes_it(aut
         assert (await on.click("e20")).is_error
     states = [(event["state"], event.get("why", "")) for event in on.told("auto_changed")]
     assert states[-1] == ("paused", "3 steps in a row were refused")
-    # Paused: the person is asked, as with "risky steps", and no model is.
     request, _ = await on.answer(asyncio.create_task(on.click("e20")), "deny")
     assert request["why"] == ["this step deletes something"] and len(on.model.requests) == 3
     await on.session.handle({"type": "resume_auto"})
@@ -232,7 +229,6 @@ async def test_a_site_outside_the_task_is_let_in_for_reading_and_checked_again_b
         {"host": "shop.example", "grade": "named"},
         {"host": "maps.example", "grade": "added_read"},
     ]
-    # Reading there needs nobody. The first step that acts there is rated.
     assert not (await on.tools.call("browser_snapshot", {})).is_error
     assert len(on.model.requests) == 1
     assert not (await on.click("e1")).is_error
@@ -243,7 +239,6 @@ async def test_a_site_outside_the_task_is_let_in_for_reading_and_checked_again_b
 
     refused = await on.tools.call("browser_navigate", {"url": "https://casino.example/"})
     assert refused.text.startswith("Not done: this step leaves the sites of the task, and the task did not")
-    # One site is settled once for the task: it is not rated at every call.
     again = await on.tools.call("browser_navigate", {"url": "https://casino.example/bonus"})
     assert again.text.startswith("Not done: casino.example is outside the task, and that was settled.")
     assert len(on.model.requests) == 3
@@ -258,7 +253,6 @@ async def test_a_page_of_another_site_the_browser_was_brought_to_is_not_even_rea
 
 async def test_a_site_that_is_a_bare_number_is_for_the_model_to_weigh_once(auto) -> None:
     on = await auto(rated("low", "in_substance"), task=None)
-    # The page that is open when the person gives the task is one of the task's.
     on.driver.url = "https://93.184.216.34/form"
     on.session.working(True, "Fix the form on this page")
     assert not (await on.tools.call("browser_type", {"ref": "e3", "text": "ada"})).is_error
@@ -267,7 +261,6 @@ async def test_a_site_that_is_a_bare_number_is_for_the_model_to_weigh_once(auto)
     ]
     assert not (await on.click("e1")).is_error
     assert len(on.model.requests) == 1, "one answer settles it for the site"
-    # An address of the person's own network is no stranger.
     on.driver.url = "http://192.168.1.20/admin"
     on.session.working(True, "Now the router on this page")
     assert not (await on.tools.call("browser_type", {"ref": "e3", "text": "ada"})).is_error
@@ -288,7 +281,6 @@ async def test_what_is_typed_is_cut_and_marked_and_a_sensitive_field_never_reach
     on.put("e20", Located("textbox", "Message", BOX, kind="text", multiline=True))
     text = "See you at nine. " * 30
     typing = {"ref": "e20", "text": text, "submit": True}
-    # Sending is held at high: the model's "low" leads to a question, not to a run.
     request, _ = await on.answer(asyncio.create_task(on.tools.call("browser_type", typing)), "deny")
     assert request["why"] == ["this step sends something to other people"]
     given = on.given()
@@ -375,13 +367,10 @@ async def test_while_auto_is_paused_a_site_outside_the_task_goes_to_the_person_a
     for host in ("one", "two", "three"):
         assert (await on.tools.call("browser_navigate", {"url": f"https://{host}.example/"})).is_error
     assert on.told("auto_changed")[-1]["state"] == "paused"
-    # Paused, the mode is still Auto, and the site is still not the task's: the person is asked
-    # where the model was, and no model is.
     opening = asyncio.create_task(on.tools.call("browser_navigate", {"url": "https://four.example/"}))
     request, opened = await on.answer(opening, "deny")
     assert request["why"] == ["four.example is not one of the sites of the task"]
     assert opened.is_error and len(on.model.requests) == 3
-    # With nobody watching it is refused. Three refusals are no way out of the task's sites.
     on.leave()
     alone = await asyncio.wait_for(on.tools.call("browser_navigate", {"url": "https://five.example/"}), 3)
     assert alone.is_error and "no one is watching" in alone.text
@@ -398,8 +387,6 @@ async def test_a_person_can_allow_once_a_step_that_was_refused_for_leaving_the_t
         on.tools.call("browser_navigate", {"url": "https://docs.example/guide"}), 3
     )
     assert not opened.is_error, opened.text
-    # Their yes is their answer about the site, as if they had been asked: it is read from then
-    # on, and the first step that acts there is checked again.
     assert on.told("sites_changed")[-1]["sites"][-1] == {"host": "docs.example", "grade": "added_read"}
     assert not (await on.tools.call("browser_snapshot", {})).is_error
     assert len(on.model.requests) == 1, "the allowed step was not rated again"

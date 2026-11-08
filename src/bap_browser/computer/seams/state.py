@@ -9,7 +9,6 @@ from typing import Any
 
 from bap_browser.config_computer import Computer
 
-# Asked before an action that changes something: the action's name and a sentence about it.
 Asker = Callable[[str, str], bool]
 
 
@@ -17,7 +16,6 @@ Asker = Callable[[str, str], bool]
 class Working:
     computer: Computer = field(default_factory=Computer)
     home: Path = field(default_factory=lambda: Path.home() / ".bap-browser" / "computer")
-    # A backend to use in place of the driver: a stand-in, in tests.
     backend: Callable[[], Any] | None = None
     ask: Asker | None = None
 

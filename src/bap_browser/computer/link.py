@@ -30,7 +30,6 @@ REFUSALS = {
     423: "The person stopped the helper. They start it again when the engine may go on.",
 }
 NO_HELPER = "The helper on the other machine could not be reached at {url}: {wrong}"
-# Sent to the helper when the engine has no more to say.
 NO_MORE = ""
 
 

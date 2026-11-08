@@ -15,7 +15,6 @@ def _the_checker() -> ModuleType:
     spec = importlib.util.spec_from_file_location("patterns", REPOSITORY / "scripts" / "patterns.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    # Its dataclasses look their own module up by name.
     sys.modules["patterns"] = module
     spec.loader.exec_module(module)
     return module
@@ -139,44 +138,31 @@ def test_a_rule_finds_what_it_is_for(tmp_path: Path, rule: str, path: str, text:
 @pytest.mark.parametrize(
     ("path", "text"),
     [
-        # A string that holds the sign of a comment is not a comment.
         ("src/bap_browser/driver/a.py", 'COLOUR = "#todo"\n'),
-        # Words that only look like an excuse.
         ("src/bap_browser/driver/a.py", "# The methodology and the hackathon are named here.\nx = None\n"),
-        # A higher layer may use a lower one, and a part may use itself.
         (
             "src/bap_browser/agent/a.py",
             "from bap_browser.service.session import ServiceSession\nfrom bap_browser.agent.loop import run_agent\n",
         ),
-        # The package's own top is anyone's to read.
         ("src/bap_browser/driver/a.py", "from bap_browser import __version__\n"),
-        # The expected errors, by name.
         ("src/bap_browser/driver/a.py", "try:\n    x = None\nexcept (OSError, ValueError):\n    x = None\n"),
-        # A tunable where tunables live; and a name in capitals that is not a number.
         ("src/bap_browser/config.py", "LIMIT = 40\nRETRIES = 3\n"),
         ("src/bap_browser/driver/a.py", 'NAME = "page"\nON = True\n'),
-        # A test may wait in a loop for a thing to become true.
         (
             "tests/unit/test_a.py",
             "import asyncio\n\n\nasync def test_a() -> None:\n    await asyncio.sleep(0.1)\n",
         ),
-        # A test's own suppression is the test's business.
         ("tests/unit/test_a.py", "x = f()  # type: ignore[arg-type]\n"),
-        # A test that cannot run on some system says where, before it starts.
         (
             "tests/unit/test_a.py",
             'import pytest\n\n\n@pytest.mark.skipif(False, reason="no links here")\ndef test_a() -> None: ...\n',
         ),
-        # A string from the list of strings, and a name that is not for a person to read.
         (
             "viewer/src/A.tsx",
             'export const a = <div aria-label={W.parts.steps} className="rows" role="log" />;\n',
         ),
-        # A character nobody can see, written by its name or its number; and letters of other
-        # alphabets and signs, which are seen.
         ("src/bap_browser/driver/a.py", 'JOINER = "\\N{ZERO WIDTH JOINER}"\nMARK = "\\u200e"\n'),
         ("src/bap_browser/driver/a.py", 'WORDS = "अभी खरीदें: ß … €"\n'),
-        # The list of every string a person reads is long by its nature.
         ("viewer/src/wording.ts", "export const a = null;\n" * 501),
     ],
 )
@@ -197,7 +183,6 @@ def test_what_is_in_the_baseline_passes_more_fails_and_less_asks_for_the_baselin
     )
     new, stale = patterns.judge(found, {"tunable-outside-config": {path: 3}})
     assert new == [] and stale == [f"tunable-outside-config: {path} has 2, the baseline still allows 3"]
-    # A file that was cleaned up altogether, and a rule nothing breaks any more.
     assert patterns.judge([], {"broad-except": {"src/bap_browser/gone.py": 1}})[1] == [
         "broad-except: src/bap_browser/gone.py has 0, the baseline still allows 1"
     ]

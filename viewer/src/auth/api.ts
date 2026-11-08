@@ -1,15 +1,9 @@
-// Signing in (spec 4.11): the admin and the user each have a page and a password of their own.
-// A password is sent once, to sign in, and is never kept by the page.
-
 export type Role = 'admin' | 'user';
 
 export interface AuthState {
-  /** Whether there is a password to sign in with, for each role. */
   admin_set: boolean;
   user_set: boolean;
-  /** Who the page's own token speaks for, when it has one that still holds. */
   role: Role | null;
-  /** The token is the service's own: the link the service printed when it started. */
   operator: boolean;
 }
 
@@ -18,10 +12,8 @@ export type SignedIn = { ok: true; token: string } | { ok: false; why: 'wrong' |
 export type PasswordSet = { ok: true } | { ok: false; why: string | null };
 
 export interface AuthApi {
-  /** `no_accounts` for a service nobody signs in to: its own token is the one way in. Null when it did not answer. */
   state(token: string | null): Promise<AuthState | 'no_accounts' | null>;
   signIn(role: Role, password: string): Promise<SignedIn>;
-  /** For the admin: their own password, or the one users sign in with. `why` is the service's own sentence. */
   setPassword(token: string, role: Role, password: string): Promise<PasswordSet>;
   signOut(token: string): Promise<void>;
 }
@@ -72,7 +64,6 @@ export function authFrom(pageAddress: string): AuthApi {
       try {
         await fetch(at('/sign-out'), { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
       } catch {
-        // The page forgets its token either way.
       }
     },
   };

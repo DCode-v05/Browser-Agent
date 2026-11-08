@@ -87,7 +87,6 @@ async def test_a_click_and_a_hover_at_a_point(make_config, tmp_path: Path) -> No
         ("hover_at", (10, 20)),
         ("hover", "e1"),
     ]
-    # The pointer a person sees goes to the point.
     assert seen.events[2:] == [
         ("started", "Clicking the page at 320, 240.5", Box(320, 240.5, 0, 0)),
         ("finished", True, "Clicked the page at 320, 240.5"),
@@ -237,7 +236,6 @@ async def test_waiting_is_for_one_thing_and_never_longer_than_the_ceiling(
     assert (await said(tools, "browser_wait", {"text": "a", "seconds": 1})).startswith(
         "ERROR: browser_wait: "
     )
-    # What is waited for may be something the agent typed: a person is told only that it waits.
     assert seen.events[0] == ("started", "Waiting for text to appear", None)
     assert seen.events[5] == ("finished", False, "Could not wait for text to appear: the wait ran out")
     assert "Done" not in (tmp_path / "events.jsonl").read_text(encoding="utf-8")

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_launcher_seed.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop launcher seeds: the dock only points at programs that exist, the look is applied."""
 
@@ -23,12 +22,9 @@ def _seed(tmp_path: Path, fake_bins: list[str], browser_exec: str = "", profile_
         exe = bindir / name
         exe.write_text("#!/bin/sh\n", encoding="utf-8")
         exe.chmod(0o755)
-    # The launcher only needs xauth to accept the generated cookie; the test host need not ship X11 tools.
     xauth = bindir / "xauth"
     xauth.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     xauth.chmod(0o755)
-    # The script's own tooling (mkdir, sed, cat, awk...) symlinked in, so PATH need not contain the
-    # host's /usr/bin where a real chrome/thunar would leak into the dock under test.
     for tool in ("mkdir", "sed", "cat", "printf", "dirname", "bash", "sh", "rm", "ln", "touch", "chmod", "xauth", "od", "tr", "awk", "grep"):
         real = shutil.which(tool)
         if real and not (bindir / tool).exists():
@@ -48,9 +44,9 @@ def _seed(tmp_path: Path, fake_bins: list[str], browser_exec: str = "", profile_
 
 
 def test_dock_lists_only_programs_present_on_path(tmp_path):
-    chrome = tmp_path / "bin" / "chrome"  # the browser is the one runtime.py resolved, never a PATH scan
+    chrome = tmp_path / "bin" / "chrome"
     cfg = _seed(tmp_path, ["xfce4-terminal", "chrome", "firefox"], browser_exec=str(chrome))
-    panel = ET.parse(cfg / "xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml")  # well-formed or this raises
+    panel = ET.parse(cfg / "xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml")
     launcher_ids = [str(p.get("name")) for p in panel.iter("property") if p.get("value") == "launcher"]
     execs = sorted(
         line.split("=", 1)[1]

@@ -25,7 +25,6 @@ from bap_browser.service.machine_helper import Helper, helper_app, tailnet_names
 CODE = "the-pairing-code"
 FROM_THE_VM = "100.64.0.7"
 A_STRANGER = "100.64.0.99"
-# A driver that answers `manifest`, says `--help`, and on `mcp` gives back every line it is sent.
 A_DRIVER = """
 import json, sys
 if sys.argv[1:] == ["manifest"]:
@@ -177,9 +176,6 @@ def test_after_the_person_stops_it_nothing_more_is_done(tmp_path: Path, said: li
     assert answer.status_code == 423
 
 
-# A helper that holds the engine to the apps its person allows (spec 22.7): every way to the driver
-# goes to the one the helper started with that list, and to no other.
-
 THE_HELD_ONE = "/somewhere/held.sock"
 
 
@@ -256,9 +252,6 @@ def test_the_driver_that_holds_the_engine_is_started_afresh_for_each_session_and
     assert second == "started with: --embedded --socket /somewhere/held-2.sock"
 
 
-# The link: the program the engine starts in the driver's place.
-
-
 @pytest.fixture
 def served(tmp_path: Path, said: list[str]) -> Iterator[str]:
     """The helper on a port of this machine, for this machine alone. Its address."""
@@ -279,7 +272,6 @@ def served(tmp_path: Path, said: list[str]) -> Iterator[str]:
     thread.join(timeout=10)
 
 
-# The Mac's name on the tailnet: nothing on the engine's machine knows it but Tailscale's proxy.
 ON_THE_TAILNET = "the-mac.tailnet.invalid"
 
 
@@ -320,7 +312,6 @@ def test_the_link_asks_the_driver_on_the_other_machine_and_names_itself_as_the_w
     manifest = json.loads(ran.stdout)
     assert ran.returncode == 0, ran.stderr
     assert manifest["binary_version"] == "0.21.0"
-    # A path on the other machine means nothing here: the engine must come back through the link.
     assert manifest["mcp_invocation"] == {"command": "cua-driver", "args": ["mcp"]}
 
 

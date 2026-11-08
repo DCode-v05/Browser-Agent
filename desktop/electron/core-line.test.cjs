@@ -28,7 +28,6 @@ test('each page is one page of the studio, as a guest, with the token where no s
 });
 
 test('the core is the studio with the desktop app\'s two pages: its own browser, and the computer', () => {
-  // `--dev`: the token is this run's own, made by the app and shown to nobody, so it stays the admin's.
   assert.deepEqual(coreArguments('/repo'), ['run', '--project', '/repo', 'bap-browser', 'studio', '--desktop', '--dev']);
 });
 

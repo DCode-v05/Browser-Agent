@@ -46,7 +46,6 @@ class FakeSocket implements SocketLike {
 function connect() {
   const events: ServerEvent[] = [];
   const frames: string[] = [];
-  /** The picture each finished step came with, by step number. */
   const pictures: Record<number, string | undefined> = {};
   const statuses: string[] = [];
   let caughtUp = 0;
@@ -128,7 +127,6 @@ describe('connecting', () => {
     });
     connection.start({ onEvent: () => {}, onFrame: () => {}, onStatus: () => {}, onCaughtUp: () => {} });
     sockets[0].open();
-    // Watch mode counts a page only while it is in front (spec 22.7).
     expect(sockets[0].sent).toEqual([JSON.stringify({ type: 'auth', token: 'secret-token' }), JSON.stringify({ type: 'seen', visible: false })]);
     page.front = true;
     for (const listener of page.listeners) listener();
@@ -180,7 +178,6 @@ describe('pictures', () => {
     socket().frame([255, 216, 1]);
     socket().frame([255, 216, 2]);
     expect(frames).toEqual(['blob:picture-1', 'blob:picture-2']);
-    // The page may still be loading the first picture. Releasing it now would fail that load.
     expect(revoked).toEqual([]);
     vi.advanceTimersByTime(999);
     expect(revoked).toEqual([]);
@@ -204,7 +201,6 @@ describe('pictures', () => {
     socket().text(finished(1));
     socket().frame([255, 216, 2]);
     socket().frame([255, 216, 3]);
-    // picture-2 is the step's copy. Live pictures come and go around it; it stays.
     expect(pictures).toEqual({ 1: 'blob:picture-2' });
     expect(frames).toEqual(['blob:picture-1', 'blob:picture-3', 'blob:picture-4']);
     vi.advanceTimersByTime(1000);
@@ -276,7 +272,6 @@ describe('commands', () => {
     connection.send({ type: 'pause' });
     socket().open();
     connection.send({ type: 'approve', id: 'a1', scope: 'once' });
-    // After the token and whether the page is in front: the command.
     expect(socket().sent.slice(2)).toEqual([JSON.stringify({ type: 'approve', id: 'a1', scope: 'once' })]);
   });
 });
@@ -297,7 +292,6 @@ describe('a lost connection', () => {
     vi.advanceTimersByTime(1);
     expect(FakeSocket.all).toHaveLength(3);
     socket().drop();
-    // The last delay is used from then on.
     vi.advanceTimersByTime(2000);
     expect(FakeSocket.all).toHaveLength(4);
   });
@@ -341,7 +335,6 @@ describe('a lost connection', () => {
     socket().text(finished(1));
     socket().frame([255, 216, 3]);
     connection.close();
-    // Everything goes at once, each address once: the one still waiting, the one on screen, the step's.
     expect([...revoked].sort()).toEqual(['blob:picture-1', 'blob:picture-2', 'blob:picture-3']);
     expect(socket().readyState).toBe(3);
     socket().onclose?.({ code: 1000 });

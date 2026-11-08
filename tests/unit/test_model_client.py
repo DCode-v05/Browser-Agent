@@ -91,7 +91,6 @@ async def test_each_wait_is_longer_and_uneven_and_none_passes_the_longest(provid
         chance=1.0,
     )
     await patient.post({})
-    # A second, two, four, eight: each with up to half of itself added, and never more than five.
     assert waits.taken == [1.5, 3.0, 5.0, 5.0]
 
 
@@ -100,14 +99,14 @@ async def test_after_the_last_try_the_failure_is_the_providers_own_words(provide
     with pytest.raises(ModelError) as failed:
         await client(stand_in, waits).post({})
     assert str(failed.value) == "The model provider answered HTTP 500: The server had a problem."
-    assert len(stand_in.requests) == 3  # agent.retries is 2
+    assert len(stand_in.requests) == 3
 
 
 async def test_the_reviewer_and_the_scan_try_once_more_only(provider) -> None:
     stand_in, waits = provider(BUSY, BUSY, BUSY), Waits()
     with pytest.raises(ModelError):
         await client(stand_in, waits, "reviewer").post({})
-    assert len(stand_in.requests) == 2  # safeguards.model.retries is 1
+    assert len(stand_in.requests) == 2
 
 
 async def test_the_wait_the_provider_asks_for_is_the_wait(provider) -> None:
@@ -223,7 +222,6 @@ async def test_the_cost_of_every_call_is_counted(provider) -> None:
     reviewer = client(stand_in, waits, "reviewer", agent=prices, spend=spend)
     await loop.post({})
     assert spend.usd == pytest.approx(6.0)
-    # The checks cost what the agent's model costs, unless they are given a model and prices of their own.
     await reviewer.post({})
     assert spend.usd == pytest.approx(10.0)
     await loop.post({})

@@ -74,11 +74,9 @@ async def run_with_viewer(
                 service,
             )
         except ModelError as failed:
-            # A person watching sees why the session ended, not only the person at the terminal.
             await session.close("failed", str(failed))
             raise
         await session.close("agent")
-        # The answer is the only thing on standard output, and it is there as soon as it is known.
         print(answer, flush=True)
         if not exit_when_done:
             tell("The session has ended. The viewer stays open until you press Ctrl+C.")
@@ -122,8 +120,6 @@ async def chat_with_viewer(
             webbrowser.open(service.viewer_address)
         tell(f"Demo site: {service.address}/demo-site/checkin.html")
         if extension is not None:
-            # The side panel finds the session through this file, and the browser opens on a page
-            # that says how to open the panel.
             browser_extension.announce(extension, service.viewer_address)
             await session.toolkit.call("browser_navigate", {"url": f"{service.address}/demo-site/start.html"})
             tell("In the browser that opened, click the BAP icon in the toolbar (or press Ctrl+Shift+Y).")
@@ -167,7 +163,6 @@ async def chat_in_own_chrome(
     `extension` is the folder the extension was put in, which the person loads into their Chrome.
     Raises Interrupted when the service was stopped (Ctrl+C).
     """
-    # The side panel shows the chat, which is this service's viewer inside the extension's page.
     config = browser_extension.may_show_viewer(config)
     tasks: asyncio.Queue[str] = asyncio.Queue()
     sessions: dict[str, ServiceSession] = {}
@@ -185,11 +180,9 @@ async def chat_in_own_chrome(
         tell("Then open its side panel with the BAP icon in the toolbar.")
         await unless_stopped(paired(bridge, extension, service, config.bridge.pairing_ttl_s), service)
         tell("The extension has connected. Opening the agent's tab.")
-        # The driver attaches to the tab through this process's own end of the bridge.
         browser = config.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
         attached = config.model_copy(update={"browser": browser})
         driver = PlaywrightDriver(attached, cdp_headers={"Authorization": f"Bearer {service.token}"})
-        # The person looks at their own browser: no picture of it is sent across the bridge.
         session = ServiceSession(
             attached,
             driver,
@@ -198,7 +191,6 @@ async def chat_in_own_chrome(
             pictures=False,
             settings=settings,
         )
-        # Which sites the agent may read and act on is decided on the person's machine.
         session.browser.ask_site = bridge.permit
         session.browser.site_done = bridge.permit_done
         await unless_stopped(session.start(), service)
@@ -262,7 +254,6 @@ async def do_task(
     kept: its time, its steps, its tokens and how it ended (spec 12.6)."""
     begun = len(history)
     session.working(True, task)
-    # A person may have chosen another model for this browser since the last task (spec 10.2).
     use = getattr(model, "use", None)
     if callable(use):
         use(config.agent)
@@ -270,7 +261,6 @@ async def do_task(
         recorder.begin(
             task,
             config.agent,
-            # Where a person turned the log off, the task's own words are not kept either.
             keep_words=session.config.logging.event_log is not None,
             waited_s=lambda: session.waited_for_a_person_s,
             redact=session.browser.redact,
@@ -303,7 +293,6 @@ async def do_task(
         elif session.control != "ended":
             outcome = "step_limit"
         if session.control != "ended":
-            # A task a person stopped has not failed.
             session.said("agent", str(stopped), failed=not session.task_stopped())
     finally:
         if trace is not None:

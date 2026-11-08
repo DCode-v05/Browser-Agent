@@ -46,12 +46,9 @@ from bap_browser.tools.arguments import (
 from bap_browser.tools.human_checks import notice_for
 from bap_browser.tools.registry import Shown
 
-# The code tool (spec 7). The toolkit runs it: its steps are tool calls of their own.
 RUN_A_SCRIPT = "browser_run"
 
-# What a person is shown in place of an address that could not be read.
 UNREADABLE = "That address"
-# From the least serious to the most.
 LOG_LEVELS: tuple[LogLevel, ...] = ("debug", "info", "warning", "error")
 
 
@@ -61,11 +58,9 @@ async def _page(session: BrowserSession, driver: Driver, args: SnapshotArgs | No
     page = await driver.snapshot(
         mode=args.mode or settings.default_mode,
         ref=args.ref,
-        # A call may ask for less than the cap, never for more.
         max_chars=min(args.max_chars or settings.max_chars, settings.max_chars),
         include_bboxes=args.include_bboxes or settings.include_bboxes,
     )
-    # A page that needs a person says so in the result that shows it (spec 8.4).
     notice = notice_for(page)
     return f"{from_page(page)}\n{notice}" if notice else from_page(page)
 
@@ -82,7 +77,6 @@ async def _allowed(session: BrowserSession, given: str) -> str:
             if shown
             else f"navigation blocked: {decision.reason}",
             url=shown or UNREADABLE,
-            # The setting's name is for whoever runs the deployment, not for the person watching.
             reason=decision.reason.split(" (")[0],
         )
     return url
@@ -236,7 +230,6 @@ async def press_key(session: BrowserSession, args: PressKeyArgs) -> str:
     chord = keys.normalise(args.keys)
     driver = await session.driver()
     outcome = await driver.press_key(chord, repeat=args.repeat, ref=args.ref)
-    # A key that types a character is typed text: the result does not repeat it.
     text = "Pressed a character key" if keys.is_typed_text(args.keys) else f"Pressed {chord}"
     if args.repeat > 1:
         text += f" {args.repeat} times"
@@ -281,7 +274,6 @@ async def _fill(driver: Driver, field: FormField) -> str:
         return f"{field.ref}={selected.labels[0]}"
     if kind == "text":
         await driver.type_text(field.ref, field.value, clear=True, submit=False, slowly=False)
-        # What was typed is not repeated.
         return field.ref
     raise BadInput(
         f"{field.ref} is not a form field. Use browser_click for buttons and links.",
@@ -297,7 +289,6 @@ async def fill_form(session: BrowserSession, args: FillFormArgs) -> str:
             filled.append(await _fill(driver, field))
         except BapError as exc:
             done = f"Filled: {', '.join(filled)}. " if filled else ""
-            # The fields before this one stay filled, and the agent is told which they are.
             raise BrowserError(f"{done}Stopped at {field.ref}: {exc}", reason=exc.reason) from exc
     return await _after_action(session, driver, f"Filled: {', '.join(filled)}", ActionOutcome(""))
 
@@ -357,7 +348,6 @@ async def screenshot(session: BrowserSession, args: ScreenshotArgs) -> Shown:
     full = settings.full_page if args.full_page is None else args.full_page
     annotate = settings.annotate_by_default if args.annotate is None else args.annotate
     driver = await session.driver()
-    # The snapshot comes first: it is what gives each control the ref that is drawn on the picture.
     page = await _page(session, driver, SnapshotArgs(mode="interactive")) if annotate else ""
     shot = await driver.screenshot(full_page=full, annotate=annotate)
     if full:
@@ -505,7 +495,6 @@ async def evaluate(session: BrowserSession, args: EvaluateArgs) -> str:
     except (TypeError, ValueError):
         text = json.dumps(str(value), ensure_ascii=False)
     cap = session.config.browser.javascript.max_result_chars
-    # The first line says what was done. The value is what the page holds, and follows it.
     head = f"The script's value, as JSON ({len(text)} characters):"
     if len(text) > cap:
         return f"{head}\n{from_page(text[:cap])}\n\u2026 {len(text) - cap} more characters not shown."
@@ -517,7 +506,6 @@ async def upload_file(session: BrowserSession, args: UploadArgs) -> str:
     files = [allowed_file(folders, path) for path in args.paths]
     waiting = (Path(session.config.browser.downloads.dir) / HELD_FOLDER).resolve()
     if any(file.is_relative_to(waiting) for file in files):
-        # Wherever uploads may come from: a file that arrived and waits for a yes is nobody's yet.
         raise BadInput(
             "That file was downloaded and waits for the person's yes. It cannot be uploaded before that.",
             reason="the file waits for the person's yes",

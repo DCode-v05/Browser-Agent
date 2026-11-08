@@ -90,8 +90,6 @@ async def taken_over(
             browser_extension.announce(
                 folder, bridge=service.bridge_address, token=service.bridge.pairing_token()
             )
-            # The extension's own page, opened here as a tab: where the person answers its questions.
-            # The bridge itself is in the extension's background, and dials in by itself.
             panel = await chrome.new_page()
             await panel.goto(f"chrome-extension://{browser_extension.EXTENSION_ID}/panel.html")
             await asyncio.wait_for(service.bridge.wait_connected(), 15)
@@ -118,12 +116,10 @@ async def test_the_agent_drives_a_tab_of_the_persons_own_chrome_through_the_exte
     async with taken_over(make_config, tmp_path) as own:
         assert own.session.hub.subscribe()[0][0]["on_screen"] is True  # type: ignore[index]
         tools = own.tools
-        # The first call on a site asks the person, in the extension's own page.
         opened = await own.call_and_answer(
             "Always allow on this site", "browser_navigate", {"url": f"{site}/form.html"}
         )
         assert not opened.is_error, opened.text
-        # It is a tab of the person's browser that went there: the one the extension opened for the agent.
         theirs = own.page_at("/form.html")
 
         typed = await tools.call(
@@ -140,13 +136,10 @@ async def test_the_agent_drives_a_tab_of_the_persons_own_chrome_through_the_exte
         read = await tools.call("browser_get_text", {})
         assert not read.is_error and "Full name" in read.text
 
-        # The safety policy is the core's here as everywhere.
         blocked = await tools.call("browser_navigate", {"url": "http://169.254.169.254/latest/meta-data/"})
         assert blocked.is_error and "cloud metadata address" in blocked.text
 
-        # The person closes the agent's tab: the agent is told, in words, that its browser is gone.
         await theirs.close()
-        # The extension says so, and the driver's end of the bridge is closed with it.
         async with asyncio.timeout(10):
             while own.driver.is_alive():
                 await asyncio.sleep(0.05)
@@ -160,7 +153,6 @@ async def test_the_person_decides_site_by_site_what_the_agent_may_do(
 ) -> None:
     form = {"url": f"{site}/form.html"}
     async with taken_over(make_config, tmp_path) as own:
-        # "Don't allow": nothing is opened, and the agent is told not to try another way.
         refused = await own.call_and_answer("Don't allow", "browser_navigate", form)
         assert refused.is_error
         assert refused.text.startswith(
@@ -169,7 +161,6 @@ async def test_the_person_decides_site_by_site_what_the_agent_may_do(
         )
         assert not [page for page in own.chrome.pages if page.url.endswith("/form.html")]
 
-        # "Allow once" is for the call that asked. The next call on the site asks again.
         opened = await own.call_and_answer("Allow once", "browser_navigate", form)
         assert not opened.is_error, opened.text
         name = ref_of(opened.text, 'textbox "Full name"')
@@ -177,7 +168,6 @@ async def test_the_person_decides_site_by_site_what_the_agent_may_do(
         assert not typed.is_error, typed.text
         assert await own.page_at("/form.html").input_value("#name") == "Ada"
 
-        # "Always allow on this site" is remembered: no question follows.
         always = await own.call_and_answer("Always allow on this site", "browser_snapshot", {})
         assert not always.is_error
         again = await asyncio.wait_for(own.tools.call("browser_type", {"ref": name, "text": "Grace"}), 10)
@@ -192,7 +182,6 @@ async def test_the_extension_does_not_rely_on_the_core_for_what_it_allows(
         opened = await own.call_and_answer("Allow once", "browser_navigate", {"url": f"{site}/form.html"})
         assert not opened.is_error, opened.text
         name = ref_of(opened.text, 'textbox "Full name"')
-        # A core that did not ask: the driver is used behind the tool layer's back.
         with pytest.raises(BrowserError, match=re.escape("The person has not allowed actions on 127.0.0.1")):
             await own.driver.click(name)
         with pytest.raises(BrowserError, match="The person has not allowed actions on localhost"):
@@ -205,7 +194,6 @@ async def test_sites_the_agent_is_never_offered_and_sites_a_deployment_blocks(
 ) -> None:
     blocked = {"blocked_sites": ["localhost"]}
     async with taken_over(make_config, tmp_path, permissions=blocked) as own:
-        # The deployment's list: the person is not even asked.
         other = await asyncio.wait_for(
             own.tools.call(
                 "browser_navigate", {"url": f"{site.replace('127.0.0.1', 'localhost')}/form.html"}
@@ -213,7 +201,6 @@ async def test_sites_the_agent_is_never_offered_and_sites_a_deployment_blocks(
             10,
         )
         assert other.is_error and other.text.startswith("The person has not allowed actions on localhost.")
-        # The browser's own pages, whoever asks.
         with pytest.raises(BrowserError, match="has not allowed actions"):
             await own.driver.navigate("chrome://settings/")
         assert await own.panel.locator("#question").is_hidden()
@@ -227,13 +214,11 @@ async def test_asking_before_every_action(
             "Always allow on this site", "browser_navigate", {"url": f"{site}/form.html"}
         )
         name = ref_of(opened.text, 'textbox "Full name"')
-        # Reading an allowed site asks nothing. Acting on it asks each time, with what will be done.
         assert not (await asyncio.wait_for(own.tools.call("browser_snapshot", {}), 10)).is_error
         typing = asyncio.create_task(own.tools.call("browser_type", {"ref": name, "text": "Ada"}))
         card = own.panel.locator("#question")
         await card.wait_for(timeout=15_000)
         assert await card.locator("#question-doing").inner_text() == 'Typing 3 characters into "Full name"'
-        # The site is allowed already, so "always" is not offered again.
         assert await card.locator("#always").is_hidden()
         await card.get_by_role("button", name="Allow once", exact=True).click()
         assert not (await asyncio.wait_for(typing, 30)).is_error
@@ -261,18 +246,15 @@ async def test_the_channel_is_cut_and_restored_and_the_run_continues(
             "Always allow on this site", "browser_navigate", {"url": f"{site}/form.html"}
         )
         name = ref_of(opened.text, 'textbox "Full name"')
-        # The connection is cut from the core's side, as a network would cut it.
         extension = bridge._extension  # pyright: ignore[reportPrivateUsage]
         assert extension is not None
         await extension.close()
         async with asyncio.timeout(5):
             while bridge.connected:
                 await asyncio.sleep(0.02)
-        # A call made while it is cut waits for the bridge, which dials again by itself.
         typed = await asyncio.wait_for(own.tools.call("browser_type", {"ref": name, "text": "Ada"}), 30)
         assert not typed.is_error, typed.text
         assert bridge.connected
-        # The tab and its refs are the ones from before.
         assert await own.page_at("/form.html").input_value("#name") == "Ada"
         assert own.driver.is_alive()
 
@@ -292,7 +274,6 @@ async def test_the_persons_own_stop_takes_the_agent_off_every_tab(
                 await asyncio.sleep(0.05)
         gone = await asyncio.wait_for(own.tools.call("browser_snapshot", {}), 30)
         assert gone.is_error and "The browser on the person's machine is not connected" in gone.text
-        # The tab is still the person's, where the agent left it. The bridge does not dial again.
         assert own.page_at("/form.html")
         await asyncio.sleep(1.5)
         assert own.service.bridge is not None and not own.service.bridge.connected
@@ -318,7 +299,6 @@ async def test_only_this_products_extension_with_a_pairing_token_may_dial_in(
             assert socket.close_code == 4401, first
 
     try:
-        # A page of another site, or another extension, is turned away before anything is said.
         for origin in ("https://evil.example", "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"):
             try:
                 async with connect(service.bridge_address, additional_headers={"Origin": origin}) as socket:
@@ -326,13 +306,11 @@ async def test_only_this_products_extension_with_a_pairing_token_may_dial_in(
                 raise AssertionError(f"{origin} was let in")
             except (ConnectionClosed, InvalidStatus):
                 pass
-        # Neither a made-up token nor the session's own token is a pairing token.
         await refused({"token": "not-the-token"})
         await refused({"token": service.token})
         await refused({"key": "not-a-key"})
         assert not bridge.connected
 
-        # The driver's end is this process's own: without the token nobody is let in there either.
         try:
             async with connect(service.bridge_cdp_address) as socket:
                 await asyncio.wait_for(socket.recv(), 5)
@@ -347,10 +325,8 @@ async def test_only_this_products_extension_with_a_pairing_token_may_dial_in(
             assert paired["type"] == "paired" and paired["heartbeat_s"] == 15 and paired["mode"]
             assert paired["own_address"] == service.address
             assert bridge.connected
-            # The bridge says it is alive, and is answered.
             await socket.send('{"type": "ping"}')
             assert json.loads(await asyncio.wait_for(socket.recv(), 5)) == {"type": "pong"}
-        # A pairing token is taken once. The key it gave lets the same bridge come back.
         await refused({"token": pairing})
         async with connect(service.bridge_address, additional_headers=ours) as socket:
             await socket.send(json.dumps({"type": "auth", "key": paired["key"]}))
@@ -383,11 +359,9 @@ async def test_a_pairing_token_runs_out_and_a_silent_bridge_is_let_go(
         async with connect(service.bridge_address, additional_headers=ours) as socket:
             await socket.send(json.dumps({"type": "auth", "token": bridge.pairing_token()}))
             assert json.loads(await asyncio.wait_for(socket.recv(), 5))["type"] == "paired"
-            # It says nothing more: after `dead_after_s` the core closes the channel.
             with pytest.raises(ConnectionClosed):
                 await asyncio.wait_for(socket.recv(), 5)
         assert not bridge.connected
-        # With nobody there, what the agent asks for is refused in words, after the wait for a bridge.
         assert await asyncio.wait_for(bridge.permit("act", "https://example.com/", "Clicking"), 5) == (
             "The browser on the person's machine is not connected."
         )
@@ -406,7 +380,6 @@ async def test_the_chat_command_waits_for_the_extension_then_opens_the_agents_ta
         )
     )
     try:
-        # First the extension is told only where to dial in: there is no session to show yet.
         async with asyncio.timeout(30):
             while not session_file.exists() and not chat.done():
                 await asyncio.sleep(0.05)
@@ -417,7 +390,6 @@ async def test_the_chat_command_waits_for_the_extension_then_opens_the_agents_ta
         async with their_chrome(tmp_path / "their-profile", folder) as chrome:
             panel = await chrome.new_page()
             await panel.goto(f"chrome-extension://{browser_extension.EXTENSION_ID}/panel.html")
-            # Once it has dialled in, the agent's tab opens on the start page, and the panel shows the chat.
             async with asyncio.timeout(60):
                 while not any(page.url.endswith("/demo-site/start.html") for page in chrome.pages):
                     assert not chat.done(), chat.exception()
@@ -426,7 +398,6 @@ async def test_the_chat_command_waits_for_the_extension_then_opens_the_agents_ta
             await panel.frame_locator("#viewer").get_by_role("region", name="Chat").wait_for()
             chat.cancel()
             await asyncio.gather(chat, return_exceptions=True)
-            # The agent has let go. The person's tab is still there, where it was left.
             assert any(page.url.endswith("/demo-site/start.html") for page in chrome.pages)
     finally:
         chat.cancel()
@@ -462,7 +433,6 @@ async def test_the_driver_hears_what_the_tab_said_in_the_order_the_tab_said_it(
                 )
                 asked = json.loads(await asyncio.wait_for(extension.recv(), 5))
                 assert asked["params"]["method"] == "Page.getFrameTree"
-                # The answer, and straight after it something the tab said.
                 await extension.send(json.dumps({"id": asked["id"], "result": {"frameTree": round_}}))
                 event = {"method": "Runtime.executionContextCreated", "params": {"round": round_}}
                 await extension.send(json.dumps({"method": "forwardCDPEvent", "params": event}))

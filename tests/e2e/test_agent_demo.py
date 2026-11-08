@@ -42,7 +42,6 @@ async def test_the_scripted_agent_signs_up_and_a_viewer_is_told_every_step(
 ) -> None:
     config = make_config(tmp_path, agent={"provider": "scripted"})
     session = ServiceSession(config, agent="Reference agent")
-    # The service serves the demo site itself. Here a server of the test's own stands in for it.
     session.served_at(demo_site)
     await session.start()
     try:
@@ -73,7 +72,6 @@ async def test_the_scripted_agent_signs_up_and_a_viewer_is_told_every_step(
         "Read the page",
     ]
     assert all(event["ok"] for event in events if event["type"] == "step_finished")
-    # Every click and every typing step tells the viewer where on the page it happened.
     targets = [event.get("target") for event in events if event["type"] == "step_started"]
     assert sum(target is not None for target in targets) == 7
     assert events[-1] == {"type": "session_ended", "reason": "agent", "ts": events[-1]["ts"]}
@@ -97,7 +95,6 @@ async def test_the_check_in_pages_can_be_done_with_the_tools(
             return result.text
 
         page = await call("browser_navigate", url=f"{demo_site}/checkin.html")
-        # A booking that does not exist is refused in words, and the page stays.
         await call("browser_type", ref=ref_of(page, 'textbox "Booking reference"'), text="XX0000")
         await call("browser_type", ref=ref_of(page, 'textbox "Last name"'), text="Nobody")
         await call("browser_click", ref=ref_of(page, 'button "Find booking"'))
@@ -110,7 +107,6 @@ async def test_the_check_in_pages_can_be_done_with_the_tools(
 
         page = await call("browser_snapshot")
         assert 'radio "15A, window (taken)"' in page and "[disabled]" in page
-        # Checking in without a seat says what is missing.
         await call("browser_click", ref=ref_of(page, 'button "Check in"'))
         assert "Choose a seat before you check in." in await call("browser_get_text")
 

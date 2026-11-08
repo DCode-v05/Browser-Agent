@@ -42,7 +42,6 @@ async def test_it_drives_a_page_of_the_running_browser_and_leaves_the_browser_ru
         moved = await tools.call("browser_navigate", {"url": f"{site}/slow_handler.html"})
         assert not moved.is_error and 'button "Think"' in moved.text
         assert (await session.driver()).description().startswith("Chromium ")
-    # The page the person had is where the agent left it, and their browser is still there.
     assert browser.is_connected()
     assert theirs.url.endswith("/slow_handler.html")
 

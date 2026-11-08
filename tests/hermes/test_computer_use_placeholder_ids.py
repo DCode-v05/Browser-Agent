@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_placeholder_ids.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """A zero-filled ``pid``/``window_id`` must not be read as exact targeting.
 
@@ -59,7 +58,6 @@ def test_frontmost_capture_survives_placeholder_ids():
 
     cap = backend.capture(mode="som", pid=0, window_id=0)
 
-    # Frontmost is the highest z_index window.
     assert cap.app == "Comet", f"frontmost capture failed; detail={cap.window_title!r}"
 
 
@@ -67,8 +65,6 @@ def test_real_exact_target_still_wins_over_app():
     """Guard: a genuine pid/window pair keeps its exact-targeting behaviour."""
     backend = _backend_with_windows(_WINDOWS)
 
-    # Ids that match no enumerated window: only the exact branch can produce
-    # this label, so it proves discovery was bypassed rather than consulted.
     cap = backend.capture(mode="som", app="Ghost", pid=999, window_id=99)
 
     assert cap.app == "Ghost", f"exact targeting was bypassed; detail={cap.window_title!r}"
@@ -100,10 +96,8 @@ def test_placeholder_predicate():
     assert _is_placeholder_id(-1) is True
     assert _is_placeholder_id(200) is False
     assert _is_placeholder_id("200") is False
-    # Garbage is not a placeholder: it must keep reaching the existing error.
     assert _is_placeholder_id("abc") is False
     assert _is_placeholder_id(None) is False
     assert _is_placeholder_id(1.5) is False
-    # bools are ints in Python; False must not read as a placeholder id.
     assert _is_placeholder_id(False) is False
     assert _is_placeholder_id(True) is False

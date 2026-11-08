@@ -16,12 +16,9 @@ from bap_browser.results import ToolResult
 
 logger = stdlib_logging.getLogger(__name__)
 
-# What an agent wrote to go into a page: what it typed, the answer to a prompt, a script.
 TYPED_ARGUMENTS = frozenset({"text", "prompt_text", "expression", "task", "value"})
 ADDRESS_ARGUMENTS = frozenset({"url"})
-# A key press that types a character is typed text. A named key, such as Enter, is not.
 KEYS_ARGUMENT = "keys"
-# The fields of a form: what goes into each is typed text.
 FIELDS_ARGUMENT = "fields"
 
 
@@ -69,8 +66,6 @@ def forget_old_lines(file: Path, days: int, now: float) -> int:
     kept: list[str] = []
     gone = 0
     size = file.stat().st_size
-    # A line ends at a line feed and nowhere else: text inside a line may hold other characters
-    # that `splitlines` would take for the end of one.
     for line in file.read_text(encoding="utf-8").removesuffix("\n").split("\n"):
         try:
             written = json.loads(line)
@@ -84,8 +79,6 @@ def forget_old_lines(file: Path, days: int, now: float) -> int:
     if not gone:
         return 0
     if file.stat().st_size != size:
-        # A line was written while this one was read. Nothing is removed now, so that it is not
-        # lost: the old lines go the next time.
         return 0
     file.write_text("".join(f"{line}\n" for line in kept), encoding="utf-8")
     return gone
@@ -102,8 +95,6 @@ def forget_old_records(logging: Logging, evals_dir: str, now: float) -> int:
         try:
             gone += forget_old_lines(file, logging.retention_days, now)
         except (OSError, UnicodeError) as failed:
-            # A file another program holds, or one that is not text. The others are still looked
-            # through, and this one again the next time.
             logger.warning("Old lines of %s could not be removed: %s", file.name, failed)
     return gone
 
@@ -137,7 +128,6 @@ class EventLog:
             "chars": len(result.text),
             **({"check": dict(check)} if check is not None else {}),
             **({"scan": dict(scan)} if scan is not None else {}),
-            # The first line says what was done. What follows is the page, which can hold anything.
             "result": result.text.split("\n", 1)[0][: self._settings.max_result_chars],
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)

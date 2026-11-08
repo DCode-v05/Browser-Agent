@@ -30,15 +30,11 @@ TESTS_INTO = ROOT / "tests/hermes"
 OURS = "bap_browser.computer.hermes"
 SEAMS = "bap_browser.computer.seams"
 
-# Hermes' folder, and the folder it becomes under `INTO`.
 MODULES = {
     "tools/computer_use": "computer_use",
     "tools/bot_desktop": "bot_desktop",
-    # The manual Hermes gives a model for the tool. It is outside the two modules, and the tool is
-    # used poorly without it.
     "skills/autonomous-ai-agents/computer-use": "skill",
 }
-# A module of Hermes, and the module of ours that stands in its place. Longest names first.
 STAND_INS = (
     ("tools.computer_use", f"{OURS}.computer_use"),
     ("tools.bot_desktop", f"{OURS}.bot_desktop"),
@@ -62,13 +58,11 @@ STAND_INS = (
     ("agent.async_utils", f"{SEAMS}.process"),
     ("model_tools", f"{SEAMS}.vision"),
 )
-# Whole statements that are written again.
 STATEMENTS = (
     ("import hermes_yaml as yaml", f"from {SEAMS} import manifest_file as yaml"),
     ("from pm import", f"from {SEAMS}.driver_package import"),
     ("from tools import terminal_tool as tt", f"from {SEAMS} import sandbox as tt"),
 )
-# Names that begin with an underscore in Hermes and are public in our seams.
 PUBLIC = (
     "_sanitize_subprocess_env",
     "_run_approval_gate",
@@ -79,13 +73,10 @@ PUBLIC = (
     "_native_tool_result_images",
     "_run_async",
     "_needs_chromium_sandbox_bypass",
-    # Used by our installer, which does on macOS what Hermes' installer does (spec 22.2.2).
     "_resolve_cua_driver_app_path",
     "_validate_cua_driver_app_signature",
-    # Started by the helper, which holds an engine elsewhere to the allowed apps (spec 22.7).
     "_EmbeddedCuaDaemon",
 )
-# What a message tells a person to run, and the variable that names another driver.
 WORDS = (
     ("hermes computer-use", "bap-browser computer"),
     ("HERMES_CUA_DRIVER_CMD", "BAP_BROWSER_CUA_DRIVER_CMD"),
@@ -150,7 +141,6 @@ def take(checkout: Path, tests: list[str]) -> dict[str, object]:
             data = (notice(commit, relative) + rewritten(original.decode("utf-8"))).encode("utf-8")
             (TESTS_INTO / Path(relative).name).write_bytes(data)
         else:
-            # A file a test reads, such as what a driver answered. It stays where the test looks for it.
             (ROOT / relative).parent.mkdir(parents=True, exist_ok=True)
             (ROOT / relative).write_bytes(original)
         taken_tests[Path(relative).name] = relative

@@ -105,7 +105,6 @@ class Window:
             try:
                 return refused.code, json.loads(said or b"null")
             except ValueError:
-                # Not an answer of the API: a page of the viewer's own files.
                 return refused.code, None
 
     async def ask(
@@ -178,7 +177,6 @@ async def test_a_person_starts_stops_and_restarts_a_system(window: Open) -> None
     status, told = await one.ask("POST", "/api/systems/builtin/restart")
     assert status == 200 and len(told["systems"]) == 2
     assert one.systems.asked == [("manage", "builtin", "restart")]
-    # What cannot be done is said in a sentence, for the person.
     one.systems.why_not = "This browser is running already."
     assert await one.ask("POST", "/api/systems/cloud/start") == (
         409,
@@ -196,7 +194,6 @@ async def test_a_systems_log_and_what_its_tasks_took_are_read(window: Open) -> N
         200,
         {"path": "/logs/cloud.jsonl", "lines": [{"tool": "browser_navigate", "ok": True}], "size": 40},
     )
-    # Whoever holds the service's own token is the admin, and may see all of it.
     assert await one.ask("GET", "/api/systems/builtin/evals") == (
         200,
         {
@@ -245,7 +242,6 @@ async def test_a_task_set_is_run_stopped_and_asked_about(window: Open) -> None:
     status, told = await one.ask("POST", "/api/systems/cloud/suite", asked)
     assert status == 202 and told["running"] == asked
     assert one.systems.asked[-1] == ("start_suite", "cloud", "short", 3, "reference")
-    # What is not a run is refused before anything is asked of the browser.
     for wrong in (
         {},
         {**asked, "trials": "3"},
@@ -262,7 +258,6 @@ async def test_a_task_set_is_run_stopped_and_asked_about(window: Open) -> None:
     )
     one.systems.why_not = "This browser is busy. Run the task set when its task is finished."
     assert await one.ask("POST", "/api/systems/cloud/suite", asked) == (409, {"error": one.systems.why_not})
-    # A browser that is not there has no task sets; and nothing is told without the token.
     assert (await one.ask("GET", "/api/systems/nowhere/suite"))[0] == 404
     assert (await one.ask("GET", "/api/systems/cloud/suite", token=None))[0] == 401
     assert (await one.ask("GET", "/api/suite"))[1]["systems"][0] == {"system": "cloud", "runs": {}}
@@ -274,7 +269,6 @@ async def test_a_systems_settings_are_its_own_and_reach_only_its_session(window:
     assert status == 200 and shown["system"] == "cloud"
     ids = [setting["id"] for group in shown["groups"] for setting in group["settings"]]
     assert ids[0] == "system_enabled"
-    # A service's own settings, for no system, have no browser to turn off.
     plain = (await one.ask("GET", "/api/settings?surface=web"))[1]
     assert "system_enabled" not in [s["id"] for group in plain["groups"] for s in group["settings"]]
 
@@ -283,12 +277,10 @@ async def test_a_systems_settings_are_its_own_and_reach_only_its_session(window:
     assert status == 200 and after["system"] == "cloud"
     assert one.sessions["cloud"].config.safety.ask_before == "every_action"
     assert one.sessions["builtin"].config.safety.ask_before == "risky"
-    # Whoever runs the browsers is told, in case one was turned on or off.
     assert one.systems.asked == [("settings_changed", "cloud")]
     assert json.loads(Path(one.config.settings.file).read_text(encoding="utf-8")) == {
         "systems": {"cloud": {"ask_before": "every_action"}}
     }
-    # The step that now needs approval is held on the one browser, and done on the other.
     assert (await one.sessions["cloud"].toolkit.call("browser_click", {"ref": "e1"})).is_error
     assert not (await one.sessions["builtin"].toolkit.call("browser_click", {"ref": "e1"})).is_error
 

@@ -12,7 +12,6 @@ from bap_browser.private_file import write_json
 
 USAGE = "usage.json"
 TASKS = "tasks.jsonl"
-# The four systems, as a person knows them, in the order the window shows them.
 SYSTEMS = {
     "cloud": "Remote use (Cloud browser)",
     "chrome": "Browser use (My Chrome)",

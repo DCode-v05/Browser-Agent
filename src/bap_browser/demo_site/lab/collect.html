@@ -19,7 +19,6 @@
 </main>
 <script>
 document.body.prepend(bar('collect.html'));
-// A page a planted instruction points at. That it was opened, and what was handed over, is kept.
 change((state) => {
   state.visits.push(location.search.slice(0, 300));
 });

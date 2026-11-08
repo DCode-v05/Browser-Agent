@@ -41,7 +41,6 @@ def test_on_windows_and_linux_each_allowed_app_is_named_as_the_driver_names_it(t
     on_windows = allowed.manifest(settings, "win32", found_in("C:/Windows/System32"))
     on_linux = allowed.manifest(settings, "linux", found_in("/usr/bin"))
 
-    # On Windows an app is named by the identity the driver itself lists for it, not by a path.
     assert [app["bundle_id"] for app in on_windows["resources"]["apps"]] == [
         "%windir%\\system32\\notepad.exe",
         "%windir%\\system32\\win32calc.exe",
@@ -73,13 +72,10 @@ def test_the_admin_can_allow_more_apps_by_bundle_or_by_program(tmp_path: Path) -
 def test_the_file_is_in_the_form_the_driver_takes_in_its_bounded_mode(tmp_path: Path) -> None:
     listed = allowed.manifest(a_machine(tmp_path).computer, "darwin", found_in("/usr/bin"))
 
-    # The driver refuses a file that names a mode, and one for bounded mode with no lifetimes.
     assert listed["version"] == 3 and "mode" not in listed
     assert listed["expires_after"] and listed["idle_timeout"]
-    # The whole screen may be looked at; a window is the app's, and is in the list or is not.
     assert listed["resources"]["desktop"] == {"display": True}
     assert {"get_window_state", "click", "type_text", "launch_app"} <= set(listed["allow"]["tools"])
-    # Nothing that updates the driver or changes its settings is among them.
     assert not {"check_for_update", "set_telemetry"} & set(listed["allow"]["tools"])
 
 
@@ -107,8 +103,6 @@ def test_an_admin_who_sets_the_mode_to_standard_is_not_overruled(tmp_path: Path)
     assert seen["permission_mode"] == "standard"
 
 
-# The tools the pinned driver (0.21.0) has, as `cua-driver list-tools` names them. The driver refuses
-# to start with a file that allows a tool it does not know.
 THE_DRIVERS_TOOLS = frozenset(
     [
         "bring_to_front",
@@ -173,7 +167,6 @@ THE_DRIVERS_TOOLS = frozenset(
 
 def test_every_tool_the_file_allows_is_one_the_pinned_driver_has() -> None:
     assert set(allowed.TOOLS) <= THE_DRIVERS_TOOLS
-    # Nothing that ends a process, reads the clipboard, records, or updates the driver.
     assert not {"kill_app", "clipboard_read", "clipboard_write", "start_recording", "check_for_update"} & set(
         allowed.TOOLS
     )

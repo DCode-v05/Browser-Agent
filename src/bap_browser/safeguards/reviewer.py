@@ -25,7 +25,6 @@ Ruling = Literal["run", "ask", "refuse"]
 RISKS: tuple[Risk, ...] = get_args(Risk)
 ASKED_FOR: tuple[AskedFor, ...] = get_args(AskedFor)
 CATEGORIES: tuple[Category, ...] = get_args(Category)
-# The categories that are held at high risk whatever risk the model gave.
 HELD_HIGH: frozenset[str] = frozenset({"pays", "sends", "deletes", "grants_access", "shares_data"})
 WITHHELD = "[withheld]"
 
@@ -93,7 +92,6 @@ VERDICT_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
-# The engine's own words for why a step was refused. The model's sentence is never given to the agent.
 WOULD = {
     "pays": "this step would pay for or order something",
     "sends": "this step would send something to other people",

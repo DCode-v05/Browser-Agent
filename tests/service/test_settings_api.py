@@ -46,7 +46,6 @@ class Served:
     async def ask(
         self, method: str, path: str, body: Any = None, *, token: str | None = TOKEN
     ) -> tuple[int, Any]:
-        # Asked from another thread: the service answers on this one.
         return await asyncio.to_thread(self._ask, method, path, body, token)
 
     async def change(self, **changes: Any) -> tuple[int, Any]:
@@ -102,7 +101,6 @@ async def test_the_screen_is_drawn_from_the_answer(serve: Serve) -> None:
     status, answer = await served.ask("GET", "/api/settings?surface=mobile")
     assert status == 200 and answer["surface"] == "mobile"
     assert "advanced" not in [group["id"] for group in answer["groups"]]
-    # With no surface named, it is the web's.
     assert (await served.ask("GET", "/api/settings"))[1]["surface"] == "web"
     assert (await served.ask("GET", "/api/settings?surface=watch"))[0] == 400
 
@@ -117,7 +115,6 @@ async def test_a_change_is_saved_answered_and_announced(serve: Serve) -> None:
         "colour_mode": "dark",
         "approval_wait": "60",
     }
-    # Every open viewer is told, so that its settings screen reads them again.
     assert served.told()[-1] == {
         "type": "settings_changed",
         "changes": {"colour_mode": "dark", "approval_wait": "60"},
@@ -168,7 +165,6 @@ async def test_a_site_a_person_blocks_is_refused_at_the_agents_next_call(serve: 
     assert (await served.change(blocked_sites=["ads.example"]))[0] == 200
     refused = await served.session.toolkit.call("browser_navigate", {"url": "https://ads.example/"})
     assert refused.is_error and "blocked" in refused.text
-    # And is opened again once the person has taken it off the list.
     assert (await served.change(blocked_sites=[]))[0] == 200
     assert not (
         await served.session.toolkit.call("browser_navigate", {"url": "https://ads.example/"})
@@ -179,7 +175,6 @@ async def test_asking_before_every_action_holds_from_the_next_call(serve: Serve)
     served = await serve()
     assert not (await served.session.toolkit.call("browser_click", {"ref": "e1"})).is_error
     assert (await served.change(ask_before="every_action"))[0] == 200
-    # Nobody is watching this session, so the approval it now needs cannot be given.
     held = await served.session.toolkit.call("browser_click", {"ref": "e1"})
     assert held.is_error and "approval" in held.text
     assert len([call for call in served.driver.calls if call[0] == "click"]) == 1, (
@@ -238,7 +233,6 @@ async def test_about_says_the_version_the_browser_and_what_differs(serve: Serve)
     assert {"key": "data_dir", "value": json.dumps(served.config.data_dir), "source": "config.json"} in about[
         "changed"
     ]
-    # The token is never part of it.
     assert TOKEN not in json.dumps(about)
 
 

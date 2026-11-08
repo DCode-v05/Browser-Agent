@@ -137,7 +137,6 @@ async def test_a_task_is_done_and_answered_in_the_chat(make_config, tmp_path: Pa
         ]
     finally:
         await session.close()
-    # The page the task read is not kept: the next task pays for none of it.
     assert history == [
         Said("user", "What is on the page?"),
         Said("assistant", "I will read the page.", (read,)),
@@ -176,7 +175,6 @@ async def test_a_task_that_fails_is_answered_and_the_session_goes_on(make_config
             ("Stopped after 1 tool calls without finishing the task.", True),
         ]
         assert session.control == "agent"
-        # Every call the model made has a result, so the conversation can go on.
         assert history[-1] == ToolOutput(second, NOT_RUN, True)
         await do_task("Third", session, model, session.config, history)
         assert chat(session)[-2]["text"] == "Fine."
@@ -256,7 +254,6 @@ async def test_stopping_lets_go_of_a_call_that_was_waiting_for_a_person(make_con
         assert result.text == "A person stopped the task, so nothing was done."
         assert session.control == "paused", "stopping a task changes nothing about who is driving"
 
-        # A request for a person's help that is open is closed with it.
         await session.handle({"type": "resume"})
         session.working(True)
         asking = asyncio.create_task(

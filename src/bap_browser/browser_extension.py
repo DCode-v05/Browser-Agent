@@ -14,8 +14,6 @@ from pathlib import Path
 
 from bap_browser.config import Config
 
-# The id Chrome gives the extension. It follows from the key in the extension's manifest, so it is
-# the same on every machine, and the service can name the extension as a page allowed to show the viewer.
 EXTENSION_ID = "fjbcdokiffgniclpchjjboebdfabkoak"
 ORIGIN = f"chrome-extension://{EXTENSION_ID}"
 SESSION_FILE = "session.json"
@@ -61,13 +59,11 @@ def announce(
     when the session ends."""
     told: dict[str, str] = {}
     if viewer_address is not None:
-        # Inside the side panel the viewer is a guest: it drops its own product name.
         address, _, fragment = viewer_address.partition("#")
         told["viewer"] = f"{address}{'&' if '?' in address else '?'}embed=1#{fragment}"
     if bridge is not None:
         told["bridge"] = bridge
     if token is not None:
-        # A pairing token: it lets the extension in once, and soon runs out.
         told["token"] = token
     (folder / SESSION_FILE).write_text(json.dumps(told), encoding="utf-8")
 

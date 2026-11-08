@@ -18,7 +18,6 @@ from bap_browser.results import ToolResult
 from bap_browser.service.session import ServiceSession
 
 State = Literal["ok", "failed", "skipped"]
-# The cloud metadata address, which the address policy refuses whatever a deployment allows (spec 8.1).
 METADATA = "http://169.254.169.254/latest/meta-data/"
 A_REF = re.compile(r"\[ref=((?:f\d+)?e\d+)\]")
 A_FIELD = re.compile(r'^- textbox "[^"]*".*?\[ref=((?:f\d+)?e\d+)\]', re.MULTILINE)
@@ -109,7 +108,6 @@ async def run_checklist(session: ServiceSession, site: str, settings: Evals) -> 
     else:
         run.skip("person", "A person can be asked", "no one is watching this browser")
 
-    # The browser goes back to where it was, for whatever the agent does next.
     if before and before != METADATA:
         await session.toolkit.call("browser_navigate", {"url": before})
     passed = sum(check.state == "ok" for check in run.checks)

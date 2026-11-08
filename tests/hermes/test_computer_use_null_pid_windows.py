@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_null_pid_windows.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Regression for the X11 null-PID `list_windows` crash.
 
@@ -26,16 +25,11 @@ from __future__ import annotations
 import base64
 from unittest.mock import MagicMock
 
-# 8×8 transparent PNG — decodes cleanly so capture() can size it.
 _PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAADUlEQVR4nG"
     "NgGAUgAAABCAABgukLHQAAAABJRU5ErkJggg=="
 )
 
-
-# ---------------------------------------------------------------------------
-# _ingest_windows: the fix locus (pure function, no session needed)
-# ---------------------------------------------------------------------------
 
 class TestIngestWindows:
     def test_skips_window_with_null_pid(self):
@@ -68,14 +62,10 @@ class TestIngestWindows:
         ])
 
         w = out[0]
-        assert w["off_screen"] is True          # derived from is_on_screen
+        assert w["off_screen"] is True
         assert w["title"] == "Mozilla Firefox"
         assert w["z_index"] == 3
 
-
-# ---------------------------------------------------------------------------
-# capture(): end-to-end proof the null-pid window no longer crashes capture
-# ---------------------------------------------------------------------------
 
 def _backend_with_windows(raw_windows):
     """A CuaDriverBackend whose session returns `raw_windows` from
@@ -114,10 +104,8 @@ def test_capture_vision_survives_null_pid_window():
 
     cap = backend.capture(mode="vision")
 
-    # The real, targetable window is selected rather than the whole capture
-    # crashing on the null-pid desktop window.
     assert cap.app == "Firefox"
     assert cap.png_b64 == _PNG_B64
     assert backend._active_pid == 4321
     assert backend._active_window_id == 77
-    assert base64.b64decode(cap.png_b64)  # decodes cleanly
+    assert base64.b64decode(cap.png_b64)

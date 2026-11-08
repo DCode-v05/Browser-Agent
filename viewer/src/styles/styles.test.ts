@@ -2,8 +2,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-// Only design tokens may be used for colour, type, spacing, radius, shadow and motion (spec 9.5).
-// This reads every stylesheet except the token file and refuses a value written out.
 const files = readdirSync('src/styles').filter((name) => name.endsWith('.css'));
 
 function rules(name: string): string[] {
@@ -11,7 +9,6 @@ function rules(name: string): string[] {
     readFileSync(`src/styles/${name}`, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .split('\n')
-      // The breakpoints of spec 9.2 and 9.12 are the only sizes written out: a media query cannot read a token.
       .filter((line) => !line.trim().startsWith('@media'))
   );
 }

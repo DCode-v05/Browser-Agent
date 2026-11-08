@@ -38,7 +38,6 @@ def test_key_names_in_any_dialect_become_one_form(written: str, normal: str) -> 
 def test_what_is_not_a_key_is_refused_without_being_repeated(written: str) -> None:
     with pytest.raises(BadInput) as refused:
         keys.normalise(written)
-    # What was given may be text an agent meant to type. The message goes to the log.
     assert "hunter2" not in str(refused.value) and "banana" not in str(refused.value)
 
 

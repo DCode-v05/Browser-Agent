@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_approval_isolation.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """computer_use approval is the shared ``bap_browser.computer.seams.approval`` gate — no private grant store, no default-allow.
 
@@ -117,7 +116,6 @@ def test_a_forgets_a_poisoned_approval_callback():
         raise RuntimeError("dead UI")
 
     cu_tool.set_approval_callback(poisoned)
-    # no reset — the autouse fixture must clean this up
 
 
 def test_b_still_dispatches_after_the_polluter(monkeypatch):

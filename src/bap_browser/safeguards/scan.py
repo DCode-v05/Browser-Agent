@@ -31,12 +31,6 @@ class Passage:
     """The passage, cut to `passage_chars`."""
 
 
-# Each rule is matched on text with its white space, line breaks included, read as single
-# spaces, so an instruction broken across two lines is still found (`_flatten`). Every gap
-# between the words of a pattern is bounded, so none of them can backtrack badly on text an
-# attacker wrote; the gaps are lazy (`?`) so a pattern latches onto the nearest anchor word
-# rather than jumping over intervening text to a repeated one further away.
-
 _ADDRESSED_TO_AN_AGENT = re.compile(
     r"\b(?:ignore|disregard|forget)\b.{0,40}?\b(?:previous|prior|above)\b.{0,40}?\b(?:instructions?|prompt|rules)\b"
     r"|\byou are(?:\s+now)?\s+(?:an?\s+)?(?:ai|assistant|agent|language model)\b"
@@ -51,8 +45,6 @@ _CHAT_MARKUP_MARKS = re.compile(
     r"</?\s*(?:system|assistant|user)\s*>|<\|im_start\|>|\[INST\]|###\s*Instruction",
     re.IGNORECASE,
 )
-# "Two or more lines that begin System:, User: or Assistant:" is about the text's own lines, not
-# the flattened text, so it is matched separately, on `text` itself.
 _ROLE_LINE = re.compile(r"^[ \t]*(?:System|User|Assistant):", re.IGNORECASE | re.MULTILINE)
 
 _TALKS_TO_THE_CHECK = re.compile(
@@ -65,9 +57,6 @@ _TALKS_TO_THE_CHECK = re.compile(
     re.IGNORECASE,
 )
 
-# The "prove you are human" trick: the words of a check or a repair together with keys to press
-# and something to paste, in either order. Documentation that shows a command ("open a terminal
-# and run …") has no check words, so it is never caught by this.
 _CHECK_WORDS = (
     r"(?:verify\s+you\s+are\s+human|i\s+am\s+not\s+a\s+robot|captcha|to\s+fix\s+this|to\s+continue)"
 )
@@ -79,10 +68,6 @@ _COMMAND_LURE = re.compile(
     rf"{_CHECK_WORDS}.{{0,80}}?{_KEY_PASTE}|{_KEY_PASTE}.{{0,80}}?{_CHECK_WORDS}", re.IGNORECASE
 )
 
-# `_TALKS_TO_THE_CHECK` needs a plain word every one of its branches holds; `_COMMAND_LURE` needs
-# one of each of its two groups. Text that is missing one of these cannot match the costlier
-# pattern it guards, so one cheap pass over the text (rather than three) decides which of the
-# costlier patterns below are worth running at all.
 _CANDIDATE_WORDS = re.compile(
     r"(?P<talks>\b(?:approved|agreed|confirmed|authorized|authorised|rate|mark|classify|treat|safe"
     r'|pre-approved|asked_for)\b|"risk")'
@@ -109,7 +94,6 @@ _STRENGTH: dict[str, Strength] = {
     "command_lure": "strong",
     "asks_for_secrets": "weak",
 }
-# The order `flagged_by` picks among several strong rules that all hit.
 _RULE_ORDER = (
     "addressed_to_an_agent",
     "names_our_tools",
@@ -259,7 +243,6 @@ def question(sent: Sequence[Passage], token: str) -> str:
     return json.dumps({"mark": token, "passages": "\n".join(parts)})
 
 
-# The second opinion's instructions, word for word (spec 18.5 rule 5).
 SCAN_INSTRUCTIONS = """\
 You are given short passages of text taken from a web page that an AI agent is reading for a
 person. A fixed rule flagged each one. Each passage is between <<passage TOKEN n>> and
@@ -318,7 +301,7 @@ def _answer_shape(answer: Mapping[str, Any] | None, count: int) -> dict[int, str
             return None
         if verdict not in ("instruction", "harmless") or not 1 <= n <= count:
             return None
-        decided.setdefault(n, verdict)  # a passage named twice: the first word counts
+        decided.setdefault(n, verdict)
     return decided
 
 
@@ -339,9 +322,6 @@ def instructions_among(
     ]
 
 
-# A snapshot line that names a control: `- button "Pay now" [ref=e2] [disabled]`. Its name is a
-# JSON string, so a quote inside it is escaped; the pattern follows that rather than stopping at
-# the first quote.
 _CONTROL_LINE = re.compile(
     r'^(?P<prefix>\s*-\s+[A-Za-z]+\s+)"(?P<name>(?:[^"\\]|\\.)*)"(?P<suffix>\s+\[ref=.*)$'
 )

@@ -46,7 +46,6 @@ async def test_the_cloud_browsers_sessions_end_and_its_kept_profile_is_deleted(
     config = make_config(tmp_path, browser={"user_data_dir": str(profile)})
     settings = SettingsStore(config)
     cloud = ServiceSession(config, FakeDriver(), name="cloud", settings=settings)
-    # The built-in browser keeps a profile of its own, which this does not touch.
     own = a_profile(tmp_path / "built-in-browser")
     built_in_config = config.model_copy(
         update={"browser": config.browser.model_copy(update={"user_data_dir": str(own)})}
@@ -60,7 +59,6 @@ async def test_the_cloud_browsers_sessions_end_and_its_kept_profile_is_deleted(
     await service.start()
     try:
         door = f"{service.address}/api/browsing-data/clear"
-        # Deleting a person's sign-ins is for the person alone.
         assert (await asyncio.to_thread(post, door, None))[0] == 401
         assert (await asyncio.to_thread(post, door, "wrong"))[0] == 401
         assert cloud.control == "agent" and profile.exists()
@@ -69,10 +67,8 @@ async def test_the_cloud_browsers_sessions_end_and_its_kept_profile_is_deleted(
         assert cloud.control == "ended" and not profile.exists()
         ended = [item for item in cloud.hub.subscribe()[0] if isinstance(item, dict)][-1]
         assert ended["type"] == "session_ended" and ended["reason"] == "person"
-        # The summary says why, in place of "You stopped it."
         assert ended["detail"] == ENDED_TO_CLEAR
         assert built_in.control == "agent" and (own / "Default" / "Cookies").exists()
-        # A second time there is nothing left to end or to delete.
         assert await asyncio.to_thread(post, door) == (200, {"sessions_ended": 0, "profile_cleared": False})
     finally:
         await service.stop()
@@ -96,7 +92,6 @@ async def test_a_folder_that_is_not_a_profile_is_never_deleted(
     await service.start()
     try:
         answer = await asyncio.to_thread(post, f"{service.address}/api/browsing-data/clear")
-        # The session ended, which is all a browser with nothing kept needs.
         assert answer == (200, {"sessions_ended": 1, "profile_cleared": False})
         assert (documents / "thesis.txt").read_text(encoding="utf-8") == "years of work"
     finally:

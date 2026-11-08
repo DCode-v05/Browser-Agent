@@ -11,8 +11,6 @@ from collections.abc import Coroutine, Mapping
 from concurrent.futures import Future
 from typing import Any
 
-# A variable whose name has one of these words in it holds something the driver must not be given:
-# a model's key, the service's token, a Tailscale key.
 SECRET_WORDS = frozenset(
     {"KEY", "KEYS", "APIKEY", "AUTHKEY", "TOKEN", "TOKENS", "SECRET", "SECRETS", "PASSWORD", "PASSWD"}
     | {"CREDENTIAL", "CREDENTIALS", "AUTH"}

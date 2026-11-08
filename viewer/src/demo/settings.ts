@@ -1,7 +1,3 @@
-// The settings answer a deployment would give (spec 10.2), kept in memory. It stands in for the
-// settings API until the service provides it, and follows the same rules: a locked setting is
-// refused, a setting from another surface is refused, a list holds only sites.
-
 import type { Surface } from '../protocol';
 import type { ChangeResult, ConfigAnswer, RefusalReason, Setting, SettingsAnswer, SettingsSource, SettingValue } from '../settings/types';
 
@@ -303,7 +299,6 @@ const CATALOGUE: Entry[] = [
   },
 ];
 
-/** The setting as the answer carries it: without the catalogue's own bookkeeping. */
 function toSetting(entry: Entry, value: SettingValue): Setting {
   const setting: Setting & { group?: string; surfaces?: Surface[] } = { ...entry, value };
   delete setting.group;
@@ -324,7 +319,6 @@ function problemWith(entry: Entry | undefined, surface: Surface, value: SettingV
   return 'not_a_choice';
 }
 
-/** `only` limits the catalogue to the settings named. */
 export function createDemoSettings(only?: readonly string[]): SettingsSource {
   const catalogue = only ? CATALOGUE.filter((entry) => only.includes(entry.id)) : CATALOGUE;
   const values = new Map<string, SettingValue>(catalogue.map((entry) => [entry.id, entry.default]));
@@ -344,7 +338,6 @@ export function createDemoSettings(only?: readonly string[]): SettingsSource {
     load: async (surface) => answer(surface),
 
     async change(surface, changes): Promise<ChangeResult> {
-      // Nothing is changed when any one change in the request is refused.
       for (const [id, value] of Object.entries(changes)) {
         const reason = problemWith(catalogue.find((entry) => entry.id === id), surface, value);
         if (reason) return { ok: false, setting: id, reason };

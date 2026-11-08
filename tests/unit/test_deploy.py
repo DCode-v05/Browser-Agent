@@ -26,11 +26,9 @@ def test_the_configuration_in_the_image_is_valid_and_made_for_a_machine_others_r
     config = load_config(str(ROOT / "deploy" / "config.vm.json"))
     assert config.server.host == "0.0.0.0"
     assert config.browser.headless is True
-    # A container has no user namespaces for the browser's own sandbox, and little shared memory.
     assert config.browser.chromium_sandbox is False
     assert "--disable-dev-shm-usage" in config.browser.args
     assert config.safety.block_private_networks is True
-    # What the service writes goes to the one folder its user owns.
     assert config.server.state_file.startswith("/data/")
     assert str(config.logging.event_log).startswith("/data/")
 
@@ -59,11 +57,8 @@ def test_the_vm_joins_a_tailnet_only_when_it_is_given_a_key_and_then_forgets_the
     )
     assert 'if [ -n "${TS_AUTHKEY:-}" ]' in START
     assert "unset TS_AUTHKEY" in START and START.index("unset TS_AUTHKEY") < START.index('exec "$@"')
-    # The key's value is never written out: not echoed, not logged.
     assert not [line for line in START.splitlines() if "echo" in line and "$TS_AUTHKEY" in line]
     assert "--state=mem:" in START, "the VM's node is ephemeral: it leaves the tailnet when the VM ends"
-    # With its state in memory a node has no folder for the HTTPS certificate `tailscale serve`
-    # fetches: without one, every HTTPS call to the viewer fails with "no TailscaleVarRoot".
     assert '--statedir="$certs"' in START and "certs=$(mktemp -d)" in START
 
 

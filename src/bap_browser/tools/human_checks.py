@@ -13,7 +13,6 @@ HUMAN_CHECK = re.compile(
     re.IGNORECASE,
 )
 SIGN_IN = re.compile(r"\b(sign in|sign-in|log in|log-in|login|signin)\b", re.IGNORECASE)
-# The lines of a page that say what the page is for: its title, its headings and its buttons.
 SAYS_WHAT_IT_IS = ("Page:", "- heading", "- button")
 PASSWORD_FIELD = "type=password"
 
@@ -34,6 +33,5 @@ def notice_for(page: str) -> str:
         SIGN_IN.search(line) for line in lines if line.lstrip().startswith(SAYS_WHAT_IT_IS)
     )
     if signs_in:
-        # A sign-in page with a human check on it is one step for the person: signing in.
         return SIGN_IN_NOTICE
     return HUMAN_CHECK_NOTICE if HUMAN_CHECK.search(page) else ""

@@ -15,18 +15,12 @@ from typing import Literal
 from bap_browser.config_safeguards import Actions
 
 ActionClass = Literal["pays", "sends", "deletes", "grants", "commits"]
-# The order in which a name is tried: a "Pay and send" button pays.
 CLASSES: tuple[ActionClass, ...] = ("pays", "sends", "deletes", "grants", "commits")
-# The classes a model is never allowed to let run by itself (the floor of 18.4).
 NEVER_ON_A_MODELS_WORD = frozenset({"pays", "sends", "deletes", "grants"})
-# Controls that are pressed. A field that is typed into is not classified by its name.
 TYPED_INTO = frozenset({"textbox", "searchbox", "combobox", "spinbutton", "slider"})
-# A link goes somewhere. Links that pay or delete exist; a link named "Blog post" sends nothing.
 NOT_FOR_A_LINK = frozenset({"sends", "commits"})
-# A box that is ticked says what is wanted. "Send me the newsletter" sends nothing when it is ticked.
 TICKED = frozenset({"checkbox", "switch", "radio"})
 NOT_FOR_A_TICK = frozenset({"sends"})
-# The keys that send what a message box holds.
 SENDING_KEYS = frozenset({"Enter", "Control+Enter", "Meta+Enter"})
 
 
@@ -73,7 +67,6 @@ def class_of(
         if held > most:
             found, most = kind, held
     if role in TICKED:
-        # The deployment's own words that say "send" say no more of a tick than the class does.
         left_out = {word.lower() for kind in NOT_FOR_A_TICK for word in getattr(actions, kind)}
         more_words = [word for word in more_words if word.lower() not in left_out]
     if found is None and role != "link" and holds(name, more_words):

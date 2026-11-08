@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_cua_no_overlay.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Tests for the cua-driver --no-overlay policy.
 
@@ -22,9 +21,6 @@ from bap_browser.computer.hermes.computer_use import cua_backend_driver
 
 
 class TestNoOverlayFlag:
-
-
-
 
 
     def test_explicit_true_overrides(self):
@@ -103,8 +99,6 @@ class TestNoOverlayFlag:
             assert cua_backend._cua_no_overlay() is False
 
 
-
-
 class TestDriverSupportsNoOverlay:
     def test_returns_true_when_help_shows_flag(self):
         fake_help = "Usage: cua-driver [OPTIONS] COMMAND\n  --no-overlay  Disable cursor overlay\n"
@@ -112,7 +106,6 @@ class TestDriverSupportsNoOverlay:
             mock_run.return_value.stdout = fake_help
             mock_run.return_value.stderr = ""
             assert cua_backend_driver._cua_driver_supports_no_overlay("cua-driver") is True
-
 
 
     def test_help_probe_passes_sanitized_env(self):
@@ -130,9 +123,6 @@ class TestDriverSupportsNoOverlay:
                 "subprocess.run was called without env= — cua-driver is a "
                 "third-party binary and must not receive inherited secrets"
             )
-            # The sanitized env must come from the same helper the MCP
-            # spawn uses, so the policy is consistent across every
-            # cua-driver invocation in this file.
             assert kwargs["env"] is not None
 
 
@@ -178,8 +168,6 @@ class TestMcpInvocationUsesResolvedCommand:
             cua_backend_driver._cua_driver_supports_no_overlay.cache_clear()
             cmd, _args = _resolve_mcp_invocation("/usr/bin/cua-driver")
         assert cmd == "/opt/relocated/cua-driver"
-        # The support probe must be called with the manifest-resolved
-        # command, not the input driver_cmd argument.
         mock_probe.assert_called_with("/opt/relocated/cua-driver")
 
 
@@ -194,7 +182,6 @@ class TestMcpInvocationUsesResolvedCommand:
                  cua_backend_driver, "_cua_driver_supports_no_overlay",
                  side_effect=lambda cmd: cmd == "/opt/relocated/cua-driver",
              ):
-            # System binary does NOT support, manifest binary DOES.
             args = cua_backend_driver._mcp_args_with_overlay_flag(
                 ["mcp"], driver_cmd="/usr/bin/cua-driver",
             )

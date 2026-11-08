@@ -30,7 +30,6 @@ def test_the_desktops_confirm_set_has_presses_a_person_is_asked_about_and_presse
     pressed = {task.id: [step[1] for step in task.solution if step[0] == "press"] for task in tasks}
     for task in tasks:
         assert ("Delete Selection" in pressed[task.id]) is task.risky, task.id
-    # Asked, and need not have been: the task fails though the file is right.
     harmless = next(task for task in tasks if not task.risky)
     assert grade(harmless, {"files": {"new_txt": "new"}, "names": ["new.txt"]}, "", 1)[:2] == (
         False,

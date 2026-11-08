@@ -43,27 +43,16 @@ from bap_browser.safeguards.scan import (
 
 logger = logging.getLogger(__name__)
 
-# Two characters that no text may hold stand around what a page wrote, from the tool that read
-# it to here. They never leave the tool layer.
 PAGE_BEGINS, PAGE_ENDS = chr(0xFDD0), chr(0xFDD1)
 _FROM_A_PAGE = re.compile(f"{PAGE_BEGINS}(.*?){PAGE_ENDS}", re.DOTALL)
-# A name a page wrote stands in the engine's own lines in double quotes.
 _A_NAME = re.compile(r'"([^"\n]+)"')
 NAME_WITHHELD = '"[withheld]"'
-# What a dialog said stands in the engine's own lines in single quotes: a confirm dialog
-# ('Proceed?'), and: the dialog 'Proceed?'. It is taken to the last quote of the line, so that a
-# page cannot end it early with a quote of its own.
 _A_DIALOGS_WORDS = re.compile(r"(?<=\(')(.+)(?='\))|(?<=the dialog ')(.+)(?='\.)")
-# What stands in a snapshot line for a control's name that was withheld, and two characters that
-# keep the engine's own insertions apart from the page's text while that text is marked.
 NAME_HELD = "[withheld]"
 HELD_LONG, HELD_SHORT = chr(0xFDD2), chr(0xFDD3)
-# A whole read of a page: when it finds nothing planted any more, the page is no longer flagged.
 WHOLE_READS = frozenset({"browser_snapshot", "browser_get_text"})
 TAKES_A_PICTURE = frozenset({"browser_screenshot", "browser_zoom"})
-# How the name of a tool of the desktop begins. What it reads was written by an app, not by a site.
 OF_A_DESKTOP = "computer_"
-# The tools whose result is a new read of the page.
 READS_THE_PAGE = frozenset({"browser_snapshot", "browser_get_text", "browser_find", "browser_navigate"})
 INSTRUCTED = (
     "[notice] This page holds text that tries to give instructions to an AI agent. It was withheld. "
@@ -133,8 +122,6 @@ class Reader:
                 self._check.memory.remember(site, page)
                 self._check.task.read_a_page = True
             if token:
-                # What the engine itself put in place of withheld text is not the page's imitation
-                # of the engine: it is kept out of the way while the page's own words are made harmless.
                 page = page.replace(WITHHELD, HELD_LONG).replace(NAME_HELD, HELD_SHORT)
                 page, imitates = marked(
                     page, token, ON_THE_SCREEN if tool.startswith(OF_A_DESKTOP) else PAGE_NOTE
@@ -184,7 +171,6 @@ class Reader:
         happened in the browser, and what is said of a dialog that blocks the page."""
         incoming = self._session.config.safeguards.incoming
         if incoming.strip_invisible:
-            # Before the rules read it: a character nobody can see would keep them from matching.
             words, _ = without_invisible(words)
         return self._engines_own(words, incoming.scan != "off")
 
@@ -223,7 +209,6 @@ class Reader:
                     SCAN_INSTRUCTIONS, question(sent, token), name="passages", schema=SCAN_SCHEMA
                 )
             except ModelError as failed:
-                # With no second opinion the fixed rules decide alone.
                 logger.warning("The scan's model could not be asked: %s", failed)
         return instructions_among(found, sent if answer is not None else [], answer)
 

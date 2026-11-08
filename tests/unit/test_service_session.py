@@ -13,7 +13,6 @@ from bap_browser.service.session import ServiceSession
 
 NOW = 1_759_480_000.0
 PUBLIC = "https://93.184.216.34"
-# What a session says of itself when it starts: what it is, how it asks, and its tabs.
 STARTED = 3
 
 
@@ -74,7 +73,6 @@ async def test_a_session_starts_its_browser_and_says_what_it_is(
             "viewport": {"width": 1280, "height": 800},
             "ts": NOW,
         },
-        # How the session asks before it acts (spec 18.10).
         {"type": "auto_changed", "mode": "risky", "state": "off", "ts": NOW},
         {
             "type": "tab_changed",
@@ -115,7 +113,6 @@ async def test_each_call_reaches_viewers_as_a_step_and_a_changed_tab(
     assert events[3]["label"] == 'Clicking "Go"'
     assert events[3]["target"] == {"x": 10, "y": 20, "w": 80, "h": 24}
     assert events[4]["summary"] == 'Clicked "Go" (button)'
-    # The tabs did not change, so they are not sent again.
     assert [event["type"] for event in events] == [
         "step_started",
         "step_finished",
@@ -220,7 +217,6 @@ async def test_after_a_hand_back_the_next_result_says_what_changed_once(
     )
     second = await session.toolkit.call("browser_snapshot", {})
     assert second.text.startswith("Page: Fake")
-    # Viewers saw the address change as soon as the person handed back.
     assert kinds(session)[-7:] == [
         "control:person",
         "tab_changed",
@@ -342,7 +338,6 @@ async def test_a_still_page_is_confirmed_as_current_and_a_moving_one_is_not(
     driver.on_frame(b"picture-1")
     assert await asyncio.wait_for(viewer.next(), 1) == b"picture-1"
     assert await asyncio.wait_for(viewer.next(), 3) == {"type": "picture_current", "ts": NOW}
-    # It means nothing to a viewer that connects later, so it is not kept.
     assert "picture_current" not in kinds(session)
 
 
@@ -378,7 +373,6 @@ async def test_a_persons_mouse_and_keys_reach_the_page_only_while_they_drive(
         ("wheel", (10, 20, 0, 120)),
     ]
     await session.handle({"type": "hand_back"})
-    # What they still held down was let go for them. Nothing they do after that reaches the page.
     handed_back = list(driver.calls)
     await session.handle(click)
     assert driver.calls == handed_back
@@ -452,8 +446,6 @@ async def test_viewers_are_told_when_the_browser_is_a_window_on_the_persons_own_
         ("remote_headless", False, False),
         ("takeover_chrome", False, True),
         ("bundled_chromium", False, True),
-        # Nobody said which backend it is: a browser that was attached to and not launched is the
-        # desktop app's or a person's own Chrome, so a file that arrives there is asked about.
         (None, True, True),
         (None, False, False),
         ("remote_headless", True, False),

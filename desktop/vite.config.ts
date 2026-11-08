@@ -6,7 +6,6 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // Relative addresses: the built shell is opened from a file by the desktop app.
   base: './',
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
 });

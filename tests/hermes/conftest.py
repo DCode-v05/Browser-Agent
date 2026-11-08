@@ -29,9 +29,6 @@ def a_home_of_its_own(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     work_for(before)
 
 
-# Hermes' tests of what was not taken from it: its package manager, its own modules, its settings
-# file. Each is named with the reason, and is left out of the run. A name that matches no test is an
-# error, so the list cannot outlive the tests it names.
 NOT_HERE = Path(__file__).with_name("not_here.json")
 
 
@@ -68,7 +65,6 @@ def leave_out(config: pytest.Config, items: list[pytest.Item]) -> None:
     items[:] = [item for item in items if item not in left_out]
 
 
-# Hermes marks a test with the systems it is about: `platforms("linux")`, `platforms("not macos")`.
 SYSTEMS = {
     "linux": ("linux",),
     "macos": ("darwin",),

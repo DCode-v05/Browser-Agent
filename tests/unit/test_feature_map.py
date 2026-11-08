@@ -37,7 +37,6 @@ def test_every_file_the_map_names_is_there() -> None:
 
 def test_every_tool_is_in_the_map_and_the_map_names_no_tool_that_is_gone() -> None:
     mapped = [tool for feature in features() for tool in feature["tools"]]
-    # A browser's tools, the desktop's (spec 21.5) and Hermes' one for a machine (spec 22.4).
     assert sorted(mapped) == sorted(tool.name for tool in (*TOOLS, *COMPUTER_TOOLS))
 
 

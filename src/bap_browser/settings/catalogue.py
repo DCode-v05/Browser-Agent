@@ -522,5 +522,4 @@ CATALOGUE: tuple[Entry, ...] = (
 
 BY_ID: Mapping[str, Entry] = {entry.id: entry for entry in CATALOGUE}
 
-# Each setting as the admin has it: every choice open (spec 4.11).
 FREE: Mapping[str, Entry] = {entry.id: entry.free() for entry in CATALOGUE}

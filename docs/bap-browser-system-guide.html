@@ -7,9 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<style>
-/* Layout: a reference manual. A contents rail at the left on wide screens, one reading column, tables and diagrams in their own scrollers. */
-:root {
+<style>:root {
   --paper: #f6f7f4;
   --sheet: #ffffff;
   --ink: #17212b;
@@ -732,7 +730,6 @@ uv run python scripts/gate.py</code></pre>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
-  // Opened from disk, the diagrams are drawn by Mermaid itself, in the reader's colours.
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict', flowchart: { htmlLabels: true } });
 </script>

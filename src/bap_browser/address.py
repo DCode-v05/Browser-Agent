@@ -25,8 +25,6 @@ DEFAULT_PORTS = {"http": 80, "https": 443}
 IPV4_PART = re.compile(r"0[xX][0-9a-fA-F]*|[0-9]+")
 LABEL = r"[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?"
 HOST_NAME = re.compile(rf"{LABEL}(?:\.{LABEL})*")
-# Characters that browsers and Python's own rules for international names turn into different
-# names. Such a name has to be given in its xn-- form.
 READ_DIFFERENTLY = frozenset("ßς\u200c\u200d")
 
 
@@ -37,7 +35,6 @@ def canonical_address(url: str) -> str:
         raise ValueError(NOT_VALID)
     if url.lower().startswith(SCHEMES_WRITTEN_WITHOUT_SLASHES):
         return url
-    # A browser reads \ as / in a web address, up to the query.
     head = re.split(r"[?#]", url, maxsplit=1)[0]
     url = head.replace("\\", "/") + url[len(head) :]
     if not HAS_SCHEME.match(url):
@@ -81,14 +78,12 @@ def canonical_host(text: str) -> str:
         raise ValueError(NO_HOST)
     if text.startswith("["):
         try:
-            # A zone such as %eth0 names an interface of this machine. A browser refuses it in an address.
             if "%" in text:
                 raise ValueError
             ip = ipaddress.IPv6Address(text.removeprefix("[").removesuffix("]"))
         except ValueError:
             raise ValueError(NOT_VALID) from None
         if ip.ipv4_mapped is not None:
-            # Written as browsers write it; Python's own spelling of these differs between versions.
             number = int(ip.ipv4_mapped)
             return f"[::ffff:{number >> 16:x}:{number & 0xFFFF:x}]"
         return f"[{ip}]"
@@ -104,7 +99,6 @@ def canonical_host(text: str) -> str:
     ip = legacy_ipv4(host)
     if ip is not None:
         return str(ip)
-    # A browser reads a host that ends in a number as an IPv4 address or not at all.
     if not HOST_NAME.fullmatch(host) or IPV4_PART.fullmatch(host.rsplit(".", 1)[-1]):
         raise ValueError(NOT_VALID)
     return host
@@ -139,7 +133,6 @@ def _carried_ipv4(ip: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
     if ip in NAT64:
         return ipaddress.IPv4Address(number & 0xFFFFFFFF)
     if ip in NAT64_LOCAL:
-        # RFC 6052 with a 48-bit prefix: 16 bits of the address, 8 unused bits, then the other 16.
         return ipaddress.IPv4Address((((number >> 64) & 0xFFFF) << 16) | ((number >> 40) & 0xFFFF))
     if ip in IPV4_COMPATIBLE and number > 1:
         return ipaddress.IPv4Address(number)

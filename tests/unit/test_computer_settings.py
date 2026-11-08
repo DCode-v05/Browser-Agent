@@ -84,7 +84,6 @@ async def test_an_app_opens_only_after_a_persons_yes_when_the_admin_asks_for_it(
         refused = await session.toolkit.call("computer_open_app", {"app": "Text editor"})
         assert refused.is_error and desktop.opened == []
         assert [question.tool for question in asked] == ["computer_open_app"]
-        # A desktop has no site: the yes cannot be given for one, only for this step.
         assert asked[0].every_time is True
     finally:
         await session.close()

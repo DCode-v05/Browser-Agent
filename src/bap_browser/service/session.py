@@ -26,7 +26,6 @@ ControlState = Literal["agent", "paused", "person_requested", "person", "ended"]
 HelpOutcome = Literal["done", "could_not", "timed_out"]
 EndReason = Literal["person", "agent", "timeout", "failed"]
 
-# What an agent's call is told when it could not run (spec 4.5). None of these is an error.
 HELD = {
     "paused": "A person paused the session, so nothing was done. Call again to keep waiting.",
     "person": "A person is in control of the browser, so nothing was done. Call again to keep waiting.",
@@ -34,9 +33,7 @@ HELD = {
 ENDED_BY_A_PERSON = "The session was ended by a person."
 TASK_STOPPED = "A person stopped the task, so nothing was done."
 ENDED = "The session has ended."
-# The backends whose browser is on the person's own machine (spec 4.3).
 OWN_MACHINE = ("takeover_chrome", "bundled_chromium")
-# Which button a pointer command names, as browsers number them.
 BUTTONS: dict[int, MouseButton] = {0: "left", 1: "middle", 2: "right"}
 
 NO_PERSON_IN_A_RUN = (
@@ -65,11 +62,9 @@ class ServiceSession(CheckNews):
         a person asks, after this session has ended, for a new one in its place. `settings` holds
         what a person chose in the settings screen: it is laid over `config` (spec 10.1). `tools` are the
         tools on offer, when they are not a browser's: a desktop's (spec 21.5)."""
-        # What the deployment and this session's own options give, before a person's settings.
         self._given = config
         self._settings = settings
         if settings is not None:
-            # A browser among several has settings of its own, under the session's name (spec 9.17).
             config = settings.apply_to(config, backend, name)
         self.config = config
         self.name = name
@@ -77,32 +72,22 @@ class ServiceSession(CheckNews):
         self.browser = BrowserSession(config, driver)
         self.browser.ask_person = self._ask_person_timed
         self.browser.ask_approval = self._ask_approval_timed
-        # Watched: a viewer has the page open in front (spec 22.7), not behind another tab.
         self.browser.watched = lambda: self.hub.watching > 0
-        # Whoever starts the session says which backend it is. When nobody says, a browser that
-        # was attached to and not launched (the desktop app's, a person's own Chrome) is taken for
-        # the person's own: a file that arrives is then asked about, not kept unasked.
         attached = backend is None and config.browser.cdp_url is not None
         self.browser.own_machine = backend in OWN_MACHINE or attached
-        # How long the agent's calls have waited for a person in all, in seconds (spec 12.6).
         self.waited_for_a_person_s = 0.0
         self.browser.on_event = self._happened
-        # The approval that is open now, and how it was answered.
         self._approval: str | None = None
         self._approval_outcome: ApprovalOutcome | None = None
         self._approvals = 0
-        # Questions that ran out unanswered in a row. Past a limit, further ones are not waited for.
         self._unanswered = 0
         self.stand_in: Callable[[str, str], ApprovalOutcome] | None = None
         """During a run of a task set (spec 12.7) there is no person to ask: this answers each
         approval at once, given the tool and what it would do. None at every other time."""
         self.toolkit = Toolkit(self.browser, tools, observer=self, gate=self._admit)
         if on_task is not None:
-            # In a chat the person's own messages are the task. An agent cannot put its own in their place.
             self.toolkit.leave_out(DECLARES_A_TASK)
-        # How Auto Mode stands, as viewers were last told (spec 18.10).
         self._auto_told: dict[str, Any] | None = None
-        # The request for a person that is open now, and how it was answered.
         self._help: str | None = None
         self._help_outcome: HelpOutcome | None = None
         self._helps = 0
@@ -110,17 +95,14 @@ class ServiceSession(CheckNews):
         self._backend = backend
         self._on_restart = on_restart
         self._on_task = on_task
-        # Whether viewers are sent live pictures of the browser. Not when each one would cross a bridge.
         self._pictures = pictures
         """Given each task a person sends from the viewer's chat. None when the agent takes no tasks there."""
         self._messages = 0
-        # Whether the agent is on a task from the chat, and whether a person has stopped that task.
         self._on_a_task = False
         self._task_stopped = False
         self._agent = agent
         self._clock = clock
         self._ended_by: EndReason | None = None
-        # Held while an action runs, so that a person takes the browser only between actions.
         self._acting = asyncio.Lock()
         self.held = 0
         """How many of the agent's calls wait now for the agent to be driving again."""
@@ -131,7 +113,6 @@ class ServiceSession(CheckNews):
         self._size = (0, 0)
         self._last_picture = 0.0
         self._heartbeat: asyncio.Task[None] | None = None
-        # What a person is holding down in the page, so that it can be let go for them.
         self._held_keys: list[str] = []
         self._held_buttons: dict[MouseButton, tuple[float, float]] = {}
 
@@ -151,10 +132,8 @@ class ServiceSession(CheckNews):
         if self._on_task is not None:
             started["chat"] = True
         if self._on_restart is not None:
-            # A person can ask for a new session here once this one has ended.
             started["restartable"] = True
         if not self.config.browser.headless or self.config.browser.cdp_url:
-            # The person watches the browser itself, so a viewer need not show its picture.
             started["on_screen"] = True
         self.hub.publish(started)
         self._tell_auto()
@@ -207,7 +186,6 @@ class ServiceSession(CheckNews):
     async def handle(self, command: Mapping[str, Any]) -> None:
         """Does what a person asked for in the viewer. A command that does not apply changes nothing."""
         kind = command.get("type") if isinstance(command, Mapping) else None
-        # A person is here: their questions are waited for again (spec 18.8).
         self._unanswered = 0
         if kind == "pause":
             await self._take("paused", ("agent",))
@@ -267,7 +245,6 @@ class ServiceSession(CheckNews):
             saved = {"name": redact(str(event.detail["name"])), "size": event.detail["size"]}
             self.hub.publish({"type": "download_saved", **saved, "ts": self._clock()})
 
-    # The chat: a person gives the agent its tasks, and reads its answers (spec 9.14).
 
     def give_task(self, text: Any) -> bool:
         """Hands a person's task to the agent. False when it cannot be taken."""
@@ -328,7 +305,6 @@ class ServiceSession(CheckNews):
             book.end()
             self.hub.publish({"type": "task_ended", "ts": self._clock()})
             self._tell_auto()
-        # The steps of a task are counted from where it begins (spec 18.8).
         if self.toolkit.task_began() if on_a_task else self.toolkit.task_ended():
             self._limit_lifted()
 
@@ -336,7 +312,6 @@ class ServiceSession(CheckNews):
         async with self._changed:
             await self._changed.wait_for(lambda: self.control == "ended")
 
-    # A person's mouse and keyboard. None of it is logged, and none of it is told to viewers or the agent.
 
     async def _input(self, kind: str, command: Mapping[str, Any]) -> None:
         driver = self.browser.started_driver
@@ -350,7 +325,6 @@ class ServiceSession(CheckNews):
                 given = command.get("button")
                 button = BUTTONS.get(given) if type(given) is int else None
                 if action == "move":
-                    # A move names no button of its own.
                     await driver.pointer("move", x, y, button or "left")
                 elif action in ("down", "up") and button is not None:
                     if action == "down":
@@ -366,13 +340,11 @@ class ServiceSession(CheckNews):
                         self._held_keys.append(key)
                     await driver.key(action, key)
             elif kind == "wheel" and x is not None and y is not None:
-                # One turn of the wheel never moves the page by more than one screen.
                 dx = _number(command.get("dx"), -math.inf, math.inf, cut_to=width)
                 dy = _number(command.get("dy"), -math.inf, math.inf, cut_to=height)
                 if dx is not None and dy is not None:
                     await driver.wheel(x, y, dx, dy)
         except BapError:
-            # The page did not take it. A person sees that in the picture; there is nobody to tell.
             return
 
     async def _let_go(self) -> None:
@@ -407,7 +379,6 @@ class ServiceSession(CheckNews):
             if asyncio.get_running_loop().time() - self._last_picture >= period:
                 self.hub.publish({"type": "picture_current", "ts": self._clock()}, keep=False)
 
-    # What the tool layer reports (StepObserver).
 
     def step_started(self, step: int, tool: str, label: str, target: Box | None) -> None:
         event: dict[str, Any] = {"type": "step_started", "step": step, "tool": tool, "label": label}
@@ -454,7 +425,6 @@ class ServiceSession(CheckNews):
             self._tell_auto()
         await self._stop_task()
 
-    # Who is driving (spec 4.5).
 
     @asynccontextmanager
     async def _admit(self) -> AsyncGenerator[Admission]:
@@ -506,7 +476,6 @@ class ServiceSession(CheckNews):
         await self._let_go()
         tabs = await self.toolkit.tabs()
         if self.control != "person":
-            # The session was stopped, or another viewer handed it back, while the tabs were being read.
             return
         self._publish_tabs(tabs)
         self._note = (
@@ -524,7 +493,6 @@ class ServiceSession(CheckNews):
             else f"The address was {before} and is now {after}."
         )
 
-    # The agent asks a person to do a step (spec 8.4): a sign-in, a CAPTCHA, a code.
 
     async def _ask_person_timed(self, reason: str, kind: str, timeout_s: float) -> tuple[str, str]:
         since = time.monotonic()
@@ -585,7 +553,6 @@ class ServiceSession(CheckNews):
             f"{self._change(tabs)} Refs from before may be out of date: take a new snapshot before you act."
         )
 
-    # The agent's action needs a person's yes (spec 8.2).
 
     async def _ask_approval(self, question: Question) -> ApprovalOutcome:
         """Runs inside the agent's call, which keeps the browser while the person decides, so nothing
@@ -597,7 +564,6 @@ class ServiceSession(CheckNews):
         self._approval, self._approval_outcome = f"a{self._approvals}", None
         control = self.config.control
         if self.stand_in is not None:
-            # Whoever watches the run sees what was asked and how it was answered.
             answered = self.stand_in(question.tool, question.summary)
             asked = {
                 "type": "approval_requested",
@@ -614,7 +580,6 @@ class ServiceSession(CheckNews):
             self._approval = None
             return "allowed"
         if watched and self._unanswered >= self.config.limits.unanswered_in_a_row:
-            # Nobody has answered for a while. The agent is not kept waiting for nobody again.
             self._approval = None
             return "expired"
         self.hub.publish(
@@ -641,7 +606,6 @@ class ServiceSession(CheckNews):
                             or self._task_stopped
                         )
                     )
-            # A task or a session that was stopped has its open question answered with no.
             stopped = self.control == "ended" or self._task_stopped
             outcome = self._approval_outcome or ("denied" if stopped else "expired")
             if every_time and outcome == "allowed_site":
@@ -662,7 +626,6 @@ class ServiceSession(CheckNews):
 
     async def _set_control(self, state: ControlState) -> None:
         if self.control == "ended":
-            # Nothing brings an ended session back.
             return
         self.control = state
         if isinstance(driver := self.browser.started_driver, HermesDriver):
@@ -682,7 +645,6 @@ class ServiceSession(CheckNews):
         redact = self.browser.redact
         shown = [
             {"id": tab.id, "title": redact(tab.title), "url": redact(tab.url), "active": tab.active}
-            # A tab with a dialog open wants a person's eye, and so does one whose page was flagged.
             | ({"attention": True} if tab.attention or tab.id in self.toolkit.check.flagged else {})
             for tab in tabs
         ]

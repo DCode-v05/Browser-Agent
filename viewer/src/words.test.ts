@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { W } from './wording';
 import { wordsFor } from './words';
 
-/** Every string of a tree of words, with the path that leads to it. */
 function strings(of: unknown, path = ''): [string, string][] {
   if (typeof of === 'string') return [[path, of]];
   if (typeof of === 'function') return [[path, String((of as (...given: string[]) => unknown)('a', 'b', 'c'))]];

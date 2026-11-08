@@ -48,8 +48,6 @@ def build_server(toolkit: Toolkit, name: str) -> Server:
                     name=tool.name,
                     description=tool.description,
                     input_schema=tool.input_schema,
-                    # Hints for the client, and no more: nothing here relies on them. Every tool
-                    # reaches the open web, where anyone may have written what comes back.
                     annotations=ToolAnnotations(read_only_hint=tool.name in READS, open_world_hint=True),
                 )
                 for tool in toolkit.definitions()
@@ -60,7 +58,6 @@ def build_server(toolkit: Toolkit, name: str) -> Server:
         result = await toolkit.call(params.name, params.arguments)
         content: list[ContentBlock] = [TextContent(type="text", text=result.text)]
         if result.picture is not None:
-            # Only a call that asked for a picture has one.
             data = base64.b64encode(result.picture.data).decode("ascii")
             content.append(ImageContent(type="image", data=data, mime_type=result.picture.mime))
         return CallToolResult(content=content, is_error=result.is_error)
@@ -82,7 +79,6 @@ async def run_stdio(config: Config) -> None:
             await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-# How the agent is named to a person watching, when it comes in over HTTP.
 AGENT_OVER_HTTP = "Agent over MCP"
 
 

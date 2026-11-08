@@ -11,7 +11,6 @@ import pytest
 from bap_browser.desktop_app import DesktopApp
 from bap_browser.errors import BapError
 
-# Stands in for the app: it says what it was started with, and stays open until it is ended.
 STAND_IN = """
 import json, os, threading
 from pathlib import Path
@@ -78,16 +77,13 @@ def test_it_is_opened_once_and_can_be_opened_again_after_it_was_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "__main__.py").write_text(STAND_IN, encoding="utf-8")
-    # Python, given the folder, runs the stand-in there, as Electron runs the app in its folder.
     monkeypatch.setattr(DesktopApp, "program", lambda self: Path(sys.executable))
-    # What an editor built on Electron sets for the programs it starts.
     monkeypatch.setenv("ELECTRON_RUN_AS_NODE", "1")
     app = app_in(tmp_path)
     try:
         assert app.start() is True
         told = started(tmp_path)
         assert told["as_node"] is None, "with it, Electron would run as Node and open no window"
-        # Its core says where it is in a file of its own, not in the one of the service that opened it.
         assert told["state_file"] == str(tmp_path / "state" / "desktop-service.json")
         assert told["folder"] is not None and Path(told["folder"]).resolve() == tmp_path.resolve()
 
@@ -108,8 +104,6 @@ def test_closing_an_app_that_was_never_opened_does_nothing(tmp_path: Path) -> No
     app_in(tmp_path).close()
 
 
-# Stands in for the app when run directly, not beside an admin studio: no state file override,
-# and it ends on its own with a code of its own, instead of waiting to be closed.
 MAIN_THAT_ENDS = """
 import json, os, sys
 from pathlib import Path
@@ -144,7 +138,6 @@ def test_opening_the_app_by_itself_with_no_app_installed_says_how_to_install_it(
         app_in(tmp_path, built=False).open_until_closed()
 
 
-# Stands in for the side chat: it says what it was started with, and stays open until it is ended.
 SIDE_STAND_IN = """
 import json, os, sys, threading
 from pathlib import Path
@@ -197,7 +190,6 @@ def test_a_side_chat_with_no_app_installed_says_how_to_install_it(tmp_path: Path
         DesktopApp(tmp_path, tmp_path / "s.json", close_wait_s=1).chat_beside(THE_CHAT, 400)
 
 
-# Stands in for the side chat when it is run to its end: it says what it was started with, and ends.
 SIDE_THAT_ENDS = SIDE_STAND_IN.replace("threading.Event().wait()", "sys.exit(0)")
 
 

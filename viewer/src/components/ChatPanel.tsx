@@ -1,5 +1,3 @@
-// The chat: a person gives the agent its tasks here and reads its answers (spec 9.14).
-
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { Chat } from '../state/reducer';
@@ -10,7 +8,6 @@ import { Button } from './StatusPanel';
 import { richText } from './richText';
 import { useWords } from '../words';
 
-/** What the agent is doing, in a word, for the top of the chat. */
 export type AgentStatus = 'working' | 'ready' | 'paused' | 'person' | 'waiting' | 'stopped' | 'offline';
 
 export function agentStatus(view: StateView): AgentStatus {
@@ -35,16 +32,12 @@ export function agentStatus(view: StateView): AgentStatus {
 interface Props {
   chat: Chat;
   status: AgentStatus;
-  /** What the agent is doing at this moment, as the timeline says it. */
   doing: string;
-  /** False when a task cannot be sent: the session has ended, or the connection is down. */
   open: boolean;
-  /** The longest task the service takes. */
   maxChars: number;
   onSend(text: string): void;
 }
 
-/** Tasks to start from, for someone who does not yet know what to ask: the page's own kind of task. */
 export function Samples({ onPick }: { onPick(task: string): void }) {
   const L = useWords();
   return (
@@ -65,7 +58,6 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
   const end = useRef<HTMLDivElement>(null);
   const count = chat.messages.length;
 
-  // The newest message is at the bottom, and it is kept in sight.
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'nearest' });
   }, [count, chat.working]);
@@ -78,7 +70,6 @@ export function ChatPanel({ chat, status, doing, open, maxChars, onSend }: Props
     setDraft('');
   };
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends; Shift+Enter starts a new line. While text is being composed, Enter belongs to that.
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     send();

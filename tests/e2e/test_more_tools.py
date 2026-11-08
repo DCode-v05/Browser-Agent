@@ -71,7 +71,6 @@ async def test_find_gives_matching_lines_with_refs_that_work(driver: PlaywrightD
     await driver.navigate(f"{site}/big.html?n=300")
     found = await driver.find("item 250", 10)
     assert found.lines[0].startswith('- button "Item 250" [ref=')
-    # Every button holds the word "item". Only the one that holds the whole phrase comes first.
     assert found.total >= 300 and len(found.lines) == 10
     ref = ref_of(found.lines[0], 'button "Item 250"')
     assert (await driver.click(ref)).target == 'button "Item 250"'
@@ -121,8 +120,6 @@ async def test_scrolling_the_page(driver: PlaywrightDriver, site: str) -> None:
 
 async def test_scrolling_a_box_inside_the_page(driver: PlaywrightDriver, site: str) -> None:
     page = await open_tools(driver, site)
-    # The button is out of sight at the end of the panel. The wheel turns over the panel, not over
-    # where the button would be if the panel did not cut it off.
     inside = await driver.scroll(0, 100, ref=ref_of(page, 'button "Deep in the panel"'))
     assert (inside.y, inside.inside, inside.moved) == (100, True, True)
     assert await driver.page.evaluate("scrollY") == 0
@@ -132,7 +129,6 @@ async def test_a_click_lands_after_a_menu_under_the_pointer_has_closed(
     driver: PlaywrightDriver, site: str
 ) -> None:
     page = await open_tools(driver, site)
-    # While the pointer is over "Products" its menu is open and pushes the rest of the page down.
     await driver.hover(ref_of(page, 'button "Products"'))
     await driver.click(ref_of(page, 'checkbox "Send me news"'))
     assert await driver.page.is_checked("#news")
@@ -173,7 +169,6 @@ async def test_a_key_the_browser_does_not_have(driver: PlaywrightDriver, site: s
     await open_tools(driver, site)
     with pytest.raises(BadInput, match="no key of that name"):
         await driver.press_key("Control+Flarp")
-    # Control is not left held down: the click that follows is a plain click.
     page = await read(driver)
     await driver.click(ref_of(page, 'checkbox "Send me news"'))
     assert await driver.page.is_checked("#news")

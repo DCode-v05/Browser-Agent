@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_delivery_ladder.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Regression tests for the cua-driver verify → escalate ladder.
 
@@ -32,10 +31,6 @@ def _reset():
     yield
     reset_backend_for_tests()
 
-
-# ---------------------------------------------------------------------------
-# Phase A — structured verdict normalization (_action_result_from)
-# ---------------------------------------------------------------------------
 
 class _FakeSession:
     """Minimal cua-driver session stub returning a canned tool result."""
@@ -106,7 +101,6 @@ def test_suspected_noop_carries_escalation():
     assert res.effect == "suspected_noop"
     assert res.escalation == {"recommended": "foreground", "reason": "occluded renderer"}
     assert res.code == "background_unavailable"
-    # transport ok, but semantically not confirmed
     assert res.verified is None
 
 
@@ -117,8 +111,8 @@ def test_unverifiable_distinct_from_success_and_failure():
     }
     be = _make_backend(_FakeSession(out))
     res = be.click(x=10, y=20)
-    assert res.ok is True            # transport succeeded
-    assert res.verified is False     # ... but not confirmed
+    assert res.ok is True
+    assert res.verified is False
     assert res.effect == "unverifiable"
 
 
@@ -153,7 +147,6 @@ def test_text_response_surfaces_fields_additively():
     from bap_browser.computer.hermes.computer_use.backend import ActionResult
     from bap_browser.computer.hermes.computer_use.tool import _text_response
 
-    # Full verdict → all fields present.
     r = ActionResult(ok=True, action="click", effect="suspected_noop",
                      escalation={"recommended": "foreground"}, code="background_unavailable",
                      path="ax", verified=False)
@@ -163,27 +156,20 @@ def test_text_response_surfaces_fields_additively():
     assert payload["code"] == "background_unavailable"
     assert payload["verified"] is False
 
-    # Bare transport success still requires fresh verification, without None noise.
     r2 = ActionResult(ok=True, action="click")
     payload2 = json.loads(_text_response(r2))
     assert payload2["ok"] is True
     assert payload2["action"] == "click"
-    # Verdict routes to fresh verification; a human hint may accompany the
-    # decision (contract is the decision, not the exact dict shape).
     assert payload2["verdict"]["decision"] == "verify_fresh_state"
     for k in ("effect", "escalation", "code", "verified", "path", "degraded", "delivery_mode"):
         assert k not in payload2
 
 
-# ---------------------------------------------------------------------------
-# Phase B — delivery_mode threading + capability gating
-# ---------------------------------------------------------------------------
-
 def test_background_is_default_no_flag_sent():
     out = {"isError": False, "data": {}, "structuredContent": {"effect": "confirmed"}}
     sess = _FakeSession(out)
     be = _make_backend(sess)
-    be.click(element=1)  # no delivery_mode
+    be.click(element=1)
     assert "delivery_mode" not in sess.last_args
 
 
@@ -208,7 +194,6 @@ def test_foreground_refused_on_old_driver():
     res = be.click(element=1, delivery_mode="foreground")
     assert res.ok is False
     assert res.code == "foreground_unsupported"
-    # crucially: no tool call was made with a silent background downgrade
     assert sess.calls == []
 
 
@@ -220,14 +205,9 @@ def test_dispatcher_threads_delivery_mode_to_backend(grant_computer_use_approval
         be = cu._get_backend()
         cu.handle_computer_use({"action": "click", "element": 5,
                                 "delivery_mode": "foreground"})
-        # noop records kwargs; find the click call
         clicks = [kw for (name, kw) in be.calls if name == "click"]  # type: ignore[attr-defined]
         assert clicks and clicks[-1].get("delivery_mode") == "foreground"
 
-
-# ---------------------------------------------------------------------------
-# Phase C — foreground approval scoping (action + delivery_mode + session)
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def _interactive_session(monkeypatch):
@@ -262,12 +242,9 @@ def test_background_approval_does_not_authorize_foreground(_interactive_session)
     cu.set_approval_callback(cb)
     _interactive_session("sess-A")
     try:
-        # Background click, approve for session.
         assert cu._request_approval("click", {}) is None
-        # A second background click needs no prompt (cached in the shared session store).
         assert cu._request_approval("click", {}) is None
         assert len(seen) == 1
-        # Foreground click on the SAME action must prompt again — the background grant does not cover it.
         assert cu._request_approval("click", {"delivery_mode": "foreground"}) is None
         assert len(seen) == 2
         assert "FOREGROUND" in seen[-1][0]
@@ -286,10 +263,8 @@ def test_approval_state_is_session_scoped(_interactive_session):
 
     cu.set_approval_callback(cb)
     try:
-        # Run A approves foreground click.
         _interactive_session("run-A")
         cu._request_approval("click", {"delivery_mode": "foreground"})
-        # Run B has NOT — it must prompt independently.
         n_before = len(calls)
         _interactive_session("run-B")
         cu._request_approval("click", {"delivery_mode": "foreground"})
@@ -325,18 +300,13 @@ def test_always_grant_is_per_scope_key_and_visible_to_shared_store(_interactive_
             approval._permanent_set().difference_update({"cua:click:background", "cua:click:foreground"})
 
 
-# ---------------------------------------------------------------------------
-# #55048 Bug 1 — a dead session must reset _started so the next call recovers
-# ---------------------------------------------------------------------------
-
-
 def test_call_tool_restarts_a_dead_session(monkeypatch):
     """call_tool on a session whose lifecycle died (_started False) must
     call start() to rebuild it, not raise 'not started' or hang."""
     from bap_browser.computer.hermes.computer_use.cua_backend_session import _CuaDriverSession
 
     sess = _CuaDriverSession.__new__(_CuaDriverSession)
-    sess._started = False           # dead session
+    sess._started = False
     started = {"count": 0}
 
     def fake_start():
@@ -347,7 +317,6 @@ def test_call_tool_restarts_a_dead_session(monkeypatch):
     sess.start = fake_start  # type: ignore[method-assign]
     sess._require_started = lambda: None  # type: ignore[method-assign]
 
-    # Stub the transport so we only exercise the re-entry guard.
     class _Bridge:
         def run(self, coro, timeout=None):
             try:
@@ -359,7 +328,7 @@ def test_call_tool_restarts_a_dead_session(monkeypatch):
     sess._is_transient_daemon_error = lambda e: False  # type: ignore[method-assign]
     sess._is_closed_session_error = lambda e: False    # type: ignore[method-assign]
 
-    async def _fake_call(name, args):  # never actually awaited to completion
+    async def _fake_call(name, args):
         return {}
     sess._call_tool_async = _fake_call  # type: ignore[method-assign]
 

@@ -115,7 +115,6 @@ class Recorder:
         if not self.settings.enabled:
             return
         add_line(self.folder / TASKS, json.dumps(asdict(record), ensure_ascii=False))
-        # The four systems' use, added up again with this task in it (spec 12.6).
         keep_usage(Path(self.settings.dir))
 
     def tasks(self) -> list[dict[str, Any]]:
@@ -202,7 +201,6 @@ class Trace:
 
     def stepped(self, began: float, waited_before: float, name: str, result: ToolResult) -> None:
         record, ms = self.record, round((time.perf_counter() - began) * 1000, 1)
-        # A step that waited for a person is not slow: the wait is taken out of its time.
         waited = min(round((self.waited_s() - waited_before) * 1000, 1), ms)
         record.spans.append(
             Span("tool", name, self._since(began), ms, ok=not result.is_error, waited_ms=max(waited, 0.0))

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/install.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Install the Bot Desktop packages on the gateway host from a Desktop client.
 
@@ -34,13 +33,10 @@ logger = logging.getLogger(__name__)
 
 _install_lock = threading.Lock()
 _running: set[str] = set()
-# Installs are host-global but the gateway (Install card) and the CLI (`screen install`) are separate
-# processes: the in-process set alone let both drive dpkg for one profile at once. The slot is also a
-# non-blocking flock on a file in the profile's state dir, held for the life of the install.
 _slot_files: dict[str, object] = {}
 
 
-NO_SUDO = -2  # install_packages: unprivileged host without sudo; the on_line stream carried the command to run as root
+NO_SUDO = -2
 
 
 class InstallBusy(RuntimeError):
@@ -49,7 +45,7 @@ class InstallBusy(RuntimeError):
 
 def _try_flock(path: Path):
     """Open + non-blocking exclusive flock; None when another process holds it."""
-    import fcntl  # windows-footgun: ok — Linux-only runtime (is_supported_host)
+    import fcntl
     path.parent.mkdir(parents=True, exist_ok=True)
     fh = open(path, "a+", encoding="utf-8")
     try:
@@ -92,7 +88,7 @@ def release(key: str) -> None:
         _running.discard(key)
         fh = _slot_files.pop(key, None)
     if fh is not None:
-        fh.close()  # closing drops the flock
+        fh.close()
 
 
 def install_packages(*, ask_password: Callable[[], str], on_line: Callable[[str], None],
@@ -129,8 +125,6 @@ def _run(cmd: str, *, ask_password: Callable[[], str], on_line: Callable[[str], 
     stdin_payload: Optional[str] = None
     if argv[0] == "sudo":
         if shutil.which("sudo") is None:
-            # Minimal containers ship no sudo: a password card would be a dead end. Hand the human the
-            # exact command for the host instead.
             on_line(f"install needs root and this host has no sudo; run on the host as root: {cmd[len('sudo '):]}")
             return NO_SUDO
         if not _sudo_nopasswd():
@@ -138,12 +132,11 @@ def _run(cmd: str, *, ask_password: Callable[[], str], on_line: Callable[[str], 
             if not password:
                 on_line("install cancelled: no sudo password provided")
                 return -1
-            # -S: read the password from stdin; -p '': no prompt text mixed into the streamed output.
             argv = ["sudo", "-S", "-p", "", *argv[1:]]
             stdin_payload = password + "\n"
     on_line(f"$ {cmd}")
     env = {"DEBIAN_FRONTEND": "noninteractive", "LC_ALL": "C.UTF-8"}
-    proc = subprocess.Popen(  # windows-footgun: ok — Linux-only (is_supported_host)
+    proc = subprocess.Popen(
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         env={**os.environ, **env}, start_new_session=True)
     try:
@@ -160,7 +153,7 @@ def _run(cmd: str, *, ask_password: Callable[[], str], on_line: Callable[[str], 
         return proc.returncode if proc.returncode is not None else -9
     finally:
         proc.stdout.close()  # type: ignore[union-attr]
-        if proc.poll() is None:  # the drain raised (a failing on_line sink): the slot is released, so no orphan
+        if proc.poll() is None:
             _kill_group(proc)
 
 
@@ -201,20 +194,18 @@ def _kill_group(proc: subprocess.Popen) -> None:
     signal reaches a root-owned child, which is why the caller never waits on EOF."""
     def _group_gone() -> bool:
         try:
-            os.killpg(proc.pid, 0)  # windows-footgun: ok — Linux-only (is_supported_host)
+            os.killpg(proc.pid, 0)
         except ProcessLookupError:
             return True
         except PermissionError:
-            return False  # a root-owned child is still there
+            return False
         return False
 
-    for sig, grace in ((signal.SIGTERM, _TERM_GRACE_SECONDS), (signal.SIGKILL, 1.0)):  # windows-footgun: ok — Linux-only (is_supported_host)
+    for sig, grace in ((signal.SIGTERM, _TERM_GRACE_SECONDS), (signal.SIGKILL, 1.0)):
         with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(proc.pid, sig)  # windows-footgun: ok — Linux-only (is_supported_host)
+            os.killpg(proc.pid, sig)
         with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=grace)
-        # The leader (sudo / the package manager) going away is not the end: wait for the whole group so a
-        # TERM-ignoring descendant gets the KILL round instead of surviving with the dpkg lock.
         deadline = time.monotonic() + grace
         while time.monotonic() < deadline and not _group_gone():
             time.sleep(0.05)

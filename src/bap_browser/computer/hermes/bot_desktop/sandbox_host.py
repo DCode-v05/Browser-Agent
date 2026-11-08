@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/sandbox_host.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop hosted INSIDE the configured terminal backend (docker / ssh / singularity).
 
@@ -30,9 +29,6 @@ from bap_browser.computer.seams.sandbox import streams
 
 logger = logging.getLogger(__name__)
 
-# The user desktop processes run as inside the sandbox image. nikolaik (and hermes-sandbox:desktop on top of
-# it) ships uid 1000 `pn`; a root Xvnc/Chromium/cua-driver is the wrong shape (Chromium refuses the sandbox,
-# AT-SPI wants a user session). Falls back to the exec default when the image has no such user.
 DESKTOP_USER = "pn"
 _REQUIRED = ("Xvnc", "xfwm4", "xfce4-panel", "xfdesktop", "xfsettingsd", "dbus-run-session", "xauth", "xdpyinfo", "xprop")
 SANDBOX_IMAGE_HINT = "nousresearch/hermes-sandbox:desktop"
@@ -219,10 +215,8 @@ def start(env: Any, profile: str, *, geometry: str, wait_seconds: float = 20.0,
     rdir = _remote_dir(env, profile)
     live = _published(env, rdir)
     if live.get("DISPLAY"):
-        # Adopting a screen the sandbox kept while this host's state was lost (fresh HERMES_HOME, a stop()
-        # whose kill missed): without the marker, status/thumbnail/stop would not know it is ours.
         return _record(env, rdir, profile, live)
-    stop(env, profile)  # a dead launcher may have left Xvnc holding :20; the relaunch needs it gone
+    stop(env, profile)
     missing = missing_binaries(env)
     if missing:
         raise RuntimeError(
@@ -241,7 +235,7 @@ def start(env: Any, profile: str, *, geometry: str, wait_seconds: float = 20.0,
     proc = streams.run_in(env, ["bash", "-c", seed], user=user, timeout=30)
     if proc.returncode != 0:
         raise RuntimeError(f"could not seed the sandbox desktop dir: {proc.stderr.decode('utf-8', 'replace')[-500:]}")
-    num = 20  # one profile per sandbox; the launcher's stale-lock logic handles a leftover :20
+    num = 20
     child_env = {
         "HERMES_BD_PROFILE": profile, "HERMES_BD_DISPLAY_NUM": str(num), "HERMES_BD_SOCKET": f"{rdir}/rfb.sock",
         "HERMES_BD_XAUTH": f"{rdir}/Xauthority", "HERMES_BD_ENV_FILE": f"{rdir}/env",
@@ -250,9 +244,6 @@ def start(env: Any, profile: str, *, geometry: str, wait_seconds: float = 20.0,
     if browser_exec and browser_exec_line:
         child_env["HERMES_BD_BROWSER_EXEC"] = browser_exec
         child_env["HERMES_BD_BROWSER_EXEC_LINE"] = browser_exec_line
-    # The launcher must outlive this exec (docker exec / ssh) and be its own session so stop() can take the
-    # whole group (Xvnc, dbus, Xfce) with one kill. `setsid -f` forks, so `$!` would be the wrong pid: the
-    # launcher records ITS OWN pid (= its session id) before doing anything else.
     spawn = (f"cd {shlex.quote(rdir)} && setsid -f bash -c "
              f"'echo $$ > launcher.pid; exec bash launcher.sh' > launcher.log 2>&1 < /dev/null; "
              f"for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s launcher.pid ] && break; sleep 0.1; done; [ -s launcher.pid ]")

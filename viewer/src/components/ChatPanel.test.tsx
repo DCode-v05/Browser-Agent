@@ -178,7 +178,6 @@ describe('what the agent is doing, in a word', () => {
   it('colours the browser for the agent only while it works', () => {
     expect(describeState(play([started]), T0, 5)).toMatchObject({ tone: 'neutral', working: false });
     expect(describeState(play([started, works]), T0, 5)).toMatchObject({ tone: 'agent', working: true });
-    // A session with no chat has an agent that works for as long as it drives.
     expect(describeState(play([{ ...started, chat: undefined }]), T0, 5)).toMatchObject({ tone: 'agent', working: true });
   });
 });
@@ -192,7 +191,6 @@ describe("the agent's answer, shown the way it was meant", () => {
     expect(p.querySelector('strong')?.textContent).toBe('google/vit-base');
     expect(p.querySelector('code')?.textContent).toBe('image classification');
     const link = p.querySelector('a')!;
-    // The full stop ends the sentence, not the address.
     expect(link.getAttribute('href')).toBe('https://huggingface.co/google/vit-base');
     expect(link.target).toBe('_blank');
     expect(link.rel).toBe('noopener noreferrer');

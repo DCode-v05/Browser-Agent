@@ -24,7 +24,6 @@ from bap_browser.errors import ModelError
 
 Use = Literal["loop", "reviewer", "scan"]
 
-# What the provider answers when the account, not the moment, is the trouble. Waiting does not mend it.
 NOT_A_MATTER_OF_WAITING = ("insufficient_quota", "billing")
 NOT_THE_JSON = "The model's answer was not the JSON asked for."
 
@@ -179,7 +178,6 @@ class ModelClient:
     async def _try(self, body: dict[str, Any]) -> dict[str, Any]:
         limit = self._agent.request_timeout_s if self._use == "loop" else self._checks.timeout_s
         try:
-            # The limit on the connection holds for each wait on it; this one holds for the whole answer.
             return await asyncio.wait_for(asyncio.to_thread(self._send, body, limit), limit)
         except TimeoutError:
             raise _Failed(f"The model provider did not answer within {limit} seconds.", True) from None
@@ -212,7 +210,6 @@ class ModelClient:
             with urllib.request.urlopen(request, timeout=limit) as reply:
                 answer = json.loads(reply.read())
         except urllib.error.HTTPError as refused:
-            # The refusal holds the connection it came on until it is closed.
             with refused:
                 raise self._refusal(refused) from None
         except TimeoutError:
@@ -231,7 +228,6 @@ class ModelClient:
     def _refusal(self, refused: urllib.error.HTTPError) -> _Failed:
         code = refused.code
         if code == 401:
-            # The provider's own message repeats part of the key. It is not passed on.
             return _Failed(
                 "The model provider did not accept the key (HTTP 401). "
                 f"Check {self._agent.api_key_env} in your .env file.",

@@ -26,7 +26,6 @@ class Tools(Protocol):
     async def call(self, name: str, arguments: Mapping[str, Any] | None = None) -> ToolResult: ...
 
 
-# A person types fast (spec 22.4). Said to the model in a browser and on a desktop alike.
 AS_THEY_MEAN_IT = (
     " The person types fast: read past a slip of spelling, a missing word or a loose name of an app "
     "to what they plainly mean, and ask only when two readings would do different things. A short "
@@ -49,8 +48,6 @@ SYSTEM = (
 SESSION_ENDED = "The session was ended before the task was finished."
 
 
-# On a real machine through Hermes' driver (spec 22.4). The same words on every system, which is
-# named so that the model presses that system's keys.
 THIS_SYSTEM = {"darwin": "macOS", "win32": "Windows", "linux": "Linux"}
 MACHINE_SYSTEM = (
     "You work on a person's own computer, which runs {system}, through the tool computer_use. Start "
@@ -67,7 +64,6 @@ MACHINE_SYSTEM = (
     + AS_THEY_MEAN_IT
 )
 
-# Which apps the agent may open on a machine: the ones a person allowed, or any (spec 22.7).
 THE_ALLOWED_APPS = (
     "computer_open_app opens an app the person allowed, by its name; do not open one another way. "
 )
@@ -79,7 +75,6 @@ ANY_APP = (
 )
 ADDRESS_BAR = {"darwin": "cmd+l"}
 
-# On a small Linux desktop of its own, in a container or in the micro VM (spec 22.6).
 ITS_OWN_DESKTOP = (
     "You do a task on a small Linux desktop of its own, through the tool computer_use. Nobody sits at "
     "it. Start with action=capture and app set to the app you work in: it numbers every element you can "

@@ -25,8 +25,6 @@ async def test_the_panel_shows_the_chat_and_the_page_shows_who_is_driving(
     folder = browser_extension.install(tmp_path / "state" / "extension")
     kept = {"user_data_dir": str(tmp_path / "profile")}
     hidden = browser_extension.with_extension(make_config(tmp_path, browser=kept), folder)
-    # The session believes its browser is on screen, as it is when a person runs it. The browser of
-    # this test has no window, because a test machine has no screen.
     shown = hidden.model_copy(update={"browser": hidden.browser.model_copy(update={"headless": False})})
     driver = PlaywrightDriver(hidden)
     session = ServiceSession(shown, driver, agent="Reference agent", on_task=lambda task: None)
@@ -40,7 +38,6 @@ async def test_the_panel_shows_the_chat_and_the_page_shows_who_is_driving(
         assert not opened.is_error, opened.text
         page = driver.page
 
-        # The side panel's page, opened here as a tab: the same page, in the same window.
         panel = await page.context.new_page()
         errors: list[str] = []
         panel.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
@@ -50,7 +47,6 @@ async def test_the_panel_shows_the_chat_and_the_page_shows_who_is_driving(
         assert await chat.get_by_role("region", name="Browser").count() == 0, "no picture of the browser"
         assert await chat.get_by_test_id("agent-status").text_content() == "Ready"
 
-        # While the agent waits for a task, the page is at rest.
         assert await page.locator(f"{LOOK}[data-tone]").count() == 0
 
         session.working(True)
@@ -66,13 +62,11 @@ async def test_the_panel_shows_the_chat_and_the_page_shows_who_is_driving(
         await panel.set_viewport_size({"width": 400, "height": 820})
         await panel.screenshot(path=str(SHOTS / "extension-panel.png"))
 
-        # What is drawn on the page is for the person. The agent reads the page without it.
         read = await tools.call("browser_get_text", {})
         seen = await tools.call("browser_snapshot", {})
         assert "Check in online" in read.text
         for words in ("Agent is working", LOOK):
             assert words not in read.text and words not in seen.text, words
-        # And it takes no click: the page under it is still what a click reaches.
         typed = await tools.call(
             "browser_type", {"ref": _ref(seen.text, 'textbox "Last name"'), "text": "Lovelace"}
         )
@@ -118,7 +112,6 @@ async def test_the_chat_command_makes_its_session_known_to_the_extension_and_for
         assert not chat.done(), chat.exception()
         viewer = json.loads(session_file.read_text(encoding="utf-8"))["viewer"]
         assert re.fullmatch(r"http://127\.0\.0\.1:\d+/\?embed=1#token=[\w-]+", viewer)
-        # The browser opens on the page that says how to open the chat.
         log = tmp_path / "events.jsonl"
         async with asyncio.timeout(30):
             while not (log.exists() and "start.html" in log.read_text(encoding="utf-8")):

@@ -1,7 +1,3 @@
-/* The design tokens (spec 9.5). Colour, type, spacing, radius, shadow and motion come only from here.
-   The look is the BAP product's: warm neutrals, ink for the main action, hairlines, pills, Hanken Grotesk. */
-
-/* Hanken Grotesk, every weight in one file. It ships with the viewer; its licence is fonts/OFL.txt. */
 @font-face {
   font-family: "Hanken Grotesk";
   font-style: normal;
@@ -23,7 +19,6 @@
 :root {
   color-scheme: light;
 
-  /* Colour: light */
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F5F4F2;
@@ -49,7 +44,6 @@
   --scrim: rgb(0 0 0 / 0.4);
   --frame-dim: rgb(255 255 255 / 0.72);
 
-  /* Type */
   --font-ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", monospace;
   --text-caption: 12px;
@@ -65,7 +59,6 @@
   --tracking-caps: 0.06em;
   --tracking-title: -0.01em;
 
-  /* Space */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -73,7 +66,6 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  /* Shape */
   --radius-small: 4px;
   --radius-control: 10px;
   --radius-card: 16px;
@@ -82,10 +74,8 @@
   --border-width: 1px;
   --control-border-width: 3px;
 
-  /* Depth: surfaces are flat. Only what floats has a shadow. */
   --shadow-float: 0 4px 20px rgb(0 0 0 / 0.04);
 
-  /* Motion */
   --duration-state: 150ms;
   --duration-enter: 200ms;
   --duration-live: 1s;
@@ -93,13 +83,11 @@
   --spinner-line: 2px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Focus and targets */
   --focus-width: 2px;
   --focus-offset: 2px;
   --control-height: 36px;
   --target-min: 32px;
 
-  /* Layout */
   --top-bar-height: 56px;
   --activity-width: 400px;
   --settings-groups-width: 184px;

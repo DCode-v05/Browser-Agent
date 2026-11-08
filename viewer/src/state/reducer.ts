@@ -1,6 +1,3 @@
-// The session as the viewer knows it: one reducer fed by the event stream (spec 9.11), so any
-// state can be reproduced from a recorded stream.
-
 import type {
   ApprovalOutcome,
   AutoState,
@@ -19,26 +16,21 @@ import type {
   TaskSite,
 } from '../protocol';
 
-/** `refused`: the service did not accept the token. Trying again would change nothing. */
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'refused';
 
-/** How a safeguards check decided a step, for its timeline row's mark (spec 18.10). */
 export type StepMark = { kind: 'checked' } | { kind: 'allowed' } | { kind: 'refused'; reason: string };
 
 export interface Step {
   n: number;
   tool: string;
-  /** What the agent is doing, shown while the step runs. */
   label: string;
   target?: Box;
   startedAt: number;
   status: 'running' | 'ok' | 'failed';
   ms?: number;
   chars?: number;
-  /** One sentence saying what happened, shown once the step has finished. */
   summary?: string;
   url?: string;
-  /** The picture on screen when the step finished. */
   picture?: string;
   mark?: StepMark;
 }
@@ -48,17 +40,12 @@ export interface Approval {
   tool: string;
   summary: string;
   site: string;
-  /** The action pays, sends or deletes: it is allowed once or not at all, never for the whole site. */
   everyTime: boolean;
   requestedAt: number;
   expiresAt: number;
-  /** Why the person is asked, each reason in words (spec 18.10). */
   why?: string[];
-  /** What leaves to another site, copied from this one (the exception of 18.6). */
   leaves?: { text: string; fromSite: string; toSite: string };
-  /** As the page shows it, e.g. "$84.00". */
   amount?: string;
-  /** The check model's own sentence, in Auto Mode only. */
   said?: string;
 }
 
@@ -93,9 +80,7 @@ export interface ChatMessage {
   at: number;
 }
 
-/** The conversation in which a person gives the agent its tasks. */
 export interface Chat {
-  /** False when this session's agent takes no tasks from the viewer: there is then no chat to show. */
   enabled: boolean;
   working: boolean;
   messages: ChatMessage[];
@@ -107,31 +92,25 @@ export interface SessionInfo {
   backend: Backend;
   browser: string;
   viewport: { width: number; height: number };
-  /** The browser is a window on the person's own screen, so there is no picture of it to show. */
   onScreen: boolean;
-  /** A person can ask for a new session here once this one has ended. */
   restartable: boolean;
   startedAt: number;
 }
 
-/** The task the agent is on, and the sites it touches (spec 18.3, 18.10). */
 export interface TaskInfo {
   task: string;
   from: 'person' | 'agent';
   sites: TaskSite[];
 }
 
-/** The newest word from the service on the "Ask before" setting and Auto Mode's own run state. */
 export interface AutoInfo {
   mode: Mode;
   state: AutoState;
   why?: string;
 }
 
-/** A step the safeguards refused, kept so a person can allow it once (spec 18.4, 18.10). */
 export interface RefusedStep {
   step: number;
-  /** Present when the step can be allowed once; absent for a hard stop, which has no such button. */
   id: string | null;
   label: string;
   reason: string;
@@ -151,7 +130,6 @@ export interface LimitInfo {
   more?: number;
 }
 
-/** "Nobody is answering" (spec 18.10): a timeline row placed among the steps by its own time. */
 export interface UnansweredMarker {
   key: string;
   count: number;
@@ -168,23 +146,17 @@ export interface ViewerState {
   url: string;
   steps: Step[];
   chat: Chat;
-  /** Characters returned to the agent so far: what the session has cost in tokens, roughly. */
   chars: number;
   approval: Approval | null;
   help: HelpRequest | null;
   dialog: PageDialog | null;
   downloads: { name: string; size: number }[];
-  /** Things that happened and deserve a word to the person. Each is shown once, by its id. */
   notices: Notice[];
-  /** False while a connection replays what had already happened. Nothing replayed is shown as new. */
   caughtUp: boolean;
-  /** The id of the last notice that was replayed. Those are not shown again. */
   noticesSeen: number;
   ended: { reason: EndReason; detail?: string; at: number } | null;
   frame: { src: string; at: number } | null;
-  /** Goes up when the settings changed, so the settings screen reads them again. */
   settingsVersion: number;
-  /** Null before an `auto_changed` has arrived: nothing is shown of the mode until then. */
   auto: AutoInfo | null;
   task: TaskInfo | null;
   refused: RefusedStep[];
@@ -226,7 +198,6 @@ export type Action =
   | { type: 'event'; event: ServerEvent; picture?: string }
   | { type: 'frame'; src: string; at: number }
   | { type: 'connection'; status: ConnectionStatus }
-  /** Everything that had already happened has been replayed. */
   | { type: 'caught_up' };
 
 export function reduce(state: ViewerState, action: Action): ViewerState {
@@ -234,7 +205,6 @@ export function reduce(state: ViewerState, action: Action): ViewerState {
     case 'frame':
       return { ...state, frame: { src: action.src, at: action.at } };
     case 'connection':
-      // A connection that has just opened replays the session before anything new arrives.
       return { ...state, connection: action.status, caughtUp: action.status === 'connected' ? false : state.caughtUp };
     case 'caught_up':
       return { ...state, caughtUp: true, noticesSeen: state.notices.at(-1)?.id ?? 0 };
@@ -243,7 +213,6 @@ export function reduce(state: ViewerState, action: Action): ViewerState {
   }
 }
 
-/** The notices a person has not been shown yet. */
 export function unseenNotices(state: ViewerState): Notice[] {
   return state.caughtUp ? state.notices.filter((notice) => notice.id > state.noticesSeen) : [];
 }
@@ -283,7 +252,6 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
     case 'step_started': {
       const step: Step = { n: event.step, tool: event.tool, label: event.label, startedAt: event.ts, status: 'running' };
       if (event.target) step.target = event.target;
-      // A new step means the agent has moved on from a blocked page.
       return { ...state, blocked: null, steps: [...state.steps, step] };
     }
 
@@ -330,7 +298,6 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
 
     case 'approval_closed': {
       if (state.approval?.id !== event.id) return state;
-      // The step that waited for this answer is the one still running: "you allowed" marks it.
       const steps =
         event.outcome === 'allowed' || event.outcome === 'allowed_site'
           ? state.steps.map((step) => (step.status === 'running' ? { ...step, mark: { kind: 'allowed' as const } } : step))
@@ -368,7 +335,6 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
       return { ...state, settingsVersion: state.settingsVersion + 1 };
 
     case 'message': {
-      // A connection that comes back replays the chat. A message already here is not added twice.
       if (state.chat.messages.some((message) => message.id === event.id)) return state;
       const message: ChatMessage = { id: event.id, role: event.role, text: event.text, failed: event.failed === true, at: event.ts };
       return { ...state, chat: { ...state.chat, messages: [...state.chat.messages, message] } };
@@ -390,7 +356,6 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
         dialog: null,
         chat: { ...state.chat, working: false },
         ended: { reason: event.reason, detail: event.detail, at: event.ts },
-        // A limit bar has nothing left to limit once the session is over.
         limit: null,
       };
 
@@ -433,7 +398,6 @@ function applyEvent(state: ViewerState, event: ServerEvent, picture: string | un
       return { ...state, unanswered: [...state.unanswered, { key: `unanswered-${state.unanswered.length + 1}`, count: event.count, at: event.ts }] };
 
     default:
-      // An event from a newer service than this viewer knows. It changes nothing here.
       return state;
   }
 }

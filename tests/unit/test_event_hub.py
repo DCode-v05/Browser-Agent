@@ -49,7 +49,6 @@ async def test_a_late_viewer_is_first_sent_what_already_happened() -> None:
     hub.publish_frame(b"picture-1")
     hub.publish(step(2))
     replay, viewer = hub.subscribe()
-    # The history carries no pictures; the newest one comes last, so a still page is visible at once.
     assert replay == [STARTED, step(1), step(2), b"picture-1"]
     hub.publish(step(3))
     assert await drain(viewer, 1) == [step(3)]
@@ -102,7 +101,6 @@ async def test_a_picture_that_was_not_sent_yet_is_replaced_by_a_newer_one() -> N
     hub.publish(step(1))
     hub.publish_frame(b"picture-3")
     hub.publish_frame(b"picture-4")
-    # A picture never overtakes an event: a step keeps the picture that was on screen when it finished.
     assert await drain(viewer, 3) == [b"picture-2", step(1), b"picture-4"]
 
 

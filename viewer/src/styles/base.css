@@ -1,5 +1,3 @@
-/* The ground everything stands on. Every colour, size and duration is a token (spec 9.5). */
-
 *,
 *::before,
 *::after {
@@ -78,8 +76,6 @@ textarea {
   height: var(--icon-large);
 }
 
-/* Buttons. The plain one is an outline; the main action is filled with ink. */
-
 .button {
   display: inline-flex;
   align-items: center;
@@ -109,7 +105,6 @@ textarea {
   cursor: not-allowed;
 }
 
-/* A control that was pressed and has not taken hold yet. */
 .button[aria-busy='true'] {
   cursor: progress;
 }
@@ -147,7 +142,6 @@ textarea {
   opacity: 0.9;
 }
 
-/* A button of one icon is a circle; with words it is a pill. */
 .button[data-kind='quiet'] {
   border-color: transparent;
   border-radius: var(--radius-pill);
@@ -161,8 +155,6 @@ textarea {
   color: var(--text);
 }
 
-/* Things that arrive fade in once. Nothing loops except the small "live" dot (spec 9.10). */
-
 @keyframes arrive {
   from {
     opacity: 0;
@@ -170,14 +162,12 @@ textarea {
   }
 }
 
-/* What has done its job fades out once. */
 @keyframes leave {
   to {
     opacity: 0;
   }
 }
 
-/* One ring spreading from a click. */
 @keyframes ring {
   from {
     opacity: 1;
@@ -190,7 +180,6 @@ textarea {
   }
 }
 
-/* The mark beside work that is going on. */
 @keyframes turn {
   to {
     transform: rotate(1turn);

@@ -46,7 +46,6 @@ async def _windows(driver: DesktopDriver) -> str:
 
 async def list_apps(session: BrowserSession, args: NoArgs) -> str:
     driver = await _desktop(session)
-    # What a person allows now: a change in the settings holds from the next call.
     allowed = allowed_apps(session.config.computer)
     names = ", ".join(app.name for app in allowed) or "none"
     if any_app(session.config):
@@ -65,7 +64,6 @@ async def open_app(session: BrowserSession, args: OpenAppArgs) -> str:
     known = next((app for app in APPS if wanted in (app.name.lower(), app.id, app.command)), None)
     allowed = allowed_apps(session.config.computer)
     if known is None and any_app(session.config):
-        # On the person's own machine, where they allow any app: it is opened by its name, after their yes.
         name = args.app.strip()
         if not await driver.open_named_app(name):
             raise BrowserError(
@@ -114,7 +112,6 @@ COMPUTER_TOOLS: tuple[ToolDefinition, ...] = (
     ),
 )
 
-# Ours of the tools, beside Hermes' one: they only look, or only wait, and are no step on the screen.
 OURS_LOOK = frozenset({"computer_list_apps", "computer_request_human"})
 COMPUTER_NAMES = frozenset(tool.name for tool in COMPUTER_TOOLS)
 

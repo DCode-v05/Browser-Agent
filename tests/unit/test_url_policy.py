@@ -64,7 +64,6 @@ BLOCKED: list[tuple[str, dict[str, Any], str]] = [
     ("http://printer/", {"block_private_networks": True}, "private name"),
     ("http://db.internal/", {"block_private_networks": True}, "private name"),
     ("http://app.localhost:3000/", {"block_private_networks": True}, "private name"),
-    # A browser reads \ as /, so the host here is 127.0.0.1 and example.com is part of the path.
     ("http://127.0.0.1:8000\\@example.com/../admin", {"block_private_networks": True}, "private address"),
     (
         "http://127.0.0.1:8000\\@example.com/",
@@ -72,10 +71,8 @@ BLOCKED: list[tuple[str, dict[str, Any], str]] = [
         "not in the allowed sites",
     ),
     ("http://169.254.169.254\\@example.com/../latest/meta-data/", {}, "cloud metadata address"),
-    # A browser decodes %31 in a host.
     ("http://%31%36%39.254.169.254/latest/meta-data/", {}, "cloud metadata address"),
     ("http://%31%32%37.0.0.1/", {"block_private_networks": True}, "private address"),
-    # Every spelling of an address is the same site to a list.
     ("http://2130706433:8000/", {"blocked_domains": ["127.0.0.1"]}, "blocked site"),
     ("http://0x7f.1/", {"blocked_domains": ["127.0.0.1"]}, "blocked site"),
     ("http://１２７.0.0.1/", {"blocked_domains": ["127.0.0.1"]}, "blocked site"),
@@ -89,7 +86,6 @@ BLOCKED: list[tuple[str, dict[str, Any], str]] = [
     ("https://bücher.example/", {"blocked_domains": ["xn--bcher-kva.example"]}, "blocked site"),
     ("https://BÜCHER.example/", {"blocked_domains": ["*.Bücher.example", "bücher.example"]}, "blocked site"),
     ("http://2130706433/", {"allowed_domains": ["example.com"]}, "not in the allowed sites"),
-    # An IPv4 address carried inside an IPv6 one is judged as that IPv4 address.
     ("http://[64:ff9b::a9fe:a9fe]/latest/meta-data/", {}, "cloud metadata address"),
     ("http://[::169.254.169.254]/", {}, "cloud metadata address"),
     ("http://[64:ff9b:1:a9fe:a9:fe00::]/", {}, "cloud metadata address"),
@@ -99,7 +95,6 @@ BLOCKED: list[tuple[str, dict[str, Any], str]] = [
     ("http://[2002:c0a8:0101::1]/", {"block_private_networks": True}, "private address"),
     ("http://[2001:0:4136:e378:8000:63bf:3fff:fdd2]/", {"block_private_networks": True}, "private address"),
     ("http://[64:ff9b::7f00:1]/", {"blocked_domains": ["127.0.0.1"]}, "blocked site"),
-    # What a browser would not open at all.
     ("http://256.0.0.1/", {}, "not a valid address"),
     ("http://1.2.3.4.5/", {}, "not a valid address"),
     ("http://exa mple.com/", {}, "not a valid address"),

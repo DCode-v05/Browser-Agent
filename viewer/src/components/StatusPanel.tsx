@@ -1,6 +1,3 @@
-// Who is driving, what is happening now, and the controls: stop, pause and take over are always
-// one action away (spec 9.1). In split view it is a card; in full view, a bar above the browser.
-
 import { useEffect, useRef, type ReactNode, type Ref } from 'react';
 
 import type { ViewerOptions } from '../options';
@@ -33,9 +30,7 @@ interface ButtonProps {
   ref?: Ref<HTMLButtonElement>;
   disabled?: boolean;
   label?: string;
-  /** Pressed, and not taken hold yet. It keeps the focus, and takes no second press. */
   busy?: boolean;
-  /** What pressing it does, shown when the pointer rests on it. */
   hint?: string;
 }
 
@@ -50,7 +45,6 @@ export function Button({ kind = 'plain', icon, onClick, children, ref, disabled,
       disabled={disabled}
       aria-label={label}
       title={hint ?? label}
-      // Not `disabled`: a button that is disabled while it has the focus drops the focus.
       aria-busy={busy || undefined}
       aria-disabled={busy || undefined}
     >
@@ -68,14 +62,10 @@ interface Props {
   onCommand(command: ClientCommand): void;
   onStop(): void;
   onHandBack(): void;
-  /** The button a person lands on when leaving the live picture. */
   primaryRef: Ref<HTMLButtonElement>;
   stopRef: Ref<HTMLButtonElement>;
-  /** The control a person pressed that has not taken hold yet (spec 9.4). */
   working?: ControlName | null;
-  /** In full view, the way back to the split view. */
   onShowSplit?(): void;
-  /** Where the focus goes when what held it is gone: an answered card, a closed question. */
   titleRef?: Ref<HTMLHeadingElement>;
 }
 
@@ -83,7 +73,6 @@ export function StatusPanel({ view, now, layout, options, onCommand, onStop, onH
   const L = useWords();
   const driving = view.key === 'person';
   const title = driving && layout === 'bar' ? W.takeover.bar : view.status;
-  // The reason a session ended is told once, in the summary.
   const detail = view.key === 'ended' ? '' : driving && layout === 'bar' ? L.takeover.release(options.releaseChord) : view.detail;
 
   const control = (name: ControlName): ReactNode => {
@@ -173,7 +162,6 @@ interface ConfirmProps {
   onCancel(): void;
 }
 
-/** A question that must be answered before something that cannot be undone. The safe answer has the focus. */
 export function Confirm({ question, consequence, confirm, cancel, onConfirm, onCancel }: ConfirmProps) {
   const safe = useRef<HTMLButtonElement>(null);
   useEffect(() => safe.current?.focus(), []);

@@ -37,10 +37,8 @@ def refusal(code: str) -> str | None:
         ("f = lambda __x: 1", "begins with an underscore"),
         ("try:\n    x = 1\nexcept Exception as _e:\n    x = 2", "begins with an underscore"),
         ("print(x=1, __y=2)", "begins with an underscore"),
-        # Reading an attribute by a name held in a string.
         ("print('{0.__class__}'.format(1))", "the attribute 'format'"),
         ("'{a.__class__}'.format_map({'a': 1})", "the attribute 'format_map'"),
-        # The frames and the code behind a value lead to the worker's own modules.
         ("g = (i for i in [1])\ng.gi_frame", "the attribute 'gi_frame'"),
         ("c = browser.snapshot()\nc.cr_frame", "the attribute 'cr_frame'"),
         ("def f():\n    return 1\nf.f_globals", "the attribute 'f_globals'"),
@@ -114,9 +112,7 @@ def test_a_script_does_steps_keeps_state_prints_and_has_a_value() -> None:
         "printed": "2 invoices\n",
         "printed_cut": False,
     }
-    # Values given without a name go to the tool's arguments in their order.
     assert core.asked == [{"call": "snapshot", "args": {"mode": "all"}}]
-    # What a script keeps is there for the next one.
     assert ran("state['rows'] + 1", state)["value"] == "3"
 
 
@@ -135,7 +131,6 @@ def test_an_error_in_the_script_is_reported_with_its_line() -> None:
         "printed": "",
         "printed_cut": False,
     }
-    # The modules a script has are a few functions of them, not the modules themselves.
     assert "has no attribute 'codecs'" in ran("json.codecs.open('x')")["error"]
     assert "has no attribute 'sys'" in ran("re.sys")["error"]
     assert ran("def f(n):\n    return f(n + 1)\nf(0)")["error"].startswith("RecursionError")
@@ -158,8 +153,6 @@ def test_a_step_takes_only_what_can_be_sent() -> None:
 
 
 def test_a_script_cannot_reach_what_it_was_not_given() -> None:
-    # Names the worker itself uses are not names of the script.
     for name in ("sys", "os", "ast", "asyncio", "builtins", "run", "check", "open", "compile", "vars", "dir"):
         assert refusal(f"{name}") is not None, name
-    # A value that is not None is returned as JSON; one that cannot be is shown as Python shows it.
     assert ran("browser")["value"].startswith('"<')

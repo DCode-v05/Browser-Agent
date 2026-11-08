@@ -20,7 +20,6 @@ from bap_browser.errors import BrowserError
 
 DOCK = "bap-browser-driver-dock"
 INSIDE = "/usr/local/bin/cua-driver"
-# Where the driver for a desktop's container is kept on this machine, apart from this machine's own.
 KEPT_IN = "contained"
 
 

@@ -1,6 +1,3 @@
-// What each state looks like (spec 9.3): the status line, the border and label of the live
-// picture, the controls on offer, and how urgently a change is announced.
-
 import { W } from '../wording';
 import type { ViewerState } from './reducer';
 
@@ -23,16 +20,13 @@ export type FrameState = 'connecting' | 'live' | 'stale' | 'paused' | 'person' |
 export interface StateView {
   key: StateKey;
   status: string;
-  /** The current action, the reason for a request, or why the session ended. */
   detail: string;
   tone: Tone;
   label: string;
   controls: ControlName[];
   urgency: 'polite' | 'assertive';
   frame: FrameState;
-  /** The agent is doing something in the browser right now. */
   working: boolean;
-  /** When the session started, for the elapsed time. Zero when there is no session. */
   since: number;
 }
 
@@ -51,7 +45,6 @@ function frameState(state: ViewerState, key: StateKey, now: number, staleAfterS:
   if (!state.frame) return 'connecting';
   if (key === 'person') return 'person';
   if (key === 'paused') return 'paused';
-  // Only a picture that should be moving can be stale.
   if ((key === 'agent' || key === 'blocked') && now - state.frame.at > staleAfterS) return 'stale';
   return 'live';
 }
@@ -71,7 +64,6 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
   if (!state.session) {
     return finish({ key: 'no_agent', status: W.status.no_agent, detail: '', tone: 'none', label: '', controls: [], urgency: 'polite' });
   }
-  // Once a session has ended there is nothing live to lose, so its summary stays whatever the connection does.
   if (state.ended) {
     return finish({
       key: 'ended',
@@ -115,7 +107,6 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
         detail: state.help?.reason ?? '',
         tone: 'person',
         label: W.label.person,
-        // "Done" answers a request for help. Without one, the person simply hands back.
         controls: state.help ? ['done', 'could_not', 'stop'] : ['hand_back', 'stop'],
         urgency: 'assertive',
       });
@@ -144,13 +135,11 @@ export function describeState(state: ViewerState, now: number, staleAfterS: numb
       urgency: 'assertive',
     });
   }
-  // With a chat, the agent works only while it has a task.
   const idle = state.chat.enabled && !state.chat.working;
   return finish({
     key: 'agent',
     status: idle ? W.status.waiting_for_task : W.status.agent,
     detail: idle ? '' : currentAction(state),
-    // The agent's colour is for when it works. While it waits for a task the browser is at rest.
     tone: idle ? 'neutral' : 'agent',
     working: !idle,
     label: idle ? W.label.waiting_for_task : W.label.agent,

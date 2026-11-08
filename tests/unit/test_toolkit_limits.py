@@ -187,7 +187,6 @@ async def test_a_person_is_told_of_the_limit_once_and_can_allow_more(watched: Wa
     assert (await tools.call("browser_click", {"ref": "e1"})).is_error
     again = told(session, "limit_reached")
     assert len(again) == 2 and again[-1]["limit"] == 3
-    # With nothing to lift, "Allow more" says nothing.
     await session.handle({"type": "extend_limit"})
     await session.handle({"type": "extend_limit"})
     assert len(told(session, "limit_lifted")) == 2
@@ -222,7 +221,6 @@ async def test_after_questions_nobody_answered_further_ones_are_not_waited_for(w
     refused = await tools.call("browser_click", {"ref": "e1"})
     assert refused.text.startswith("The person did not answer in time")
     assert len(told(session, "approval_requested")) == 2, "the third question was not put to anybody"
-    # A person is back: anything they do in the viewer makes their questions worth waiting for again.
     await session.handle({"type": "pause"})
     await session.handle({"type": "resume"})
     call = asyncio.create_task(tools.call("browser_click", {"ref": "e1"}))

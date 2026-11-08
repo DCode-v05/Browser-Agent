@@ -28,7 +28,6 @@ from bap_browser.service.viewer_socket import LARGEST_VIEWER_MESSAGE
 from bap_browser.settings.store import SettingsStore
 from bap_browser.tools.event_log import forget_old_records
 
-# How often the records are looked through for what is too old to keep.
 A_DAY_S = 24 * 60 * 60
 
 
@@ -63,7 +62,6 @@ class Service:
         self._opened = opened
         self._sessions = sessions
         self.token = token or os.environ.get(config.server.token_env) or secrets.token_urlsafe(32)
-        # Each request stands by itself: an agent keeps no connection that could be lost.
         self._mcp = StreamableHTTPSessionManager(mcp, stateless=True) if mcp is not None else None
         self._mcp_running: asyncio.Task[None] | None = None
         self._mcp_over = asyncio.Event()
@@ -139,14 +137,12 @@ class Service:
         try:
             listener.bind((self._config.server.host, self._wanted_port))
         except OSError:
-            # The port is taken. Whoever asked may try another; the socket is not left open.
             listener.close()
             raise
         self.port = listener.getsockname()[1]
         if self.bridge is not None:
             self.bridge.own_address = self.address
         for session in self._sessions.values():
-            # The start page and the demo site are served from here: they are no stranger's pages.
             session.served_at(self.address)
         self._server = uvicorn.Server(
             uvicorn.Config(
@@ -155,15 +151,11 @@ class Service:
                 access_log=False,
                 server_header=False,
                 lifespan="off",
-                # A page read through the bridge is far larger than anything a viewer sends. A
-                # viewer's own messages are held to their limit where they are read.
                 ws_max_size=(
                     self._config.bridge.max_message_mb * 1024 * 1024
                     if self.bridge is not None
                     else LARGEST_VIEWER_MESSAGE
                 ),
-                # Without a limit, stopping can wait for ever: on Windows asyncio never counts a
-                # connection that the other side cut as closed.
                 timeout_graceful_shutdown=self.shutdown_wait_s,
             )
         )
@@ -172,7 +164,6 @@ class Service:
             if self._serving.done():
                 await self._serving
             await asyncio.sleep(0)
-        # Files are written off the event loop, which is busy with sessions.
         if self._opened:
             await asyncio.to_thread(self._write_state)
         self._forgetting = asyncio.create_task(self._forget_what_is_old())

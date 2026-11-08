@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend_parse.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Pure parsing helpers for the cua-driver backend: MCP result flattening, ``list_windows`` /
 ``get_window_state`` payload normalisation, key combos. No I/O, no module state — every function
@@ -13,18 +12,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bap_browser.computer.hermes.computer_use.backend import ActionResult, UIElement, image_dimensions_from_bytes
 
-# Linux/X11 surfaces GNOME Shell / desktop backdrop windows ahead of real app windows with no useful z-order; they
-# are targetable but capture as empty, so default capture skips them.
-_NON_APP_WINDOW_TITLE_PREFIXES = ("@!", "Desktop", "gnome-shell", "GNOME Shell")  # "@!" = GNOME helpers
+_NON_APP_WINDOW_TITLE_PREFIXES = ("@!", "Desktop", "gnome-shell", "GNOME Shell")
 
 _ELEMENT_LINE_RE = re.compile(
     r'^\s*(?:-\s+)?\[(\d+)\]\s+(\w+)'
     r'(?:'
-      r'\s*=\s*"([^"]*)"'              # = "value"
-      r'|\s+"([^"]*)"'                 # "value"
-      r'|\s+\((?!\d+\))([^)]*)\)'      # (value) but not a pure-digit (order) number
+      r'\s*=\s*"([^"]*)"'
+      r'|\s+"([^"]*)"'
+      r'|\s+\((?!\d+\))([^)]*)\)'
     r')?'
-    r'(?:\s+(?:\(\d+\)\s+)?id=([^\s\[\]]+))?',  # optional id=value (after an optional (order))
+    r'(?:\s+(?:\(\d+\)\s+)?id=([^\s\[\]]+))?',
     re.MULTILINE,
 )
 """get_window_state AX-tree markdown line: ``[N] AXRole`` + label in one of four forms (``= "value"``, ``"quoted"``,
@@ -59,9 +56,7 @@ def _action_result_from(name: str, ok: bool, message: str, meta: dict[str, Any],
         verified=_typed(_raw("verified"), bool), effect=_typed(_raw("effect"), str),
         escalation=_typed(_raw("escalation"), dict), path=_typed(_raw("path"), str),
         degraded=_typed(_raw("degraded"), bool),
-        # What we asked for; the driver's `path` records the rung that ran.
         delivery_mode=_typed(requested_delivery, str),
-        # Refusal/limitation code — drivers spell it "code" or "reason_code".
         code=_typed(_raw("code") or _raw("reason_code"), str),
     )
 
@@ -90,7 +85,6 @@ def _parse_elements_from_tree(markdown: str) -> list[UIElement]:
     array (see ``_parse_elements_from_structured`` — Surface 2 of #47072 prefers that path).
     """
     return [
-        # groups 3-6: value / quoted / paren / id= label (first non-None wins)
         UIElement(index=int(m.group(1)), role=m.group(2),
                   label=m.group(3) or m.group(4) or m.group(5) or m.group(6) or "", bounds=(0, 0, 0, 0))
         for m in _ELEMENT_LINE_RE.finditer(markdown)
@@ -117,7 +111,6 @@ def _parse_elements_from_structured(raw_elements: list[dict[str, Any]]) -> list[
         elements.append(UIElement(
             index=idx, role=role if isinstance(role, str) else "", label=label if isinstance(label, str) else "",
             bounds=bounds,
-            # Opaque `s{snapshot_hex}:{index}` token — the driver owns parse + LRU semantics.
             element_token=token if isinstance(token, str) and token else None,
         ))
     return elements
@@ -186,7 +179,6 @@ def _extract_tool_result(mcp_result: Any) -> dict[str, Any]:
             data = joined
     return _tool_envelope(
         data, images, _mcp_field(mcp_result, "structured_content", "structuredContent") or None,
-        # Identity, not truthiness: mocks/proxies synthesize truthy attributes.
         _mcp_field(mcp_result, "is_error", "isError", False) is True, image_mime_types)
 
 def _image_from_tool_result(out: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
@@ -231,7 +223,7 @@ def _ingest_windows(raw_windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     front; Wayland's null (undefined stacking) sorts lowest so real windows stay above the desktop."""
     windows: list[dict[str, Any]] = []
     for w in raw_windows:
-        if not isinstance(w, dict):  # untrusted compatibility envelopes
+        if not isinstance(w, dict):
             continue
         pid_int, window_id_int = _positive_int(w.get("pid")), _positive_int(w.get("window_id"))
         if pid_int is None or window_id_int is None:
@@ -241,7 +233,6 @@ def _ingest_windows(raw_windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "app_name": app_name if isinstance(app_name, str) else "",
             "pid": pid_int,
             "window_id": window_id_int,
-            # Only explicit False means off-screen; null (Linux 0.6.x) means unknown.
             "off_screen": w.get("is_on_screen") is False,
             "title": title if isinstance(title, str) else "",
             "z_index": z_raw if isinstance(z_raw, (int, float)) and not isinstance(z_raw, bool) else 0,

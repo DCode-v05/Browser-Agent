@@ -12,7 +12,6 @@ from bap_browser.config import Config
 from bap_browser.driver import BrowserSession, open_session
 from bap_browser.tools import Toolkit
 
-# With nobody watching, an action that needs approval is done only where the deployment says so.
 UNATTENDED = {"approval_without_viewer": "allow"}
 
 
@@ -29,8 +28,6 @@ async def finished(tools: Toolkit, count: int) -> tuple[str, str]:
         while True:
             listed = (await tools.call("browser_downloads", {})).text
             news += listed.partition("\n[events] ")[2]
-            # The list itself, and not the news beside it: a download's end can be told a moment
-            # before the list that was already being written says so.
             told = body(listed)
             if told.count(" saved at ") + told.count(" failed: ") >= count:
                 return told, news
@@ -54,11 +51,9 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
 
         one = await tools.call("browser_upload_file", {"ref": field, "paths": ["cv.txt"]})
         assert one.text.startswith(f'Uploaded cv.txt via {field} (button "Your CV").'), one.text
-        # The page reads the file before it says what was chosen, and that takes it a moment.
         await tools.call("browser_wait", {"text": "Chosen: cv.txt"})
         assert "Chosen: cv.txt (my cv)" in (await tools.call("browser_get_text", {})).text
 
-        # A button that opens the file chooser takes them too, by full path as well as by name.
         two = await tools.call(
             "browser_upload_file", {"ref": button, "paths": ["cv.txt", str(folder / "photo.txt")]}
         )
@@ -68,7 +63,6 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
             "Chosen: cv.txt (my cv), photo.txt (my photo)" in (await tools.call("browser_get_text", {})).text
         )
 
-        # Only a file in a folder uploads may come from.
         for path in (str(tmp_path / "secret.txt"), "../secret.txt"):
             outside = await tools.call("browser_upload_file", {"ref": field, "paths": [path]})
             assert outside.is_error
@@ -86,8 +80,6 @@ async def test_files_are_given_to_a_file_field_and_to_a_button_that_asks_for_the
         )
         assert wrong.is_error and "no file chooser opened" in wrong.text
 
-        # A plain click on a file field opens a chooser nobody asked for. It is closed, the agent is
-        # told how a file is given, and the next upload finds the field as free as before.
         clicked = await tools.call("browser_click", {"ref": field})
         told = clicked.text + (await tools.call("browser_wait", {"seconds": 0.3})).text
         assert "[events] a file chooser opened and was closed: give files with browser_upload_file" in told
@@ -147,15 +139,12 @@ async def test_a_download_is_kept_in_the_downloads_folder_under_a_name_of_its_ow
         first, news = await finished(tools, 1)
         assert first == f"1 download:\nreport.txt (22 bytes) saved at {folder / 'report.txt'}", first
         assert (folder / "report.txt").read_text(encoding="utf-8") == "The quarterly report.\n"
-        # The agent is told when the file is there, whichever call comes next.
         assert 'download saved: "report.txt"' in clicked.text + news
 
-        # The same name again does not replace the first file.
         await tools.call("browser_click", {"ref": link})
         second, _ = await finished(tools, 2)
         assert second.endswith(f"report (1).txt (22 bytes) saved at {folder / 'report (1).txt'}"), second
 
-        # A name the page suggests is never a path: the file stays inside the folder.
         await tools.call("browser_click", {"ref": ref_of(page.text, 'link "Download with a strange name"')})
         await finished(tools, 3)
         kept = sorted(file.name for file in folder.iterdir())
@@ -186,8 +175,6 @@ async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, s
         everything = body((await tools.call("browser_console", {})).text)
         lines = everything.splitlines()
         assert re.fullmatch(r"\d console messages, oldest first:", lines[0]), lines[0]
-        # A picture that could not be loaded is an error the browser itself reports. It can arrive
-        # before or after what the page's own script writes.
         missing = [line for line in lines[1:] if line.startswith("[error] Failed to load resource")]
         assert missing, lines
         assert [line for line in lines[1:] if line not in missing] == [
@@ -201,7 +188,6 @@ async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, s
         assert "[warning] careful now\n[error] went wrong" in serious
         assert "[info]" not in serious and "[debug]" not in serious
 
-        # A script that breaks is in the log too. Then the log is emptied.
         await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Break"')})
         broken = body((await tools.call("browser_console", {"level": "error", "clear": True})).text)
         assert "[error] Uncaught " in broken and "null" in broken, broken
@@ -210,7 +196,6 @@ async def test_the_console(make_config: Callable[..., Config], tmp_path: Path, s
             "The console holds no message of level error or above."
         )
 
-        # No call returns more than the cap, however much a page writes.
         await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Chatter"')})
         capped = body((await tools.call("browser_console", {"limit": 500})).text).splitlines()
         assert capped[0] == "50 console messages, the newest of 80, oldest first:"
@@ -246,7 +231,6 @@ async def test_the_network_log(make_config: Callable[..., Config], tmp_path: Pat
 
         await tools.call("browser_network", {"clear": True})
         assert body((await tools.call("browser_network", {})).text) == "No request has been made."
-    # The log keeps what was done, never what the page asked for.
     log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
     assert "missing.png" not in log
 
@@ -277,11 +261,9 @@ async def test_a_script_in_the_page_runs_only_where_it_is_allowed_and_approved(
         assert len(shown[1]) == 60 and shown[2] == "… 442 more characters not shown."
     log = [json.loads(line) for line in (tmp_path / "a" / "events.jsonl").read_text("utf-8").splitlines()]
     scripts_run = [line for line in log if line["tool"] == "browser_evaluate"]
-    # Neither what was run nor what the page gave back is kept.
     assert scripts_run[0]["args"] == {"expression": "<13 characters>"}
     assert scripts_run[0]["result"] == "The script's value, as JSON (34 characters):"
 
-    # Allowed, with nobody to approve it: it is not run.
     async with open_session(
         make_config(tmp_path / "b", browser={"javascript": {"allow_evaluate": True}})
     ) as session:
@@ -291,7 +273,6 @@ async def test_a_script_in_the_page_runs_only_where_it_is_allowed_and_approved(
         assert unasked.is_error and "needs a person's approval" in unasked.text
         assert (await tools.call("browser_snapshot", {})).text.startswith("Page: Logs\n")
 
-    # Not allowed: there is no such tool.
     async with open_session(make_config(tmp_path / "c")) as session:
         absent = await Toolkit(session).call("browser_evaluate", {"expression": "1"})
         assert absent.is_error and absent.text.startswith("Unknown tool 'browser_evaluate'.")
@@ -302,12 +283,10 @@ async def test_dragging(make_config: Callable[..., Config], tmp_path: Path, site
         tools = Toolkit(session)
         page = await tools.call("browser_navigate", {"url": f"{site}/drag.html"})
         knob = ref_of(page.text, 'clickable "Knob"')
-        # A slider that follows the mouse: its knob is taken to a point.
         slid = await tools.call("browser_drag", {"from_ref": knob, "to_xy": [255, 270]})
         assert body(slid.text) == f'Dragged from {knob} (div "Knob") to (255, 270) (div)', slid.text
         assert "Knob at 200" in (await tools.call("browser_get_text", {})).text
 
-        # A card that is dropped on a column, the way a page built for dragging expects it.
         card, column = ref_of(page.text, 'clickable "Card A"'), ref_of(page.text, 'clickable "Done column"')
         dropped = await tools.call("browser_drag", {"from_ref": card, "to_ref": column})
         assert body(dropped.text) == (

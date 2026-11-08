@@ -1,18 +1,4 @@
 #!/usr/bin/env bash
-# Hermes Bot Desktop — one headless Xfce desktop per Hermes profile, served over RFB.
-#
-# Spawned by tools/bot_desktop/runtime.py with HERMES_BD_* variables set. Runs TigerVNC's Xvnc
-# (X server + RFB server in one process; damage-driven, resizable via SetDesktopSize) listening on a
-# 0600 Unix socket only, then a minimal Xfce started component-wise under a private dbus session.
-#
-# Why not startxfce4 / xfce4-session: xfce4-session expects a logind session scope; outside one it
-# spawns polkit agents that pop empty dialogs and light-locker/xfce4-screensaver lock the desktop for a
-# user who has no password. Starting xfsettingsd -> xfwm4 -> xfdesktop -> xfce4-panel directly, with
-# the screensaver/locker/power-manager autostarts masked, is the shape every headless-VNC recipe
-# converges on (TigerVNC #1096/#581, OpenOnDemand's apptainer desktop, the Arch wiki).
-#
-# Why not the xfce4 metapackage: it drags in the screensaver, power manager and polkit agent this
-# script exists to keep out.
 set -euo pipefail
 
 : "${HERMES_BD_PROFILE:?}"      # profile name (display name in the VNC title)
@@ -30,8 +16,6 @@ export XDG_DATA_HOME="${HERMES_BD_DATA_HOME:-$HERMES_BD_CONFIG_HOME/.local-share
 export XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=XFCE
 export GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb NO_AT_BRIDGE=1 GTK_A11Y=none
 export LANG="${LANG:-C.UTF-8}"
-# Inheriting a login session's bus/session manager yields "Another session manager is already
-# running" / "Unable to contact settings server".
 unset SESSION_MANAGER DBUS_SESSION_BUS_ADDRESS DISPLAY XAUTHORITY WAYLAND_DISPLAY
 
 mkdir -p "$XDG_CONFIG_HOME/xfce4/xfconf/xfce-perchannel-xml" "$XDG_CONFIG_HOME/autostart" \
@@ -40,22 +24,16 @@ mkdir -p "$XDG_CONFIG_HOME/xfce4/xfconf/xfce-perchannel-xml" "$XDG_CONFIG_HOME/a
 export DISPLAY=":$HERMES_BD_DISPLAY_NUM"
 export XAUTHORITY="$HERMES_BD_XAUTH"
 
-# Stale lock files from a crashed server block restart; a lock whose pid is alive belongs to a
-# running server (another profile may have taken this number) and is never touched — Xvnc then
-# fails to start on it and runtime.py reports that instead of us disrupting the other desktop.
 rm -f "$HERMES_BD_SOCKET"
-# no-tmp: ok — the X11 protocol fixes its lock and socket under /tmp; this is not our scratch dir
 xlock="/tmp/.X${HERMES_BD_DISPLAY_NUM}-lock"
 if [[ -e "$xlock" ]] && ! kill -0 "$(tr -d ' ' < "$xlock" 2>/dev/null)" 2>/dev/null; then
   rm -f "$xlock" "/tmp/.X11-unix/X${HERMES_BD_DISPLAY_NUM}"  # no-tmp: ok — X11 display socket, fixed by the protocol
 fi
 : > "$XAUTHORITY"; chmod 600 "$XAUTHORITY"
-# The cookie goes in on stdin, not argv: a command line is readable by every local user via ps.
 xauth -q -f "$XAUTHORITY" source - <<COOKIE
 add $DISPLAY MIT-MAGIC-COOKIE-1 $(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
 COOKIE
 
-# ---- look: dark theme from whatever the host ships (first match wins), Hermes wallpaper ----
 pick_theme() { local d t; for t in "$@"; do for d in /usr/share/themes "$HOME/.themes"; do [[ -d "$d/$t" ]] && { echo "$t"; return; }; done; done; echo "$1"; }
 pick_icons() { local d t; for t in "$@"; do for d in /usr/share/icons "$HOME/.icons"; do [[ -d "$d/$t" ]] && { echo "$t"; return; }; done; done; echo "$1"; }
 GTK_THEME_NAME=$(pick_theme Adwaita-dark Breeze-Dark Greybird-dark Arc-Dark Adwaita)
@@ -63,7 +41,6 @@ WM_THEME_NAME=$(pick_theme Default-hdpi Default)   # xfwm4 window themes ship wi
 ICON_THEME_NAME=$(pick_icons Papirus-Dark breeze-dark Adwaita hicolor)
 : "${HERMES_BD_WALLPAPER:="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/wallpaper.png"}"
 
-# ---- pre-seed xfconf BEFORE xfconfd starts (it caches; edits after start are overwritten) ----
 X="$XDG_CONFIG_HOME/xfce4/xfconf/xfce-perchannel-xml"
 [[ -e "$X/xfwm4.xml" ]] || cat > "$X/xfwm4.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -129,15 +106,10 @@ sed -i "s|HERMES_BD_GTK_THEME|$GTK_THEME_NAME|; s|HERMES_BD_ICON_THEME|$ICON_THE
 </channel>
 EOF
 sed -i "s|HERMES_BD_WALLPAPER_PLACEHOLDER|$HERMES_BD_WALLPAPER|" "$X/xfce4-desktop.xml"
-# Own panel layout (a layout on disk also suppresses the first-run "Welcome to the panel" dialog):
-# top bar = menu · tasks · tray · clock; bottom dock = only launchers whose program exists on this
-# host, the browser pinned to the one the bot drives so a human lands in the bot's own browser profile.
 if [[ ! -e "$X/xfce4-panel.xml" ]]; then
   L="$XDG_CONFIG_HOME/xfce4/panel"; mkdir -p "$L"
   dock_ids=(); n=20
   add_launcher() {  # name icon executable [Exec= line] — skipped when the executable is missing.
-    # The Exec= line is passed ready-made (spec-quoted by Python) so paths with spaces survive; a bare
-    # program name is its own Exec= value.
     command -v "$3" >/dev/null 2>&1 || return 0
     n=$((n+1)); mkdir -p "$L/launcher-$n"
     printf '[Desktop Entry]\nVersion=1.0\nType=Application\nName=%s\nIcon=%s\n%s\nTerminal=false\nStartupNotify=false\n' \
@@ -145,8 +117,6 @@ if [[ ! -e "$X/xfce4-panel.xml" ]]; then
     dock_ids+=("$n")
   }
   add_launcher "Terminal" utilities-terminal "xfce4-terminal"
-  # The bot's browser: runtime.py resolves the executable agent-browser drives plus the profile's
-  # persistent user-data-dir, so a human taking over lands in the bot's own cookie jar.
   [[ -n "${HERMES_BD_BROWSER_EXEC:-}" ]] && \
     add_launcher "Browser" internet-web-browser "$HERMES_BD_BROWSER_EXEC" "${HERMES_BD_BROWSER_EXEC_LINE:-}" && \
     echo "$n" > "$L/.hermes-browser-launcher"
@@ -217,19 +187,13 @@ if [[ ! -e "$X/xfce4-panel.xml" ]]; then
 </channel>
 PANEL
 fi
-# Mask system autostarts that want logind/polkit/keyring/at-spi.
 for a in xfce4-screensaver light-locker xfce4-power-manager xfce-polkit \
          polkit-gnome-authentication-agent-1 lxpolkit xfce4-notifyd blueman at-spi-dbus-bus \
          gnome-keyring-pkcs11 gnome-keyring-secrets gnome-keyring-ssh xdg-user-dirs; do
   [[ -e "$XDG_CONFIG_HOME/autostart/$a.desktop" ]] || \
     printf '[Desktop Entry]\nType=Application\nName=%s\nHidden=true\n' "$a" > "$XDG_CONFIG_HOME/autostart/$a.desktop"
 done
-# The Browser launcher's Exec= line binds the bot's user-data-dir by absolute path. The panel layout is
-# seeded once (the human may have rearranged it), but this one line is ours and must follow the profile:
-# after `hermes profile rename` the old path would open a browser with an empty, unshared cookie jar.
 L="$XDG_CONFIG_HOME/xfce4/panel"
-# Profiles seeded before the marker existed have the launcher but no `.hermes-browser-launcher`; recover
-# it from our own Browser entry (hermes.desktop is ours by name) so their Exec= follows a rename too.
 if [[ -n "${HERMES_BD_BROWSER_EXEC:-}" && -n "${HERMES_BD_BROWSER_EXEC_LINE:-}" && ! -r "$L/.hermes-browser-launcher" ]]; then
   for d in "$L"/launcher-*/hermes.desktop; do
     [[ -f "$d" ]] || continue
@@ -247,16 +211,8 @@ if [[ -n "${HERMES_BD_BROWSER_EXEC:-}" && -n "${HERMES_BD_BROWSER_EXEC_LINE:-}" 
   [[ -f "$d" ]] && sed -i "s|^Exec=.*|$(printf '%s' "$HERMES_BD_BROWSER_EXEC_LINE" | sed 's/[&|\\]/\\&/g')|" "$d"
 fi
 
-# Tests seed the config tree on a fake PATH and stop here (no X server needed).
 [[ -n "${HERMES_BD_SEED_ONLY:-}" ]] && exit 0
 
-# ---- X server + RFB (TigerVNC Xvnc), Unix socket only ----
-# SecurityTypes None is safe ONLY because -rfbport -1 disables TCP and the 0600 socket is reachable
-# only by processes running as this user (the gateway's WebSocket bridge does the real authentication;
-# same-UID processes, the bot's own terminal tool included, are inside that boundary by design).
-# -SendCutText=0: watchers must never receive the holder's clipboard; -AcceptCutText stays on so
-# paste INTO the screen keeps working. -MaxCutText caps a client cut-text at 256 KiB — the same bound
-# the bridge enforces (tools/bot_desktop/rfb_filter.py _MAX_CUT_TEXT); keep the two in sync.
 Xvnc "$DISPLAY" -geometry "$GEOM" -depth "$DEPTH" -dpi 96 \
   -rfbport -1 -rfbunixpath "$HERMES_BD_SOCKET" -rfbunixmode 0600 \
   -SecurityTypes None -AlwaysShared -AcceptSetDesktopSize -FrameRate 30 -SendCutText=0 -MaxCutText 262144 \
@@ -275,12 +231,6 @@ setxkbmap -display "$DISPLAY" us 2>/dev/null || true   # RFB keysyms + xdotool a
 xsetroot -display "$DISPLAY" -solid '#1c1f29' 2>/dev/null || true
 xset -display "$DISPLAY" s off -dpms s noblank 2>/dev/null || true
 
-# ---- private session bus + Xfce components (no xfce4-session) ----
-# dbus-run-session scopes the bus to this subshell: no leaked dbus-daemons on restart. The env file
-# is written from INSIDE the bus so DBUS_SESSION_BUS_ADDRESS is the real one; runtime.py and every
-# cua-driver / browser spawn for this profile source it.
-# Not exec'd: this script stays the supervisor so the EXIT trap above still reaps Xvnc when the Xfce
-# session dies on its own (exec would replace the trap's owner and orphan the X server).
 dbus-run-session -- bash -c '
   set -e
   umask 077

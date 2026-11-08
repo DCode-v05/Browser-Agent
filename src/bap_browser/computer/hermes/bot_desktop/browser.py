@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/browser.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """The bot's browser on its Bot Desktop: one executable, one persistent user-data-dir per profile.
 
@@ -92,14 +91,7 @@ def dock_argv(exe: str, user_data_dir: str, *, sandbox_bypass: Optional[bool] = 
     """Command the dock's Browser icon runs. ``--remote-debugging-port=0`` makes a human-started
     instance attachable (Chromium writes the chosen port to ``<user-data-dir>/DevToolsActivePort``);
     first-run / default-browser dialogs would sit between the human and the bot's tabs."""
-    # --test-type hides the "Chrome for Testing is only for automated testing" and unsupported-flag
-    # (--no-sandbox as root) infobars, which otherwise sit at the top of the human's takeover view.
-    # The same sandbox policy agent-browser starts this binary with (root, Docker, AppArmor userns): the
-    # human's Browser is the bot's browser, in the same container; a stricter rule here just made the dock
-    # icon die with 'No usable sandbox!' in the official image while the agent's own Chromium ran fine.
     from bap_browser.computer.seams.sandbox import CHROMIUM_SANDBOX_BYPASS_ARGS, needs_chromium_sandbox_bypass
-    # The profile is persistent by design (logins survive handoffs); its HTTP cache is not worth a
-    # gateway's disk: uncapped it grows for months toward a hosted instance's 6 GB.
     return [exe, f"--user-data-dir={user_data_dir}", "--remote-debugging-port=0", "--no-first-run",
             "--no-default-browser-check", "--test-type", f"--disk-cache-size={DISK_CACHE_BYTES}",
             *(CHROMIUM_SANDBOX_BYPASS_ARGS if (needs_chromium_sandbox_bypass() if sandbox_bypass is None

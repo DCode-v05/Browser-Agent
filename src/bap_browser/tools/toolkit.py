@@ -94,7 +94,6 @@ def _sentence(words: str) -> str:
     return words[:1].upper() + words[1:]
 
 
-# What an acting step is told when its answer was lost on the way (spec 18.8).
 OUTCOME_UNKNOWN = (
     "The connection to the browser was lost while this step ran. Whether it was done is not known. "
     "Read the page before anything else, and do not repeat a step that pays, sends or deletes "
@@ -138,7 +137,6 @@ def tools_for(config: Config) -> tuple[ToolDefinition, ...]:
     browser = config.browser
     absent = {
         "browser_evaluate": not browser.javascript.allow_evaluate,
-        # With no folder to upload from, no upload could ever be allowed.
         "browser_upload_file": not (browser.uploads.enabled and browser.uploads.allowed_dirs),
         "browser_downloads": not browser.downloads.enabled,
         RUN_A_SCRIPT: not config.code.enabled,
@@ -155,8 +153,6 @@ class Toolkit:
         gate: Gate = always_open,
     ) -> None:
         self._session = session
-        # None when the tools are those the configuration offers, which a person's settings can change.
-        # What is on offer, for the configuration as it is: the browser's tools by default.
         self._offer: Callable[[Config], Sequence[ToolDefinition]] = (
             tools_for if tools is None else tools if callable(tools) else lambda config: tools
         )
@@ -167,7 +163,6 @@ class Toolkit:
         self._turn = asyncio.Lock()
         self._log = EventLog(session.config.logging)
         self._steps = 0
-        # The tools that are not on offer in this session, whatever the configuration offers.
         self._left_out: set[str] = set()
         session.tool_names = tuple(self._tools)
         session.begin_task = self._begin_task
@@ -176,13 +171,9 @@ class Toolkit:
         self.reader = Reader(session, self.check, observer)
         self.limits = Limits(lambda: self._session.config.limits, self.check.spend)
         session.guard_files(self.check.judge_file)
-        # The limit the person watching has been told of, so that they are told once.
         self._reached: Reached | None = None
-        # What the page said of itself after the last step (spec 18.8).
         self._mark: str | None = None
-        # The action that a dialog interrupted. It goes on when the dialog has been answered.
         self._held: asyncio.Future[Outcome] | None = None
-        # The code tool's worker (spec 7). It starts with the first script, and ends with the session.
         self._scripts = ScriptRunner(lambda: self._session.config.code, self.call, self._in_a_script)
         session.at_close(self._scripts.close)
 
@@ -267,7 +258,6 @@ class Toolkit:
         or stops between two steps, as between any two calls."""
         redact = self._session.redact
         waiting_since = time.perf_counter()
-        # The script itself is never kept: it can hold what it types.
         logged = names_only(arguments)
         async with self._gate() as admission:
             refused, note = admission.refused, admission.note
@@ -295,7 +285,6 @@ class Toolkit:
             assert isinstance(args, RunArgs)
             ran = await self._scripts.run(args.code, args.timeout_s)
         tabs = await self.tabs()
-        # What a script printed may be what a page wrote: all of it is read as such.
         printed, withheld = await self._read(RUN_A_SCRIPT, arguments, from_page(ran.text))
         text = note + printed + self._state_block(tabs, self._news())
         result = ToolResult(redact(text), ran.failure is not None)
@@ -304,7 +293,6 @@ class Toolkit:
         if self._observer:
             summary = summary_for(RUN_A_SCRIPT, arguments, None, ran.failure, self._room())
             if ran.failure is None:
-                # Each step is a row of its own. This row says how many there were.
                 summary += f": {ran.steps} step{'' if ran.steps == 1 else 's'}"
             self._observer.step_finished(step, ran.failure is None, ms, len(result.text), summary, tabs)
         return result
@@ -351,7 +339,6 @@ class Toolkit:
                     else:
                         outcome = Outcome(decision.text, decision.reason)
                 if self._session.site_done is not None and kind_of(name, arguments) not in NEED_NO_SITE:
-                    # What the person allowed once was for this call.
                     await self._session.site_done()
                 logged = masked(arguments, redact)
             tabs = await self.tabs()
@@ -420,7 +407,6 @@ class Toolkit:
         control = target
         kind = kind_of(name, arguments)
         fields: list[Located] = []
-        # A page with a dialog open answers nothing, so it is not asked.
         if driver is not None and self._session.pending_dialog() is None:
             with contextlib.suppress(BapError):
                 if target is not None and target.role == POINT and target.box is not None:
@@ -428,13 +414,10 @@ class Toolkit:
                 elif target is None and kind in GO_WHERE_THE_FOCUS_IS and arguments.get("ref") is None:
                     control = await driver.locate_focus()
                 elif (name, arguments.get("action")) in PRESS_ON_A_DESKTOP and "element" in arguments:
-                    # On a desktop an element is named by its number in the newest capture.
                     control = await driver.locate(str(arguments["element"]))
                 elif (name, arguments.get("action")) in PRESS_ON_A_DESKTOP and isinstance(
                     driver, DesktopDriver
                 ):
-                    # A click by its place names no element: it is judged as a press of the gravest
-                    # control the screen holds, which it may be on.
                     control = gravest_of(driver.on_screen(), self._session.config)
                 asked = arguments.get("fields") if name == "browser_fill_form" else None
                 for entry in asked if isinstance(asked, list) else []:
@@ -443,7 +426,6 @@ class Toolkit:
                         fields.append(await driver.locate(ref))
         if kind in GO_WHERE_THE_FOCUS_IS and control is not None:
             fields = [control]
-        # An element in a frame is on the frame's own site, which may not be the page's.
         in_a_frame = control is not None and control.document.startswith(("http://", "https://"))
         address = (control.document if control and in_a_frame else here) if opens is None else opens
         return Step(
@@ -491,11 +473,9 @@ class Toolkit:
         again = self.limits.goes_in_circles(same_step(name, arguments))
         if again is None:
             if self._mark is None:
-                # What the page is like before the first step, so that it can be said to have changed.
                 await self._page_moved()
             return None
         if await self._page_moved():
-            # The page changed by itself meanwhile: the step may do something now.
             self.limits.page_changed()
             return None
         return Outcome(again, "the same step again and again")
@@ -521,7 +501,6 @@ class Toolkit:
         """Whether the page has changed since this was last asked. True when it cannot be told."""
         driver = self._session.started_driver
         mark: str | None = None
-        # A page with a dialog open answers nothing.
         if driver is not None and self._session.pending_dialog() is None:
             try:
                 mark = await driver.change_mark()
@@ -542,7 +521,6 @@ class Toolkit:
         else:
             note = self.limits.acted(step, changed=await self._page_moved())
             if outcome.failure is not None or kind in CHANGES_UNSEEN:
-                # A step that failed has said so; and what a hover changes is not always seen.
                 note = note.removeprefix(NOTHING_CHANGED)
         return replace(outcome, text=outcome.text + note) if note else outcome
 
@@ -568,7 +546,6 @@ class Toolkit:
         note = await self._what_was_held_finished()
         work = asyncio.ensure_future(self._outcome(name, tool, args))
         if self._session.pending_dialog() is not None:
-            # A tool that runs beside an open dialog. It does not wait for one to open.
             outcome = await work
             if name == ANSWERS_A_DIALOG and outcome.failure is None:
                 outcome = await self._resume(outcome)
@@ -627,10 +604,8 @@ class Toolkit:
         except BapError as exc:
             return Outcome(str(exc), exc.reason)
         except Exception as exc:
-            # The last line of defence: an agent's call must never take the service down.
             logger.exception("%s failed unexpectedly", name)
             if kind_of(name, args.model_dump()) not in READS and self._lost_on_the_way(exc):
-                # Reading again is safe. Acting again may do the thing twice.
                 return Outcome(OUTCOME_UNKNOWN, "it is not known whether it was done")
             return Outcome(
                 f"{name} failed unexpectedly ({type(exc).__name__}). Try again, or take a new snapshot.",
@@ -652,12 +627,9 @@ class Toolkit:
     async def _locate(self, name: str, arguments: Mapping[str, Any]) -> Located | None:
         """The element a call names, for the sentence and the outline a person sees."""
         driver = self._session.started_driver
-        # A page with a dialog open answers nothing, so it is not asked.
         if driver is None or name not in self._tools or self._session.pending_dialog() is not None:
             return None
-        # A drag is shown where it starts.
         ref = arguments.get("ref", arguments.get("from_ref"))
-        # The arguments are not checked yet. Only what is a ref, for a tool that exists, goes to the page.
         if not isinstance(ref, str) or not re.fullmatch(REF_PATTERN, ref):
             return _point(arguments, driver) if ref is None and name in POINTED else None
         try:
@@ -681,7 +653,6 @@ class Toolkit:
         """What ends every result: the open tabs, and what happened in the browser by itself since
         the last call."""
         block = ""
-        # A desktop has no tabs: its one screen is not listed (spec 21.5).
         tabs = [tab for tab in tabs if tab.id != SCREEN]
         if tabs:
             block += "\n[tabs] " + " | ".join(

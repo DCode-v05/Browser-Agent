@@ -15,7 +15,6 @@ from bap_browser.computer.hermes.computer_use import permissions as their_permis
 from bap_browser.config import Config
 
 NOT_INSTALLED = "The driver of computer use is not installed. Run: bap-browser computer install"
-# The program of macOS that takes note of where an app is.
 REGISTER = (
     "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 )
@@ -50,11 +49,7 @@ def not_ready(config: Config, binary: Path, system: str = sys.platform) -> str |
         if not contract["ready"]:
             return f"The driver cannot be used: {contract['reason']}."
         if not config.computer.base.driver_telemetry:
-            # The setting in the driver's environment does not reach a daemon the system starts for
-            # it, so the driver is told once, in its own settings.
             tell(config, binary, "telemetry", "disable")
-        # The driver registers its own logon task, so that it is there before anybody opens a
-        # window: a machine driven from elsewhere.
         wanted = system == "win32" and config.computer.base.autostart
         if wanted and not tell(config, binary, "autostart", "enable"):
             waited = config.computer.base.register_timeout_s

@@ -1,6 +1,3 @@
-// The chat follows the task (spec 22.3.1): when a person gives the agent a task on a real machine,
-// the chat is opened beside the screen, so that it is still with them once an app covers the page.
-
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Connection } from '../connection/connection';

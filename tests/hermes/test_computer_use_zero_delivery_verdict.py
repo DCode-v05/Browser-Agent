@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_zero_delivery_verdict.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Zero-delivery `type` verdict: web inputs behind trusted-event checks
 swallow synthetic keystrokes entirely (delivered 0 of N). Retrying the

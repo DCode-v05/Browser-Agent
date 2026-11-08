@@ -2,10 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-// Tests run from the viewer folder. The test runner does not hand CSS files to imports.
 const css = readFileSync('src/tokens.css', 'utf8');
 
-/** Every token a block sets, with its value as written. */
 function values(selector: string): Record<string, string> {
   const start = css.indexOf(selector + ' {');
   expect(start, `block ${selector}`).toBeGreaterThanOrEqual(0);
@@ -15,7 +13,6 @@ function values(selector: string): Record<string, string> {
   return tokens;
 }
 
-/** The tokens of a block that are one opaque colour. */
 function block(selector: string): Record<string, string> {
   return Object.fromEntries(Object.entries(values(selector)).filter(([, value]) => /^#[0-9A-Fa-f]{6}$/.test(value)));
 }
@@ -40,23 +37,21 @@ const darkBySystem = { ...light, ...block(':root:not([data-theme="light"])') };
 const ACCENTS = ['agent', 'person', 'waiting', 'danger', 'success'];
 const SURFACES = ['--bg', '--surface', '--surface-2', '--surface-3'];
 
-// [foreground, background]: text needs 4.5:1.
 const TEXT_PAIRS: [string, string][] = [
   ...SURFACES.flatMap((surface): [string, string][] => [
     ['--text', surface],
     ['--text-muted', surface],
   ]),
-  ['--on-ink', '--ink'], // the label of the main action
+  ['--on-ink', '--ink'],
   ...ACCENTS.flatMap((name): [string, string][] => [
     [`--${name}`, `--${name}-tint`],
     [`--${name}`, '--surface'],
     [`--${name}`, '--bg'],
-    [`--${name}`, '--surface-2'], // a failed or running row under the pointer
-    ['--surface', `--${name}`], // the label of a filled button
+    [`--${name}`, '--surface-2'],
+    ['--surface', `--${name}`],
   ]),
 ];
 
-// Edges of controls and the focus ring need 3:1.
 const CONTROL_PAIRS: [string, string][] = [
   ['--border-strong', '--surface'],
   ['--border-strong', '--bg'],

@@ -23,7 +23,6 @@ installed, a key that only one command uses. `problem` is something that stops b
 
 MARKS: dict[State, str] = {"ok": "ok ", "missing": "-- ", "problem": "NO "}
 OLDEST_PYTHON = (3, 12)
-# What a browser says when it is not on the machine, whichever browser it is.
 NOT_INSTALLED = ("is not found at", "Executable doesn't exist", "is not installed")
 
 Launch = Callable[[Config, str], Awaitable[str]]
@@ -44,7 +43,6 @@ class Finding:
 
 async def launch_and_open(config: Config, channel: str) -> str:
     """The real thing: the browser is started the way a session starts it, shows a page, and is closed."""
-    # Imported here so that the other commands start without loading the browser library.
     from playwright.async_api import async_playwright
 
     from bap_browser.driver.browser_parts import launch_options

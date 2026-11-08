@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_cua_atexit_teardown.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Tests for cua-driver subprocess teardown on interpreter exit.
 
@@ -49,8 +48,6 @@ class TestAtexitTeardown:
         atexit.unregister(cu_tool._shutdown_backend_atexit)
         try:
             with patch.object(cu_tool, "_backend", MagicMock()) as fake:
-                # Re-register and fire the full atexit chain the way the
-                # interpreter would, then confirm our hook ran.
                 atexit.register(cu_tool._shutdown_backend_atexit)
                 atexit._run_exitfuncs()
                 fake.stop.assert_called_once()

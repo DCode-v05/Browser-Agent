@@ -103,7 +103,6 @@ async def test_the_next_request_carries_the_whole_turn_back_thinking_included(pr
     assert done == Reply("Done.")
     assert stand_in.requests[1]["body"]["messages"] == [
         {"role": "user", "content": "Read the page"},
-        # Exactly as the provider sent them, the thinking block included.
         {"role": "assistant", "content": first},
         {
             "role": "user",

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_resources.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop memory gate: the screen is refused, with a reason clients can show, while the host
 cannot spare ``bot_desktop.min_free_memory_mb``; a host we cannot read is never treated as small."""
@@ -28,8 +27,8 @@ def test_start_refuses_and_status_explains_when_memory_is_short(tmp_path, monkey
 
 
 @pytest.mark.parametrize("info", [
-    resources.MemoryInfo(available_mb=None, limit_mb=None),  # unreadable: not evidence of a small host
-    resources.MemoryInfo(available_mb=1536, limit_mb=2048),  # exactly the threshold is enough
+    resources.MemoryInfo(available_mb=None, limit_mb=None),
+    resources.MemoryInfo(available_mb=1536, limit_mb=2048),
 ])
 def test_unknown_or_sufficient_memory_never_blocks(monkeypatch, info):
     monkeypatch.setattr(resources, "min_free_mb", lambda: 1536)
@@ -62,7 +61,7 @@ def test_memory_info_takes_the_tighter_of_cgroup_and_host(tmp_path, monkeypatch)
     (v2 / "memory.max").write_text(str(2 * 1024 ** 3), encoding="utf-8")
     info = resources.memory_info()
     assert info.available_mb == 1024 and info.limit_mb == 2048
-    (v2 / "memory.max").write_text("max", encoding="utf-8")  # no limit: host numbers
+    (v2 / "memory.max").write_text("max", encoding="utf-8")
     assert resources.memory_info() == resources.MemoryInfo(available_mb=3072, limit_mb=4096)
 
 
@@ -70,7 +69,7 @@ def _cgroup(monkeypatch, tmp_path, *, v2=True, limit, usage, cache):
     """A cgroup tree: ``usage`` consumed, ``cache`` of it reclaimable."""
     root = tmp_path / "cg"
     root.mkdir(exist_ok=True)
-    monkeypatch.setattr(resources, "_MEMINFO", tmp_path / "no-meminfo")  # cgroup numbers only
+    monkeypatch.setattr(resources, "_MEMINFO", tmp_path / "no-meminfo")
     if v2:
         monkeypatch.setattr(resources, "_CGROUP_V2", root)
         monkeypatch.setattr(resources, "_CGROUP_V1", tmp_path / "nope")

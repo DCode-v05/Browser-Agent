@@ -100,7 +100,6 @@ def _split(keys: str) -> list[str]:
     text = keys.strip()
     if text == "+":
         return ["+"]
-    # `ctrl++` is Control and the plus key.
     plus_key = text.endswith("++")
     parts = [part.strip() for part in (text[:-2] if plus_key else text).split("+")]
     if any(part == "" for part in parts):
@@ -117,7 +116,6 @@ def _key(name: str, *, with_modifiers: bool) -> str:
     if len(low) >= 2 and low[0] == "f" and low[1:].isdigit() and 1 <= int(low[1:]) <= 24:
         return f"F{int(low[1:])}"
     if len(name) == 1:
-        # With a modifier held, a letter is the key, not the capital: Control+a, not Control+A.
         return name.lower() if with_modifiers and name.isalpha() else name
     raise BadInput(
         "That is not a key name. Use a name such as Enter, Escape, Tab, ArrowDown, PageDown or F5, or one "

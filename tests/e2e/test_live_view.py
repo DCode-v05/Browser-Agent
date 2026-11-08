@@ -95,9 +95,6 @@ async def test_the_rate_is_limited(live: PlaywrightDriver, site: str) -> None:
     started, first = time.monotonic(), len(frames)
     await until(lambda: time.monotonic() - started >= 1.5, "a second and a half passed")
     arrived = len(frames) - first
-    # The page moves on every frame of the browser, dozens of times a second. The browser keeps at
-    # most two pictures on their way, and each acknowledgement lets one more out: 1.5 s at four a
-    # second is seven acknowledgements at most, so nine pictures at most.
     assert 3 <= arrived <= 9, f"{arrived} pictures in 1.5 s at 4 a second"
 
 
@@ -141,7 +138,6 @@ async def test_a_persons_typing_reaches_the_page(live: PlaywrightDriver, site: s
     await live.key("down", "Shift")
     await press("A")
     await live.key("up", "Shift")
-    # The last two are a letter the keyboard Playwright knows does not have, and a key name that is no key at all.
     for key in ("d", "a", "x", "Backspace", " ", "é", "Dead", "₹"):
         await press(key)
     assert await live.page.input_value("#name") == "Ada é₹"

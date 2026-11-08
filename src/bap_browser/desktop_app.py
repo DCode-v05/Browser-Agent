@@ -10,11 +10,8 @@ from urllib.parse import quote, urlsplit
 
 from bap_browser.errors import BapError
 
-# An editor built on Electron sets this for the programs it starts. With it, Electron runs as plain
-# Node and opens no window.
 RUN_AS_NODE = "ELECTRON_RUN_AS_NODE"
 STATE_FILE = "BAP_BROWSER__SERVER__STATE_FILE"
-# What the chat's own window is told: the address it shows, and how wide it is.
 SIDE_CHAT, SIDE_CHAT_WIDTH = "BAP_SIDE_CHAT", "BAP_SIDE_CHAT_WIDTH"
 
 
@@ -127,7 +124,6 @@ class DesktopApp:
             raise BapError("The desktop app is not installed. Run: npm --prefix desktop install")
         chat = f"{at.scheme}://{at.netloc}/?session={quote(page)}&beside"
         if at.fragment.startswith("token="):
-            # The viewer's link: its token stays after the #, which no server is sent.
             chat += f"#{at.fragment}"
         env = {name: value for name, value in os.environ.items() if name != RUN_AS_NODE}
         env |= {SIDE_CHAT: chat, SIDE_CHAT_WIDTH: str(width)}

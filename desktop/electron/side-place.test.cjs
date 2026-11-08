@@ -1,5 +1,3 @@
-// The side chat (spec 22.3.1): where its window stands on the screen, and what address it shows.
-
 'use strict';
 
 const assert = require('node:assert/strict');

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Tests for the computer_use toolset (cua-driver backend, universal schema)."""
 
@@ -15,17 +14,12 @@ import pytest
 import itertools
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 @pytest.fixture(autouse=True)
 def _reset_backend(grant_computer_use_approvals):
     """Tear down the cached backend between tests; destructive actions get an interactive "once"
     through the shared approval gate (the tool fails closed with nobody to ask)."""
     from bap_browser.computer.hermes.computer_use import tool as cu_tool
     cu_tool.reset_backend_for_tests()
-    # Force the noop backend.
     with patch.object(cu_tool, "_new_backend", lambda mode: cu_tool._NoopBackend()):
         yield
     cu_tool.reset_backend_for_tests()
@@ -36,11 +30,6 @@ def noop_backend():
     """Return the active noop backend instance so tests can inspect calls."""
     from bap_browser.computer.hermes.computer_use.tool import _get_backend
     return _get_backend()
-
-
-# ---------------------------------------------------------------------------
-# Registration
-# ---------------------------------------------------------------------------
 
 
 class TestRegistration:
@@ -58,10 +47,6 @@ class TestRegistration:
         assert cua_backend_driver.resolve_cua_driver_cmd() == str(driver)
         assert cua_backend.cua_driver_binary_available() is True
 
-
-# ---------------------------------------------------------------------------
-# Dispatch & action routing
-# ---------------------------------------------------------------------------
 
 class TestDispatch:
 
@@ -132,7 +117,6 @@ class TestDispatch:
         from bap_browser.computer.hermes.computer_use.backend import ActionResult
         from bap_browser.computer.hermes.computer_use.tool import handle_computer_use
 
-        # Make click() return a failure.
         with patch.object(noop_backend, "click",
                           return_value=ActionResult(ok=False, action="click",
                                                     message="element not found")):
@@ -140,16 +124,11 @@ class TestDispatch:
                                        "capture_after": True})
 
         parsed = json.loads(out)
-        # Should return the error, not a multimodal capture.
         assert parsed.get("ok") is False
         assert parsed.get("action") == "click"
-        # No follow-up capture should have been issued.
         capture_calls = [c for c in noop_backend.calls if c[0] == "capture"]
         assert len(capture_calls) == 0, "capture must not be called after a failed action"
 
-# ---------------------------------------------------------------------------
-# Safety guards (type / key block lists)
-# ---------------------------------------------------------------------------
 
 class TestSafetyGuards:
     def test_blocked_type_patterns(self, noop_backend):
@@ -166,28 +145,22 @@ class TestSafetyGuards:
             assert "blocked pattern" in parsed["error"], text
 
     def test_blocked_key_combos(self, noop_backend):
-        # The cua-driver backend splits key strings on both '+' and '-'
-        # (cua_backend._parse_key_combo), so "ctrl-alt-delete" executes as the
-        # real destructive combo. The block must canonicalize the same way or
-        # it is trivially bypassed with hyphen notation.
         from bap_browser.computer.hermes.computer_use.tool import handle_computer_use
         for keys in (
-            "cmd+shift+backspace",      # empty trash
-            "cmd+option+backspace",     # force delete
-            "cmd+ctrl+q",               # lock screen
-            "cmd+shift+q",              # log out
-            "ctrl-alt-delete",          # hyphen notation (alt -> option)
-            "alt-f4",                   # force-quit window
-            "cmd-shift-q",              # log out, hyphenated
-            "cmd+shift-backspace",      # mixed + and - separators
+            "cmd+shift+backspace",
+            "cmd+option+backspace",
+            "cmd+ctrl+q",
+            "cmd+shift+q",
+            "ctrl-alt-delete",
+            "alt-f4",
+            "cmd-shift-q",
+            "cmd+shift-backspace",
         ):
             parsed = json.loads(handle_computer_use({"action": "key", "keys": keys}))
             assert "error" in parsed, keys
             assert "blocked key combo" in parsed["error"], keys
 
     def test_safe_key_combos_pass(self, noop_backend):
-        # Non-destructive combos, including hyphen notation and the literal '-'
-        # zoom key, must not be caught by the widened separator.
         from bap_browser.computer.hermes.computer_use.tool import handle_computer_use
         for keys in ("cmd+s", "cmd-c", "ctrl-c", "cmd+-"):
             parsed = json.loads(handle_computer_use({"action": "key", "keys": keys}))
@@ -199,10 +172,6 @@ class TestSafetyGuards:
         parsed = json.loads(out)
         assert "error" not in parsed
 
-
-# ---------------------------------------------------------------------------
-# Capture → multimodal envelope
-# ---------------------------------------------------------------------------
 
 class TestCaptureResponse:
 
@@ -224,7 +193,6 @@ class TestCaptureResponse:
                     app="Safari", window_title="example.com",
                     png_bytes_len=100,
                 )
-            # unused
             def click(self, **kw): ...
             def drag(self, **kw): ...
             def scroll(self, **kw): ...
@@ -331,8 +299,6 @@ class TestCaptureResponse:
         assert parsed["total_elements"] == 600
         assert len(parsed["elements"]) == cu_tool._DEFAULT_MAX_ELEMENTS
         assert parsed["truncated_elements"] == 600 - cu_tool._DEFAULT_MAX_ELEMENTS
-        # Truncation must be visible in the human summary so the model knows
-        # the JSON view is partial and can re-issue with a tighter scope.
         assert "truncated to" in parsed["summary"]
 
     def test_capture_ax_ignores_stale_max_elements_argument(self):
@@ -349,11 +315,9 @@ class TestCaptureResponse:
                 {"action": "capture", "mode": "ax", "max_elements": 10_000}
             )
         parsed = json.loads(out)
-        # Ignored: cap stays at the fixed default regardless of the argument.
         assert len(parsed["elements"]) == cu_tool._DEFAULT_MAX_ELEMENTS
         assert parsed["total_elements"] == 5000
         assert parsed["truncated_elements"] == 5000 - cu_tool._DEFAULT_MAX_ELEMENTS
-        # The full tree is spilled so nothing is lost.
         assert parsed.get("elements_file")
 
 class TestCuaCaptureImageDimensions:
@@ -367,9 +331,6 @@ class TestCuaCaptureImageDimensions:
         )
         assert _image_dimensions_from_bytes(raw_png) == (1, 1)
 
-# ---------------------------------------------------------------------------
-# Anthropic adapter: multimodal tool-result conversion
-# ---------------------------------------------------------------------------
 
 class TestAnthropicAdapterMultimodal:
     def test_multimodal_envelope_becomes_tool_result_with_image_block(self):
@@ -432,8 +393,6 @@ class TestAnthropicAdapterMultimodal:
                 },
             }
 
-        # Build screenshots interleaved with assistant messages. The eviction frontier
-        # advances in whole batches, so use a count that lands exactly on one advance.
         from agent.image_eviction_policy import IMAGE_EVICTION_BATCH, OUTBOUND_IMAGE_LIMIT
 
         total = OUTBOUND_IMAGE_LIMIT + 1
@@ -452,7 +411,6 @@ class TestAnthropicAdapterMultimodal:
 
         _, anthropic_msgs = convert_messages_to_anthropic(messages)
 
-        # One batch retires; everything newer keeps its image payload.
         tool_results = []
         for m in anthropic_msgs:
             if m["role"] != "user" or not isinstance(m["content"], list):
@@ -592,9 +550,6 @@ class TestAnthropicAdapterMultimodal:
                 )
             )
 
-        # Span three batch windows. The placeholder count must step once per batch (a
-        # one-step frontier fails the plateau check) AND the surviving image count must
-        # never exceed the limit (a fixed one-batch retire fails that after window one).
         span = range(OUTBOUND_IMAGE_LIMIT - 2, OUTBOUND_IMAGE_LIMIT + 3 * IMAGE_EVICTION_BATCH)
         counts = [placeholder_count(n) for n in span]
         assert all(n - c <= OUTBOUND_IMAGE_LIMIT for n, c in zip(span, counts)), counts
@@ -604,14 +559,10 @@ class TestAnthropicAdapterMultimodal:
             "each step invalidates the cached prefix"
         )
 
-# ---------------------------------------------------------------------------
-# Context compressor: screenshot-aware pruning
-# ---------------------------------------------------------------------------
 
 class TestCompressorScreenshotPruning:
     def _make_compressor(self):
         from agent.context_compressor import ContextCompressor
-        # Minimal constructor — _prune_old_tool_results doesn't need a real client.
         c = ContextCompressor.__new__(ContextCompressor)
         return c
 
@@ -633,7 +584,6 @@ class TestCompressorScreenshotPruning:
         ]
         c = self._make_compressor()
         out, _ = c._prune_old_tool_results(messages, protect_tail_count=1)
-        # The image-bearing tool_result (index 2) should now have no image part.
         pruned_msg = out[2]
         assert isinstance(pruned_msg["content"], list)
         assert not any(
@@ -662,14 +612,9 @@ class TestCompressorScreenshotPruning:
         c = self._make_compressor()
         out, _ = c._prune_old_tool_results(messages, protect_tail_count=1)
         pruned = out[2]
-        # Envelope should become a plain string containing the summary.
         assert isinstance(pruned["content"], str)
         assert "screenshot removed" in pruned["content"]
 
-
-# ---------------------------------------------------------------------------
-# Token estimator: image-aware
-# ---------------------------------------------------------------------------
 
 class TestImageAwareTokenEstimator:
 
@@ -686,13 +631,8 @@ class TestImageAwareTokenEstimator:
             }},
         ]
         tokens = estimate_messages_tokens_rough(messages)
-        # One image = 1500, + small text envelope overhead
         assert 1500 <= tokens < 2500
 
-
-# ---------------------------------------------------------------------------
-# Run-agent multimodal helpers
-# ---------------------------------------------------------------------------
 
 class TestRunAgentMultimodalHelpers:
 
@@ -708,14 +648,9 @@ class TestRunAgentMultimodalHelpers:
         }
         _append_subdir_hint_to_multimodal(env, "\n[subdir hint]")
         assert env["content"][0]["text"] == "summary\n[subdir hint]"
-        # Image part untouched
         assert env["content"][1]["type"] == "image_url"
         assert env["text_summary"] == "summary\n[subdir hint]"
 
-
-# ---------------------------------------------------------------------------
-# Regression tests for bugs 2 & 5 from issue #24170 (cua-driver v0.1.6)
-# ---------------------------------------------------------------------------
 
 class TestElementLabelParsing:
     """Bug 5: element labels stripped in capture results (cua-driver v0.1.6 format).
@@ -737,7 +672,7 @@ class TestElementLabelParsing:
         assert els[0].role == "AXButton"
         assert els[0].label == "One"
         assert els[1].label == "Two"
-        assert els[2].label == ""  # empty quoted label
+        assert els[2].label == ""
 
     def test_new_id_eq_format(self):
         """cua-driver v0.1.6 format: [N] AXRole (order) id=Label"""
@@ -753,7 +688,7 @@ class TestElementLabelParsing:
         assert els[0].role == "AXButton"
         assert els[0].label == "One"
         assert els[1].label == "Two"
-        assert els[2].label == ""  # empty id= value
+        assert els[2].label == ""
 
     def test_parenthesised_and_value_label_formats(self):
         """Real cua-driver System Settings format: `(label)` and `= "value"`.
@@ -771,21 +706,19 @@ class TestElementLabelParsing:
             '          - [4] AXStaticText = "Wi\u2011Fi" [id=com.apple.wifi actions=[showmenu]]\n'
             '- [92] AXPopUpButton = "Automatic" [id=HighlightColorPicker actions=[press]]\n'
             '- [100] AXRadioButton (Always) [actions=[press]]\n'
-            '[200] AXButton (5) id=RealLabel\n'   # (5) is order number -> label from id=
-            '[201] AXButton (7)\n'                # order number only, no real label
+            '[200] AXButton (5) id=RealLabel\n'
+            '[201] AXButton (7)\n'
         )
         els = _parse_elements_from_tree(tree)
         labels = {e.index: e.label for e in els}
         assert labels[77] == "Auto"
         assert labels[78] == "Light"
-        assert labels[79] == "Dark"           # the exact case that broke theme-switching
+        assert labels[79] == "Dark"
         assert labels[4] == "Wi\u2011Fi"
         assert labels[92] == "Automatic"
         assert labels[100] == "Always"
-        assert labels[200] == "RealLabel"     # (5) order skipped, id= used
-        assert labels[201] == ""              # pure order number, no label
-
-
+        assert labels[200] == "RealLabel"
+        assert labels[201] == ""
 
 
 class TestLazyMcpInstall:
@@ -830,10 +763,7 @@ class TestLazyMcpInstall:
              patch.object(cua_backend._CuaDriverSession, "start") as mock_sess_start:
             with pytest.raises(FeatureUnavailable):
                 cua_backend.CuaDriverBackend().start()
-        mock_sess_start.assert_not_called()  # never reaches the MCP session
-
-
-
+        mock_sess_start.assert_not_called()
 
 
 class TestCaptureAfterAppContext:
@@ -851,7 +781,7 @@ class TestCaptureAfterAppContext:
         captured_app_args = []
 
         class TrackingBackend:
-            _last_app = "Calculator"  # simulates a previous focus_app call
+            _last_app = "Calculator"
 
             def start(self):
                 pass
@@ -903,18 +833,11 @@ class TestCaptureAfterAppContext:
 
         cu_tool.handle_computer_use({"action": "click", "element": 14, "capture_after": True})
 
-        # The follow-up capture must have been called with app="Calculator"
         assert len(captured_app_args) == 1
         assert captured_app_args[0] == "Calculator", (
             f"Expected follow-up capture with app='Calculator', got {captured_app_args[0]!r}"
         )
 
-
-# ---------------------------------------------------------------------------
-# Regression tests for bug 1 from issue #24170:
-#   capture(app=...) and focus_app(app=...) must surface when the filter
-#   matches nothing instead of silently picking the frontmost window.
-# ---------------------------------------------------------------------------
 
 def _make_cua_backend_with_windows(windows: list[dict[str, Any]]):
     """Construct a CuaDriverBackend with a mocked MCP session that returns
@@ -950,8 +873,6 @@ def _make_cua_backend_with_windows_and_apps(
                 "isError": False,
             }
         if name == "list_apps":
-            # cua-driver MCP puts the canonical app objects in
-            # structuredContent; `data` is only a human-readable summary.
             return {
                 "data": f"✅ Found {len(apps)} app(s)",
                 "images": [],
@@ -1020,13 +941,12 @@ class TestCuaDriverSessionReconnect:
         session._started = True
         session._capabilities = {}
         session._capability_version = ""
-        session._ready_event = None  # populated by real _start_lifecycle
+        session._ready_event = None
         session._shutdown_event = None
         session._lifecycle_future = None
         session._setup_error = None
         session._declared_session_id = None
         session._call_tool_async = lambda name, args: ("call", name, args)
-        # Record what reconnect does — stop then start, in that order.
         session._reconnect_log = []
         session._stop_lifecycle_locked = lambda: session._reconnect_log.append("stop")
         session._start_lifecycle_locked = lambda: session._reconnect_log.append("start")
@@ -1039,7 +959,6 @@ class TestCuaDriverSessionReconnect:
         class FakeBridge:
             def __init__(self):
                 self.calls = []
-                # 1st call_tool -> closed transport; retried call_tool ok.
                 self.effects = [ClosedResourceError(), {"ok": True}]
 
             def run(self, value, timeout=None):
@@ -1053,7 +972,6 @@ class TestCuaDriverSessionReconnect:
         session = self._make_session(bridge)
 
         assert session.call_tool("list_apps", {}) == {"ok": True}
-        # Reconnect-once sequence: failed call -> stop -> start -> retried call.
         assert bridge.calls[0][0] == ("call", "list_apps", {})
         assert session._reconnect_log == ["stop", "start"]
         assert bridge.calls[1][0] == ("call", "list_apps", {})
@@ -1099,14 +1017,10 @@ class TestCuaDriverSessionReconnect:
 
         result = session.call_tool("click", {"x": 20, "y": 30})
 
-        # Uncertainty surfaced in the error shape: the action MAY have taken
-        # effect on the remote screen before the deadline hit.
         assert result["isError"] is True
         assert result["structuredContent"]["code"] == "timeout_outcome_unknown"
         assert result["structuredContent"]["next_step"] == "fresh_state"
         assert "unknown" in result["data"]
-        # The timed-out call was NOT replayed and the session was not
-        # eagerly torn down — recreation is deferred to the next call.
         assert len(bridge.calls) == 1
         assert session._reconnect_log == []
         assert session._timeout_suspect is True
@@ -1135,14 +1049,11 @@ class TestCuaDriverSessionReconnect:
         bridge.timeout = False
         assert session.call_tool("list_apps", {}) == {"ok": True}
 
-        # Recreate-before-call: stop/start happened ahead of the second call,
-        # and only one call per call_tool — no replay of either operation.
         assert session._reconnect_log == ["stop", "start"]
         assert [c for c in bridge.calls] == [
             ("call", "get_window_state", {"window_id": 42}),
             ("call", "list_apps", {}),
         ]
-        # Flag cleared: subsequent calls do not trigger another restart.
         assert session._timeout_suspect is False
         session.call_tool("list_windows", {})
         assert session._reconnect_log == ["stop", "start"]
@@ -1220,7 +1131,6 @@ class TestCuaDriverSessionReconnect:
         class FakeProc:
             returncode = 0
             stderr = ""
-            # Daemon returns a path, not inline base64.
             stdout = ('{"element_count": 7, "tree_markdown": "- [0] AXButton",'
                       f' "screenshot_file_path": "{shot!s}"}}')
 
@@ -1238,9 +1148,7 @@ class TestCuaDriverSessionReconnect:
         finally:
             _sp.run = orig_run
 
-        # Screenshot read from disk and base64-encoded.
         assert out["images"] == [_b64.b64encode(png_bytes).decode("ascii")]
-        # tree_markdown surfaced as the data text blob with the element-count summary.
         assert "AXButton" in out["data"]
         assert "7 elements" in out["data"]
 
@@ -1258,7 +1166,6 @@ class TestCaptureEmptyResultClipFallback:
             "is_on_screen": True, "z_index": 0, "title": "Desktop",
         }]
 
-        # A valid 1x1 PNG, base64-encoded.
         png = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
                b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00"
                b"\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82")
@@ -1267,8 +1174,6 @@ class TestCaptureEmptyResultClipFallback:
         backend = CuaDriverBackend()
         sess = MagicMock()
 
-        # MCP path: list_windows OK, but get_window_state returns EMPTY (no
-        # images, blank data) — the silent-failure mode.
         def mcp_call(name, args, timeout=30.0):
             if name == "list_windows":
                 return {"data": "", "images": [], "isError": False,
@@ -1279,7 +1184,6 @@ class TestCaptureEmptyResultClipFallback:
             return {"data": "", "images": [], "isError": False, "structuredContent": None}
         sess.call_tool.side_effect = mcp_call
 
-        # CLI re-fetch returns a real screenshot + tree.
         cli_calls = []
         def cli_call(name, args, timeout):
             cli_calls.append(name)
@@ -1290,7 +1194,6 @@ class TestCaptureEmptyResultClipFallback:
         backend._session = cast(Any, sess)
         cap = backend.capture(mode="som", app="Finder")
 
-        # The empty MCP gws result triggered a CLI re-fetch that supplied the PNG.
         assert "get_window_state" in cli_calls
         assert cap.png_b64 == png_b64
         assert cap.width == 1 and cap.height == 1
@@ -1306,7 +1209,6 @@ class TestCaptureAppFilterNoMatch:
     """
 
     def test_app_filter_no_match_returns_empty_capture_with_diagnostic(self):
-        # Simulates a localized macOS where Calculator's app_name is "計算機".
         windows = [
             {"app_name": "Fuwari", "pid": 100, "window_id": 1,
              "is_on_screen": True, "title": "menu bar", "z_index": 0},
@@ -1317,14 +1219,12 @@ class TestCaptureAppFilterNoMatch:
 
         cap = backend.capture(mode="som", app="Calculator")
 
-        # No window matched; capture must NOT pick the frontmost (Fuwari).
         assert cap.app == "", (
             f"app= filter no-match should not silently target a window; got {cap.app!r}"
         )
         assert cap.elements == []
         assert "Calculator" in cap.window_title
         assert "list_apps" in cap.window_title
-        # _active_pid must remain unset so a subsequent click doesn't hit Fuwari.
         assert backend._active_pid is None
         assert backend._active_window_id is None
 
@@ -1391,7 +1291,6 @@ class TestFocusAppFilterNoMatch:
         assert res.ok is False
         assert res.action == "focus_app"
         assert "Calculator" in res.message
-        # _active_pid must remain unset so a subsequent click doesn't hit Fuwari.
         assert backend._active_pid is None
 
 
@@ -1467,17 +1366,15 @@ class TestCuaEnvironmentScrubbing:
 
         async def drive_lifecycle():
             test_env = {
-                "OPENAI_API_KEY": "sk-secret",         # blocked
-                "ANTHROPIC_API_KEY": "sk-ant-secret",  # blocked
-                "PATH": "/usr/bin:/bin",               # safe
-                "HOME": "/home/user",                  # safe
-                "SAFE_VAR": "allowed",                 # safe
+                "OPENAI_API_KEY": "sk-secret",
+                "ANTHROPIC_API_KEY": "sk-ant-secret",
+                "PATH": "/usr/bin:/bin",
+                "HOME": "/home/user",
+                "SAFE_VAR": "allowed",
             }
 
             def capture_env(**kwargs):
                 captured_env.update(kwargs.get("env", {}))
-                # Return any sentinel — never actually used by the
-                # patched stdio_client path below.
                 return MagicMock()
 
             with patch.dict(os.environ, test_env, clear=True), \
@@ -1489,28 +1386,19 @@ class TestCuaEnvironmentScrubbing:
                  patch("mcp.client.stdio.stdio_client") as mock_stdio, \
                  patch("mcp.ClientSession") as mock_session_class:
 
-                # stdio_client(params) is used as `async with`.
                 mock_stdio.return_value.__aenter__ = AsyncMock(
                     return_value=(MagicMock(), MagicMock()))
                 mock_stdio.return_value.__aexit__ = AsyncMock(return_value=None)
 
-                # ClientSession(read, write) is used as `async with`.
                 fake_session = MagicMock()
                 fake_session.initialize = AsyncMock()
-                # tools/list yields nothing — keeps _populate_capabilities
-                # quiet without us needing to fully mock the response shape.
                 fake_session.list_tools = AsyncMock(return_value=MagicMock(tools=[]))
                 mock_session_class.return_value.__aenter__ = AsyncMock(
                     return_value=fake_session)
                 mock_session_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
-                # Run the lifecycle with the shutdown event pre-set so it
-                # tears down right after setup. We can't pre-set
-                # session._shutdown_event because _lifecycle_coro creates
-                # it inside the coroutine; instead, kick a background
-                # task that signals as soon as the event exists.
                 async def _signal_shutdown_when_ready():
-                    for _ in range(200):  # ~1s budget
+                    for _ in range(200):
                         if session._shutdown_event is not None:
                             session._shutdown_event.set()
                             return
@@ -1520,7 +1408,7 @@ class TestCuaEnvironmentScrubbing:
                 try:
                     await session._lifecycle_coro()
                 except BaseException:
-                    pass  # mocks may raise; the env capture still landed
+                    pass
                 finally:
                     signal_task.cancel()
                     try:
@@ -1530,12 +1418,10 @@ class TestCuaEnvironmentScrubbing:
 
         asyncio.run(drive_lifecycle())
 
-        # Blocked credentials must NOT have been passed to the subprocess.
         assert "OPENAI_API_KEY" not in captured_env, \
             "OPENAI_API_KEY should be stripped from cua-driver subprocess"
         assert "ANTHROPIC_API_KEY" not in captured_env, \
             "ANTHROPIC_API_KEY should be stripped from cua-driver subprocess"
-        # At least one safe var must survive the scrub.
         assert "PATH" in captured_env or "SAFE_VAR" in captured_env, \
             "At least one safe environment variable should be preserved"
 
@@ -1587,7 +1473,6 @@ class TestClickButtonPassthrough:
             "structuredContent": None,
             "isError": False,
         }
-        # Pretend capture() ran and resolved a target.
         backend._active_pid = 111
         backend._active_window_id = 222
         return backend
@@ -1609,8 +1494,6 @@ class TestClickButtonPassthrough:
 
     def test_coordinate_drag_and_scroll_keep_the_captured_window(self):
         backend = self._backend_with_active_target()
-        # Mock the capability check so x/y are included (they're gated
-        # behind the input.scroll.coordinates capability).
         backend._session.supports_capability.return_value = True
 
         backend.drag(from_xy=(10, 20), to_xy=(30, 40))
@@ -1706,7 +1589,6 @@ class TestZIndexSorting:
 
         backend.capture(mode="ax")
 
-        # Firefox has z_index=10 (frontmost) — must be selected.
         assert backend._active_pid == 200
         assert backend._active_window_id == 2
 
@@ -1723,9 +1605,7 @@ class TestZIndexSorting:
              "is_on_screen": True, "title": "browser", "z_index": 5},
         ]
         out = _ingest_windows(raw)
-        # Both windows survive (null z_index doesn't drop the window).
         assert len(out) == 2
-        # Null z_index was normalised to 0.
         desktop = next(w for w in out if w["app_name"] == "Desktop")
         assert desktop["z_index"] == 0
 
@@ -1841,7 +1721,7 @@ class TestMcpInvocationResolution:
 
         manifest = (
             '{"mcp_invocation":'
-            '{"command":"cua-driver","args":"mcp"}}'  # args should be list
+            '{"command":"cua-driver","args":"mcp"}}'
         )
         with patch("subprocess.run", new=self._fake_run(stdout=manifest)):
             _cmd, args = _resolve_mcp_invocation("cua-driver")
@@ -1884,7 +1764,6 @@ class TestStructuredElementsConsumption:
 
         backend = CuaDriverBackend()
         backend._session = MagicMock()
-        # Modern driver: capabilities discovered, `screenshot` not advertised.
         backend._session._has_tool.return_value = False
         backend._session.capabilities_discovered = True
 
@@ -1921,7 +1800,6 @@ class TestStructuredElementsConsumption:
         assert cap.image_mime_type == "image/png"
         assert cap.width == 1
         assert cap.height == 1
-        # Vision mode stays free of AX element noise.
         assert cap.elements == []
 
 class TestCapabilityDiscovery:
@@ -1941,10 +1819,7 @@ class TestCapabilityDiscovery:
             "click": {"input.pointer.click", "accessibility.element_tokens"},
             "type_text": {"input.keyboard.type"},
         }
-        # `accessibility.element_tokens` is advertised by `click` — the
-        # global probe should see it without naming the tool.
         assert session.supports_capability("accessibility.element_tokens") is True
-        # Not advertised by anyone:
         assert session.supports_capability("never.heard.of.it") is False
 
     def test_supports_capability_scoped_to_specific_tool(self):
@@ -1953,14 +1828,12 @@ class TestCapabilityDiscovery:
         session = _CuaDriverSession(_AsyncBridge())
         session._capabilities = {
             "click":     {"input.pointer.click", "accessibility.element_tokens"},
-            "type_text": {"input.keyboard.type"},  # no element_tokens
+            "type_text": {"input.keyboard.type"},
         }
-        # Tool-scoped check is precise:
         assert session.supports_capability("accessibility.element_tokens",
                                            tool="click") is True
         assert session.supports_capability("accessibility.element_tokens",
                                            tool="type_text") is False
-        # Unknown tool → False (instead of KeyError).
         assert session.supports_capability("anything", tool="never_registered") is False
 
 
@@ -1992,7 +1865,6 @@ class TestElementTokenAttachment:
             "data": "ok", "images": [], "image_mime_types": [],
             "structuredContent": None, "isError": False,
         }
-        # `supports_capability(cap, tool=None)` honors the supplied map.
         def _supports(cap, tool=None):
             if tool is not None:
                 return cap in capabilities.get(tool, set())
@@ -2011,14 +1883,13 @@ class TestElementTokenAttachment:
         name, args = backend._session.call_tool.call_args.args
         assert name == "click"
         assert args["element_index"] == 5
-        # The matching token rode along — cua-driver will prefer it.
         assert args["element_token"] == "s0001:5"
 
     def test_token_attached_when_only_input_schema_advertises_it(self):
         """cua-driver >= 0.21 dropped the per-tool `capabilities[]` array from tools/list but advertises
         `element_token` in `click`'s inputSchema and REFUSES a bare element_index (`snapshot_id_required`).
         The token must ride along from the live schema alone, or every element click is refused."""
-        backend = self._backend_with_session({})  # no capabilities[] at all — the modern shape
+        backend = self._backend_with_session({})
         backend._session.supports_input_property = lambda tool, prop: (tool, prop) == ("click", "element_token")
         backend._snapshot_tokens = {5: "s00000001:5"}
         backend.click(element=5, button="left")
@@ -2036,7 +1907,6 @@ class TestElementTokenAttachment:
         backend = CuaDriverBackend()
         backend._session = MagicMock()
         backend._session.supports_capability = lambda cap, tool=None: True
-        # Pretend an earlier capture left this stale state.
         backend._snapshot_tokens = {99: "stale:99"}
 
         windows_payload = {"windows": [{
@@ -2066,7 +1936,6 @@ class TestElementTokenAttachment:
         backend._session.call_tool.side_effect = fake_call_tool
         backend.capture(mode="ax")
 
-        # Stale 99 token is gone; only the two new tokens remain.
         assert backend._snapshot_tokens == {1: "snap2:1", 2: "snap2:2"}
 
 
@@ -2084,7 +1953,7 @@ class TestSessionLifecycle:
         from bap_browser.computer.hermes.computer_use.cua_backend import CuaDriverBackend
         backend = CuaDriverBackend()
         backend._session = MagicMock()
-        backend._session._started = True  # start() probe
+        backend._session._started = True
         backend._session.call_tool.return_value = {
             "data": "ok", "images": [], "image_mime_types": [],
             "structuredContent": None, "isError": False,
@@ -2099,7 +1968,6 @@ class TestSessionLifecycle:
         from bap_browser.computer.hermes.computer_use.cua_backend import CuaDriverBackend
 
         backend = CuaDriverBackend()
-        # Replace the real session with a mock to capture call_tool.
         backend._session = MagicMock()
         backend._session.start = MagicMock()
         backend._session.call_tool = MagicMock(return_value={
@@ -2107,15 +1975,12 @@ class TestSessionLifecycle:
             "structuredContent": None, "isError": False,
         })
 
-        # Session lifecycle is independent of PM acquisition.
         with patch(
             "bap_browser.computer.hermes.computer_use.cua_backend.cua_driver_runtime_contract_status",
             return_value={"ready": True},
         ), patch("pm.ensure"), patch("pm.ensure_import"):
             backend.start()
 
-        # First call_tool after _session.start() must be start_session
-        # with this backend instance's session id.
         first_call = backend._session.call_tool.call_args_list[0]
         name, args = first_call.args
         assert name == "start_session"
@@ -2130,7 +1995,6 @@ class TestSessionLifecycle:
         backend = CuaDriverBackend()
         backend._session = MagicMock()
         backend._session.start = MagicMock()
-        # First call (start_session) raises; subsequent calls are fine.
         backend._session.call_tool.side_effect = [
             RuntimeError("older cua-driver — start_session unknown"),
         ]
@@ -2139,7 +2003,7 @@ class TestSessionLifecycle:
             "bap_browser.computer.hermes.computer_use.cua_backend.cua_driver_runtime_contract_status",
             return_value={"ready": True},
         ), patch("pm.ensure"), patch("pm.ensure_import"):
-            backend.start()  # must not raise
+            backend.start()
 
 
 class TestCuaToolCoverageExpansion:
@@ -2163,7 +2027,6 @@ class TestCuaToolCoverageExpansion:
         backend._session.supports_capability = lambda cap, tool=None: False
         return backend
 
-    # ── App lifecycle ────────────────────────────────────────────
 
     def test_launch_app_requires_bundle_id_or_name(self):
         backend = self._backend()
@@ -2171,7 +2034,6 @@ class TestCuaToolCoverageExpansion:
         with pytest.raises(ValueError, match="bundle_id or name"):
             backend.launch_app()
 
-    # ── Generic escape hatch ────────────────────────────────────
 
     def test_call_tool_preserves_caller_session(self):
         """If the caller already supplied `session`, that wins
@@ -2196,8 +2058,6 @@ class TestStartupTimeoutPhaseDetail:
         phase_reached = threading.Event()
 
         async def _wedged_lifecycle(self):
-            # Real lifecycle shape: shutdown event on the loop, phase marker,
-            # then block — here at MCP initialize, as a wedged driver does.
             self._shutdown_event = asyncio.Event()
             self._startup_phase = "mcp-initialize"
             phase_reached.set()
@@ -2215,7 +2075,7 @@ class TestStartupTimeoutPhaseDetail:
 
         bridge = cbs._AsyncBridge()
         session = cbs._CuaDriverSession(bridge)
-        bridge.start()  # before the Event patch, so only the ready wait sees it
+        bridge.start()
         try:
             with patch.object(cbs._CuaDriverSession, "_lifecycle_coro", _wedged_lifecycle), \
                  patch.object(cbs.threading, "Event", _FastReadyEvent):
@@ -2224,8 +2084,6 @@ class TestStartupTimeoutPhaseDetail:
             msg = str(excinfo.value)
             assert "stuck in phase: mcp-initialize" in msg
             assert "computer-use doctor" in msg
-            # The timeout path signals the wedged lifecycle to shut down, and
-            # the session stays un-started so the next call rebuilds it.
             session._lifecycle_future.result(timeout=5)
             assert session._started is False
         finally:
@@ -2291,8 +2149,6 @@ class TestBoundsSpaceNote:
         from bap_browser.computer.hermes.computer_use.backend import UIElement
         from bap_browser.computer.hermes.computer_use.tool import _bounds_space_note
 
-        # Live repro: 1455x791 screenshot, element bounds out to x=3840
-        # (native 4K desktop space).
         elems = [UIElement(index=0, role="Button", label="Close",
                            bounds=(3771, 0, 69, 60), app="")]
         note = _bounds_space_note(elems, 1455, 791)
@@ -2342,10 +2198,9 @@ class TestElementSpillFile:
         assert str(out["elements_file"]) in out["summary"]
         spill = json.loads(
             open(out["elements_file"], encoding="utf-8-sig").read())
-        # Everything the in-context response dropped is in the file:
         assert spill["total_elements"] == 120
-        assert len(spill["elements"]) == 120           # beyond max_elements cap
-        assert len(spill["elements"][0]["label"]) > 2000  # beyond label cap
+        assert len(spill["elements"]) == 120
+        assert len(spill["elements"][0]["label"]) > 2000
         assert spill["elements"][119]["label"].startswith("msg 119")
 
     def test_no_spill_when_nothing_dropped(self, tmp_path, monkeypatch):
@@ -2378,7 +2233,6 @@ class TestElementSpillFile:
         monkeypatch.setattr(cu_tool, "_spill_elements_to_file",
                             lambda cap: None)
         out = json.loads(cu_tool._capture_response(self._dense_capture()))
-        # Capture still succeeds and stays budget-capped without the file.
         assert out["truncated_elements"] == 20
         assert "elements_file" not in out
 
@@ -2438,7 +2292,6 @@ class TestBoundsScaleField:
         from bap_browser.computer.hermes.computer_use.backend import CaptureResult, UIElement
         from bap_browser.computer.hermes.computer_use.tool import _capture_response
 
-        # Live repro geometry: 1455x791 screenshot, native bounds to 3799.
         elems = [UIElement(index=0, role="Button", label="Close",
                            bounds=(3730, 0, 69, 60), app="")]
         cap = CaptureResult(mode="som", width=1455, height=791, png_b64=None,

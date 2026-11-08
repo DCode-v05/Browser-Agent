@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 
-# Test files cannot import each other (pytest's importlib mode), so the fixture's type is spelled here.
 OpenView = Callable[..., Awaitable[Any]]
 SIZES = ["desktop", "phone"]
 
@@ -13,7 +12,6 @@ GROUPS = ["Browser", "Approvals", "Sites", "Files", "Privacy", "Live view", "App
 
 
 async def test_the_full_run_from_start_to_summary(open_view: OpenView) -> None:
-    # Twenty times faster than it was recorded, so the test does not wait on the agent's pauses.
     view = await open_view("demo=signup&pace=0.05")
     page = view.page
     await page.get_by_role("button", name="Allow once").click()
@@ -65,7 +63,6 @@ async def test_the_step_drawer_shows_the_evidence(open_view: OpenView) -> None:
     drawer = page.get_by_role("dialog", name="Step 8")
     await drawer.wait_for()
     picture = drawer.get_by_role("img", name="The browser at step 8")
-    # The picture is given the time to load. A picture that cannot be shown fails here.
     assert await picture.evaluate("image => image.decode().then(() => image.naturalWidth > 0)")
     await view.shot("step-drawer-light-desktop")
     assert await view.accessibility_violations() == []
@@ -126,7 +123,6 @@ async def test_the_keyboard_reaches_every_control_and_shows_where_it_is(open_vie
     reached: list[str] = []
     for _ in range(12):
         await page.keyboard.press("Tab")
-        # After the last control the focus leaves the page for the browser's own controls.
         if await page.evaluate("document.activeElement === document.body"):
             break
         name = await page.evaluate(
@@ -198,10 +194,8 @@ async def test_on_a_narrow_screen_the_keyboard_never_falls_out_of_settings(open_
     await dialog.get_by_role("tab", name="Browser").wait_for()
     inside = "document.querySelector('.settings').contains(document.activeElement)"
     seen = "document.activeElement.checkVisibility()"
-    # Choosing a group replaces the list of groups with that group's settings.
     await page.keyboard.press("Enter")
     await dialog.get_by_role("button", name="Back").wait_for()
-    # The focus follows the screen: it is neither left on the hidden list nor dropped onto the page.
     await page.wait_for_function(f"{inside} && {seen}", timeout=2000)
     for _ in range(14):
         await page.keyboard.press("Tab")
@@ -218,11 +212,9 @@ async def test_an_approval_pops_up_and_is_answered_there(open_view: OpenView) ->
     page = view.page
     popup = page.get_by_role("dialog", name="The agent needs your approval")
     await popup.wait_for()
-    # The pop-up holds the focus and none of its buttons does: a stray key allows nothing.
     assert await page.evaluate("document.activeElement?.getAttribute('role')") == "dialog"
     await page.keyboard.press("Enter")
     assert await popup.is_visible()
-    # The answers are in the pop-up, and are not offered a second time behind it.
     assert await page.get_by_role("button", name="Allow once").count() == 1
     assert await view.sideways_overflow() <= 0
     assert await view.accessibility_violations() == []
@@ -235,7 +227,6 @@ async def test_an_approval_pops_up_and_is_answered_there(open_view: OpenView) ->
 async def test_in_full_view_an_approval_fits_and_can_be_answered(open_view: OpenView) -> None:
     view = await open_view("state=waiting_approval")
     page = view.page
-    # The person looks at the page first: the request stays open as a card.
     await page.get_by_role("button", name="Look first").click()
     await page.keyboard.press("f")
     await page.locator('.app[data-view="full"]').wait_for()

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_input_target_guard.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Input actions must not silently deliver to a different app than requested.
 
@@ -19,8 +18,6 @@ from bap_browser.computer.hermes.computer_use.tool import (
 def _backend(last_app):
     return SimpleNamespace(_last_app=last_app)
 
-# ── mismatch predicate ──────────────────────────────────────────────────
-
 def test_clear_mismatch_returns_current_app():
     assert _input_target_mismatch(_backend("kcalc"), "kate") == "kcalc"
 
@@ -28,15 +25,12 @@ def test_same_app_no_mismatch():
     assert _input_target_mismatch(_backend("kate"), "kate") is None
 
 def test_substring_variants_no_mismatch():
-    # list_windows names are localized/variant; never refuse fuzzy matches.
     assert _input_target_mismatch(_backend("Google-chrome"), "chrome") is None
     assert _input_target_mismatch(_backend("chrome"), "Google-chrome") is None
 
 def test_unknown_current_target_fails_open():
     assert _input_target_mismatch(_backend(None), "kate") is None
     assert _input_target_mismatch(_backend(""), "kate") is None
-
-# ── dispatch guard ──────────────────────────────────────────────────────
 
 def _dispatch_result(backend, action, args):
     return json.loads(_dispatch(backend, action, args))
@@ -77,5 +71,3 @@ def test_type_without_app_unchanged():
     backend.type_text = lambda text, **kw: _fake_action_result()
     out = _dispatch_result(backend, "type", {"text": "9"})
     assert out.get("ok") is True
-
-# ── unknown-action suggestions ──────────────────────────────────────────

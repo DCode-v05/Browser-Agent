@@ -14,7 +14,6 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from bap_browser.tools.registry import tools_hash
 
-# A request that is refused is read no further than this before it is answered.
 LARGEST_REFUSED_REQUEST = 64 * 1024
 
 
@@ -30,8 +29,6 @@ class McpEndpoint:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         headers = Headers(scope=scope)
         origin = headers.get("origin")
-        # A browser says which page sends a request. A web page that is not the viewer's own has no
-        # business with the tools, whatever token it holds. An agent that is no browser says nothing.
         own = {f"http://{headers.get('host', '')}", f"https://{headers.get('host', '')}"}
         if origin is not None and origin not in own | self._origins:
             await self._refuse(Response(status_code=403), scope, receive, send)
@@ -45,8 +42,6 @@ class McpEndpoint:
 
     @staticmethod
     async def _refuse(refusal: Response, scope: Scope, receive: Receive, send: Send) -> None:
-        # What was sent is read first. An answer that closes the connection over a request still
-        # unread reaches the sender as a broken connection, not as a refusal.
         read = 0
         while read < LARGEST_REFUSED_REQUEST:
             message = await receive()

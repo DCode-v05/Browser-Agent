@@ -37,7 +37,6 @@ async def test_a_person_changes_settings_and_the_service_keeps_them(
     config = make_config(
         tmp_path,
         safety={"blocked_domains": ["*.internal.example"]},
-        # What config.json locks is nobody's to change from a screen, the admin's included.
         settings={"locked": ["page_scripts"]},
     )
     settings = SettingsStore(config)
@@ -54,40 +53,32 @@ async def test_a_person_changes_settings_and_the_service_keeps_them(
         await page.get_by_role("button", name="Open settings").click()
         dialog = page.get_by_role("dialog", name="Settings")
         await dialog.get_by_role("tab", name="Browser").wait_for()
-        # The screen is the service's own: the groups of this build, and no setting it has not.
         assert [await tab.inner_text() for tab in await dialog.get_by_role("tab").all()] == GROUPS
         assert await dialog.get_by_text("My Chrome", exact=True).count() == 0
 
-        # A change is saved as it is made, and holds for the agent's next call.
         await dialog.get_by_role("tab", name="Approvals").click()
-        # The choice shows as taken once the service has saved it.
         await dialog.get_by_role("radio", name="Every action").click()
         await dialog.get_by_text("Saved", exact=True).wait_for()
         assert session.config.safety.ask_before == "every_action"
         click = asyncio.create_task(session.toolkit.call("browser_click", {"ref": "e1"}))
-        # The settings screen keeps the pop-up back. Once it is closed, the approval asks.
         await dialog.get_by_role("button", name="Close", exact=True).click()
         popup = page.get_by_role("dialog", name="The agent needs your approval")
         await popup.get_by_role("button", name="Deny").click()
         assert (await asyncio.wait_for(click, 10)).is_error
         assert [call for call in driver.calls if call[0] == "click"] == []
         await page.get_by_role("button", name="Open settings").click()
-        # Back to what the deployment has is no loosening.
         await dialog.get_by_role("tab", name="Approvals").click()
         await dialog.get_by_role("radio", name="Risky actions").click()
         await dialog.get_by_text("Saved", exact=True).wait_for()
         assert session.config.safety.ask_before == "risky"
 
-        # What the deployment requires is shown, and is not the person's to change.
         await dialog.get_by_role("tab", name="Advanced").click()
         scripts = dialog.get_by_role("switch", name="Let the agent run scripts in pages")
         assert await scripts.is_disabled()
         await dialog.get_by_text("Set by your organisation").first.wait_for()
-        # About this deployment comes from the service too.
         await dialog.get_by_text("0.1.0").wait_for()
         await dialog.get_by_text("safety.blocked_domains").wait_for()
 
-        # A site list: the deployment's entry stays, the person's is added, a bad one is refused in its row.
         await dialog.get_by_role("tab", name="Sites").click()
         await dialog.get_by_text("*.internal.example").wait_for()
         blocked = dialog.get_by_role("textbox", name="Blocked sites")
@@ -102,7 +93,6 @@ async def test_a_person_changes_settings_and_the_service_keeps_them(
         refused = await session.toolkit.call("browser_navigate", {"url": "https://ads.example/"})
         assert refused.is_error and "blocked" in refused.text
 
-        # The colour mode changes the page at once, and is still there after the page is loaded again.
         await dialog.get_by_role("tab", name="Appearance").click()
         await dialog.get_by_role("radio", name="Dark").click()
         await page.wait_for_function(IS_DARK)
@@ -116,7 +106,6 @@ async def test_a_person_changes_settings_and_the_service_keeps_them(
         }
         assert errors == []
     finally:
-        # The service first: a page closed while it is connected leaves its socket open.
         await service.stop()
         await session.close()
         await page.close()
@@ -141,7 +130,6 @@ async def test_a_person_clears_the_browsing_data_and_the_session_ends(
         dialog = page.get_by_role("dialog", name="Settings")
         await dialog.get_by_role("tab", name="Privacy").click()
         await dialog.get_by_role("button", name="Clear data").click()
-        # It asks first, in words that say what will be lost.
         asks = page.get_by_role("alertdialog")
         await asks.get_by_text("Clear cookies and site data in the cloud browser?").wait_for()
         await asks.get_by_text("You'll be signed out of sites there, and open sessions will end.").wait_for()

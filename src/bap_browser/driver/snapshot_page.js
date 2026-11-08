@@ -1,13 +1,11 @@
-// Reads a document and prepares its elements for actions. It runs in an isolated world, so the
-// page's own scripts cannot see it or change it. One entry point: __bap(operation, arguments).
 (() => {
   if (globalThis.__bap) return;
 
-  const refs = new Map(); // ref -> WeakRef(element): never keeps a removed element alive
-  const ids = new WeakMap(); // element -> ref: an element keeps its ref while its document lives
+  const refs = new Map();
+  const ids = new WeakMap();
 
-  const GONE = 0; // not rendered, and nothing below it is
-  const SELF_HIDDEN = 1; // not shown itself; its children may be
+  const GONE = 0;
+  const SELF_HIDDEN = 1;
   const SHOWN = 2;
 
   const SKIPPED_TAGS = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'HEAD', 'META', 'LINK', 'TITLE']);
@@ -37,7 +35,7 @@
   const CHECKABLE = new Set(['checkbox', 'radio', 'switch', 'menuitemcheckbox', 'menuitemradio']);
   const VALUE_ROLES = new Set(['textbox', 'searchbox', 'spinbutton', 'slider']);
   const TEXT_INPUT_TYPES = new Set(['text', 'email', 'tel', 'url', 'password', 'search', 'number']);
-  const PLAIN_WORD = /^[a-z-]+$/; // a role or type from the page is used only when it is a plain word
+  const PLAIN_WORD = /^[a-z-]+$/;
   const STOP = Symbol('stop');
 
   const quote = (text) => JSON.stringify(text);
@@ -56,8 +54,7 @@
   function visibility(el) {
     if (SKIPPED_TAGS.has(el.tagName) || el.getAttribute('aria-hidden') === 'true' || el.inert) return GONE;
     if (el.checkVisibility({ visibilityProperty: true })) return SHOWN;
-    if (el.checkVisibility()) return SELF_HIDDEN; // visibility:hidden hides the element, not its children
-    // An element with no box of its own still renders its children.
+    if (el.checkVisibility()) return SELF_HIDDEN;
     return getComputedStyle(el).display === 'contents' ? SELF_HIDDEN : GONE;
   }
 
@@ -81,9 +78,6 @@
     return TAG_ROLES[tag] || '';
   }
 
-  // Things that only behave like buttons: a click handler attribute, a tab index, or a pointer
-  // cursor that is not inherited from the parent. The style lookup runs only for elements that
-  // reach this far: no role, no handler attribute, no tab index.
   function looksClickable(el) {
     if (el.hasAttribute('onclick')) return true;
     const tabIndex = el.getAttribute('tabindex');
@@ -93,16 +87,11 @@
     return !parent || getComputedStyle(parent).cursor !== 'pointer';
   }
 
-  // How often the document has changed since this script was put in it (spec 18.8): its
-  // structure, what was typed or chosen, what was scrolled, and where the keyboard put the focus.
-  // A focus that a press of the pointer brought is not counted: a dead button pressed twice
-  // changes nothing the second time.
   let changes = 0;
   let pointerIsDown = false;
   const WATCHED = { subtree: true, childList: true, attributes: true, characterData: true };
   const watcher = new MutationObserver(() => changes++);
   const watchedRoots = new WeakSet();
-  // A shadow root is a tree of its own: the watcher of the document does not see into it.
   function watch(root) {
     if (watchedRoots.has(root)) return;
     watchedRoots.add(root);
@@ -116,7 +105,6 @@
   addEventListener('focusin', () => pointerIsDown || changes++, seen);
 
   function stamp() {
-    // What the watcher has seen and not yet told.
     if (watcher.takeRecords().length) changes++;
     return changes;
   }
@@ -131,13 +119,10 @@
     return el.childNodes;
   }
 
-  // Text that is rendered and that no person can see (spec 18.5): too faint, too small, moved off
-  // the page, clipped to nothing, or in the colour of what is behind it. `a.unseen` holds the
-  // limits; without it nothing is tested. Only text is left out: a control stays where it is.
-  const looked = new WeakMap(); // element -> what was found, kept until the document changes
-  let unseenTexts = []; // what one read left out, for the rules that read it in the agent's place
-  const UNSEEN_KEPT = 20; // passages of one read
-  const UNSEEN_FROM = 20; // characters: shorter text is no passage
+  const looked = new WeakMap();
+  let unseenTexts = [];
+  const UNSEEN_KEPT = 20;
+  const UNSEEN_FROM = 20;
 
   function parts(colour) {
     const found = /rgba?\(([^)]+)\)/.exec(colour || '');
@@ -158,7 +143,6 @@
     const [light, dark] = [luminance(one), luminance(other)].sort((x, y) => y - x);
     return (light + 0.05) / (dark + 0.05);
   }
-  // The colour behind an element's text. Null when a picture is behind it: that cannot be told.
   function behind(el) {
     for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
       const style = getComputedStyle(node);
@@ -177,7 +161,6 @@
   function offThePage(el, style) {
     let box = el.getBoundingClientRect();
     if (parseFloat(style.textIndent) < 0) {
-      // The text is drawn where its indent puts it, which may be outside the box of its element.
       const range = document.createRange();
       range.selectNodeContents(el);
       box = range.getBoundingClientRect();
@@ -197,12 +180,10 @@
     let opacity = above.opacity * parseFloat(style.opacity || '1');
     const filtered = /opacity\(\s*([\d.]+)(%?)\s*\)/.exec(style.filter || '');
     if (filtered) opacity *= parseFloat(filtered[1]) / (filtered[2] ? 100 : 1);
-    // What hides an element hides everything in it.
     let around = above.around;
     if (!around) {
       if (opacity <= limits.minOpacity) around = 'faint';
       else if (offThePage(el, style)) around = 'off the page';
-      // Sites clip short texts away for screen readers ("Skip to content"). Those are kept.
       else if (clippedAway(el, style) && (el.textContent || '').trim().length > limits.screenReaderChars) around = 'clipped';
     }
     let why = around;
@@ -220,7 +201,6 @@
     looked.set(el, found);
     return found;
   }
-  // Whether the text an element holds itself is left out. What is left out is kept for the rules.
   function leftOut(el, text, a) {
     if (!a.unseen || !el || el.nodeType !== 1 || !text.trim()) return false;
     if (!look(el, a).why) return false;
@@ -229,7 +209,6 @@
     return true;
   }
 
-  // The rendered text inside an element, without the text of form controls.
   function textOf(el, limit, a) {
     let out = '';
     const walk = (node) => {
@@ -285,7 +264,6 @@
     if (tag === 'IMG') return clean(el.getAttribute('alt') || el.getAttribute('title') || '', limit);
     if (tag === 'IFRAME') return clean(el.getAttribute('title') || el.getAttribute('name') || '', limit);
     if (NAMED_BY_CONTENT.has(role)) {
-      // A control with no other name keeps one that nobody sees: an icon button has nothing else.
       const text = textOf(el, limit, a) || (a.unseen ? textOf(el, limit, { ...a, unseen: null }) : '');
       if (text) return text;
     }
@@ -331,7 +309,6 @@
       const type = tag === 'INPUT' ? inputType(el) : 'text';
       if (VALUE_ROLES.has(role)) {
         if (el.value) {
-          // A password is shown as a fixed row of dots: neither its text nor its length leaves the page.
           out.push('value=' + quote(type === 'password' ? '\u2022'.repeat(8) : clean(el.value, a.maxValue)));
         } else {
           const hint = clean(el.getAttribute('placeholder') || '', a.maxValue);
@@ -351,7 +328,6 @@
   function lineFor(el, role, indent, a, state) {
     let ref = ids.get(el);
     if (!ref) {
-      // A ref inside a frame begins with the frame's name: f2e7.
       ref = (a.prefix || '') + 'e' + state.next++;
       ids.set(el, ref);
       refs.set(ref, new WeakRef(el));
@@ -376,12 +352,10 @@
   function snapshot(a) {
     const state = { next: a.next };
     const lines = [];
-    // The frames met on the way: the driver reads each one and puts it under its line.
     const framesMet = [];
     let size = 0;
     let truncated = false;
     const budget = a.maxChars - a.notice.length - 1;
-    // The walk stops here when the cap is reached. It does not read the rest of the page.
     const emit = (line) => {
       if (size + line.length + 1 > budget) {
         truncated = true;
@@ -418,7 +392,6 @@
         childNamed = named || NAMED_BY_CONTENT.has(role);
       }
       const tag = node.tagName;
-      // A select's options and a text area's text are in its own line; a frame is read separately.
       if (tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'IFRAME' || depth >= a.maxDepth) return;
       for (const child of kids(node, a)) visit(child, depth + 1, childIndent, childNamed, shown);
     };
@@ -430,7 +403,6 @@
     }
     unseenTexts = [];
     try {
-      // A frame read as part of its page has no heading of its own.
       if (!a.embedded) {
         emit('Page: ' + clean(document.title, a.maxText));
         emit('URL: ' + clean(location.href, a.maxText));
@@ -444,9 +416,6 @@
     return { text: lines.join('\n'), next: state.next, truncated, frames: framesMet, unseen: unseenTexts };
   }
 
-  // Resolves at the next animation frame, or after `ms` on a page that is not being painted.
-  // Waits for the browser's next frame, and no longer than `ms`: a page that is not being drawn
-  // has no frames. Says whether a frame was drawn.
   const nextFrame = (ms) =>
     new Promise((done) => {
       const timer = setTimeout(() => done(false), ms);
@@ -461,8 +430,6 @@
     return true;
   }
 
-  // Lets the page do what an action has just set going: a form it sends, a script that leaves.
-  // Two turns of the page's own queue, with no wait for anything to be drawn.
   async function turn() {
     for (let i = 0; i < 2; i++) await new Promise((done) => setTimeout(done, 0));
     return true;
@@ -476,19 +443,15 @@
     return run(a);
   };
 
-  // Shared with the action operations added to this file.
   globalThis.__bapParts = { look, INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE };
 })();
 
-// Operations that prepare an element for an action. The driver then sends the real input events.
 (() => {
   if (globalThis.__bap.withActions) return;
   const shared = globalThis.__bapParts;
   const { INTERACTIVE, refs, resolve, roleOf, nameOf, textOf, visibility, nextFrame, quote, inputType, operations, clean, snapshot, SHOWN, TEXT_INPUT_TYPES, VALUE_ROLES, CHECKABLE } =
     globalThis.__bapParts;
 
-  // What an element is and what it is called. What a field holds is what was typed into it, so a
-  // field with no label has no name: its content never stands in for one.
   function identify(el, a) {
     const role = roleOf(el) || el.tagName.toLowerCase();
     const holdsTypedText = VALUE_ROLES.has(role) || role === 'combobox' || el.isContentEditable;
@@ -500,7 +463,6 @@
     return name ? `${role} ${quote(name)}` : role;
   }
 
-  // True when `node` is `ancestor` or sits inside it, looking through shadow roots.
   function within(node, ancestor) {
     for (let current = node; current; current = current.parentNode || current.host) {
       if (current === ancestor) return true;
@@ -535,18 +497,13 @@
 
   const disabled = (el) => el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true';
 
-  // Waits until the element is visible, enabled, holding still and not covered, then gives the
-  // point to click. When the time runs out it says which of these failed.
   async function prepare(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
     const described = describe(el, a);
     const deadline = performance.now() + a.timeoutMs;
-    // Whether the browser drew a frame during the last wait.
     let drawn = true;
     let lastBox = '';
-    // The frame the element was last looked at in. The page's own clock moves on with each frame
-    // the browser draws, and stands still between them.
     let lastFrame = null;
     let broughtIntoView = false;
     for (;;) {
@@ -567,16 +524,11 @@
           lastFrame = frame;
           reason = 'it is still moving';
         } else if (drawn && frame !== null && frame === lastFrame) {
-          // The element is where it was, but this is still the frame it was last looked at in: the
-          // wait ended inside a frame that was already under way. The page has not moved on, so
-          // looking twice told nothing. The next frame tells.
           reason = 'it is still moving';
         } else {
           const hit = elementAt(point.x, point.y);
           if (hit && (within(hit, el) || labelOf(hit, el))) return { x: point.x, y: point.y, describe: described };
           if (!broughtIntoView) {
-            // Inside a list or a dialog that scrolls by itself, the element can be within the window
-            // and still out of sight. It is brought into view once before it is called covered.
             broughtIntoView = true;
             el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
             lastBox = '';
@@ -585,14 +537,10 @@
         }
       }
       if (performance.now() >= deadline) return { error: 'not_ready', reason, describe: described };
-      // On a page that is not being drawn no frame comes, its clock stands still, and nothing in
-      // it moves: there the wait ends by its time, and the same place twice is holding still.
       drawn = await nextFrame(a.frameMs);
     }
   }
 
-  // After the pointer has gone to the point it will press, the page may have moved: a menu that
-  // was open under the pointer closes, and what follows it shifts. True when the element is still there.
   async function holds(a) {
     await nextFrame(a.frameMs);
     const el = resolve(a.ref);
@@ -607,8 +555,6 @@
     return el;
   }
 
-  // Focuses a text field and selects what it holds (or puts the caret at its end), so that the
-  // text the driver inserts next replaces it (or follows it).
   function focus(a) {
     const el = a.ref ? resolve(a.ref) : focused();
     if (a.ref && !el) return { error: 'stale' };
@@ -623,7 +569,6 @@
     }
     el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
     el.focus();
-    // A page can send the focus elsewhere as soon as it arrives. What is typed next would land there.
     const active = focused();
     if (active !== el && !(el.isContentEditable && active && active.contains(el))) {
       return { error: 'not_ready', reason: 'the page moved the focus to another element', describe: described };
@@ -636,7 +581,6 @@
         try {
           el.setSelectionRange(el.value.length, el.value.length);
         } catch {
-          // Email and number fields have no selection range; after focus the caret is already at the end.
         }
       }
     } else {
@@ -654,7 +598,6 @@
   const isTextField = (el) =>
     el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_INPUT_TYPES.has(inputType(el))) || el.isContentEditable;
 
-  // The control that a press at a point lands on: the element there, or the control it is part of.
   function pressedAt(x, y) {
     const hit = elementAt(x, y);
     for (let el = hit; el && el !== document.documentElement; el = el.parentElement || el.getRootNode().host) {
@@ -665,21 +608,18 @@
 
   const textFieldsOf = (form) => Array.from(form.querySelectorAll('input, textarea, [contenteditable]')).filter(isTextField);
 
-  // A box people search in: a search field, or the one field of its form.
   function isSearchBox(el) {
     if (el.tagName !== 'INPUT') return roleOf(el) === 'searchbox';
     const form = el.form;
     return inputType(el) === 'search' || roleOf(el) === 'searchbox' || (Boolean(form) && textFieldsOf(form).length === 1);
   }
 
-  // Whether pressing an element sends the form it is in.
   function sendsItsForm(el) {
     const type = (el.getAttribute('type') || '').toLowerCase();
     if (el.tagName === 'BUTTON') return type !== 'button' && type !== 'reset';
     return el.tagName === 'INPUT' && (type === 'submit' || type === 'image');
   }
 
-  // The nearest part of the page around a control that says more than the control itself.
   const LEVELS_AROUND = 4;
   function blockAround(el) {
     const own = (el.innerText || '').length;
@@ -691,9 +631,6 @@
     return around;
   }
 
-  // What the check needs to know of an element besides its name (spec 18.4, 18.6): of a field,
-  // what kind of thing is typed into it; of a control that is pressed, what pressing it sends
-  // and what stands near it.
   const FIELDS_OF_A_FORM = 20;
   function facts(el, a) {
     const tag = el.tagName;
@@ -718,8 +655,6 @@
     return out;
   }
 
-  // What an element is and where, without touching the page. Without a ref: the control at a
-  // point, or the element that has the focus.
   function locate(a) {
     const el = a.ref ? resolve(a.ref) : a.focused ? focused() : pressedAt(a.x, a.y);
     if (a.ref && !el) return { error: 'stale' };
@@ -736,7 +671,6 @@
     };
   }
 
-  // What the page says it is about, in a few words: its headings and its buttons (spec 18.6).
   function gist(a) {
     const said = [];
     for (const el of document.querySelectorAll('h1, h2, h3, [role=heading], button, [role=button], input[type=submit]')) {
@@ -750,14 +684,12 @@
 
   const isNativeCheck = (el) => el.tagName === 'INPUT' && (inputType(el) === 'checkbox' || inputType(el) === 'radio');
 
-  // How a form field is filled: by typing, by ticking, or by choosing an option.
   function kindOf(el) {
     if (el.tagName === 'SELECT') return 'select';
     if (isNativeCheck(el) || CHECKABLE.has(roleOf(el))) return 'check';
     return isTextField(el) ? 'text' : 'other';
   }
 
-  // The rendered text of the page or of one element. What a field holds is not part of it.
   function text(a) {
     const el = a.ref ? resolve(a.ref) : document.body;
     if (a.ref && !el) return { error: 'stale' };
@@ -765,7 +697,6 @@
     let all = el.innerText ?? el.textContent ?? '';
     const unseen = [];
     if (a.unseen) {
-      // The browser gives the text as it is laid out. What nobody can see is taken out of it again.
       let from = 0;
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -787,7 +718,6 @@
     return { text: shown, more: all.length - shown.length, unseen };
   }
 
-  // The nearest thing around an element that scrolls by itself: a list, a panel, a dialog.
   function scroller(el) {
     for (let node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement || (node.getRootNode() || {}).host) {
       const style = getComputedStyle(node);
@@ -797,8 +727,6 @@
     return null;
   }
 
-  // Where the page, or the box an element scrolls in, is scrolled to. It waits until the position
-  // has held still for two checks, or the time has run out.
   async function scrolled(a) {
     const el = a.ref ? resolve(a.ref) : null;
     if (a.ref && !el) return { error: 'stale' };
@@ -819,9 +747,6 @@
       : { x, y, width: doc.scrollWidth, height: doc.scrollHeight, inside: false };
   }
 
-  // Where the wheel is turned to scroll at an element: the middle of the box it scrolls in, or
-  // its own middle when it is in no such box. It is brought into view first when it is outside
-  // what the browser shows.
   function wheelPoint(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -837,7 +762,6 @@
     return { x: at.x, y: at.y, describe: described };
   }
 
-  // What is at a point of the page, as the snapshot names it.
   function at(a) {
     const hit = elementAt(a.x, a.y);
     return { describe: hit ? describe(hit, a) : '' };
@@ -850,7 +774,6 @@
     return { describe: describe(el, a) };
   }
 
-  // Gives an element the keyboard focus, whatever it is, so that a key press goes to it.
   function focusOn(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -862,8 +785,6 @@
 
   const optionLabel = (option) => (option.label || option.text || '').replace(/\s+/g, ' ').trim();
 
-  // Chooses options in a dropdown or a list, by value or by label, and tells the page as a person's
-  // choice would: an input event, then a change event.
   function select(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -892,7 +813,6 @@
     return { describe: described, selected: chosen.map(optionLabel) };
   }
 
-  // Whether a checkbox, a radio button or a switch is on.
   function checkable(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -903,7 +823,6 @@
     return { describe: described, checked, radio: role === 'radio' || role === 'menuitemradio' };
   }
 
-  // Waits until the rendered text of the page holds some words, or no longer holds them.
   async function waitText(a) {
     const want = a.text.replace(/\s+/g, ' ').trim().toLowerCase();
     const deadline = performance.now() + a.timeoutMs;
@@ -915,8 +834,6 @@
     }
   }
 
-  // What the browser shows of the page and how large the whole page is, in page pixels, and how
-  // many pixels of the screen one page pixel takes.
   function area() {
     const doc = document.documentElement;
     const body = document.body;
@@ -931,9 +848,6 @@
     };
   }
 
-  // The labels of an annotated screenshot: the ref of each control a snapshot has listed, drawn at
-  // its corner. They are in the page only while the picture is taken, inside a closed shadow root,
-  // and take no room in it.
   const LABEL_HEIGHT = 14;
   const LABEL_STYLE = `position:absolute;height:${LABEL_HEIGHT}px;padding:0 3px;border-radius:3px;font:bold 11px/${LABEL_HEIGHT}px sans-serif;white-space:nowrap;color:#fff;background:#b3261e`;
   const OUTLINE_STYLE = 'position:absolute;box-sizing:border-box;border:1px solid #b3261e';
@@ -951,7 +865,6 @@
       const el = weak.deref();
       if (!el || !el.isConnected || visibility(el) !== SHOWN) continue;
       const role = roleOf(el);
-      // A heading or a paragraph has a ref too, and is not something to act on.
       if (role && !INTERACTIVE.has(role)) continue;
       const box = el.getBoundingClientRect();
       if (!box.width || !box.height) continue;
@@ -969,14 +882,11 @@
     }
     document.documentElement.append(host);
     labels = host;
-    // The picture is taken of what has been painted.
     await nextFrame(a.frameMs);
     await nextFrame(a.frameMs);
     return { drawn };
   }
 
-  // Where the page inside a frame begins, in this document's own window: the frame's box without
-  // its border and padding. A point inside the frame is this far from the same point out here.
   function frameBox(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -988,8 +898,6 @@
     };
   }
 
-  // Brings an element into view when its middle is outside what the window shows. One that can be
-  // seen is left where it is, so the page does not jump at every action.
   function intoView(a) {
     const el = resolve(a.ref);
     if (!el) return { error: 'stale' };
@@ -1000,8 +908,6 @@
     return {};
   }
 
-  // Makes a picture smaller, in the browser itself, so that no image library is needed. The picture
-  // comes in and goes out as base64.
   async function shrink(a) {
     const bytes = Uint8Array.from(atob(a.data), (character) => character.charCodeAt(0));
     const bitmap = await createImageBitmap(new Blob([bytes], { type: a.mime }), {
@@ -1015,7 +921,6 @@
     const blob = await canvas.convertToBlob({ type: a.mime, quality: a.quality });
     const smaller = new Uint8Array(await blob.arrayBuffer());
     let text = '';
-    // In pieces: a call with every byte as an argument would be too long for the browser.
     for (let from = 0; from < smaller.length; from += a.piece) {
       text += String.fromCharCode.apply(null, smaller.subarray(from, from + a.piece));
     }

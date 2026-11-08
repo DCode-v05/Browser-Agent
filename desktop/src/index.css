@@ -2,9 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* The BAP look, the same as the viewer's (spec 9.5): its colours and its typeface. The typeface is
-   the viewer's own copy, so nothing is fetched from another site. */
-
 @font-face {
     font-family: "Hanken Grotesk";
     font-style: normal;
@@ -156,8 +153,6 @@
   }
 }
 
-/* The strip that stands in for the title bar the OS no longer draws (frame: false, main.cjs):
-   the whole thing moves the window, except whatever is clickable inside it. */
 .app-drag {
   -webkit-app-region: drag;
 }

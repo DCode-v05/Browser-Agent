@@ -18,7 +18,7 @@ def lookalike_of(host: str, protected: Sequence[str], checks: SiteChecks) -> str
     protected_sites = {sites.registrable_name(name) for name in protected}
     host_site = sites.registrable_name(host)
     if host_site in protected_sites:
-        return None  # a protected site, named by itself or a subdomain, is never a look-alike
+        return None
     host_label = host_site.split(".")[0]
     host_latin = sites.to_latin(host_label)
     close_measured = host_latin not in {word.lower() for word in checks.common_words}
@@ -82,7 +82,6 @@ def _close(host_label: str, host_latin: str, protected_label: str, checks: SiteC
     distance = _edit_distance(host_latin, protected_latin)
     if distance == 0:
         return host_latin != host_label
-    # One edit for a short name, two for a longer one.
     threshold = 1 if len(protected_latin) <= checks.one_edit_max_chars else 2
     return distance <= threshold
 
@@ -92,7 +91,6 @@ def _stands_with_lure(
 ) -> bool:
     """Rule (b): the protected label stands in the host as a whole label or a hyphen-part of one, with
     a lure word beside it: another hyphen-part of the same label, or any part of another label."""
-    # A shorter name is too many short, ordinary words.
     if len(protected_label) < shortest:
         return False
     for index, label in enumerate(host_labels):

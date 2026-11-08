@@ -14,7 +14,6 @@ from bap_browser.safeguards.task import TaskSite
 from bap_browser.service.events import EventHub
 from bap_browser.tools.toolkit import Toolkit
 
-# The commands of a viewer that are for the check (spec 18.10).
 ASKED_OF_THE_CHECK = frozenset({"resume_auto", "allow_refused", "drop_site", "extend_limit"})
 
 
@@ -71,7 +70,6 @@ class CheckNews:
             "reason": reason,
         }
         if said:
-            # A model wrote this sentence. It goes to the people watching, and to no log.
             event["said"] = self.browser.redact(said)
         if refused_id is not None:
             event["refused_id"] = refused_id
@@ -138,7 +136,6 @@ class CheckNews:
             "limit": limit,
             "scope": "task" if on_a_task else "session",
         }
-        # What "Allow more" adds. More steps do not buy more money.
         more = {"calls": limits.extend_calls, "minutes": limits.extend_minutes}.get(kind)
         if more:
             event["more"] = more

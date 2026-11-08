@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_cua_telemetry.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Tests for the cua-driver telemetry opt-in policy.
 
@@ -29,10 +28,8 @@ class TestTelemetryDisabledFlag:
 
 
     def test_config_load_failure_fails_safe(self):
-        # Unreadable config => default to disabling telemetry (privacy-safe).
         with patch("bap_browser.computer.seams.settings.load_config", side_effect=RuntimeError("boom")):
             assert cua_backend._cua_telemetry_disabled() is True
-
 
 
 class TestChildEnv:
@@ -40,14 +37,10 @@ class TestChildEnv:
         with patch.object(cua_backend, "_cua_telemetry_disabled", return_value=True):
             env = cua_backend.cua_driver_child_env({"PATH": "/usr/bin"})
             assert env[_VAR] == "0"
-            # base env is preserved
             assert env["PATH"] == "/usr/bin"
 
 
-
     def test_disabled_overrides_inherited_enabled(self):
-        # Even if the parent process had telemetry enabled, the default policy
-        # forces it off in the child.
         with patch.object(cua_backend, "_cua_telemetry_disabled", return_value=True):
             env = cua_backend.cua_driver_child_env({_VAR: "1"})
             assert env[_VAR] == "0"

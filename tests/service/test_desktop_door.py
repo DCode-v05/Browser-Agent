@@ -74,11 +74,9 @@ async def test_the_window_is_told_there_is_an_app_and_opens_it_once(
         assert status == 200 and json.loads(body)["desktop"] is True
 
         door = f"{service.address}/api/desktop"
-        # Opening a program on the person's machine is for the person alone.
         assert (await asyncio.to_thread(ask, door, method="POST"))[0] == 401
         assert (await asyncio.to_thread(ask, door, method="POST", token="wrong"))[0] == 401
         assert app.asked == 0
-        # A link that is merely followed opens nothing: there is no such page to get.
         assert (await asyncio.to_thread(ask, door, token=TOKEN))[0] == 404
         assert app.asked == 0
 

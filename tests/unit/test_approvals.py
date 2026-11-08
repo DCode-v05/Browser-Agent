@@ -30,8 +30,6 @@ async def watched(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIt
         await session.start()
         for _ in range(viewers):
             session.hub.subscribe()
-        # The browser is put on the page directly: opening it with a tool would itself be asked about
-        # in the tests where every action is.
         driver.url = "https://shop.example/cart"
         return session, driver
 
@@ -180,7 +178,6 @@ async def test_an_action_on_a_control_that_pays_sends_or_deletes_always_asks(wat
     assert request["summary"] == 'Clicking "Pay now" on shop.example'
     assert request["every_time"] is True, "the viewer is told not to offer the whole site"
     assert not (await answered(session, paying, {"type": "approve", "scope": "site"})).is_error
-    # "Allow on this site" does not cover it: such an action asks every time.
     assert told(session, "approval_closed")[-1]["outcome"] == "allowed"
     again = asyncio.create_task(session.toolkit.call("browser_click", {"ref": "e7"}))
     await answered(session, again, {"type": "deny"}, 2)
@@ -189,7 +186,6 @@ async def test_an_action_on_a_control_that_pays_sends_or_deletes_always_asks(wat
 
 async def test_typing_is_not_asked_about_by_itself(watched: Watched) -> None:
     session, _ = await watched()
-    # An ordinary field. A password field is a person's to allow (spec 18.6, test_check.py).
     typed = await asyncio.wait_for(session.toolkit.call("browser_type", {"ref": "e3", "text": "abc"}), 2)
     assert not typed.is_error
     assert told(session, "approval_requested") == []

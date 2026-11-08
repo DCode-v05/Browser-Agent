@@ -85,7 +85,6 @@ class PageScript:
             self._context_id = None
             return False
         except TimeoutError:
-            # A page too busy to draw a frame is still the same document.
             return True
         return True
 
@@ -98,7 +97,6 @@ class PageScript:
             self._context_id = None
             return False
         except TimeoutError:
-            # A page too busy to answer is still the same document.
             return True
         return True
 

@@ -18,7 +18,6 @@ from bap_browser.service.accounts import Accounts
 from bap_browser.service.server import Service
 from bap_browser.settings.store import SettingsStore
 
-# Where the core of the desktop app says where it is, beside this service's own such file.
 DESKTOP_STATE_FILE = "desktop-service.json"
 
 
@@ -57,8 +56,6 @@ async def run_studio(
             dev=dev,
         )
 
-    # The configured port, so that the two sign-in pages keep their addresses from one start to
-    # the next. Where it is taken, any free port.
     service = serving(None)
     try:
         await service.start()
@@ -76,8 +73,6 @@ async def run_studio(
         )
         tell("Press Ctrl+C to end.")
         if open_viewer:
-            # The first time, the admin's page with this start's own link, which creates the
-            # admin's password. After that, the page where people sign in.
             first_time = f"{service.address}/admin#token={service.token}"
             webbrowser.open(f"{service.address}/" if accounts.has("admin") else first_time)
         await studio.run(service)

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/doctor.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """`bap-browser computer doctor` — thin client for cua-driver's `health_report` MCP tool. cua-driver owns the health
 model; we drive the stdio JSON-RPC handshake, call `health_report` and render the stable ``schema_version="1"``
@@ -21,7 +20,6 @@ from bap_browser.computer.seams.process import windows_hide_flags
 from bap_browser.computer.hermes.computer_use.permissions import _child_env as _sanitized_cua_env
 from bap_browser.computer.hermes.computer_use.permissions import stale_tcc_grant_hint
 
-# Match the ALLOWED_STATUS_VALUES + ALLOWED_OVERALL_VALUES the cua-driver integration test pins.
 _STATUS_GLYPH = {"pass": "✅", "fail": "❌", "skip": "⏭️"}
 _OVERALL_GLYPH = {"ok": "✅", "degraded": "⚠️", "failed": "❌"}
 _SUPPORTED_PLATFORMS = ("darwin", "linux", "windows")
@@ -38,7 +36,7 @@ _DEAD_DAEMON_MSG = ("{unit} is configured to run `cua-driver serve` but no daemo
 _DEAD_DAEMON_HINT = ("Check `systemctl --user status {unit}` / `journalctl --user -u {unit}`; a driver reinstall does not "
                      "start the daemon and cannot fix a broken unit")
 Report = dict[str, Any]
-_Row = tuple[str, str, Report]  # (status, message, extra {hint?, data?}) for one check
+_Row = tuple[str, str, Report]
 
 
 class HealthReportUnavailable(RuntimeError):
@@ -75,7 +73,7 @@ def _cli_driver_version(binary: str, timeout: float = 5.0) -> tuple[str, Optiona
     text, failed = _combined_output(cp), cp.returncode != 0
     if failed and not text:
         return "fail", f"--version exited {cp.returncode}"
-    m = re.search(r"(\d+\.\d+\.\d+(?:[-+][\w.]+)?)", text)  # typical: "cua-driver 0.10.0"
+    m = re.search(r"(\d+\.\d+\.\d+(?:[-+][\w.]+)?)", text)
     return ("fail" if failed else "pass"), m.group(1) if m else (_first_line(text) or "unknown")
 
 def _cli_doctor_snippet(binary: str, timeout: float = 8.0) -> Optional[str]:
@@ -85,17 +83,17 @@ def _cli_doctor_snippet(binary: str, timeout: float = 8.0) -> Optional[str]:
 
 def _build_identity(binary: str, report: Report) -> Report:
     """Hermes-side identity block comparing resolved binary vs health_report."""
-    def token(text: str) -> str:  # dotted version-ish token out of a free-form string
+    def token(text: str) -> str:
         m = text and re.search(r"(\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?)", text)
         return m.group(1) if m else text.strip().lower()
     cli, report_v = _read_cli_version(binary) or "", str(report.get("driver_version") or "")
     return {"resolved_binary": binary, "cli_version": cli or None, "health_report_driver_version": report_v or None,
             "version_mismatch": bool(token(cli) and token(report_v) and token(cli) != token(report_v))}
 
-def _is_valid_health_report(payload: Any) -> bool:  # looks like a schema_version=1 health_report
+def _is_valid_health_report(payload: Any) -> bool:
     return isinstance(payload, dict) and {"schema_version", "overall"} <= payload.keys() and isinstance(payload.get("checks"), list)
 
-def _text_items(result: Report) -> Iterator[str]:  # text of every {"type": "text"} content item
+def _text_items(result: Report) -> Iterator[str]:
     return (i.get("text") or "" for i in result.get("content") or [] if isinstance(i, dict) and i.get("type") == "text")
 
 def _first_text(result: Report, default: str) -> str:
@@ -109,11 +107,11 @@ def _extract_health_report_from_result(result: Report) -> Report:
     sc = result.get("structuredContent")
     if _is_valid_health_report(sc):
         return sc  # type: ignore[return-value]
-    for text in _text_items(result):  # older builds: JSON text block with schema_version
+    for text in _text_items(result):
         with suppress(ValueError, TypeError):
             if _is_valid_health_report(parsed := json.loads(text)):
                 return parsed
-    if isinstance(sc, dict):  # present but not a real report — unavailable, not fatal
+    if isinstance(sc, dict):
         raise HealthReportUnavailable(f"health_report structuredContent lacks schema_version/overall/checks (keys={sorted(sc.keys())})")
     raise RuntimeError(f"health_report response carried neither structuredContent nor a parseable JSON text block. Result keys: {list(result.keys())}")
 
@@ -131,7 +129,7 @@ def _mcp_rpc(proc: subprocess.Popen, msg_id: int, method: str, params: Any = Non
     line = proc.stdout.readline()
     if not line:
         tail: list[str] = []
-        with suppress(Exception):  # last 3 stderr lines, best-effort
+        with suppress(Exception):
             tail = [str(x) for x in (proc.stderr.read() or "").strip().splitlines()[-3:]]
         raise RuntimeError(f"cua-driver mcp produced no response for {method!r}. stderr tail: {tail or '(empty)'}")
     try:
@@ -188,9 +186,8 @@ def _drive_fallback_probes(binary: str, *, timeout: float = 12.0) -> Report:
     with _mcp_session(binary, timeout) as proc:
         server_info = (_mcp_rpc(proc, 1, "initialize", {}).get("result") or {}).get("serverInfo") or {}
         out["init_version"] = server_info.get("version") if isinstance(server_info, dict) else None
-        perms, out["permissions_error"] = _probe_tool(proc, 2, "check_permissions")  # primary TCC signal on 0.10
+        perms, out["permissions_error"] = _probe_tool(proc, 2, "check_permissions")
         out["permissions"] = _structured(perms) if perms is not None else None
-        # list_apps — light AX capability probe; text-only success still counts as AX working
         apps, out["list_apps_error"] = _probe_tool(proc, 3, "list_apps")
         out["list_apps_ok"] = apps is not None
         app_list = _structured(apps).get("apps") if apps is not None else None
@@ -206,13 +203,13 @@ def _tcc_row(field: str, label: str, platform_bound: bool, ctx: Report) -> _Row:
     if perms is None:
         return ("fail" if err else "skip"), err or "check_permissions unavailable", {}
     granted = perms.get(field)
-    if not isinstance(granted, bool):  # only real booleans select a branch; anything else is "absent"
+    if not isinstance(granted, bool):
         off_platform = platform_bound and ctx["plat"] != "darwin"
         return "skip", f"not applicable on {ctx['plat']}" if off_platform else f"{field} field absent from check_permissions", {}
     if not granted:
         return "fail", f"{label} is not granted.", {"hint": _TCC_HINT.format(label), "data": {field: False}}
     data = {field: True, **({"screen_recording_capturable": perms.get("screen_recording_capturable")} if field == "screen_recording" else {})}
-    if data.get("screen_recording_capturable") is False:  # the granted-but-not-capturable row wins over plain pass
+    if data.get("screen_recording_capturable") is False:
         return "fail", "Screen Recording granted but not capturable.", {"hint": (
             "Screen Recording permission may need a restart of CuaDriver or a re-grant in System Settings."), "data": data}
     return "pass", f"{label} is granted.", {"data": data}
@@ -231,11 +228,9 @@ def _cli_doctor_row(txt: Optional[str]) -> Optional[_Row]:
     return None if not txt else (("pass" if "[ok" in txt.lower() or "ok  ]" in txt else "skip"), txt.splitlines()[0].strip(),
                                  {"data": {"snippet": txt[:2000]}})
 
-# Fallback composite probe table, in emitted order: (check name, row builder(ctx) -> _Row | None to omit).
 _FALLBACK_PROBES: tuple[tuple[str, Callable[[Report], Optional[_Row]]], ...] = (
     ("binary_version", lambda c: (c["ver_status"], c["ver_msg"], {})),
     ("platform_supported", lambda c: ("pass", f"platform={c['plat']}", {}) if c["plat"] in _SUPPORTED_PLATFORMS else ("fail", f"platform={c['plat']} (unsupported)", {})),
-    # doctor does not start a session, so session_active is never probed
     ("session_active", lambda c: ("skip", "not probed (doctor does not open a cua session)", {})),
     ("tcc_accessibility", lambda c: _tcc_row("accessibility", "Accessibility", False, c)),
     ("tcc_screen_recording", lambda c: _tcc_row("screen_recording", "Screen Recording", True, c)),
@@ -258,7 +253,7 @@ def _compose_fallback_report(binary: str, *, reason: str = "", timeout: float = 
     plat = _platform_name()
     ver_status, ver_value = _cli_driver_version(binary)
     probes = _drive_fallback_probes(binary, timeout=timeout)
-    if probes.get("init_version"):  # MCP initialize version beats a messy CLI parse
+    if probes.get("init_version"):
         ver_status, ver_value = "pass", str(probes["init_version"])
     perms = probes.get("permissions") if isinstance(probes.get("permissions"), dict) else None
     reason_short = (reason or "health_report unavailable").strip()
@@ -267,8 +262,8 @@ def _compose_fallback_report(binary: str, *, reason: str = "", timeout: float = 
                    "perm_err": probes.get("permissions_error"), "reason_short": reason_short,
                    "ver_msg": f"cua-driver {ver_value}" if ver_status == "pass" else (ver_value or "version unknown"),
                    "ax_granted": bool(perms and perms.get("accessibility") is True),
-                   "doctor_txt": _cli_doctor_snippet(binary)}  # optional CLI doctor text (best-effort)
-    checks = [{"name": name, "status": row[0], "message": row[1], **row[2]}  # hint/data only when present
+                   "doctor_txt": _cli_doctor_snippet(binary)}
+    checks = [{"name": name, "status": row[0], "message": row[1], **row[2]}
               for name, build in _FALLBACK_PROBES if (row := build(ctx)) is not None]
     return {"schema_version": "1", "platform": plat,
             "driver_version": str(ver_value if ver_status == "pass" else (ver_value or "?")),
@@ -309,7 +304,6 @@ def cua_daemon_units(config_dir: Optional[str] = None) -> list[tuple[str, str, s
     entry whose Exec runs cua-driver — the hand-written daemon units Linux relies on (there is no managed
     autostart). ``%h`` is expanded in the socket path so it can be probed; the exec target is left as written."""
     home = os.path.expanduser("~")
-    # systemd --user and XDG autostart both honour $XDG_CONFIG_HOME; a host that sets it keeps its units there.
     base = config_dir or os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
     units: list[tuple[str, str, str, bool, Optional[str]]] = []
     sources = (("systemd user unit", os.path.join(base, "systemd", "user"), ".service", "ExecStart"),
@@ -328,7 +322,6 @@ def cua_daemon_units(config_dir: Optional[str] = None) -> list[tuple[str, str, s
             for line in text.splitlines():
                 stripped = line.strip()
                 tokens = stripped.split("=", 1)[1].split() if stripped.startswith(key + "=") else []
-                # first token = executable; systemd's prefix modifiers (-, +, !, :) never start a path
                 if not tokens or "cua-driver" not in tokens[0]:
                     continue
                 socket = next((tokens[i + 1] for i, t in enumerate(tokens[:-1]) if t == "--socket"), None)
@@ -382,7 +375,7 @@ def _apply_stale_unit_guard(report: Report) -> Report:
             checks.append({"name": f"daemon unit ({unit})", "status": "fail",
                            "message": _PRUNED_UNIT_MSG.format(target=target),
                            "hint": _PRUNED_UNIT_HINT.format(kind=kind)})
-            if report.get("overall") == "ok":  # fail-worse overalls are never softened
+            if report.get("overall") == "ok":
                 report["overall"] = "degraded"
     return report
 
@@ -400,15 +393,14 @@ def _print_text_report(report: Report, color: bool, *, identity: Optional[Report
     platform, report_v, overall = (report.get(k, "?") for k in ("platform", "driver_version", "overall"))
     identity = identity or {}
     cli_v = identity.get("cli_version") or ""
-    header_v = cli_v or report_v  # binary's own --version wins when health_report is stale
-    # No external color library — inline ANSI keeps doctor self-contained; colors only for known overall values.
+    header_v = cli_v or report_v
     red, yellow, green, reset, dim = ("\033[31m", "\033[33m", "\033[32m", "\033[0m", "\033[2m") if color and overall in _OVERALL_GLYPH else ("",) * 5
     col_for = {"failed": red, "degraded": yellow, "ok": green}.get(overall, "")
     status_cols = {"pass": green, "fail": red, "skip": dim}
     lines = [f"{_OVERALL_GLYPH.get(overall, '•')} cua-driver {header_v} on {platform} — {col_for}{overall}{reset}"]
     if identity.get("resolved_binary"):
         lines.append(f"  {dim}binary: {identity['resolved_binary']}{reset}")
-    if cli_v and report_v and str(report_v) not in str(cli_v) and str(cli_v) not in str(report_v):  # clearly differ
+    if cli_v and report_v and str(report_v) not in str(cli_v) and str(cli_v) not in str(report_v):
         lines += [f"  {dim}--version: {cli_v}{reset}", f"  {dim}health_report.driver_version: {report_v}{reset}"]
     if environment:
         lines += [f"  {dim}environment: current CLI process{reset}",
@@ -430,7 +422,6 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
                color: Optional[bool] = None) -> int:
     """Resolve the binary via the shared runtime resolver (diagnose what `computer_use` actually invokes), call
     `health_report`, render; on 0.10.x (denied) a report is synthesized from probes."""
-    # Windows' locale codec (cp1252, cp936, ...) cannot encode the ✅ ❌ ⚠️ ⏭️ glyphs — force UTF-8.
     for stream in (sys.stdout, sys.stderr):
         with suppress(AttributeError, OSError):
             stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
@@ -439,14 +430,12 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     if not binary:
         print(f"cua-driver: not installed (looked for {driver_cmd or 'cua-driver (PATH and canonical install paths)'!r}).\n  Run: bap-browser computer install")
         return 2
-    try:  # prefer real health_report; on denial/non-schema, synthesize via probes
+    try:
         try:
             report = _drive_health_report(binary, include=include, skip=skip, timeout=12.0)
         except HealthReportUnavailable as e:
             report = _compose_fallback_report(binary, reason=str(e), timeout=12.0)
     except OSError as e:
-        # The spawn itself failed (Windows: a venv interpreter denied `CreateProcess` on a binary under
-        # `C:\Program Files\WindowsApps`, WinError 5). A traceback here hides the one fact the user needs.
         print(f"cua-driver could not be started from {binary!r}: {e}\n"
               "  The Hermes runtime interpreter cannot execute this binary; the tool may still work because the\n"
               "  shell resolves a different copy on PATH. Fix: install cua-driver outside the protected directory\n"
@@ -463,8 +452,6 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     identity = _build_identity(binary, report)
     environment = _wayland_environment_context(report)
     if json_output:
-        # Additive envelope: upstream keys preserved, identity under hermes_identity (and environment under
-        # hermes_environment when present) so overall/checks parsers keep working.
         payload = {**report, "hermes_identity": identity}
         if environment:
             payload["hermes_environment"] = environment
@@ -473,4 +460,4 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     else:
         _print_text_report(report, color=sys.stdout.isatty() if color is None else bool(color), identity=identity,
                            environment=environment)
-    return 0 if report.get("overall") == "ok" else 1  # unknown/missing overall must not look like success
+    return 0 if report.get("overall") == "ok" else 1

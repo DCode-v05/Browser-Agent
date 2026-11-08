@@ -48,7 +48,6 @@ describe('the window of three pages (spec 9.16)', () => {
     const tabs = within(screen.getByRole('tablist', { name: W.studio.pages })).getAllByRole('tab');
     expect(tabs.map((one) => one.textContent)).toEqual(['Cloud browserReady', 'My ChromeNot connected', 'Built-in browserReady']);
     expect(tab(/Cloud browser/)).toHaveAttribute('aria-selected', 'true');
-    // The page under the tabs is that browser's own session.
     expect(asked).toEqual(['cloud']);
     expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
   });
@@ -112,9 +111,7 @@ describe('the window of three pages (spec 9.16)', () => {
       });
       await waitFor(() => expect(tab(/Built-in browser/)).toHaveAttribute('data-mood', 'attention'));
       expect(tab(/Built-in browser/)).toHaveTextContent(W.studio.mood.attention);
-      // The Chrome that has connected is a page like the others now.
       expect(tab(/My Chrome/)).toHaveTextContent(W.studio.mood.ready);
-      // An answer that could not be had changes nothing.
       loadRooms.mockResolvedValueOnce(null);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1600);
@@ -186,7 +183,6 @@ describe('what the service says of itself when the window opens', () => {
     const onEnded = vi.fn();
     const load = roomsFrom('http://127.0.0.1:8765/admin', 'a-visit', onEnded);
     expect(await load()).toEqual([{ ...cloud, note: undefined, extension: undefined }]);
-    // A service that fails for a moment has ended nobody's visit.
     expect(await load()).toBeNull();
     expect(onEnded).not.toHaveBeenCalled();
     expect(await load()).toBeNull();
@@ -200,7 +196,6 @@ describe('what the service says of itself when the window opens', () => {
     const [address, how] = fetched.mock.calls[0];
     expect(address).toBe('http://127.0.0.1:8765/api/desktop');
     expect(how).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer the-token' } });
-    // The service refused, or did not answer: the app did not open.
     expect(await open()).toBe(false);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('no network')));
     expect(await open()).toBe(false);
@@ -256,14 +251,12 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     expect(within(views).getByRole('tab', { name: W.studio.view.agent })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('region', { name: 'Browser' })).toBeInTheDocument();
 
-    // Configuration: that browser's card, and no other's, in place of its page.
     await user.click(within(views).getByRole('tab', { name: W.studio.view.configuration }));
     expect((await screen.findAllByRole('article')).map((card) => card.getAttribute('aria-label'))).toEqual(['Cloud browser']);
     expect(screen.getByRole('region', { name: W.systems.configuration })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: `${W.systems.use}: Cloud browser` })).toBeChecked();
     expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
 
-    // The view stays from one browser to the next, so the three are looked at one after the other.
     await user.click(tab(/Built-in browser/));
     expect(screen.getByRole('tablist', { name: W.studio.views('Built-in browser') })).toBeInTheDocument();
     expect((await screen.findAllByRole('article')).map((card) => card.getAttribute('aria-label'))).toEqual(['Built-in browser']);
@@ -292,7 +285,6 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     await user.click(screen.getByRole('button', { name: W.studio.systems }));
     expect(screen.getByRole('region', { name: W.systems.title })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
-    // No browser's tab is the chosen one while the Systems page is shown.
     expect(screen.getAllByRole('tab', { selected: true }).map((one) => one.textContent)).toEqual([W.systems.view.users]);
     await user.click(tab(/Cloud browser/));
     expect(screen.queryByRole('region', { name: W.systems.title })).not.toBeInTheDocument();
@@ -308,7 +300,6 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
     expect(screen.queryByRole('region', { name: 'Browser' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: W.studio.turnOn }));
     await waitFor(() => expect(changed).toEqual([['builtin', { system_enabled: true }]]));
-    // The window asks at once where the pages stand now, and the browser's own page is back.
     await waitFor(() => expect(loadRooms).toHaveBeenCalled());
     expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
   });
@@ -316,7 +307,6 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
   it('goes, from the settings button on a browser’s page, to that browser’s own configuration', async () => {
     const { user, changed } = withSystems();
     await user.click(screen.getByRole('button', { name: W.buttons.openSettings }));
-    // A browser's settings are in one place: no second screen is opened over the page.
     expect(await screen.findByRole('heading', { name: W.systems.panel.title.configuration('Cloud browser') })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: W.studio.view.configuration })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -327,7 +317,6 @@ describe('the browsers as systems, from the window (spec 9.17)', () => {
 
 describe('the window as the admin and as a user see it (spec 4.11)', () => {
   const sees = { evaluations: true, cost: true, traces: true, checklist: true, log: false };
-  /** The settings the service gives a user: those that can be a user's, and no others (spec 10.2). */
   const A_USERS = ['ask_before', 'approval_wait', 'remember_site_approval', 'blocked_sites', 'allowed_sites', 'picture_quality', 'show_agent_pointer', 'colour_mode'];
 
   function signedIn(role: 'admin' | 'user', rooms: Room[], me: Me | null, over: Partial<SystemsApi> = {}, pollMs = 0, loadRooms: () => Promise<Room[] | null> = async () => rooms) {
@@ -391,7 +380,6 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     expect(screen.queryByRole('button', { name: W.studio.systems })).not.toBeInTheDocument();
     expect(screen.getByText(W.signIn.role.user)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: W.studio.signOut })).toBeInTheDocument();
-    // Only the browsers the admin lets users use are there at all.
     expect(screen.getAllByRole('tab', { name: /browser/ }).map((one) => one.textContent)).toEqual(['Cloud browserReady', 'Built-in browserReady']);
   });
 
@@ -426,7 +414,6 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
   it('goes to the browser a user has just preferred, and shows the browser itself', async () => {
     const { user, prefer, pages } = signedIn('user', [cloud, builtIn], { role: 'user', systems: ['cloud', 'builtin'], preferred: 'cloud', sees });
     await user.click(screen.getByRole('tab', { name: W.studio.view.settings }));
-    // Their own settings are on the card by now, each a working control, beside the browser they prefer.
     expect(await screen.findByRole('radio', { name: /Every action/ })).toBeInTheDocument();
     const preferred = screen.getByRole('combobox', { name: new RegExp(`^${W.systems.user.preferred}`) });
     await user.selectOptions(preferred, 'builtin');
@@ -443,7 +430,6 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     let rooms: Room[] = [cloud, builtIn];
     signedIn('user', rooms, mine, { me: async () => now }, 20, async () => rooms);
     expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings, W.studio.view.evaluations]);
-    // The admin keeps the evaluations from users, and then the built-in browser.
     now = { ...mine, sees: { ...sees, evaluations: false } };
     await waitFor(() => expect(views('Cloud browser')).toEqual([W.studio.view.agent, W.studio.view.settings]));
     rooms = [cloud];
@@ -455,7 +441,6 @@ describe('the window as the admin and as a user see it (spec 4.11)', () => {
     await user.click(screen.getByRole('tab', { name: W.studio.view.configuration }));
     await user.click(await screen.findByRole('radio', { name: 'Dark' }));
     await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
-    // On the browser's own page, on another browser's, and on the Systems page: it holds.
     await user.click(screen.getByRole('tab', { name: W.studio.view.agent }));
     expect(await screen.findByRole('region', { name: 'Browser' })).toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
@@ -551,7 +536,6 @@ describe('the pop-up that asks a person to do a step (spec 9.16)', () => {
     expect(within(popup).getByRole('heading')).toHaveTextContent(/^The agent needs/);
     expect(within(popup).getByText(W.help.popup.hint)).toBeInTheDocument();
     expect(within(popup).getByRole('button', { name: W.buttons.takeOver })).toHaveFocus();
-    // The answers are in the pop-up, and are not offered a second time behind it.
     expect(screen.getAllByRole('button', { name: W.buttons.takeOver })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: W.buttons.couldNot })).toHaveLength(1);
   });
@@ -573,7 +557,6 @@ describe('the pop-up that asks a person to do a step (spec 9.16)', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(sent).toEqual([]);
-    // The request is still there to answer, where it was before there were pop-ups.
     expect(screen.getByRole('button', { name: W.buttons.takeOver })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: W.buttons.couldNot })).toBeInTheDocument();
   });

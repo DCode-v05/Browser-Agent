@@ -11,7 +11,6 @@ from bap_browser.cli import main
 def no_settings_from_the_test_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for name in [name for name in os.environ if name.startswith("BAP_BROWSER")]:
         monkeypatch.delenv(name)
-    # The command reads a .env file in the folder it is run from. The developer's own must not be read.
     monkeypatch.chdir(tmp_path)
 
 
@@ -45,7 +44,6 @@ def test_show_tools_gives_the_tools_on_offer_and_the_one_value_that_stands_for_t
     assert main(["config", "show", "--config", str(file), "--tools"]) == 0
     first, *names = capsys.readouterr().out.splitlines()
     offered = tools_for(Config())
-    # The same value the service gives at /api/tools: a client can keep it and notice a change.
     assert first == f"tools = {tools_hash(offered)}"
     assert names == [tool.name for tool in offered]
 
@@ -128,7 +126,6 @@ def test_the_agent_command_can_show_its_browser(make_config, tmp_path: Path) -> 
     config = make_config(tmp_path, browser={"channel": "chrome"})
     assert config.browser.headless is True and config.browser.viewport is not None
     shown = with_visible_browser(config)
-    # A window a person watches: it is on screen, and the page is as large as the window.
     assert shown.browser.headless is False and shown.browser.viewport is None
     assert shown.browser.channel == "chrome", "nothing else about the browser changes"
     assert config.browser.headless is True, "the configuration it was made from is left as it was"

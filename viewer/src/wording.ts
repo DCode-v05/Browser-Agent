@@ -1,5 +1,3 @@
-// Every string a person reads (spec 9.6). Sentence case; buttons start with a verb; say what will happen.
-
 import type { ApprovalOutcome, Backend, DialogKind, EndReason, HelpKind, HelpOutcome } from './protocol';
 
 export const W = {
@@ -21,7 +19,6 @@ export const W = {
 
   refused: 'Open it again from where you started the session.',
 
-  // The words on the border of the live picture.
   label: {
     agent: 'Agent is working',
     waiting_for_task: 'Ready for your task',
@@ -60,7 +57,6 @@ export const W = {
     viewStep: 'View step',
     dismiss: 'Dismiss',
     newSession: 'Start a new session',
-    /** What a button does, shown when the pointer rests on it. */
     hint: {
       pause: 'Holds the agent after the step it is on. Resume lets it go on.',
       resume: 'Lets the agent go on from where it was held.',
@@ -211,7 +207,6 @@ export const W = {
       evaluations: 'Evaluations',
     },
     signOut: 'Sign out',
-    /** What each part of the window's bar is, shown when the pointer rests on it. */
     hint: {
       systems: 'For the admin: what users are allowed, and the browsers and the desktop compared.',
       desktop: 'Opens the desktop app in a window of its own, with its own browser and its own chat.',
@@ -234,7 +229,6 @@ export const W = {
     noBrowserLead: "Your admin has not let users use any browser. Ask them to turn one on for users: it is in that browser's Configuration.",
     starting: 'Starting the browser…',
     failed: 'The browser could not be started',
-    /** A real machine as the desktop of computer use, through the installed driver (spec 22). */
     machine: {
       title: 'Let the agent use this machine',
       lead: 'The agent works on this machine\'s own screen, in the background: your pointer and the window in front of you stay yours. It opens only the apps allowed in Configuration.',
@@ -247,14 +241,12 @@ export const W = {
       tip: 'To take the screen yourself, press Take over. Stop ends the agent\'s work at once.',
       adminOnly: 'Your admin sets this machine up for the agent.',
     },
-    /** The page of computer use, which is a desktop and no browser (spec 21). */
     computer: {
       starting: 'Starting the desktop…',
       failed: 'The desktop could not be started',
       turnedOff: 'The desktop is turned off',
       view: 'Desktop and chat',
     },
-    /** Where the computer page's engine runs, and what it works on (spec 22.6): said on the page. */
     where: {
       engine: 'Engine on',
       worksOn: 'Controls',
@@ -262,12 +254,10 @@ export const W = {
       container: 'a Linux desktop of its own, in a container beside the engine',
       here: "the engine's own Linux desktop",
       machine: (system?: string) => (system ? `the engine's own ${system} machine: its real screen` : "the engine's own machine: its real screen"),
-      /** The systems, by the names Python gives them. */
       systems: { darwin: 'macOS', linux: 'Linux', win32: 'Windows' } as Record<string, string>,
       remote: 'a machine elsewhere, through its helper',
       remoteNamed: (machine: string) => `${machine}, a machine elsewhere, through its helper`,
     },
-    /** The chat alone, in a window to keep beside a real machine's screen (spec 22.3.1). */
     beside: {
       open: 'Chat beside your screen',
       yourOwnHands: "You're in control of this machine. Use its own mouse and keyboard: the picture here only shows the screen. On a Mac the picture can be driven too, once the program that runs bap-browser is allowed under System Settings, Privacy & Security, Accessibility. Press Hand back when you have finished.",
@@ -346,7 +336,6 @@ export const W = {
     loading: 'Loading…',
     unreachable: 'The service did not answer. Try again.',
     thisBrowser: 'This browser',
-    /** The same parts of a system's page, for the desktop of computer use (spec 21), which is no browser. */
     desktop: {
       thisBrowser: 'This desktop',
       use: 'Use this desktop',
@@ -461,7 +450,6 @@ export const W = {
       tokens: 'Tokens',
       notRun: 'Not run',
     },
-    /** The task sets (spec 12.7). */
     suite: {
       title: 'Task sets',
       lead: 'Tasks with a known right end, done on a practice site in this browser and checked by code. A run puts the site back to how it begins before each task, and the browser goes back to where it was afterwards. While it runs nobody is asked: each approval is answered as the task says, and that it was asked is counted.',
@@ -586,7 +574,6 @@ export const W = {
     title: 'Chat',
     messages: 'Messages',
     empty: 'Tell the agent what to do. It answers here when it has finished.',
-    /** Tasks to start from, offered while nothing has been said. One pressed is given to the agent. */
     samplesLead: 'Or press one of these to start:',
     sample: (task: string) => `Try: ${task}`,
     sampleHint: 'Gives the agent this task now.',
@@ -662,7 +649,6 @@ export const W = {
     refused: 'Not connected',
   },
 
-  /** The names of the parts of the page, for whoever finds their way by them. */
   parts: {
     activity: 'Activity',
     browser: 'Browser',
@@ -678,7 +664,6 @@ export const W = {
     agent: 'Agent',
     browser: 'Browser',
     sessions: 'Sessions',
-    /** The page's title for a screen reader when the viewer is shown inside a client. */
     embeddedTitle: 'Browser session',
     controls: 'Session controls',
     attention: 'Needs your attention',
@@ -735,7 +720,6 @@ export const W = {
     help: (reason: string) => `The agent asked for help: ${reason}. Press A to go to it.`,
   },
 
-  // Auto Mode and safeguards (spec 18.10).
   autoMode: {
     mode: {
       every_action: 'Asks every step',
@@ -791,15 +775,10 @@ export const W = {
   },
 } as const;
 
-/** Every word of `W`, as text: what a page is drawn from, whichever system it is of. */
 export type Words = Worded<typeof W>;
 type Worded<T> = T extends string ? string : T extends (...given: infer A) => unknown ? (...given: A) => string : { readonly [K in keyof T]: Worded<T[K]> };
 type Some<T> = T extends string ? string : T extends (...given: infer A) => unknown ? (...given: A) => string : { readonly [K in keyof T]?: Some<T[K]> };
 
-/**
- * What the page of computer use says where a browser's page says "browser" (spec 22.3): it shows a
- * desktop. Only the words that differ are here; every other word is `W`'s.
- */
 export const ON_A_DESKTOP: Some<typeof W> = {
   product: 'bap-browser · Computer use',
   buttons: {

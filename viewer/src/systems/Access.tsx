@@ -1,6 +1,3 @@
-// What only the admin has, and is not one browser's (spec 4.11): what users are allowed, the two
-// passwords, where each browser stands, and the evaluations of every system as one.
-
 import { useId, useState, type FormEvent } from 'react';
 
 import type { PasswordSet, Role } from '../auth/api';
@@ -12,7 +9,6 @@ import { count, dollars, percent, spanOf } from './format';
 import { BACKEND_ICON, NOT_RUNNING, SwitchRow, TableScroll } from './parts';
 import { useWords } from '../words';
 
-/** Sets a password: the admin's own, or the one users sign in with. */
 export interface Passwords {
   set(role: Role, password: string): Promise<PasswordSet>;
 }
@@ -22,7 +18,6 @@ interface AccessProps {
   systems: SystemInfo[];
   onPolicy(changes: PolicyChange): void;
   passwords?: Passwords;
-  /** Goes to a browser's own configuration, where users are let in to it or kept out. */
   onOpen(system: string): void;
 }
 
@@ -121,14 +116,11 @@ function PasswordForm({ role, passwords }: { role: Role; passwords: Passwords })
 
 interface BrowsersProps {
   systems: SystemInfo[];
-  /** What the admin lets users use. Null until the service has said. */
   policy: Policy | null;
   wordFor(system: SystemInfo): string;
   onOpen(system: string, view: 'configuration' | 'evaluations'): void;
 }
 
-/** Where each browser stands, and the way to its own configuration and evaluations. Nothing is
- *  changed here: each browser is set up in one place, under its own tab. */
 export function BrowsersCard({ systems, policy, wordFor, onOpen }: BrowsersProps) {
   const V = W.systems.overview;
   return (
@@ -191,7 +183,6 @@ export function BrowsersCard({ systems, policy, wordFor, onOpen }: BrowsersProps
   );
 }
 
-/** The tasks of every system as one, with a line for each system: the admin's view of the whole (spec 12.6). */
 export function OverallCard({ overall, nameOf, onRefresh }: { overall: Overall | null; nameOf(system: string): string; onRefresh(): void }) {
   const L = useWords();
   const O = W.systems.overall;

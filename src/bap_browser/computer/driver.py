@@ -21,16 +21,12 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 LOCK = Path(__file__).with_name("driver.lock.json")
-# How each kind of processor is named by the systems that report it.
 PROCESSORS = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x64", "amd64": "x64"}
-# Where the driver's program is in what is unpacked. On macOS it is inside the signed app, and is
-# started from there: the permissions a person gives belong to that app.
 BINARY = {
     "darwin": "CuaDriver.app/Contents/MacOS/cua-driver",
     "win32": "cua-driver.exe",
     "linux": "cua-driver",
 }
-# The makers' kit for other programs. Not used here, and not kept.
 NOT_KEPT = "sdk"
 
 
@@ -135,7 +131,6 @@ def install(
     shutil.rmtree(partial, ignore_errors=True)
     try:
         unpack(data, partial)
-        # A release is one folder. What is in it becomes the version's folder.
         inside = [entry for entry in partial.iterdir()]
         root = inside[0] if len(inside) == 1 and inside[0].is_dir() else partial
         shutil.rmtree(root / NOT_KEPT, ignore_errors=True)

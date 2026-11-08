@@ -270,7 +270,6 @@ def test_a_driver_too_slow_to_register_its_logon_task_is_said_and_is_no_crash(tm
     binary.write_text(
         f"#!{sys.executable}\nimport json, sys, threading\n"
         f"if sys.argv[1:] == ['manifest']:\n    print(json.dumps({GOOD!r}))\n"
-        # It never answers: it is ended when the wait for it is over.
         "else:\n    threading.Event().wait()\n",
         encoding="utf-8",
     )

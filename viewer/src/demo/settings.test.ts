@@ -6,7 +6,6 @@ import { createDemoSettings } from './settings';
 const ids = (answer: SettingsAnswer) => answer.groups.flatMap((group) => group.settings.map((setting) => setting.id));
 const find = (answer: SettingsAnswer, id: string) => answer.groups.flatMap((group) => group.settings).find((setting) => setting.id === id)!;
 
-// The sets of spec 10.2. Web and mobile hold what milestone 1 builds; desktop shows its whole design.
 const MOBILE = [
   'stay_signed_in',
   'ask_before',

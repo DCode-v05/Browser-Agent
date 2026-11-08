@@ -187,9 +187,6 @@ def test_what_a_machine_lacks_is_said_in_words_a_person_can_act_on(make_config, 
     assert "not installed" in lacks.said
 
 
-# What the page's two buttons do (the admin's, in the window).
-
-
 def a_config(make_config, tmp_path: Path, runs: str = "machine"):
     return make_config(tmp_path, computer={"runs": runs, "base": {"home": str(tmp_path / "home")}})
 

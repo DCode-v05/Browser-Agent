@@ -23,7 +23,6 @@ from bap_browser.computer.seams.state import Asker, Working, current, work_for
 from bap_browser.config import Config
 from bap_browser.errors import BrowserError
 
-# The whole screen, as Hermes' tool names it, and who holds it when a person takes over in the viewer.
 THE_SCREEN = "screen"
 THE_VIEWER = "viewer"
 __all__ = [
@@ -57,16 +56,13 @@ def base(
     elsewhere = config.computer.runs == "remote"
     settings = remote.through_the_link(config.computer, home) if elsewhere else config.computer
     if container is not None:
-        # The desktop is in a container, and so is its driver: the dock reaches it (spec 22.6).
         settings = contained.through_the_dock(settings, container)
     if allowed.held(settings) and backend is None:
-        # The driver itself holds the agent to the apps the person allowed (spec 22.7).
         listed = str(allowed.write(home, settings))
         settings = settings.model_copy(
             update={"base": settings.base.model_copy(update={"capability_manifest": listed})}
         )
     before = work_for(Working(computer=settings, home=home, backend=backend))
-    # A session that ended while a person held the screen must not hold the next one.
     lease.release()
     try:
         yield
@@ -121,7 +117,6 @@ def lacks(config: Config) -> Lacks | None:
     It is asked before a session begins, never during one."""
     settings = config.computer
     if settings.runs == "container":
-        # The driver is put into the desktop's container when it starts. Nothing here is needed.
         return None
     if settings.runs == "remote":
         if os.environ.get(settings.helper_token_env):
@@ -136,8 +131,6 @@ def lacks(config: Config) -> Lacks | None:
         return None
     with base(config):
         status = permissions.computer_use_status()
-    # Only a plain no counts. With the driver not yet running macOS gives no answer, and the first
-    # capture will tell.
     missing = [
         name
         for field, name in (("accessibility", "Accessibility"), ("screen_recording", "Screen Recording"))
@@ -162,16 +155,12 @@ def person_holds(holds: bool) -> None:
 def screen(session: str) -> CaptureResult:
     """The whole screen, for the person who watches. It is theirs to see whoever holds the screen,
     so it does not pass the gate the agent's own captures pass."""
-    # Named here and not at the top: the library of the driver's protocol is loaded only where a
-    # driver is spoken to, as the copied code itself does.
     from mcp.shared.exceptions import MCPError
 
     try:
         with tool._backend_for_call(session) as backend:
             return backend.capture(mode="vision", app=THE_SCREEN)
     except (MCPError, RuntimeError, OSError) as cut:
-        # The driver went away under it: it was ended, or it stopped answering. The next look starts
-        # a conversation with it afresh.
         raise BrowserError("The machine gave no picture of its screen.", reason="no picture") from cut
 
 

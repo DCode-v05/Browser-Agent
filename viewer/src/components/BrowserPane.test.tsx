@@ -50,7 +50,6 @@ describe("the agent's pointer (spec 9.11)", () => {
 
   it('points at the middle of the element a step names, and the element is outlined', () => {
     const { pointer, target } = show([begins(1, 'browser_click', BUTTON)]);
-    // (100 + 200 / 2) of 1000 wide, (50 + 100 / 2) of 500 high.
     expect(pointer?.style.transform).toBe('translate(20%, 20%)');
     expect(target?.dataset.state).toBe('targeting');
     expect(target?.style.left).toBe('10%');

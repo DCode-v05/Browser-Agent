@@ -1,13 +1,9 @@
-/* The shell, the browser column and the activity column (spec 9.2 to 9.4). Tokens only. */
-
 .app {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-width: 0;
 }
-
-/* Top bar. It has no edge of its own: it is part of the page. */
 
 .top-bar {
   flex: none;
@@ -30,7 +26,6 @@
   white-space: nowrap;
 }
 
-/* One of the two places the brand's gradient appears. */
 .brand-mark {
   width: var(--brand-mark);
   height: var(--brand-mark);
@@ -60,7 +55,6 @@
   font-weight: var(--weight-regular);
 }
 
-/* The mode chip opens settings: a chip that is also a button. */
 .chip-button {
   border: 0;
   cursor: pointer;
@@ -73,8 +67,6 @@
 .top-bar-space {
   flex: 1;
 }
-
-/* The task line under the head (spec 18.3, 18.10): the task, cut to two lines, and its sites as chips. */
 
 .task-line {
   display: flex;
@@ -145,8 +137,6 @@
   background: var(--waiting);
 }
 
-/* Workspace */
-
 .workspace {
   flex: 1;
   min-height: 0;
@@ -160,8 +150,6 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Nothing has been given to the agent yet: no browser pane to show, so the chat opens alone,
-   centred, the width a chat reads at rather than stretched edge to edge. */
 .workspace:not([data-started]) {
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
@@ -171,8 +159,6 @@
   width: 100%;
   max-width: var(--dialog-width);
 }
-
-/* Browser column: one card. Tabs and address are pills; under them a warm stage holds the picture. */
 
 .browser {
   display: flex;
@@ -218,7 +204,6 @@
   color: var(--text);
 }
 
-/* The strip scrolls sideways, which would cut a ring drawn outside the tab. */
 .tab:focus-visible {
   outline-offset: calc(-1 * var(--focus-width));
 }
@@ -247,7 +232,6 @@
   color: var(--text-muted);
 }
 
-/* The lock or the globe sits inside the pill, before the address. */
 .address > .icon {
   position: absolute;
   left: calc(var(--space-3) + var(--space-3));
@@ -312,8 +296,6 @@
   animation: live var(--duration-live) var(--ease) infinite;
 }
 
-/* Live picture, on its stage */
-
 .frame-area {
   flex: 1;
   min-height: 0;
@@ -326,14 +308,12 @@
   container-type: size;
 }
 
-/* Before a session there are no tabs and no address above the stage. */
 .frame-area:first-child {
   margin-top: var(--space-3);
 }
 
 .frame {
   position: relative;
-  /* As large as the area allows, at the browser's own shape. */
   width: min(100cqw, calc(100cqh * var(--frame-w) / var(--frame-h)));
   aspect-ratio: var(--frame-w) / var(--frame-h);
   border: var(--control-border-width) solid var(--border);
@@ -363,8 +343,6 @@
   border-color: var(--border-strong);
 }
 
-/* While the agent works, the edge of the browser glows in its colour and breathes. It is drawn over
-   the picture and takes no clicks. */
 .frame-glow {
   position: absolute;
   inset: 0;
@@ -442,9 +420,6 @@
   font-size: var(--text-caption);
 }
 
-/* Where the agent is about to act, and where it has just acted. Drawn by the viewer, never
-   inside the page. */
-
 .target {
   position: absolute;
   outline: var(--focus-width) solid var(--agent);
@@ -455,7 +430,6 @@
   animation: arrive var(--duration-enter) var(--ease);
 }
 
-/* After the action the outline stays for a moment, then leaves. */
 .target[data-state='acted'],
 .target[data-state='failed'] {
   animation: leave var(--duration-enter) var(--ease) var(--pointer-hold) forwards;
@@ -483,8 +457,6 @@
   display: none;
 }
 
-/* The agent's pointer. It covers the picture and is moved by a transform, so its top-left corner,
-   where the arrow's tip is, glides from the last place the agent acted to the next. */
 .agent-pointer {
   position: absolute;
   inset: 0;
@@ -495,8 +467,6 @@
   animation: arrive var(--duration-enter) var(--ease);
 }
 
-/* Where the agent clicked: a dot that stays for a moment, and one ring that spreads from it once
-   the pointer has arrived. */
 .click-mark {
   position: absolute;
   width: var(--space-2);
@@ -544,8 +514,6 @@
 .placeholder-hint {
   max-width: var(--placeholder-width);
 }
-
-/* Activity column: one warm panel, with white cards inside it. */
 
 .activity {
   position: relative;
@@ -621,7 +589,6 @@
   text-overflow: ellipsis;
 }
 
-/* What to do next is read in full, however narrow the screen. */
 .status[data-state='refused'] .status-detail {
   white-space: normal;
 }
@@ -641,12 +608,9 @@
   gap: var(--space-2);
 }
 
-/* Stop sits apart from the others, so it is not pressed by mistake. */
 .status-controls .button[data-kind='danger'] {
   margin-left: auto;
 }
-
-/* In full view the status and the controls are a bar above the browser. */
 
 .control-bar {
   flex: none;
@@ -672,8 +636,6 @@
   align-self: center;
 }
 
-/* In full view, whatever needs a person sits between the controls and the browser. */
-
 .attention {
   flex: none;
   display: flex;
@@ -687,8 +649,6 @@
   flex: 0 1 var(--activity-width);
   min-width: 0;
 }
-
-/* Cards */
 
 .card {
   flex: none;
@@ -751,7 +711,6 @@
   margin-top: var(--space-1);
 }
 
-/* The "Refused" list (spec 18.4, 18.10): one entry per refused step. */
 .refused-list {
   display: flex;
   flex-direction: column;
@@ -787,8 +746,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Timeline */
-
 .timeline {
   flex: 1;
   min-height: 0;
@@ -816,7 +773,6 @@
   overflow-y: auto;
 }
 
-/* The log is in the order things happened; it is shown newest first. */
 .rows {
   display: flex;
   flex-direction: column-reverse;
@@ -897,7 +853,6 @@
   color: var(--agent);
 }
 
-/* A step's mark (spec 18.10): checked by the reviewer, allowed by a person, or refused and why. */
 .row-mark {
   font-size: var(--text-caption);
   color: var(--text-muted);
@@ -942,8 +897,6 @@
   font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
-
-/* Step drawer */
 
 .drawer {
   position: absolute;
@@ -1032,8 +985,6 @@
   color: var(--text-muted);
 }
 
-/* Overlays */
-
 .scrim {
   position: fixed;
   inset: 0;
@@ -1076,7 +1027,6 @@
   margin-top: var(--space-3);
 }
 
-/* In a pop-up that asks, setting the question aside is apart from the answers, at the start. */
 .popup-actions > :first-child {
   margin-inline-end: auto;
 }
@@ -1117,10 +1067,7 @@
   color: var(--on-ink);
 }
 
-/* Chat: the tasks a person gives and the agent's answers, oldest on top; the box to write in is under them. */
-
 .chat {
-  /* The conversation is what a person works in: it gets two parts of the column to the steps' one. */
   flex: 2;
   min-height: var(--chat-min-height);
   display: flex;
@@ -1140,7 +1087,6 @@
   padding-right: var(--space-4);
 }
 
-/* What the agent is doing, in a word: an icon-sized dot, a colour and the word itself. */
 .agent-status {
   flex: none;
   display: inline-flex;
@@ -1221,7 +1167,6 @@
   color: var(--text-muted);
 }
 
-/* Tasks to start from: each a quiet card that puts its words in the box. */
 .chat-samples {
   display: flex;
   flex-direction: column;
@@ -1362,9 +1307,6 @@
   color: var(--text-muted);
 }
 
-/* Beside a browser that is a window on the person's own screen, the page is the chat: one
-   column as tall as the window, in which the conversation takes the room. */
-
 .app[data-beside] {
   height: 100%;
   min-height: 0;
@@ -1386,9 +1328,6 @@
   max-height: none;
 }
 
-/* The conversation: the whole page when the browser is on the person's own screen (spec 9.14).
-   No cards one under another: what was asked, the steps taken, the answer, and one box to write in. */
-
 .talk {
   flex: 1;
   min-height: 0;
@@ -1408,7 +1347,6 @@
 .talk-head {
   flex: none;
   display: flex;
-  /* A narrow chat puts what does not fit on a second line, rather than cut a word short. */
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
@@ -1442,7 +1380,6 @@
   text-align: center;
 }
 
-/* What the person asked is a bubble on their side. What the agent says is plain text. */
 .talk-person {
   align-self: flex-end;
   max-width: 85%;
@@ -1609,7 +1546,6 @@
   box-shadow: var(--shadow-float);
 }
 
-/* The box is one thing to the eye, so the ring goes around all of it. */
 .talk-compose:has(.talk-input:focus-visible) {
   outline: var(--focus-width) solid var(--focus);
   outline-offset: var(--focus-offset);
@@ -1638,8 +1574,6 @@
   align-items: center;
   gap: var(--space-1);
 }
-
-/* The window of three pages (spec 9.16): a bar of tabs, one for each browser, and the page under it. */
 
 .studio {
   display: flex;
@@ -1720,7 +1654,6 @@
   background: var(--danger);
 }
 
-/* A page that waits for the person says so on its tab, whichever page is open. */
 .studio-tab[data-mood='attention'] {
   border-color: var(--waiting);
   background: var(--waiting-tint);
@@ -1783,7 +1716,6 @@
   margin-top: var(--space-2);
 }
 
-/* What the window has besides its browsers: the Systems page and the desktop app. */
 .studio-side {
   display: inline-flex;
   align-items: center;
@@ -1824,8 +1756,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The pop-up that asks a person to do a step (spec 9.16). */
-
 .popup {
   gap: var(--space-3);
   border-color: var(--waiting);
@@ -1864,8 +1794,6 @@
   overflow-wrap: anywhere;
 }
 
-/* The two sign-in pages (spec 4.11): one card in the middle of the page. */
-
 .sign-in {
   display: grid;
   place-items: center;
@@ -1900,7 +1828,6 @@
   font-weight: var(--weight-emphasis);
 }
 
-/* The admin's page and the admin's window are told apart from a user's at a glance. */
 .sign-in[data-role='admin'] .sign-in-role,
 .studio-role[data-role='admin'] {
   background: var(--person-tint);
@@ -1956,7 +1883,6 @@
   margin-top: var(--space-2);
 }
 
-/* A password is set in a row of its own: the box, and the button beside it. */
 .system-password {
   display: flex;
   flex-direction: column;
@@ -1972,7 +1898,6 @@
   flex: 1;
 }
 
-/* Under a browser's tab: the browser itself, how it is set up, what its tasks took. */
 .studio-views {
   flex: none;
   display: flex;
@@ -1982,13 +1907,11 @@
   padding: var(--space-3) var(--space-4) 0;
 }
 
-/* On a narrow screen the views are scrolled sideways, not broken in the middle of a word. */
 .studio-views .systems-views {
   max-width: 100%;
   overflow-x: auto;
 }
 
-/* Where the computer page's engine runs, and what it works on: which page is which. */
 .studio-where {
   display: flex;
   flex-wrap: wrap;
@@ -2005,7 +1928,6 @@
   font-weight: var(--weight-emphasis);
 }
 
-/* In a chat alone, the line is a badge at its top: which engine this chat is, and what it controls. */
 .talk .studio-where {
   margin: var(--space-2) var(--space-4) 0;
   padding: var(--space-2) var(--space-3);
@@ -2018,7 +1940,6 @@
   color: var(--agent);
 }
 
-/* The mark beside the product's name on every page, and atop a browser's chat: where the engine is. */
 .engine-mark {
   margin: 0;
   padding: var(--space-1) var(--space-3);
@@ -2038,13 +1959,10 @@
   margin: var(--space-2) var(--space-4) 0;
 }
 
-/* What a person is told once they have taken over a real machine. */
 .studio-own-hands {
   margin: 0;
   padding: var(--space-2) var(--space-4);
 }
-
-/* The Systems page (spec 9.17, 12.6): the three browsers side by side, each a card. */
 
 .systems {
   display: flex;
@@ -2102,7 +2020,6 @@
   color: var(--on-ink);
 }
 
-/* Where the service has not yet answered, or could not: a held place, not a stray line of text. */
 .systems-empty {
   display: flex;
   align-items: center;
@@ -2121,7 +2038,6 @@
   gap: var(--space-4);
 }
 
-/* One system by itself, under its own tab: one card, no wider than is good to read. */
 .systems-grid[data-single='true'] {
   grid-template-columns: minmax(0, var(--dialog-width));
   justify-content: center;
@@ -2203,13 +2119,11 @@
   font-weight: var(--weight-regular);
 }
 
-/* A line saying what the controls beside it do, or who a part of the card is for. */
 .system-hint {
   color: var(--text-muted);
   font-size: var(--text-secondary);
 }
 
-/* The settings of one group, on the card itself: the rows of the settings screen. */
 .system-group {
   display: flex;
   flex-direction: column;
@@ -2224,7 +2138,6 @@
   padding-bottom: var(--space-2);
 }
 
-/* A browser's name in a table: in the words' own face, not the one for a tool's name. */
 .system-table-name {
   display: inline-flex;
   align-items: center;
@@ -2237,7 +2150,6 @@
   justify-content: flex-end;
 }
 
-/* One browser by itself: what the page is for stands over its card, as wide as the card. */
 .systems[data-single='true'] .systems-head {
   align-self: center;
   width: 100%;
@@ -2361,7 +2273,6 @@
   white-space: nowrap;
 }
 
-/* A table wider than its card is scrolled sideways, not squeezed until its words break. */
 .system-table-scroll {
   overflow-x: auto;
 }
@@ -2375,7 +2286,6 @@
   font-family: var(--font-mono);
 }
 
-/* A table of words, not of numbers: read from the left, with only what is pressed at the right. */
 .system-table-words th,
 .system-table-words td {
   text-align: left;
@@ -2457,8 +2367,6 @@
   background: var(--danger);
 }
 
-/* Below 980 px the columns stack: browser first, activity under it. The page never scrolls sideways. */
-
 @media (max-width: 979px) {
   .app {
     height: auto;
@@ -2471,7 +2379,6 @@
     align-content: start;
   }
 
-  /* With one column there is nothing to switch between. */
   .wide-only {
     display: none;
   }
@@ -2525,7 +2432,6 @@
     padding: var(--space-2);
   }
 
-  /* A phone has no Ctrl key to press, and little room on the picture. */
   .frame-hint,
   .status[data-layout='bar'] .status-detail {
     display: none;
@@ -2538,8 +2444,6 @@
     font-size: var(--text-caption);
   }
 }
-
-/* The task sets of a browser (spec 12.7) */
 
 .suite-tries {
   display: flex;

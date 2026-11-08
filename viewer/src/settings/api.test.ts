@@ -57,7 +57,6 @@ describe('the settings of a live session (spec 10.2)', () => {
     expect(address).toBe('http://127.0.0.1:8765/api/browsing-data/clear');
     expect(how).toMatchObject({ method: 'POST', headers: { Authorization: 'Bearer the-token' } });
     await expect(settingsFrom(PAGE, 'the-token').run('web', 'clear_browsing_data')).rejects.toBeInstanceOf(SettingsUnreachable);
-    // An action this build does not know asks for nothing.
     await settingsFrom(PAGE, 'the-token').run('web', 'something_else');
     expect(fetched).toHaveBeenCalledTimes(2);
   });

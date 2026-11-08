@@ -30,16 +30,11 @@ BASELINE = Path(__file__).with_name("patterns_baseline.json")
 
 SRC = "src/bap_browser"
 VIEWER = "viewer/src"
-# Folders that are built or installed, not written.
-# Hermes' code and Hermes' tests of it, taken whole by scripts/take_hermes.py and never edited by
-# hand (spec 22.3). Its rules are Hermes'; a test holds each file to what was taken.
 TAKEN = ("computer/hermes/", "tests/hermes/test_")
 NOT_OURS = ("viewer_dist", "node_modules", "__pycache__", "/dist/", *TAKEN)
-# A file longer than this is hard for a reader with little context to hold, a person or an agent.
 LONGEST_PYTHON_FILE = 700
 LONGEST_VIEWER_FILE = 500
 SAMPLES = "test_patterns.py"
-# Long because it is a list, not because it does much: every string a person reads.
 LISTS = ("wording.ts",)
 
 RULES = {
@@ -58,7 +53,6 @@ RULES = {
     "invisible-character": "A character nobody can see is written into the source as itself. Write it by its name or its number.",
 }
 
-# The kinds of character nobody can see: format characters, controls, line and paragraph separators.
 UNSEEN_KINDS = frozenset({"Cf", "Cc", "Zl", "Zp"})
 SUPPRESSIONS = re.compile(
     r"#\s*(pyright:\s*ignore|type:\s*ignore|noqa\b|ruff:\s*noqa)|eslint-disable|@ts-ignore|@ts-expect-error"
@@ -73,16 +67,11 @@ A_COMMENT = {
     ".tsx": re.compile(r"//(.*)$|/\*(.*)"),
 }
 SKIPS = re.compile(r"pytest\.skip\(|mark\.skip\b(?!if)|mark\.xfail|\b(it|test|describe)\.(skip|only|todo)\(")
-# A second or more, written as a number. A short sleep in a loop that looks again is not a fixed wait.
 FIXED_WAITS = re.compile(r"wait_for_timeout\(|\b(time|asyncio)\.sleep\(\s*[1-9][0-9]*(\.[0-9]+)?\s*\)")
-# What a person reads or hears of an element, written as text and not taken from the list of strings.
 A_READ_ATTRIBUTE = re.compile(r'\b(aria-label|title|alt|placeholder)="[^"{}]*[A-Za-z]{2}[^"]*"')
 TEXT_IN_A_TAG = re.compile(r">\s*[A-Z][A-Za-z]+(?: [A-Za-z']+)*[.:…]?\s*<")
-# A function shorter than this is too small to call a copy.
 SHORTEST_COPY = 3
 
-# Where anything at all may go wrong and must not go further: `except Exception` is right here, and
-# nowhere else. Each is one function, with the reason it is a boundary.
 BOUNDARIES = {
     ("src/bap_browser/tools/toolkit.py", "_outcome"): "an agent's call must never take the service down",
     ("src/bap_browser/code/worker.py", "run"): "the script is the agent's own: anything may go wrong in it",
@@ -94,8 +83,6 @@ BOUNDARIES = {
 }
 A_VIEWER_NUMBER = re.compile(r"^(export )?const [A-Z][A-Z0-9_]* = -?[0-9][0-9_.]*;")
 
-# Which part of the engine may use which. A part may import only parts on a lower line. A new
-# import upward fails the check: the boundary is held by the import graph, not by a reader's care.
 LAYERS = (
     ("errors", "results", "env_file", "address", "private_file", "config_base"),
     ("config_safeguards", "config_computer"),
@@ -219,7 +206,6 @@ def _copies(root: Path) -> Iterator[Found]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 continue
-            # What a function says of itself is not what it does.
             does = [
                 one
                 for one in node.body
@@ -238,7 +224,6 @@ def _copies(root: Path) -> Iterator[Found]:
 def _layer(root: Path, path: Path, node: ast.ImportFrom) -> Iterator[Found]:
     parts = (node.module or "").split(".")
     here, there = _unit(root, path), parts[1] if len(parts) > 1 else ""
-    # The package's own top (its version) is anyone's to read.
     if not there or there == here or here not in RANK or there not in RANK:
         return
     if RANK[there] >= RANK[here]:
@@ -286,7 +271,6 @@ def scan(root: Path = ROOT) -> list[Found]:
     for path in _files(root, SRC, ".py"):
         found += _python(root, path, product=True)
     for path in _files(root, "tests", ".py"):
-        # The test of these rules holds a sample of each pattern, as text. It is not read for them.
         if path.name != SAMPLES:
             found += _python(root, path, product=False)
     for path in _files(root, VIEWER, ".ts", ".tsx"):
@@ -302,7 +286,6 @@ Counts = dict[str, dict[str, int]]
 def counted(found: list[Found]) -> Counts:
     counts: Counts = defaultdict(dict)
     for one in found:
-        # A file is over the size or it is not: its length is not a count to keep under.
         counts[one.rule][one.path] = 1 if one.rule == "large-file" else counts[one.rule].get(one.path, 0) + 1
     return {rule: dict(sorted(paths.items())) for rule, paths in sorted(counts.items())}
 

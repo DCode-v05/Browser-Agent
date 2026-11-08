@@ -1,6 +1,3 @@
-// The viewer: one page that shows who is driving the browser, what is happening, and lets a person
-// approve, pause, stop, take over and hand back (spec 9).
-
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import { BrowserPane } from './components/BrowserPane';
@@ -26,18 +23,15 @@ import { W } from './wording';
 import { TheWords, wordsFor } from './words';
 import { type Toast, toastFor } from './state/toasts';
 
-/** The commands that take hold only when the agent's action in progress has finished. */
 const TAKES_A_MOMENT: Partial<Record<ClientCommand['type'], ControlName>> = { pause: 'pause', resume: 'resume', take_over: 'take_over', hand_back: 'hand_back' };
 
 export function App({ createConnection, settings, surface = 'web', embedded = false, options = DEFAULT_OPTIONS, preferences: given = DEFAULT_PREFERENCES, onOpenSettings, inWindow = false, beside: chatAlone = false, where }: AppProps) {
   const hosted = onOpenSettings !== undefined;
-  // A page has one bar that is its banner and one main part. In the window, those are the window's.
   const Bar = inWindow ? 'div' : 'header';
   const Workspace = inWindow ? 'div' : 'main';
   const connection = useMemo(() => createConnection(), [createConnection]);
   const [state, dispatch] = useReducer(reduce, initialState);
   const L = wordsFor(state.session?.backend);
-  // The window's own title says what the page is for, where the page is the window's whole.
   useEffect(() => {
     if (!inWindow) document.title = L.product;
   }, [inWindow, L.product]);
@@ -46,15 +40,11 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const [selected, setSelected] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
-  /** The request for help the person chose to look at first, before answering its pop-up. */
   const [lookingFirst, setLookingFirst] = useState<string | null>(null);
-  /** The approval the person chose to look at first, in the same way. */
   const [approvalLookedAt, setApprovalLookedAt] = useState<string | null>(null);
-  /** What the person prefers, as this page last read it. Until then, and in a page that keeps it, what was given. */
   const [own, setOwn] = useState<Preferences | null>(null);
   const preferences = hosted ? given : (own ?? given);
   const [ownToasts, setOwnToasts] = useState<Toast[]>([]);
-  /** The control a person pressed, and the state the session was in when they did. */
   const [pressed, setPressed] = useState<{ name: ControlName; at: StateKey } | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
@@ -66,7 +56,6 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const statusTitle = useRef<HTMLHeadingElement>(null);
   const helpCard = useRef<HTMLDivElement>(null);
   const rowBeforeDrawer = useRef<HTMLElement | null>(null);
-  /** Where the focus goes once the settings screen has closed. */
   const afterSettings = useRef<'button' | 'pending' | null>(null);
   const toastCount = useRef(0);
 
@@ -80,7 +69,6 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     return () => connection.close();
   }, [connection]);
 
-  // The clock on screen: elapsed time, time left on a card, how long the picture has been still.
   useEffect(() => {
     if (!options.tickMs) return;
     const timer = setInterval(() => setTick((tick) => tick + 1), options.tickMs);
@@ -95,7 +83,6 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     return () => root.removeAttribute('data-theme');
   }, [hosted, preferences.colourMode]);
 
-  // The settings were changed somewhere else: what the person prefers is read again.
   const settingsVersion = state.settingsVersion;
   useEffect(() => {
     if (hosted || settingsVersion === 0) return;
@@ -109,26 +96,15 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     };
   }, [hosted, settings, surface, settingsVersion]);
 
-  // Nothing has been given to the agent yet: the browser pane has nothing of its own to show, so it
-  // stays off screen and the chat takes the whole width, the way a chat app opens (spec 9.5). `steps`
-  // only grows within a session (a new one resets state entirely), so this stays true once it is,
-  // even reconnecting to a session already past that: no separate latch is needed.
   const started = state.task !== null || state.steps.length > 0 || state.ended !== null;
-  // Without a session there is nothing to hide behind chat: the browser pane says so itself
-  // ("No session to show", "Waiting for an agent to connect"), the same as always.
   const showBrowser = !state.session || started;
 
   const now = connection.now();
   const view = describeState(state, now, options.staleAfterS);
   const driving = view.key === 'person';
-  // The person watches the screen itself, a browser of theirs or a real machine (spec 22.3.1): this page is the chat beside it.
   const beside = chatAlone || state.session?.onScreen === true;
-  // A person who takes over gets the whole width to work in.
   const full = !beside && (driving || wantsFull);
-  // Beside the browser, a session with a chat is one conversation and nothing else.
   const talking = beside && state.chat.enabled;
-  // Shown in a frame beside the browser, which is the extension's side panel: the browser's pages
-  // are told who is driving, so that they can show it (spec 9.15).
   const look = beside && window.parent !== window ? JSON.stringify(lookOf(state, view, preferences.showAgentPointer)) : '';
   useEffect(() => {
     if (look) tellPanel(JSON.parse(look) as Look);
@@ -136,15 +112,12 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const viewKey = view.key;
   const send = useCallback(
     (command: ClientCommand) => {
-      // A pause or a take-over begins when the agent's action in progress has finished. Until the
-      // session says so, the control that was pressed shows that it is working (spec 9.4).
       const control = TAKES_A_MOMENT[command.type];
       if (control) setPressed({ name: control, at: viewKey });
       connection.send(command);
     },
     [connection, viewKey],
   );
-  // The press is over once the session has moved on, or when nothing came of it.
   const working = pressed && pressed.at === viewKey ? pressed.name : null;
   useEffect(() => {
     if (!pressed) return;
@@ -210,7 +183,6 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
     rowBeforeDrawer.current?.focus();
   }, []);
 
-  // The keyboard map (spec 9.8). Dialogs and the live picture during takeover keep their own keys.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) return;
@@ -246,22 +218,17 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
         : '';
   const polite = view.urgency === 'polite' ? (view.key === 'agent' && view.detail ? W.announce.newStep(view.detail) : view.status) : '';
 
-  // The agent asked a person to do a step: a pop-up says so over whatever is on screen, until the
-  // person answers it or chooses to look at the page first (spec 9.16).
   const askingForHelp = state.help !== null && state.control === 'person_requested' && lookingFirst !== state.help.id && !settingsOpen && !confirmingStop;
 
-  // An approval pops up in the same way: the agent does nothing until it is answered.
   const askingToApprove = state.approval !== null && approvalLookedAt !== state.approval.id && !settingsOpen && !confirmingStop;
   const answerApproval = (answer: 'once' | 'site' | 'deny') => {
     const id = state.approval?.id ?? '';
     send(answer === 'deny' ? { type: 'deny', id } : { type: 'approve', id, scope: answer });
-    // What asked is about to go, and the focus with it.
     statusTitle.current?.focus();
   };
 
   const status = (
     <StatusPanel
-      // While the pop-up asks, it holds the answers: the same buttons are not offered twice.
       view={askingForHelp ? { ...view, controls: view.controls.filter((control) => control === 'stop') } : view}
       now={now}
       layout={full ? 'bar' : 'card'}
@@ -282,10 +249,8 @@ export function App({ createConnection, settings, surface = 'web', embedded = fa
   const needsAttention = Boolean(
     state.approval || state.help || state.dialog || blocked || unwatched || state.ended || flaggedVisible.length > 0 || autoPaused || state.limit || state.refused.length > 0,
   );
-  // What needs a person's answer or attention. It is on screen in both views.
   const cards = (
     <>
-      {/* While the pop-up asks, it holds the answers: they are not offered twice. */}
       {state.approval && !askingToApprove && <ApprovalCard approval={state.approval} now={now} firstRef={approvalButton} onAnswer={answerApproval} />}
       {state.help && <HelpCard help={state.help} now={now} cardRef={helpCard} />}
       {state.dialog && <DialogCard dialog={state.dialog} />}

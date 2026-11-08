@@ -44,7 +44,6 @@ async def test_a_call_in_progress_cannot_start_the_browser_again_after_stop(star
         await release.wait()
         return await resolve(host)
 
-    # The call is held where a navigation looks its name up, before it asks for the browser.
     session.browser.policy._resolve = slow_lookup
     call = asyncio.create_task(session.toolkit.call("browser_navigate", {"url": "https://example.com/"}))
     await settle()
@@ -114,7 +113,6 @@ async def test_keys_and_buttons_a_person_still_holds_are_let_go_when_they_hand_b
         ("key", ("up", "Shift")),
         ("pointer", ("up", 30, 40, "left")),
     ]
-    # A key that comes up after the hand-back is the person's own business; it does not reach the page.
     await session.handle({"type": "key", "action": "up", "key": "Control"})
     assert len(driver.calls) == 3
 
@@ -122,7 +120,6 @@ async def test_keys_and_buttons_a_person_still_holds_are_let_go_when_they_hand_b
 async def test_the_pointer_can_move_without_a_button(started: Started) -> None:
     session, driver = await started()
     await session.handle({"type": "take_over"})
-    # A browser reports -1 for the button of a move.
     await session.handle({"type": "pointer", "action": "move", "x": 12, "y": 34, "button": -1})
     await session.handle({"type": "pointer", "action": "move", "x": 13, "y": 35})
     assert driver.calls == [("pointer", ("move", 12, 34, "left")), ("pointer", ("move", 13, 35, "left"))]

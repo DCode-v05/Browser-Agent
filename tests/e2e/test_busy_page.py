@@ -24,7 +24,6 @@ async def test_a_page_too_busy_to_answer_fails_the_call_instead_of_holding_it(
         tools = Toolkit(session)
         page = await tools.call("browser_navigate", {"url": f"{site}/busy.html"})
         started = time.perf_counter()
-        # The click starts four seconds in which the page answers nothing.
         clicked = await tools.call("browser_click", {"ref": ref_of(page.text, 'button "Work"')})
         read = await tools.call("browser_snapshot", {})
         elapsed = time.perf_counter() - started
@@ -33,7 +32,6 @@ async def test_a_page_too_busy_to_answer_fails_the_call_instead_of_holding_it(
         assert read.text.startswith("The page did not answer within 0.4 s. It may be busy or still loading.")
         assert read.text.endswith(f"[tabs] t1* {site}/busy.html")
         assert elapsed < 3, f"the calls took {elapsed:.1f} s while the page was busy for 4 s"
-        # Once the page answers again, so do the tools.
         await (await session.driver()).page.wait_for_function("true", timeout=10000)  # type: ignore[attr-defined]
         assert not (await tools.call("browser_snapshot", {})).is_error
 

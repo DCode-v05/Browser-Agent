@@ -1,14 +1,5 @@
-// Shows, on the page itself, who is driving the browser: a glowing edge, a label, and the agent's
-// pointer on what it is acting on. What to show comes from the session's viewer through the side
-// panel (panel.js); this script decides nothing and holds no words of its own.
-//
-// Everything is drawn inside a closed shadow root on one element that takes no clicks, so the page
-// and the agent's reading of the page see none of it.
-
 (() => {
   const LOOK = 'bap-browser.look';
-  // With no word from the side panel for this long, the page shows nothing: the panel was closed or
-  // the session ended.
   const FORGET_MS = 3000;
   const TONES = ['agent', 'person', 'waiting', 'neutral', 'danger'];
 
@@ -84,7 +75,6 @@
   }
 
   function colour(value, fallback) {
-    // Only a plain colour is ever put into the page's styles.
     return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value.trim()) ? value.trim() : fallback;
   }
 
@@ -118,7 +108,6 @@
     if (at) {
       parts.pointer.style.transform = `translate(${at.x}px, ${at.y}px)`;
       if (typeof look.click === 'number' && look.click !== lastClick) {
-        // One ring for each click, where the pointer is.
         lastClick = look.click;
         Object.assign(parts.ring.style, { left: `${at.x}px`, top: `${at.y}px` });
         parts.ring.classList.remove('go');

@@ -37,7 +37,6 @@ const EXPECTED: Record<string, { key: StateKey; frame: FrameState }> = {
   disconnected: { key: 'disconnected', frame: 'disconnected' },
   stale: { key: 'agent', frame: 'stale' },
   own_browser: { key: 'agent', frame: 'own_browser' },
-  // The browser is on the person's own screen, so no picture ever arrives.
   beside: { key: 'agent', frame: 'connecting' },
   auto_on: { key: 'agent', frame: 'live' },
   refused: { key: 'agent', frame: 'live' },

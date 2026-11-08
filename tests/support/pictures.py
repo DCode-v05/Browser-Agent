@@ -13,9 +13,7 @@ import struct
 import zlib
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
-# How many numbers a pixel has, by the PNG colour type: grey, colour, grey with alpha, colour with alpha.
 CHANNELS = {0: 1, 2: 3, 4: 2, 6: 4}
-# A difference of this many shades out of 255 in one colour of one pixel is not seen by anyone.
 SAME_TO_THE_EYE = 2
 
 

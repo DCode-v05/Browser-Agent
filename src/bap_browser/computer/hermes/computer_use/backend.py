@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/backend.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Abstract backend interface for computer use. Any implementation (cua-driver over MCP, a plugin
 driver, the test noop) returns the shapes below. All methods are synchronous; async is handled inside
@@ -22,7 +21,7 @@ def image_dimensions_from_bytes(raw: bytes) -> Optional[tuple[int, int]]:
     segments (skipping 0xFF fill bytes) to the first SOF marker; stop at SOS. Used by the
     tool layer's provider min-size guard."""
     if raw.startswith(b"\x89PNG\r\n\x1a\n") and len(raw) >= 24:
-        width, height = struct.unpack(">II", raw[16:24])  # cannot fail: 8 bytes are guaranteed present
+        width, height = struct.unpack(">II", raw[16:24])
         return int(width), int(height)
     if raw.startswith(b"\xff\xd8") and len(raw) > 4:
         i = 2
@@ -50,17 +49,14 @@ def image_dimensions_from_bytes(raw: bytes) -> Optional[tuple[int, int]]:
 class UIElement:
     """One interactable element on the current screen."""
 
-    index: int                       # 1-based SOM index
-    role: str                        # AX role (AXButton, AXTextField, ...)
-    label: str = ""                  # AXTitle / AXDescription / AXValue snippet
-    bounds: tuple[int, int, int, int] = (0, 0, 0, 0)  # x, y, w, h (logical px)
-    app: str = ""                    # owning bundle ID or app name
-    pid: int = 0                     # owning process PID
-    window_id: int = 0               # SkyLight / CG window ID
+    index: int
+    role: str
+    label: str = ""
+    bounds: tuple[int, int, int, int] = (0, 0, 0, 0)
+    app: str = ""
+    pid: int = 0
+    window_id: int = 0
     attributes: dict[str, Any] = field(default_factory=dict)
-    # Opaque per-snapshot handle from cua-driver, passed alongside `index` for explicit stale-detection: a
-    # stale token errors instead of silently re-resolving to a different element. None on older drivers.
-    # None for pre-#1961 drivers that didn't carry the field.
     element_token: Optional[str] = None
 
 
@@ -71,22 +67,15 @@ class CaptureResult:
     the backend and `elements` holds the matching index → element mapping."""
 
     mode: str
-    width: int                      # screenshot width (logical px, pre-Anthropic-scale)
+    width: int
     height: int
     png_b64: Optional[str] = None
     elements: list[UIElement] = field(default_factory=list)
-    app: str = ""                   # target app/window the elements were captured for
+    app: str = ""
     window_title: str = ""
-    png_bytes_len: int = 0          # raw bytes sent to Anthropic, for token estimation
-    # MIME type of `png_b64` when the backend supplied it (cua-driver-rs emits `mimeType` on every image
-    # part). None → consumers fall back to base64-prefix sniffing (older drivers).
-    # See #1961, #47072.
+    png_bytes_len: int = 0
     image_mime_type: Optional[str] = None
-    # Guidance appended to the summary by capture lanes that intentionally return no elements (e.g.
-    # full-screen composited grabs) to point the model at an interactive lane.
     note: str = ""
-    # ``max_elements`` the backend asked the driver's AX walk to stop at (0 = unbounded / not applicable);
-    # ``len(elements) >= ax_max_elements > 0`` means the tree may be truncated.
     ax_max_elements: int = 0
 
 
@@ -104,17 +93,16 @@ class ActionResult:
 
     ok: bool
     action: str
-    message: str = ""                # human-readable summary
-    capture: Optional[CaptureResult] = None  # trailing screenshot, when requested / always-on
-    meta: dict[str, Any] = field(default_factory=dict)  # debugging / telemetry extras
-    verified: Optional[bool] = None  # AX read-back: True confirmed, False unconfirmed, None n/a
-    effect: Optional[str] = None     # "confirmed" | "unverifiable" | "suspected_noop"
-    # {"recommended": "px"|"foreground"|"page", "reason": str} — only when driver recommends climbing
+    message: str = ""
+    capture: Optional[CaptureResult] = None
+    meta: dict[str, Any] = field(default_factory=dict)
+    verified: Optional[bool] = None
+    effect: Optional[str] = None
     escalation: Optional[dict[str, Any]] = None
-    path: Optional[str] = None       # delivery rung that ran (e.g. "ax", "x11_pixel", "cgevent_fg")
-    degraded: Optional[bool] = None  # AX walk found no actionable elements (act by px instead)
-    delivery_mode: Optional[str] = None  # the delivery_mode the caller requested, echoed back
-    code: Optional[str] = None       # refusal code, e.g. "background_unavailable", "desktop_scope_disabled"
+    path: Optional[str] = None
+    degraded: Optional[bool] = None
+    delivery_mode: Optional[str] = None
+    code: Optional[str] = None
 
 
 class ComputerUseBackend(ABC):
@@ -131,7 +119,7 @@ class ComputerUseBackend(ABC):
     def stop(self) -> None: ...
 
     @abstractmethod
-    def is_available(self) -> bool: ...  # usable on this host right now (check_fn gating, setup wizard)
+    def is_available(self) -> bool: ...
 
     @abstractmethod
     def capture(self, mode: str = "som", app: Optional[str] = None, pid: Optional[int] = None,
@@ -161,7 +149,7 @@ class ComputerUseBackend(ABC):
     def key(self, keys: str, *, delivery_mode: Optional[str] = None, bring_to_front: bool = False) -> ActionResult: ...
 
     @abstractmethod
-    def list_apps(self) -> list[dict[str, Any]]: ...  # running apps with bundle IDs, PIDs, window counts
+    def list_apps(self) -> list[dict[str, Any]]: ...
 
     def list_windows(self) -> list[dict[str, Any]]:
         """Visible native windows with PID and window identifiers. Optional compatibility hook: backends that
@@ -169,12 +157,12 @@ class ComputerUseBackend(ABC):
         return []
 
     @abstractmethod
-    def focus_app(self, app: str, raise_window: bool = False) -> ActionResult: ...  # route input to `app` (name / bundle ID)
+    def focus_app(self, app: str, raise_window: bool = False) -> ActionResult: ...
 
     @abstractmethod
-    def set_value(self, value: str, element: Optional[int] = None) -> ActionResult: ...  # e.g. AXPopUpButton selection
+    def set_value(self, value: str, element: Optional[int] = None) -> ActionResult: ...
 
-    def wait(self, seconds: float) -> ActionResult:  # default implementation
+    def wait(self, seconds: float) -> ActionResult:
         time.sleep(max(0.0, min(seconds, 30.0)))
         return ActionResult(ok=True, action="wait", message=f"waited {seconds:.2f}s")
 

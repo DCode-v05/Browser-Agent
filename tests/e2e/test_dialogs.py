@@ -41,7 +41,6 @@ async def test_a_dialog_interrupts_the_action_which_finishes_once_it_is_answered
             "Answer it with browser_handle_dialog: what this call began is then finished."
         ), asked.text
 
-        # While it is open, a tool that needs the page is refused, and is told why.
         for tool, arguments in (("browser_snapshot", {}), ("browser_click", {"ref": button})):
             refused = await tools.call(tool, arguments)
             assert refused.is_error
@@ -49,7 +48,6 @@ async def test_a_dialog_interrupts_the_action_which_finishes_once_it_is_answered
                 "A confirm dialog is open ('Proceed?') and blocks the page. "
                 "Answer it first with browser_handle_dialog."
             ), refused.text
-        # The tools that need nothing from the page still run.
         listed = await tools.call("browser_tabs", {"action": "list"})
         assert not listed.is_error and listed.text.startswith("1 tab, the active one marked *:")
         assert not (await tools.call("browser_console", {})).is_error
@@ -83,7 +81,6 @@ async def test_an_alert_and_a_prompt(make_config: Callable[..., Config], tmp_pat
         await tools.call("browser_handle_dialog", {"action": "accept", "prompt_text": "Ada Lovelace"})
         assert await said(tools) == "Name: Ada Lovelace"
 
-        # Accepted with no text, a prompt keeps what the page put in it.
         await tools.call("browser_click", {"ref": name})
         await tools.call("browser_handle_dialog", {"action": "accept"})
         assert await said(tools) == "Name: nobody"
@@ -127,7 +124,6 @@ async def test_an_answer_that_comes_late_does_not_fail_the_action_it_held_up(
     quick = {"timeouts": {"action_ms": 500, "page_reply_ms": 500}}
     async with on_the_dialogs_page(make_config, tmp_path, site, **quick) as (tools, page):
         await tools.call("browser_click", {"ref": ref_of(page, 'button "Ask to proceed"')})
-        # A model takes longer to answer than a click is given to finish: three times as long here.
         await asyncio.sleep(3 * quick["timeouts"]["action_ms"] / 1000)
         answered = await tools.call("browser_handle_dialog", {"action": "accept"})
         assert not answered.is_error
@@ -155,7 +151,6 @@ async def test_a_dialog_nobody_answers_is_dismissed_and_the_agent_is_told(
     async with on_the_dialogs_page(make_config, tmp_path, site, dialogs={"timeout_s": 1}) as (tools, page):
         button = ref_of(page, 'button "Ask to proceed"')
         await tools.call("browser_click", {"ref": button})
-        # While the dialog is open the page cannot be read. It can again once the dialog is gone.
         async with asyncio.timeout(10):
             while (read := await tools.call("browser_get_text", {})).is_error:
                 await asyncio.sleep(0.05)

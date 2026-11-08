@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_launcher_xvnc.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """The Bot Desktop's Xvnc is started with the RFB options the lease design relies on."""
 
@@ -40,7 +39,6 @@ def test_xvnc_never_sends_the_holders_clipboard_to_watchers(tmp_path):
     argv = argv_log.read_text(encoding="utf-8-sig").split("\n")
     assert "-SendCutText=0" in argv, argv
     assert not any(a.startswith("-AcceptCutText") for a in argv), "paste into the screen must keep working"
-    # Xvnc's own cut-text cap and the bridge filter's must agree, or one side drops a paste the other admits.
     from bap_browser.computer.hermes.bot_desktop.rfb_filter import _MAX_CUT_TEXT
     assert int(argv[argv.index("-MaxCutText") + 1]) == _MAX_CUT_TEXT, argv
-    assert not os.path.exists(tmp_path / "rfb.sock")  # stub never bound it; nothing leaked
+    assert not os.path.exists(tmp_path / "rfb.sock")

@@ -22,7 +22,6 @@ function show(name: string, props: Partial<AppProps> = {}) {
     return connection;
   };
   const user = userEvent.setup();
-  // The on-screen clock stands still in tests; what it shows is checked through the state it is given.
   render(<App createConnection={createConnection} settings={createDemoSettings()} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} {...props} />);
   return { sent, user };
 }
@@ -208,7 +207,6 @@ describe('approval pop-up (spec 9.16)', () => {
     show('waiting_approval');
     expect(within(popup()).getByText('Upload cv.pdf to example.com')).toBeInTheDocument();
     expect(within(popup()).getByText(/^\d:\d\d left, then this is denied$/)).toBeInTheDocument();
-    // The answers are in the pop-up, and are not offered a second time behind it.
     expect(screen.queryByRole('group', { name: 'Approval needed' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Allow once' })).toHaveLength(1);
     expect(within(popup()).getByRole('button', { name: 'Allow on this site' })).toBeInTheDocument();
@@ -225,7 +223,6 @@ describe('approval pop-up (spec 9.16)', () => {
 
   it('is answered from the keyboard, and the focus goes to what the session is doing now', async () => {
     const { sent, user } = show('waiting_approval');
-    // Look first, Deny, Allow on this site, Allow once.
     await user.tab();
     await user.tab();
     await user.keyboard('{Enter}');
@@ -259,7 +256,6 @@ describe('approval card', () => {
     ['Allow on this site', { type: 'approve', id: 'a1', scope: 'site' }, 'Allowed on this site'],
     ['Deny', { type: 'deny', id: 'a1' }, 'Denied'],
   ])('%s sends the answer, closes what asked and confirms it', async (name, command, toast) => {
-    // From the pop-up, and from the card of a person who looked first.
     for (const looksFirst of [false, true]) {
       const { sent, user } = show('waiting_approval');
       if (looksFirst) await user.click(button('Look first'));
@@ -401,10 +397,8 @@ describe('keyboard (spec 9.8)', () => {
     picture.focus();
     await user.keyboard('{Shift>}a');
     sent.length = 0;
-    // The person switches to another window: the key comes up where the viewer cannot see it.
     act(() => picture.blur());
     expect(sent).toEqual([{ type: 'key', action: 'up', key: 'Shift', code: 'ShiftLeft' }]);
-    // Leaving again lets go of nothing twice.
     act(() => picture.focus());
     act(() => picture.blur());
     expect(sent).toHaveLength(1);
@@ -589,7 +583,6 @@ describe('settings', () => {
     };
     render(<App createConnection={createConnection} settings={settings} options={{ ...DEFAULT_OPTIONS, tickMs: 0 }} />);
     expect(document.documentElement).not.toHaveAttribute('data-theme');
-    // Another page changes the colour mode, and the service says the settings changed.
     await settings.change('web', { colour_mode: 'dark' });
     act(() => handlers?.onEvent({ type: 'settings_changed', changes: { colour_mode: 'dark' }, ts: 1001 } as ServerEvent));
     await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
@@ -598,7 +591,6 @@ describe('settings', () => {
   it('leaves the settings and the colour mode to a page that has them, and sends its button there', async () => {
     const onOpenSettings = vi.fn();
     const { user } = show('agent', { onOpenSettings, preferences: { colourMode: 'dark', showAgentPointer: true } });
-    // The page around the app keeps the colour mode: the app sets none, and takes none away.
     expect(document.documentElement).not.toHaveAttribute('data-theme');
     await user.click(button('Open settings'));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
@@ -634,7 +626,6 @@ describe('settings', () => {
     const { user } = await open('waiting_approval');
     await user.keyboard('a');
     expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument();
-    // The settings screen kept the pop-up back. It asks now.
     expect(screen.getByRole('dialog', { name: 'The agent needs your approval' })).toHaveFocus();
   });
 });
@@ -725,7 +716,6 @@ describe('a link that the service refuses', () => {
 });
 
 describe('a control that was pressed and has not taken hold yet (spec 9.4)', () => {
-  /** A session whose agent is in the middle of an action: a command is sent, and nothing comes of it until the test says so. */
   function midAction() {
     let handlers: ConnectionHandlers | undefined;
     const sent: ClientCommand[] = [];
@@ -751,13 +741,10 @@ describe('a control that was pressed and has not taken hold yet (spec 9.4)', () 
     await user.click(button('Pause'));
     const pausing = button('Pausing…');
     expect(pausing).toHaveAttribute('aria-busy', 'true');
-    // Not disabled: a button that is disabled while it has the focus drops the focus.
     expect(pausing).toHaveFocus();
     await user.click(pausing);
     expect(types(sent)).toEqual(['pause']);
-    // The other controls are still one action away.
     expect(button('Take over')).not.toHaveAttribute('aria-busy');
-    // The agent's action has finished, and the session is paused.
     paused();
     expect(button('Resume')).not.toHaveAttribute('aria-busy');
     noButton('Pausing…');
@@ -801,7 +788,6 @@ describe('full view keeps what needs a person on screen', () => {
         handlers = given;
         given.onStatus('connected');
         given.onEvent({ type: 'session_started', session: 'default', agent: 'Agent', backend: 'remote_headless', browser: 'Chromium', viewport: { width: 1280, height: 800 }, ts: 1000 });
-        // A task is what puts the browser there to be shown full width: nothing is, before one.
         given.onEvent({ type: 'task_set', task: 'Buy a plane ticket', from: 'person', sites: [], ts: 1000 });
         given.onCaughtUp?.();
       },
@@ -917,13 +903,11 @@ describe("beside a browser that is a window on the person's own screen", () => {
     const talk = screen.getByRole('region', { name: 'Chat' });
     const log = within(talk).getByRole('log', { name: 'Messages' });
     expect(within(log).getByText('Check in for booking SK4821, last name Lovelace. Choose a window seat.')).toBeInTheDocument();
-    // The steps of the work under way are open, under the task that led to them.
     expect(log.firstElementChild).toHaveTextContent('Check in for booking SK4821');
     expect(within(log).getByRole('button', { name: '3 steps', expanded: true })).toBeInTheDocument();
     expect(within(log).getByText('Opened example.com/checkin')).toBeInTheDocument();
     expect(within(log).getAllByText('Clicking "Find booking" (button)').length).toBeGreaterThan(0);
     expect(within(talk).getByTestId('agent-status')).toHaveTextContent('Working');
-    // There is no picture to show full width, and no second list of the steps.
     noButton('Show the browser full width');
     expect(screen.queryByRole('heading', { name: 'Activity' })).not.toBeInTheDocument();
   });

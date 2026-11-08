@@ -8,9 +8,7 @@ from bap_browser.errors import BrowserError
 from bap_browser.results import Picture
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-# The JPEG markers that open a frame, which is where the size is written.
 JPEG_FRAMES = frozenset(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
-# The JPEG markers that stand alone, with no length after them.
 JPEG_ALONE = frozenset({0x01, *range(0xD0, 0xDA)})
 
 

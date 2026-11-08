@@ -16,7 +16,6 @@ POLICY_DIR = Path(__file__).resolve().parent.parent / "src" / "bap_browser" / "p
 CONFUSABLES_HEADER = (
     "# This is the part of Unicode's confusables data that maps a character to a Latin letter or a digit.\n"
 )
-# The header lines of confusables.txt that state its version or its licence and terms of use.
 KEPT_HEADER_KEYWORDS = ("Version:", "Date:", "license")
 
 

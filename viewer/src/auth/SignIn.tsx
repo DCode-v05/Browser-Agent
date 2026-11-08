@@ -1,6 +1,3 @@
-// The two sign-in pages (spec 4.11): one for the admin, at /admin, and one for users. The first
-// time, the admin's page makes the admin's password instead of asking for it.
-
 import { useId, useState, type FormEvent } from 'react';
 
 import { Icon } from '../components/Icon';
@@ -11,11 +8,8 @@ interface Props {
   role: Role;
   state: AuthState;
   api: AuthApi;
-  /** The service's own token, when the page was opened with the link the service printed. */
   operator: string | null;
-  /** The page signed in. The token is for the rest of the visit. */
   onSignedIn(token: string): void;
-  /** Where the other page is. */
   otherPage: string;
 }
 
@@ -30,7 +24,6 @@ export function SignIn({ role, state, api, operator, onSignedIn, otherPage }: Pr
   const saidId = useId();
 
   const creating = role === 'admin' && !state.admin_set;
-  // The admin's password is made with the link the service printed, and with nothing else.
   const cannot = creating && !(operator && state.operator) ? S.adminNotMade : role === 'user' && !state.user_set ? S.userNotSet : '';
 
   async function signIn() {

@@ -23,10 +23,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from bap_browser.config import Config
 
-# The name the driver knows the tab's session by. The extension knows the tab itself.
 TAB_SESSION = "bap-tab"
-# A driver may ask for a session with the browser as a whole, and through it for further sessions
-# with the tab. There is one debugger on the tab, so each of those is another name for it.
 BROWSER_SESSION = "bap-browser"
 VERSION = {
     "protocolVersion": "1.3",
@@ -34,12 +31,10 @@ VERSION = {
     "userAgent": "bap-browser-bridge",
 }
 NO_EXTENSION = "The browser on the person's machine is not connected."
-# What the agent is told when the extension did not let a call through (spec 8.8).
 NOT_ALLOWED = "The person has not allowed actions on {site}."
 NO_ANSWER = "The person did not answer, so this action was cancelled."
 
 
-# What `_answer` gives for a command it does not answer itself: the command is the tab's.
 FOR_THE_TAB: Any = object()
 
 
@@ -62,21 +57,17 @@ class Bridge:
         self._permissions = config.permissions
         self.own_address = own_address
         self._op_timeout_s = config.bridge.op_timeout_ms / 1000
-        # A pairing token lets an extension in once. The key it is given then lets it come back.
         self._pairing: tuple[str, float] | None = None
         self._key: str | None = None
         self._giving_up: asyncio.Task[None] | None = None
         self._extension: WebSocket | None = None
         self._driver: WebSocket | None = None
         self._waiting: dict[int, asyncio.Future[Any]] = {}
-        # The driver's commands that are with the extension now: whose they are, and the timer
-        # that answers for the extension when it does not.
         self._forwarded: dict[int, tuple[Any, Any, asyncio.TimerHandle]] = {}
         self._asked = 0
         self._target: dict[str, Any] | None = None
         self._other_names: set[str] = set()
         self._connected = asyncio.Event()
-        # One message at a time goes out on each connection, whoever sends it.
         self._to_extension_turn = asyncio.Lock()
         self._to_driver_turn = asyncio.Lock()
 
@@ -88,7 +79,6 @@ class Bridge:
         """Returns once an extension has dialled in."""
         await self._connected.wait()
 
-    # Pairing (spec 4.9).
 
     def pairing_token(self) -> str:
         """A new token that lets one extension in, once, for `bridge.pairing_ttl_s`. The one before
@@ -127,37 +117,29 @@ class Bridge:
             "preview_timeout_s": permissions.preview_timeout_s,
         }
 
-    # The extension's side.
 
     async def serve_extension(self, socket: WebSocket, *, attached: bool = False) -> None:
         """Carries the extension's answers and the tab's events until the extension leaves or falls
         silent. An extension that comes back takes the place of the connection it had; `attached`
         says whether it still holds the agent's tab."""
         if self._extension is not None:
-            # The connection it had is dead, whether or not that has been noticed here yet.
             with contextlib.suppress(RuntimeError):
                 await self._extension.close()
         if self._giving_up is not None:
             self._giving_up.cancel()
             self._giving_up = None
         if self._target is not None and not attached:
-            # It came back without the tab: the person closed it meanwhile.
             await self._drop_driver()
         self._extension = socket
         self._connected.set()
         try:
             while True:
-                # A bridge that is alive says so. One that has fallen silent is let go.
                 async with asyncio.timeout(self._settings.dead_after_s):
                     message = json.loads(await socket.receive_text())
                 if not isinstance(message, dict):
                     continue
                 if isinstance(message.get("id"), int):
                     if message["id"] in self._forwarded:
-                        # The answer to a command of the driver's goes to the driver from here, in
-                        # its turn. A driver must hear what a tab said in the order the tab said it:
-                        # an event that overtook the answer before it would be about a frame the
-                        # driver has not heard of yet, and be dropped.
                         await self._answer_driver(message)
                     else:
                         self._answered(message)
@@ -167,7 +149,6 @@ class Bridge:
                 elif message.get("method") == "forwardCDPEvent":
                     await self._pass_event(message.get("params"))
                 elif message.get("method") == "detached":
-                    # The person closed the tab or told Chrome to stop: the driver's browser is gone.
                     await self._drop_driver()
         except TimeoutError:
             with contextlib.suppress(RuntimeError):
@@ -184,8 +165,6 @@ class Bridge:
                 self._waiting.clear()
                 for asked in list(self._forwarded):
                     await self._answer_driver({"id": asked, "error": NO_EXTENSION})
-                # The channel may only be cut: the extension dials again by itself. The driver keeps
-                # its tab for a while, and is let go when nobody came back.
                 self._giving_up = asyncio.create_task(self._give_up_later())
 
     async def permit_done(self) -> None:
@@ -306,11 +285,9 @@ class Bridge:
             return
         told = {"method": event.get("method"), "params": event.get("params") or {}}
         within = event.get("sessionId")
-        # An event of the tab itself is heard under every name the driver has for the tab.
         for name in [within] if within else [TAB_SESSION, *self._other_names]:
             await self._to_driver({"sessionId": name, **told})
 
-    # The driver's side.
 
     async def serve_driver(self, socket: WebSocket) -> None:
         """Answers the driver as a browser's debugging port would, until the driver leaves. Leaving
@@ -319,8 +296,6 @@ class Bridge:
             await socket.close(1013)
             return
         self._driver = socket
-        # A driver asks many things at once, and the answer to one can wait on another being asked:
-        # each is answered in its own time.
         answering: set[asyncio.Task[None]] = set()
         try:
             while True:
@@ -352,7 +327,6 @@ class Bridge:
             await self._to_driver(_refusal(message.get("id"), session, str(refused)))
             return
         if result is FOR_THE_TAB:
-            # A frame or a worker inside the tab has a session of its own, which the extension knows.
             within = None if session in (TAB_SESSION, BROWSER_SESSION, *self._other_names) else session
             await self._forward(message.get("id"), session, within, method, params)
             return
@@ -363,7 +337,6 @@ class Bridge:
 
     async def _answer(self, method: str, params: dict[str, Any], session: Any) -> Any:
         if session is None or session == BROWSER_SESSION:
-            # What a driver asks of the browser as a whole. There is no whole browser here, only the tab.
             if method == "Target.attachToBrowserTarget":
                 return {"sessionId": BROWSER_SESSION}
             if method == "Target.attachToTarget":
@@ -394,7 +367,6 @@ class Bridge:
                 return {}
             if method == "Target.getTargetInfo":
                 return {"targetInfo": self._target}
-        # Everything else is for the tab, or for a frame or worker inside it.
         return FOR_THE_TAB
 
     async def _to_driver(self, message: dict[str, Any]) -> None:
@@ -405,7 +377,6 @@ class Bridge:
             async with self._to_driver_turn:
                 await driver.send_text(json.dumps(message))
         except (WebSocketDisconnect, RuntimeError):
-            # The driver left while this was on its way.
             pass
 
     async def _drop_driver(self) -> None:

@@ -46,13 +46,11 @@ async def test_a_session_says_which_browser_it_is_on_and_whether_it_can_be_start
             True,
         )
         assert events(plain)[0]["backend"] == "remote_headless" and "restartable" not in events(plain)[0]
-        # A session that is running is not replaced.
         await session.handle({"type": "new_session"})
         assert asked == []
         await session.handle({"type": "stop"})
         await session.handle({"type": "new_session"})
         assert asked == ["again"]
-        # One that cannot be started again ignores the request.
         await plain.close()
         await plain.handle({"type": "new_session"})
     finally:
@@ -101,7 +99,6 @@ def test_a_chrome_with_no_window_open_is_said_in_words_a_person_can_act_on() -> 
     assert said_of(raw) == (
         "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
     )
-    # Any other reason is said as it was given.
     other = BrowserError("The browser could not be started: no such file")
     assert said_of(other) == "The browser could not be started: no such file"
 
@@ -153,7 +150,6 @@ CAPTCHA_PAGE = """Page: One more step
         (SIGN_IN_PAGE, SIGN_IN_NOTICE),
         (CAPTCHA_PAGE, HUMAN_CHECK_NOTICE),
         ('Page: Shop\n- heading "Verify you are human" [ref=e1]', HUMAN_CHECK_NOTICE),
-        # A password to choose is not a sign-in, and a link or an address that says "login" is not a page that asks for one.
         (SIGN_UP_PAGE, ""),
         ('Page: News\n- link "Log in" [ref=e1]\n- button "Search" [ref=e2]', ""),
         ('Page: Fake\n- button "Go" [ref=e1]', ""),
@@ -185,7 +181,6 @@ async def test_a_task_tells_the_model_where_the_browser_is(make_config, tmp_path
     session = ServiceSession(make_config(tmp_path), driver)
     await session.start()
     try:
-        # A browser that is nowhere yet adds nothing.
         assert await with_where_the_browser_is("Find the price", session) == "Find the price"
         driver.url = "https://example.com/shop"
         assert await with_where_the_browser_is("Find the price", session) == (

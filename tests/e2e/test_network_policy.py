@@ -111,7 +111,6 @@ async def test_a_redirect_cannot_lead_where_the_agent_may_not_go(
         assert "secret" not in (await tools.call("browser_snapshot", {})).text.lower().replace(
             "secret.html", ""
         )
-        # The request was stopped before it was made.
         assert sites.asked_of_the_refused_site() == []
 
         fine = await tools.call("browser_navigate", {"url": f"{sites.allowed}/hop?to=/plain.html"})
@@ -143,11 +142,9 @@ async def test_a_frame_from_a_refused_site_is_left_empty(
         page = await tools.call("browser_navigate", {"url": f"{sites.allowed}/framed.html"})
         waited = await tools.call("browser_wait", {"load_state": "networkidle"})
         read = await tools.call("browser_snapshot", {})
-        # Whichever result comes next after the frame was stopped carries the news.
         told = page.text + waited.text + read.text
         assert f"[events] navigation to {sites.refused}/secret.html in a frame blocked: blocked site" in told
         assert "The secret page" not in read.text
-        # The frame that may be loaded is read as ever.
         assert '- iframe "Fine"' in read.text and "Plain page" in read.text
         assert sites.asked_of_the_refused_site() == []
 
@@ -160,7 +157,6 @@ async def test_a_new_tab_cannot_open_there(
         page = await tools.call("browser_navigate", {"url": f"{sites.allowed}/links.html"})
         clicked = await tools.call("browser_click", {"ref": ref_of(page.text, 'link "In a new tab"')})
         told = clicked.text + (await tools.call("browser_wait", {"seconds": 0.5})).text
-        # Stopped at the network, or closed as soon as it was seen: either way the agent is told why.
         assert "blocked site" in told and f"{sites.refused}/secret.html" in told, told
         tabs = (await tools.call("browser_tabs", {"action": "list"})).text
         assert "secret" not in tabs.lower().replace("secret.html", ""), tabs
@@ -175,7 +171,6 @@ async def test_pictures_and_scripts_are_checked_only_when_the_deployment_asks(
         tools = Toolkit(session)
         await tools.call("browser_navigate", {"url": f"{sites.allowed}/pictures.html"})
         await tools.call("browser_wait", {"load_state": "networkidle"})
-    # By default only documents are held up: a page with many requests loads at its own speed.
     assert sorted(sites.asked_of_the_refused_site()) == ["/pixel.png", "/script.js"]
 
     sites.asked.clear()
@@ -186,7 +181,6 @@ async def test_pictures_and_scripts_are_checked_only_when_the_deployment_asks(
         page = await tools.call("browser_navigate", {"url": f"{sites.allowed}/pictures.html"})
         await tools.call("browser_wait", {"load_state": "networkidle"})
         assert not page.is_error
-        # A picture that was stopped is not news for the agent: only a page that was.
         assert "[events]" not in page.text
     assert sites.asked_of_the_refused_site() == []
 
@@ -221,7 +215,6 @@ async def test_a_person_watching_is_told_what_was_blocked(make_config, tmp_path:
             "reason": "private address",
             "ts": 1_759_480_000.0,
         } in events
-        # The agent hears it with its next result.
         read = await session.toolkit.call("browser_snapshot", {})
         assert read.text.endswith(
             "[events] navigation to http://10.0.0.5/ blocked: private address (safety.block_private_networks)"

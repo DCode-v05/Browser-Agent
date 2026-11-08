@@ -62,7 +62,6 @@ async def test_the_loop_runs_tool_calls_until_the_model_answers_without_one(
     answer = await run_agent("Click Go", tools, model, SETTINGS, on_text=said.append)
     assert answer == "Done: the button was clicked."
     assert [call[0] for call in driver.calls] == ["navigate", "snapshot", "click"]
-    # What the model says while it works is passed on as it comes; the answer is returned.
     assert said == ["I will open the page."]
 
 
@@ -141,7 +140,6 @@ async def test_a_scripted_model_takes_refs_from_the_page_it_was_last_shown(
         [
             calls("browser_navigate", url="https://93.184.216.34/"),
             lambda page: Reply("", (ToolCall("c2", "browser_click", {"ref": ref_of(page, 'button "Go"')}),)),
-            # A result with no page in it does not replace the page the model last saw.
             lambda page: Reply("Clicked." if 'button "Go"' in page else "The page was lost.", ()),
         ]
     )
@@ -181,7 +179,6 @@ async def test_a_session_that_has_ended_is_noticed_before_the_model_is_asked_aga
         await run_agent("Read", tools, Counting(), SETTINGS, ended=lambda: ended)
     with pytest.raises(Unfinished):
         await run_agent("Read", tools, Counting(), SETTINGS, ended=lambda: True)
-    # The second run was over before it began: a model that is paid for by the call is not called.
     assert asked == 1
 
 

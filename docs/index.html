@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bap-browser section 18 review</title>
-<style>
-  :root {
+<style>  :root {
     --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ee; --border: #e4e0da;
     --text: #1a1714; --muted: #5d5853; --accent: #6e3b83;
     --high: #b4232f; --high-tint: #fdecee; --med: #8a5200; --med-tint: #fff4db;
@@ -55,7 +54,6 @@
   .t-ref { background: var(--high-tint); color: var(--high); }
   .t-rev { background: var(--med-tint); color: var(--med); }
   .t-note { background: var(--low-tint); color: var(--low); }
-  /* stage pipeline */
   .pipe { list-style: none; padding: 0; margin: 12px 0; counter-reset: s; }
   .pipe li { position: relative; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px;
     align-items: start; background: var(--surface); border: 1px solid var(--border);
@@ -82,7 +80,6 @@
   .steps li { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     padding: 10px 14px; margin-bottom: 8px; max-width: none; }
   .steps li b { margin-right: 6px; }
-  /* flags */
   .flag { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     padding: 16px 20px; margin: 14px 0; border-left-width: 4px; }
   .flag.high { border-left-color: var(--high); }
@@ -127,7 +124,6 @@
   <a href="#low">Low flags</a>
 </nav>
 
-<!-- ============================ PART 1 ============================ -->
 <h2 id="explain">Part 1: What section 18 says, in plain words</h2>
 
 <p>Today bap-browser has two ways of working: <b>ask before risky actions</b> (uploads, page scripts, and buttons with words like pay, send or delete) or <b>ask before every action</b>. Section 18 adds two things.</p>
@@ -274,7 +270,6 @@
   <li>An explicit list of what leaves the machine, and an honest known-limits list.</li>
 </ul>
 
-<!-- ============================ PART 2 ============================ -->
 <h2 id="high">Part 2: Flags. High (fix before building)</h2>
 
 <article class="flag high" id="h1">

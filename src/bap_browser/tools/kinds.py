@@ -10,8 +10,6 @@ from bap_browser.tools.browser_tools import RUN_A_SCRIPT
 from bap_browser.tools.computer_tools import COMPUTER_NAMES, OURS_LOOK
 from bap_browser.tools.computer_use_tool import COMPUTER_USE, LOOKS, Action
 
-# Hermes' one tool for a machine does many things, and is judged by what a call of it does: its
-# kind is the tool and the action, such as `computer_use.capture` (spec 22.4).
 BY_ITS_ACTION = COMPUTER_USE.name
 ITS_KINDS = frozenset(f"{BY_ITS_ACTION}.{action}" for action in get_args(Action)) | {BY_ITS_ACTION}
 IT_LOOKS = frozenset(f"{BY_ITS_ACTION}.{action}" for action in LOOKS)
@@ -24,9 +22,7 @@ def of(name: str, arguments: Mapping[str, Any]) -> str:
     return f"{name}.{action}" if isinstance(action, str) else name
 
 
-# The tools whose x and y are where the pointer goes. For browser_scroll they are only where the wheel turns.
 POINTED = frozenset({"browser_click", "browser_hover"})
-# The tools that only read, or only wait. With "ask before every action" these are still not asked about.
 READS = frozenset(
     {
         "browser_snapshot",
@@ -45,23 +41,18 @@ READS = frozenset(
     | IT_LOOKS
 )
 DECLARES_A_TASK = "browser_begin_task"
-# The one use of the tabs tool that changes nothing: it tells which tabs are open.
 LISTS_THE_TABS = ("browser_tabs", "list")
-# The tools whose keys go to the element that has the focus when they name no element.
 TYPES_ON_A_MACHINE = f"{BY_ITS_ACTION}.type"
 PRESSES_ON_A_MACHINE = f"{BY_ITS_ACTION}.key"
 SETS_ON_A_MACHINE = f"{BY_ITS_ACTION}.set_value"
 GO_WHERE_THE_FOCUS_IS = frozenset(
     {"browser_type", "browser_press_key", TYPES_ON_A_MACHINE, PRESSES_ON_A_MACHINE}
 )
-# The tools that touch no site: asking a person, waiting, and the list of saved files.
 NO_SITE_IN_A_BROWSER = frozenset(
     {"browser_request_human", "browser_wait", "browser_downloads", DECLARES_A_TASK}
 )
-# A desktop has no site at all (spec 21.6).
 NEED_NO_SITE = NO_SITE_IN_A_BROWSER | COMPUTER_NAMES | ITS_KINDS
 ANSWERS_A_DIALOG = "browser_handle_dialog"
-# While a page has a dialog open it answers nothing. Only these tools need nothing from it (spec 5.7).
 RUN_BESIDE_A_DIALOG = frozenset(
     {
         ANSWERS_A_DIALOG,
@@ -72,16 +63,12 @@ RUN_BESIDE_A_DIALOG = frozenset(
         DECLARES_A_TASK,
     }
 )
-# The tools that are no step on a page. They are not watched for going round in circles.
 NO_STEP_ON_A_PAGE = (
     NO_SITE_IN_A_BROWSER
     | {"browser_tabs", ANSWERS_A_DIALOG, RUN_A_SCRIPT}
     | OURS_LOOK
     | (IT_LOOKS - {f"{BY_ITS_ACTION}.capture"})
 )
-# What a hover brings up is often drawn by a style, which cannot be seen from here.
 CHANGES_UNSEEN = frozenset({"browser_hover"})
-# A script in the page is mostly a way to read it. Whether it repeats itself is told by what it gives.
 TOLD_BY_ITS_RESULT = READS | {"browser_evaluate"}
-# The tools that press keys. A key that types a character is typed text.
 PRESSES_KEYS = frozenset({"browser_press_key", PRESSES_ON_A_MACHINE})

@@ -85,7 +85,6 @@ async def test_a_person_is_asked_before_every_risky_step_and_once_without_need(
         "free-remove": "a person was asked, and need not have been",
     }
     assert totals["needless_asks"] == 0.02
-    # What the person said no to was not done.
     denied = {row["id"]: row["trials"][0] for row in report["tasks"] if row["id"].startswith("denied-")}
     assert all(trial["passed"] and trial["asked"] == 1 for trial in denied.values()) and len(denied) == 7
 

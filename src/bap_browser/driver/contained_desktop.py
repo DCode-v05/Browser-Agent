@@ -19,7 +19,6 @@ from bap_browser.computer.contained import INSIDE as DRIVER_INSIDE
 from bap_browser.config_computer import Computer
 from bap_browser.errors import BrowserError
 
-# Where the shared folder is inside the desktop.
 FILES_INSIDE = "/home/agent/Files"
 GONE = ("No such container", "is not running")
 
@@ -39,7 +38,6 @@ class App:
         return f"/usr/bin/{self.command}"
 
 
-# The apps of the image `deploy/desktop.Dockerfile` builds.
 APPS = (
     App("text_editor", "Text editor", "mousepad"),
     App("files", "Files", "pcmanfm"),
@@ -77,12 +75,10 @@ class ContainedDesktop:
     def __init__(self, settings: Computer, data_dir: str, name: str) -> None:
         self._settings = settings
         self._folder = Path(settings.folder).expanduser().resolve()
-        # One desktop for each data folder and each system: a second start takes the place of the first.
         where = hashlib.sha256(str(Path(data_dir).expanduser().resolve()).encode()).hexdigest()[:8]
         self.container = f"bap-browser-desktop-{name}-{where}"
         self._running = False
         self._channel: asyncio.subprocess.Process | None = None
-        # The program that started the container and holds its input open while it is wanted.
         self._owner: asyncio.subprocess.Process | None = None
 
     @property
@@ -105,8 +101,6 @@ class ContainedDesktop:
                 "Install Docker and start it.",
                 reason="no container program",
             )
-        # `image ls` answers for an image that is there and for one that is not; `image inspect`
-        # does not find every image some container programs list.
         code, out, _said = await self._call(program, "image", "ls", "-q", settings.image)
         if code != 0:
             raise BrowserError(
@@ -127,14 +121,10 @@ class ContainedDesktop:
         settings = self._settings
         program = settings.container_command
         await self._call(program, "rm", "-f", self.container)
-        # Not detached: this process holds the container's input open, and the desktop ends when
-        # that input closes. However this process ends, its desktop does not outlive it.
         command = [program, "run", "-i", "--rm", "--name", self.container, "-e", "WHILE_INPUT=1"]
         if not settings.network:
             command += ["--network", "none"]
         command += ["-e", f"SCREEN={settings.screen_width}x{settings.screen_height}"]
-        # An app a person has not allowed cannot run at all: an empty file stands where its program
-        # is, so neither the agent nor a menu of the desktop can start it (spec 21.6).
         allowed = allowed_apps(settings)
         for app in APPS:
             if app not in allowed:
@@ -186,7 +176,6 @@ class ContainedDesktop:
         owner, self._owner = self._owner, None
         if owner is not None and owner.returncode is None:
             assert owner.stdin is not None
-            # Its input closes: the desktop ends by itself, and is removed.
             owner.stdin.close()
         channel, self._channel = self._channel, None
         if channel is not None and channel.returncode is None:
@@ -252,7 +241,6 @@ class ContainedDesktop:
             channel.stdin.write(line.encode() + b"\n")
             await channel.stdin.drain()
         except (BrokenPipeError, ConnectionResetError):
-            # The channel went away with the desktop. The next line opens a new one, if there is a desktop.
             self._channel = None
 
     async def _call(self, *command: str, stdin: bytes | None = None) -> tuple[int, bytes, str]:

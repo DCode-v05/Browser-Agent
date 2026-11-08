@@ -18,13 +18,10 @@ Grade = Literal["named", "added_read", "added_act"]
 `added_act`, read and act (the check let the first acting step there run)."""
 Source = Literal["person", "agent"]
 
-# A token of two or more labels joined by dots, whose last label is letters only, with or without
-# http:// in front. One that follows an `@` is the end of an email address, and names no site.
 A_DOMAIN = re.compile(
     r"(?<![\w@.-])(?:https?://)?((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24})(?![\w-])",
     re.IGNORECASE,
 )
-# Pages that are no site's: the empty page a tab starts on.
 NO_SITE = ("", "about:blank")
 
 
@@ -69,7 +66,6 @@ class TaskBook:
         if self.source == "person" and self.text is not None:
             self.earlier.append(self.text)
         elif self.source == "agent":
-            # A task an agent declared ends when a person gives one.
             self._sites.clear()
         self.text, self.source = message, "person"
         for site in sites_in(message):

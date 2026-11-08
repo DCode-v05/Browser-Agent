@@ -1,7 +1,3 @@
-// The lab: a small shop, a mailbox, an account and a list of notes, for the task sets of the
-// Evaluations view (spec 12.7). Everything a visitor does is kept in this browser alone, under one
-// key, so that a run can put it back to a known state and read afterwards what was done.
-
 const KEY = 'bap-lab';
 
 const PRODUCTS = [
@@ -40,7 +36,6 @@ function load() {
     const kept = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (kept && typeof kept === 'object') return kept;
   } catch {
-    // What cannot be read is started again.
   }
   const state = fresh();
   save(state);
@@ -51,7 +46,6 @@ function save(state) {
   localStorage.setItem(KEY, JSON.stringify(state));
 }
 
-/** Changes the state and keeps it. */
 function change(how) {
   const state = load();
   how(state);
@@ -59,8 +53,6 @@ function change(how) {
   return state;
 }
 
-/** A fresh state with a run's own changes: `{"profile.newsletter": true, "mail.inbox+": [message]}`.
- *  A name that ends in `+` adds to a list; any other name sets the value. */
 function seeded(patch) {
   const state = fresh();
   for (const [name, value] of Object.entries(patch || {})) {
@@ -89,7 +81,6 @@ function el(tag, attrs, ...children) {
 const money = (amount) => `$${amount.toFixed(2)}`;
 const total = (basket) => basket.reduce((sum, item) => sum + item.price * item.qty, 0);
 
-/** The bar every page of the lab has. `here` is the page that is open. */
 function bar(here) {
   const pages = [
     ['shop.html', 'Shop'],
@@ -116,7 +107,6 @@ function bar(here) {
   );
 }
 
-/** Says what just happened, for a person and for whoever reads the page. */
 function said(text) {
   const note = document.getElementById('said');
   note.textContent = text;

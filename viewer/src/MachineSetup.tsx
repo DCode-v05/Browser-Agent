@@ -6,8 +6,6 @@ import { W } from './wording';
 type Done = { ok: true } | { ok: false; why: string };
 type Step = 'install' | 'allow';
 
-/** The desktop on a real machine through the installed driver, while the machine still lacks
- * something: install the driver, and on macOS allow it (spec 22.10.1). */
 export function MachineSetup({ note, onManage }: { note?: string; onManage?(step: Step): Promise<Done> }) {
   const [said, setSaid] = useState('');
   const [busy, setBusy] = useState<Step | null>(null);

@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_cua_macos_identity.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """macOS CuaDriver.app path and signing identity contracts."""
 
@@ -35,7 +34,7 @@ def _patch_codesign(monkeypatch, proc):
     monkeypatch.setattr(cua_backend.subprocess, "run", lambda *args, **kwargs: proc)
 
 
-@pytest.mark.platforms("posix")  # macOS bundle paths use POSIX separators
+@pytest.mark.platforms("posix")
 def test_resolve_app_path_follows_real_symlink_and_is_idempotent(tmp_path):
     app = tmp_path / "CuaDriver.app"
     executable = app / "Contents" / "MacOS" / "cua-driver"

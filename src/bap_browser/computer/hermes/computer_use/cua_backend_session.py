@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend_session.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """cua-driver MCP session plumbing: the asyncio bridge thread and the lazily-started, self-healing
 ``_CuaDriverSession`` (MCP transport with a ``cua-driver call`` CLI fallback). Config/policy
@@ -54,10 +53,10 @@ class _AsyncBridge:
     def run(self, coro, timeout: Optional[float] = 30.0) -> Any:
         from bap_browser.computer.seams.process import safe_schedule_threadsafe
         alive = self._loop is not None and self._thread is not None and self._thread.is_alive()
-        fut = safe_schedule_threadsafe(coro, self._loop) if alive else None  # closes the coroutine on failure
+        fut = safe_schedule_threadsafe(coro, self._loop) if alive else None
         if fut is None:
             if asyncio.iscoroutine(coro):
-                coro.close()  # no-op when safe_schedule_threadsafe already closed it
+                coro.close()
             raise RuntimeError("cua-driver bridge not started")
         return fut.result(timeout=timeout)
 
@@ -68,8 +67,6 @@ class _AsyncBridge:
             self._thread.join(timeout=2.0)
         self._thread = self._loop = None
 
-# Fail-closed messages for calls whose effect on the remote screen is unknown. The action MAY have landed, so it
-# is never replayed; the caller decides after taking fresh state.
 _UNKNOWN_OUTCOME_MESSAGES = {
     "transport_outcome_unknown": (
         "cua-driver transport failed during {name}; the action outcome is unknown, so Hermes "
@@ -92,7 +89,7 @@ def _tool_field(obj: Any, *names: str) -> Any:
     value = _mcp_field(obj, names[0], names[-1])
     return (getattr(obj, "model_extra", None) or {}).get(names[-1]) if value is None else value
 
-_CLI_ATTEMPTS = 4  # CLI fallback transport retries (backoff 0.5s doubling)
+_CLI_ATTEMPTS = 4
 
 def _cli_run_json(cmd: list[str], env: dict[str, str], name: str, timeout: float) -> Any:
     """Run ``cua-driver call`` with backoff until it prints JSON; return the parsed value. "daemon is not running"
@@ -119,7 +116,7 @@ def _cli_run_json(cmd: list[str], env: dict[str, str], name: str, timeout: float
         with contextlib.suppress(json.JSONDecodeError):
             if start != -1:
                 return json.loads(out[start:])
-        if attempt < _CLI_ATTEMPTS - 1:  # no JSON (EAGAIN warning / empty) — retry with backoff
+        if attempt < _CLI_ATTEMPTS - 1:
             logger.warning("cua-driver CLI fallback for %s got no JSON (attempt %d/%d); "
                            "retrying in %.1fs", name, attempt + 1, _CLI_ATTEMPTS, backoff)
             _time.sleep(backoff)
@@ -131,10 +128,8 @@ def _cli_result(parsed: Any, shot_file: Optional[str]) -> dict[str, Any]:
     """Remap a ``cua-driver call`` JSON body into the ``_extract_tool_result`` shape (no ``image_mime_types`` key)."""
     if not isinstance(parsed, dict):
         return _tool_envelope(None, [], None, False)
-    # In-band logical failures with exit 0 must still fail closed.
     is_error = parsed.get("isError") is True or parsed.get("is_error") is True
     shot = parsed.get("screenshot_png_b64")
-    # Otherwise the screenshot was routed to a file (ours or the daemon's choice).
     fpath = parsed.get("screenshot_file_path") or shot_file
     if not shot and fpath and os.path.exists(fpath):
         try:
@@ -176,36 +171,20 @@ class _CuaDriverSession:
     anyio's cancel-scope invariant requires (each `bridge.run(coro)` is a NEW task). Tool calls run in short-lived
     tasks touching only the session object."""
 
-    # Handshake calls issued BY start()/stop() — exempt from call_tool's auto-restart guard, or start() would recurse.
     _LIFECYCLE_CALLS = frozenset({"start_session", "end_session"})
-    # Idempotent reads, safe to replay after a broken transport. Mutations stay out: a lost response does not
-    # prove they failed.
     _TRANSPORT_REPLAY_SAFE_TOOLS = frozenset({"get_cursor_position", "get_displays", "get_screen_size",
                                               "get_window_state", "list_apps", "list_windows"})
-    # A timed-out MCP session is wedged for later calls, so it is recreated before the next non-lifecycle
-    # call_tool. Class-level default: tests that bypass __init__ see healthy.
-    # See #74799.
     _timeout_suspect = False
 
     def __init__(self, bridge: _AsyncBridge, embedded_daemon: Optional[Any] = None) -> None:
         self._bridge, self._embedded_daemon, self._session = bridge, embedded_daemon, None
         self._lock, self._started = threading.Lock(), False
-        # Per-tool capability-token sets from `tools/list` (read via supports_capability). Raw input schemas are
-        # the source of truth for action properties: 0.9-era drivers advertise delivery_mode in inputSchema
-        # without the ``input.delivery_mode`` token.
-        # Keys are tool names (e.g. "click", "get_window_state"); values are sets of capability strings
-        # (e.g. "accessibility.element_tokens", "input.keyboard.type.terminal_safe"). Empty until the
-        # session starts; consumers should call `supports_capability` rather than reading directly. See
-        # #47072.
         self._capabilities: dict[str, set] = {}
         self._tool_schemas: dict[str, dict[str, Any]] = {}
         self._capability_version, self._ready_event = "", threading.Event()
-        self._shutdown_event: Optional[asyncio.Event] = None  # created on bridge loop
-        self._lifecycle_future = None  # concurrent.futures.Future
+        self._shutdown_event: Optional[asyncio.Event] = None
+        self._lifecycle_future = None
         self._setup_error: Optional[BaseException] = None
-        # Declared via start_session; revives an ended-session rejection non-re-entrantly.
-        # Stable driver-side identity declared through start_session. Used to revive a logical ended-session
-        # rejection without recursive call_tool re-entry or backend-owned state (#71166).
         self._declared_session_id: Optional[str] = None
         self._transport_generation, self._transport_reset_callback = 0, None
 
@@ -217,11 +196,8 @@ class _CuaDriverSession:
         from bap_browser.computer.hermes.computer_use import cua_backend as _cb
         from bap_browser.computer.seams.process import sanitize_subprocess_env
 
-        self._shutdown_event = asyncio.Event()  # built on the loop's own thread
+        self._shutdown_event = asyncio.Event()
         _t0 = _time.monotonic()
-        # Phase marker: the ready-timeout error reports HOW FAR a wedged startup got.
-        # Phase marker surfaced by the ready-timeout error (issue #57025): when startup wedges, the caller
-        # reports HOW FAR it got instead of an opaque "never reached ready".
         self._startup_phase = "binary-check"
         try:
             driver_cmd = _driver.resolve_cua_driver_cmd()
@@ -233,14 +209,12 @@ class _CuaDriverSession:
                 (daemon.proxy_invocation(), daemon.child_env()) if daemon is not None
                 else _cb.sandbox_mcp_invocation() or (_driver._resolve_mcp_invocation(driver_cmd), _cb.cua_driver_child_env()))
             _t_manifest = _time.monotonic()
-            # Telemetry policy first (default: disabled), then strip Hermes secrets.
             params = StdioServerParameters(command=command, args=args, env=sanitize_subprocess_env(child_env))
             async with stdio_client(params) as (read, write):
                 self._startup_phase = "mcp-initialize"
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     _t_init = _time.monotonic()
-                    # Capabilities BEFORE exposing the session: the first call sees them.
                     self._startup_phase = "capability-discovery"
                     await self._populate_capabilities(session)
                     self._session, self._startup_phase = session, "ready"
@@ -249,21 +223,12 @@ class _CuaDriverSession:
                                 _time.monotonic() - _t0, _t_manifest - _t0, _t_init - _t_manifest)
                     await self._shutdown_event.wait()
         except BaseException as e:
-            # Ordinary errors and anyio CancelledError alike: start() surfaces this.
             self._setup_error = e
             self._ready_event.set()
             raise
         finally:
-            # A session that dies for ANY reason must be re-enterable: the next call sees _started False and
-            # rebuilds. Atomic bool write — stop() may hold _lock.
             self._session, self._started = None, False
 
-    # Reset _started so a session that dies for ANY reason (MCP connection drop, driver crash, unexpected
-    # coro exit) is re-enterable: the next start()/call sees _started False and rebuilds the session instead
-    # of hanging forever on a dead one via _require_started(). On the normal stop() path this is a harmless
-    # idempotent no-op (stop() already set it False). A plain bool write is atomic in CPython, so this is
-    # safe from the bridge-loop thread without taking self._lock (which stop() may hold while awaiting this
-    # coro's future). See #55048 Bug 1.
     async def _populate_capabilities(self, session: Any) -> None:
         """Cache per-tool capability sets, input schemas and capability_version from tools/list. Soft
         prerequisite: on failure the map stays empty (capability False)."""
@@ -278,7 +243,6 @@ class _CuaDriverSession:
                 self._capabilities[tool_name] = (
                     {c for c in caps if isinstance(c, str)} if isinstance(caps, list) else set())
                 self._tool_schemas[tool_name] = dict(schema) if isinstance(schema, dict) else {}
-            # capability_version is a sibling of `tools` in tools/list (NOT in initialize).
             cv = _tool_field(tools_list, "capability_version")
             if isinstance(cv, str):
                 self._capability_version = cv
@@ -296,15 +260,12 @@ class _CuaDriverSession:
         """Spawn the lifecycle owner and wait for ready. Caller holds self._lock."""
         self._ready_event = threading.Event()
         self._setup_error = self._shutdown_event = None
-        # The future tracks the WHOLE lifecycle; readiness is signalled via _ready_event.
         loop = self._bridge._loop
         if loop is None:
             raise RuntimeError("cua-driver bridge not started")
         self._lifecycle_future = asyncio.run_coroutine_threadsafe(self._lifecycle_coro(), loop)
         if not self._ready_event.wait(timeout=30.0):
             self._signal_shutdown_locked()
-            # Surface which startup phase wedged (issue #57025) — "doctor passes but the wrapper times out"
-            # reports are undiagnosable from a bare "never reached ready".
             from bap_browser.computer.seams.home import display_hermes_home
             raise RuntimeError(
                 f"cua-driver session never reached ready (timeout 30s; stuck in phase: "
@@ -348,14 +309,12 @@ class _CuaDriverSession:
         """Set the asyncio shutdown event from the caller's thread."""
         loop, event = self._bridge._loop, self._shutdown_event
         if loop is not None and event is not None and loop.is_running():
-            with contextlib.suppress(RuntimeError):  # loop closed — nothing to signal
+            with contextlib.suppress(RuntimeError):
                 loop.call_soon_threadsafe(event.set)
 
     async def _call_tool_async(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         return _extract_tool_result(await self._session.call_tool(name, args))
 
-    # ── Capability detection ─────────────────────────────────────────
-    # See #47072.
     def supports_capability(self, capability: str, tool: Optional[str] = None) -> bool:
         """Driver advertises *capability* for *tool* (or ANY tool). False before start.
 
@@ -385,7 +344,6 @@ class _CuaDriverSession:
         """Driver-advertised capability vocabulary version ("" on old builds)."""
         return self._capability_version
 
-    # ── Error classification (instance-patchable seams; result-shape checks live at module level) ──
     @staticmethod
     def _is_closed_session_error(exc: Exception) -> bool:
         """True for MCP/stdio failures that are recoverable by reconnecting."""
@@ -403,7 +361,6 @@ class _CuaDriverSession:
         return any(needle in msg for needle in ("Resource temporarily unavailable", "os error 35",
                                                 "daemon transport error", "daemon proxy"))
 
-    # ── Recovery ─────────────────────────────────────────────────────
     def _redeclare_session(self, timeout: float, failure_msg: str) -> bool:
         """start_session with the declared id; log *failure_msg* and return False on rejection."""
         session_id = self._declared_session_id
@@ -469,13 +426,10 @@ class _CuaDriverSession:
 
     def call_tool(self, name: str, args: dict[str, Any], timeout: float = 30.0) -> dict[str, Any]:
         if name not in self._LIFECYCLE_CALLS:
-            # A prior MCP timeout marks the session suspect (possibly wedged): recreate it so one timeout never
-            # poisons the run. Healthy sessions are never restarted here.
             if self._timeout_suspect:
                 self._recreate_session(
                     name, timeout, "cua-driver session suspect after earlier MCP timeout; recreating before %s",
                     clear_timeout_suspect=True)
-            # A prior session may have died (MCP drop / driver crash) and reset _started.
             if not self._started:
                 self._recreate_session(
                     name, timeout, "cua-driver session not active on %s; (re)starting before call", restart=False)
@@ -484,10 +438,6 @@ class _CuaDriverSession:
         try:
             result = self._bridge.run(self._call_tool_async(name, args), timeout=timeout)
         except concurrent.futures.TimeoutError as e:
-            # Fail closed: the action may have landed, so never replay it.
-            # MCP deadline hit (#74799): the session is suspect and must be recreated before the next call.
-            # Fail closed — the action may have taken effect on the remote screen, so never replay it here;
-            # surface the uncertainty instead (#74799).
             self._timeout_suspect = True
             logger.warning("cua-driver MCP timed out on %s; marking session suspect "
                            "for recreation before the next call", name)
@@ -506,13 +456,10 @@ class _CuaDriverSession:
             if name not in self._TRANSPORT_REPLAY_SAFE_TOOLS:
                 return _outcome_unknown(name, e, "transport_outcome_unknown")
             result = self._bridge.run(self._call_tool_async(name, args), timeout=timeout)
-        # Remember only a SUCCESSFULLY declared identity: no stale recovery state.
         declared_id, ok = args.get("session"), result.get("isError") is not True
         if name == "start_session" and ok and isinstance(declared_id, str) and declared_id:
             self._declared_session_id = declared_id
         if _is_ended_session_result(result):
-            # Revive the stable session and replay the rejected call once; a 2nd rejection surfaces as-is.
-            # Never re-runs lifecycle calls -> an end_session result is final.
             session_id = self._declared_session_id
             if session_id and name not in self._LIFECYCLE_CALLS:
                 logger.warning("cua-driver session %s ended during %s; reviving and retrying once", session_id, name)

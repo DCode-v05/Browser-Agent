@@ -52,9 +52,7 @@ async def test_the_first_task_is_taken_as_it_is_and_shown_to_the_person(
     assert told(session, "approval_requested") == []
     (shown,) = told(session, "task_set")
     assert (shown["task"], shown["from"]) == (TASK["task"], "agent")
-    # A site an agent declares may be read. The first step that acts there is checked.
     assert shown["sites"] == [{"host": "news.example", "grade": "added_read"}]
-    # The log keeps how long the task is, never its words.
     log = (tmp_path / "events.jsonl").read_text("utf-8")
     assert json.loads(log.splitlines()[-1])["args"]["task"] == f"<{len(TASK['task'])} characters>"
     assert "headlines" not in log
@@ -160,7 +158,6 @@ async def test_the_steps_of_a_task_are_counted_from_where_it_is_stated(watched: 
     await tools.call("browser_snapshot", {})
     await tools.call("browser_snapshot", {})
     assert (await tools.call("browser_snapshot", {})).text.startswith("This session has reached its limit")
-    # A limit stops every call, this one too: only a person can let the agent go on.
     stopped = await tools.call("browser_begin_task", TASK)
     assert stopped.is_error and "reached its limit" in stopped.text
 

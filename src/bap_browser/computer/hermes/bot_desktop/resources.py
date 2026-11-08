@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/resources.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Host resources the screen needs before it starts: memory.
 
@@ -30,8 +29,8 @@ DEFAULT_MIN_FREE_MB = 1536
 
 @dataclass
 class MemoryInfo:
-    available_mb: Optional[int]  # None when nothing readable (non-Linux, odd sandboxes)
-    limit_mb: Optional[int]  # the cgroup limit when there is one, else the machine's MemTotal
+    available_mb: Optional[int]
+    limit_mb: Optional[int]
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -39,7 +38,7 @@ def _read_int(path: Path) -> Optional[int]:
         text = path.read_text(encoding="utf-8-sig").strip()
     except OSError:
         return None
-    return int(text) if text.isdigit() else None  # "max" → None
+    return int(text) if text.isdigit() else None
 
 
 def _meminfo() -> dict[str, int]:
@@ -52,7 +51,7 @@ def _meminfo() -> dict[str, int]:
         key, _, rest = line.partition(":")
         parts = rest.split()
         if parts and parts[0].isdigit():
-            out[key] = int(parts[0]) * 1024  # kB
+            out[key] = int(parts[0]) * 1024
     return out
 
 
@@ -82,7 +81,7 @@ def _cgroup_limit_and_usage() -> tuple[Optional[int], Optional[int]]:
         limit = _read_int(_CGROUP_V1 / "memory.limit_in_bytes")
         usage = _read_int(_CGROUP_V1 / "memory.usage_in_bytes")
         cache = _stat_value(_CGROUP_V1 / "memory.stat", "total_inactive_file")
-        if limit is not None and limit >= 1 << 60:  # v1 "unlimited" is a huge sentinel
+        if limit is not None and limit >= 1 << 60:
             limit = None
     if usage is not None and cache:
         usage = max(usage - cache, 0)

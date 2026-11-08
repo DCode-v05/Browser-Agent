@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_screenshot_dedup.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Screenshot dedup — unchanged frames are delivered without their image.
 
@@ -51,8 +50,6 @@ def _cap(seed: int = 1, app: str = "kate", title: str = "notes") -> CaptureResul
 @pytest.fixture(autouse=True)
 def _fresh_dedup(monkeypatch):
     cu_tool._reset_screenshot_dedup()
-    # Keep the aux-vision router out of the way — these tests exercise the
-    # multimodal branch directly.
     monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision", lambda: False)
     monkeypatch.setattr(cu_tool, "_persist_capture_image", lambda cap: None)
     yield
@@ -75,7 +72,6 @@ class TestScreenshotDedup:
         data = json.loads(resp)
         assert data["screen_unchanged"] is True
         assert "screen unchanged" in data["summary"]
-        # Text metadata is still complete: the model can keep acting by element index.
         assert data["app"] == "kate" and "elements" in data
 
     def test_changed_pixels_deliver_image_again(self):
@@ -100,12 +96,9 @@ class TestScreenshotDedup:
             resp = cu_tool._capture_response(_cap(seed=1), session_id="s1")
             assert not _is_multimodal(resp)
             omitted += 1
-        # Streak exhausted — identical pixels must be re-delivered in full.
         resp = cu_tool._capture_response(_cap(seed=1), session_id="s1")
         assert _is_multimodal(resp)
         assert omitted == cu_tool._SCREENSHOT_DEDUP_MAX_STREAK
-        # And the re-delivery resets the streak: next identical capture
-        # dedups again.
         resp = cu_tool._capture_response(_cap(seed=1), session_id="s1")
         assert not _is_multimodal(resp)
 
@@ -116,10 +109,10 @@ class TestScreenshotDedup:
 
     def test_change_resets_streak_state(self):
         cu_tool._capture_response(_cap(seed=1), session_id="s1")
-        cu_tool._capture_response(_cap(seed=1), session_id="s1")  # omitted
-        cu_tool._capture_response(_cap(seed=3), session_id="s1")  # new pixels
+        cu_tool._capture_response(_cap(seed=1), session_id="s1")
+        cu_tool._capture_response(_cap(seed=3), session_id="s1")
         resp = cu_tool._capture_response(_cap(seed=3), session_id="s1")
-        assert not _is_multimodal(resp)  # dedups against the NEW frame
+        assert not _is_multimodal(resp)
 
     def test_ax_mode_untouched(self):
         cap = CaptureResult(mode="ax", width=64, height=64, png_b64=None,
@@ -138,7 +131,7 @@ class TestScreenshotDedup:
         assert _is_multimodal(first)
         after_click = cu_tool._dispatch(backend, "click", {"element": 1, "capture_after": True}, session_id="s1")
         assert not _is_multimodal(after_click) and json.loads(after_click)["screen_unchanged"] is True
-        assert json.loads(after_click)["ok"] is True  # action payload merged into the text capture
+        assert json.loads(after_click)["ok"] is True
         explicit = cu_tool._dispatch(backend, "capture", {"mode": "som"}, session_id="s1")
         assert not _is_multimodal(explicit)
         assert _is_multimodal(cu_tool._dispatch(backend, "capture", {"mode": "som"}, session_id="s1"))

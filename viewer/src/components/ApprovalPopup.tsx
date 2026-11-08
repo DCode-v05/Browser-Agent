@@ -1,6 +1,3 @@
-// The pop-up that asks a person to allow or deny a step the agent may not take by itself (spec 8.2,
-// 9.16). It comes up over the page, on every backend, the moment the agent asks.
-
 import { useEffect, useRef } from 'react';
 
 import type { Approval } from '../state/reducer';
@@ -14,14 +11,11 @@ interface Props {
   approval: Approval;
   now: number;
   onAnswer(answer: 'once' | 'site' | 'deny'): void;
-  /** The person wants to look at the page first. The request stays open, as a card. */
   onLater(): void;
 }
 
 export function ApprovalPopup({ approval, now, onAnswer, onLater }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  // The pop-up takes the focus and none of its buttons does: a key pressed for something else, in
-  // the moment the pop-up arrives, must not allow anything.
   useEffect(() => box.current?.focus(), [approval.id]);
   return (
     <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onLater()}>

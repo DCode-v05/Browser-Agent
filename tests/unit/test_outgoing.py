@@ -40,9 +40,6 @@ def read_on_mail() -> CopyMemory:
     return kept
 
 
-# Text carried from one site to another.
-
-
 def test_text_read_on_one_site_and_sent_to_another_is_a_copy() -> None:
     copy = read_on_mail().copied("the gate closes at a quarter to seven", "evil.test")
     assert copy is not None
@@ -64,8 +61,8 @@ def test_white_space_and_capitals_do_not_hide_a_copy() -> None:
 
 def test_a_copy_is_twenty_four_characters_or_more() -> None:
     kept = read_on_mail()
-    assert kept.copied("the gate closes at a qu", "evil.test") is None  # 23
-    assert kept.copied("the gate closes at a qua", "evil.test") is not None  # 24
+    assert kept.copied("the gate closes at a qu", "evil.test") is None
+    assert kept.copied("the gate closes at a qua", "evil.test") is not None
 
 
 def test_a_copy_inside_other_text_is_found_and_only_it_is_reported() -> None:
@@ -113,7 +110,6 @@ def test_a_short_secret_is_found_however_it_is_packed(secret: str, packing) -> N
     kept = memory()
     kept.remember("shop.test", f"Your order: {secret}. Thank you for shopping with us.")
     copy = kept.copied(packing(secret), "evil.test")
-    # An email address of twenty-four characters is long enough to be found as copied text too.
     assert copy is not None and copy.site == "shop.test"
     assert copy.how == "secret" or len(secret) >= 24
     assert kept.copied(packing(secret), "shop.test") is None
@@ -150,7 +146,7 @@ def test_the_memory_of_a_session_stays_under_two_megabytes_and_keeps_no_text() -
 
 def test_a_page_is_taken_in_quickly() -> None:
     kept = memory()
-    page = (LETTER + " ") * 210  # about 20,000 characters
+    page = (LETTER + " ") * 210
     began = time.perf_counter()
     kept.remember("mail.test", page)
     assert time.perf_counter() - began < 0.2
@@ -160,9 +156,6 @@ def test_unpacking_never_fails_on_what_is_not_packed() -> None:
     assert unpacked("plain words", 8) == ["plain words"]
     assert unpacked("%E0%A4%A", 12)[0] == "%E0%A4%A"
     assert "hello world!!" in unpacked(base64.b64encode(b"hello world!!").decode(), 12)
-
-
-# Money.
 
 
 @pytest.mark.parametrize(
@@ -194,9 +187,6 @@ def test_the_largest_amount_and_the_largest_in_one_currency() -> None:
     assert largest(found) == Amount(Decimal("24.50"), "USD", "$24.50")
     assert largest(found, "eur") == Amount(Decimal("22.40"), "EUR", "€22,40")
     assert largest(found, "INR") is None and largest([]) is None
-
-
-# Fields.
 
 
 @pytest.mark.parametrize(
@@ -240,9 +230,6 @@ def test_a_word_counts_only_whole_and_a_pin_code_is_a_postal_code(
     assert sensitive_kind(WORDS, texts=texts, attributes=attributes) is None
 
 
-# Files.
-
-
 @pytest.mark.parametrize(
     ("name", "first", "own", "what"),
     [
@@ -271,9 +258,6 @@ def test_a_deployment_can_ask_about_every_file_or_about_none() -> None:
     assert judged_file("report.pdf", b"%PDF", always, own_machine=False) == "ask"
     assert judged_file("archive.zip", b"PK", never, own_machine=True) == "keep"
     assert judged_file("setup.exe", b"MZ", never, own_machine=True) == "risky", "what can run is never kept"
-
-
-# Addresses and screens.
 
 
 def test_a_long_address_is_told_by_its_path_its_query_and_its_fragment() -> None:

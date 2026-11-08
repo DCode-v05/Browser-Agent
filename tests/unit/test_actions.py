@@ -51,17 +51,14 @@ def test_a_control_is_classed_by_what_its_name_says_it_does(name: str, kind: str
     [
         "Next",
         "Search",
-        # Wizards say these at every step: they are not what makes a step final.
         "Finish",
         "Proceed",
         "Complete profile",
-        # Words that open something more often than they send it are not in the lists.
         "Reply",
         "Share",
         "Apply filters",
         "Open menu",
         "Window seat",
-        # A word is matched whole: these only hold the letters of one.
         "Paypal",
         "Display options",
         "Resend-code-later-1buyer",
@@ -102,7 +99,6 @@ def test_a_field_that_is_typed_into_is_not_classed_by_its_name() -> None:
 def test_the_deployments_own_words_make_a_step_one_that_commits() -> None:
     assert class_of("Escalate ticket", ACTIONS) is None
     assert class_of("Escalate ticket", ACTIONS, ["escalate"]) == "commits"
-    # A word that is in a class keeps that class.
     assert class_of("Pay", ACTIONS, ["pay"]) == "pays"
 
 
@@ -136,12 +132,10 @@ def test_a_message_box_is_a_field_a_message_is_written_in(
 @pytest.mark.parametrize("role", ["checkbox", "switch", "radio"])
 def test_a_box_that_is_ticked_sends_nothing_though_its_name_says_send(role: str) -> None:
     assert class_of("Send me the newsletter", ACTIONS, role=role) is None
-    # The deployment's own list of words that matter holds "send" too, and says no more of a tick.
     assert class_of("Send me the newsletter", ACTIONS, ["send", "newsletter rules"], role=role) is None
     assert (
         class_of("Accept the newsletter rules", ACTIONS, ["send", "newsletter rules"], role=role) == "commits"
     )
-    # What it would pay for, delete or give access to is still asked about.
     assert class_of("Delete my account when I sign out", ACTIONS, role=role) == "deletes"
     assert class_of("Send me the newsletter", ACTIONS) == "sends"
 

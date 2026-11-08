@@ -114,7 +114,6 @@ async def run(
     with pages() as site:
         for channel in browsers:
             browser = config.browser.model_copy(update={"channel": channel, "headless": True})
-            # The bench measures the tools, not a person's answer: nothing waits for an approval.
             quiet = config.logging.model_copy(update={"event_log": None})
             on_this = config.model_copy(update={"browser": browser, "logging": quiet})
             for line in lines:
@@ -140,8 +139,6 @@ def _unmeasured(line: Line, browser: str, state: State, note: str) -> Measured:
 async def _time(config: Config, site: str, scenario: Scenario, warmup: int, runs: int) -> list[float]:
     """One browser for the line, so that no line is slowed or sped up by the one before it."""
     samples: list[float] = []
-    # A line is measured by calling one tool far more often than any agent does: the limits of a
-    # task are not what is being measured (spec 18.8).
     unhurried = config.limits.model_copy(update={"max_calls": 0, "max_calls_per_minute": 0})
     async with open_session(config.model_copy(update={"limits": unhurried})) as session:
         stage = Stage(Toolkit(session), site, {})

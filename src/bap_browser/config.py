@@ -554,7 +554,6 @@ class Config(Section):
     evals: Evals = Evals()
     bench: Bench = Bench()
     computer: Computer = Computer()
-    # For each key a layer set, the layer: a file, the environment or the session. Not a setting.
     _sources: dict[str, str] = PrivateAttr(default_factory=dict[str, str])
 
     @property
@@ -630,7 +629,6 @@ def _find_file(path: str | Path | None, env: Mapping[str, str]) -> Path | None:
 
 def _read_file(file: Path) -> Mapping[str, Any]:
     try:
-        # utf-8-sig also reads a file that a Windows editor saved with a byte-order mark.
         data = json.loads(file.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise ConfigError(

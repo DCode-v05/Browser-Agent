@@ -43,46 +43,31 @@ from bap_browser.service.session import ServiceSession
 from bap_browser.tools.computer_tools import computer_tools_for
 
 MODES = ("som", "vision", "ax")
-# An app each system has: how it is started, the name a capture finds it by, and how it is closed
-# when ending its process is not enough.
 KNOWN: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["notepad.exe"], "Notepad", []),
     "linux": (["zenity", "--entry", "--title=Ladder", "--text=A window the ladder knows"], "zenity", []),
-    # `-F` opens it afresh: macOS would bring back the windows of its last run, and the driver does
-    # not type in the background into an app that has several windows. It is ended by its process:
-    # asking it to quit goes through AppleScript, which macOS lets through only after a consent.
     "darwin": (["open", "-F", "-a", "TextEdit"], "TextEdit", ["pkill", "-x", "TextEdit"]),
 }
-# An app each system has that the settings do not allow: how it is started, the name a capture would
-# find it by, and how it is closed.
 NOT_ALLOWED: dict[str, tuple[list[str], str, list[str]]] = {
     "win32": (["charmap.exe"], "Character Map", []),
     "linux": (["xmessage", "-name", "Other", "A window that is not allowed"], "xmessage", []),
     "darwin": (["open", "-a", "Stickies"], "Stickies", ["pkill", "-x", "Stickies"]),
 }
-# An app each system has that is none of the four the settings name: the name it is opened by, and
-# what its window is found by.
 BY_NAME: dict[str, tuple[str, str]] = {
     "win32": ("Character Map", "Character Map"),
     "linux": ("xclock", "xclock"),
     "darwin": ("Stickies", "Stickies"),
 }
-# What the driver says when it refuses for the list of allowed apps.
 REFUSED_FOR_THE_LIST = re.compile(r"manifest|authoriz|not allowed|denied|outside", re.IGNORECASE)
-# A line of a capture that names a field text goes into: its number and its role.
 A_FIELD = re.compile(r"#(\d+) (\S*(?:[Tt]ext|[Ee]dit|[Ee]ntry|[Dd]ocument)\S*) ")
 A_ROLE_OF_A_FIELD = re.compile(r"text|edit|entry|document", re.IGNORECASE)
 OK_BUTTON = re.compile(r"#(\d+) \S*button\S* 'OK'")
 TYPED = "ladder 4711"
 WAIT_FOR_THE_APP_S = 20.0
 WAIT_FOR_THE_OTHER_APP_S = 3.0
-# How long a page of a website is given to load before it is read.
 WAIT_FOR_THE_PAGE_S = 8.0
-# How often the address is given before the page is said not to have come.
 TRIES_FOR_THE_PAGE = 3
-# The chord that reaches a browser's address bar.
 ADDRESS_BAR = {"darwin": "cmd+l"}
-# A line of a capture that names a browser's address bar: its number.
 THE_ADDRESS_BAR = re.compile(r"#(\d+) \S+ '[^'\n]*(?:[Aa]ddress|URL)[^'\n]*'")
 LOOK_AGAIN_S = 0.5
 
@@ -94,7 +79,6 @@ def said(result: Any) -> dict[str, Any]:
         answer = json.loads(result)
         if not isinstance(answer, dict):
             return {"error": result}
-        # A screen that has not changed is not sent twice: the picture is the one before.
         return {**answer, "picture": bool(answer.get("screen_unchanged"))}
     meta = result.get("meta", {})
     picture = any(part.get("type") == "image_url" for part in result.get("content", []))
@@ -114,7 +98,6 @@ def a_known_app() -> Iterator[tuple[str, subprocess.Popen[bytes]]]:
     command, name, closing = KNOWN[system]
     with tempfile.TemporaryDirectory() as folder:
         if system == "darwin":
-            # TextEdit begins with its box for opening a file, and no document. It is given one.
             page = Path(folder) / "ladder.txt"
             page.write_text("", encoding="utf-8")
             command = [*command, str(page)]
@@ -150,7 +133,6 @@ def an_app_not_allowed() -> Iterator[tuple[str, int]]:
     command, name, closing = NOT_ALLOWED[system]
     with tempfile.TemporaryDirectory() as folder:
         if system == "linux":
-            # The same small dialog under another name: to the driver, another program, not allowed.
             other = shutil.copy(shutil.which(KNOWN["linux"][0][0]) or "", Path(folder) / "not-allowed-dialog")
             command, name = (
                 [str(other), "--info", "--title=Other", "--text=Not allowed"],
@@ -228,12 +210,9 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
         while "#" not in seen.text and time.monotonic() < ends:
             await asyncio.sleep(LOOK_AGAIN_S)
             seen = await session.toolkit.call("computer_use", look)
-        # An editor has many elements, and a capture's text names only the first of them. The field
-        # is looked for among all of them, as the tool itself gives them.
         whole = said(await asyncio.to_thread(computer.computer_use, look, "ladder"))
         every = whole.get("elements", [])
         if whole.get("elements_file"):
-            # Past a hundred, the tool keeps the rest in a file and names it.
             kept = await asyncio.to_thread(Path(whole["elements_file"]).read_text, encoding="utf-8")
             every = json.loads(kept)["elements"]
         fields = [one for one in every if A_ROLE_OF_A_FIELD.search(str(one.get("role", "")))]
@@ -256,7 +235,6 @@ async def in_the_container(config: Config) -> list[tuple[str, bool, str]]:
                 " | ".join(typed.text.splitlines())[:300],
             )
         )
-        # The editor puts a star before its document's name once the document is changed.
         titles = await inside_it.windows()
         rungs.append(
             ("3, the editor marks its window as changed", any("*" in title for title in titles), str(titles))
@@ -299,7 +277,6 @@ async def looked_at(session: ServiceSession, pid: int, name: str) -> ToolResult:
     while True:
         rows = [row for row in await the_windows() if row.get("pid") == pid]
         rows = rows or [row for row in await the_windows() if name.lower() in json.dumps(row).lower()]
-        # A window takes a moment to open, and longer on a machine that is busy.
         if rows or time.monotonic() > ends:
             break
         await asyncio.sleep(LOOK_AGAIN_S)
@@ -319,26 +296,20 @@ async def a_site_is_read(
     async def does(step: dict[str, Any]) -> ToolResult:
         did = await session.toolkit.call("computer_use", step)
         if did.is_error and "foreground" in did.text:
-            # The tool says where background delivery is not to be had, and what to do: the agent
-            # is told to follow it.
             did = await session.toolkit.call("computer_use", {**step, "delivery_mode": "foreground"})
         return did
 
     opened = await session.toolkit.call("computer_open_app", {"app": browser})
-    # A browser takes a while to show its first window.
     await a_window_of(browser)
     look = {"action": "capture", "mode": "ax", "app": browser}
     done = [opened]
     bar = None
     read = opened
-    # A new browser may put a page of its own in the way of the first try. The agent, told that
-    # the effect was not seen, captures and tries again: so does this.
     for _ in range(TRIES_FOR_THE_PAGE):
         first = await session.toolkit.call("computer_use", look)
         done.append(first)
         bar = THE_ADDRESS_BAR.search(first.text)
         if bar is not None:
-            # The bar is given its value as a field is.
             number = int(bar.group(1))
             steps: list[dict[str, Any]] = [
                 {"action": "click", "element": number},
@@ -402,7 +373,6 @@ async def through_the_engine(
             rungs.append(
                 (f"3, a field of {app} is found by its number", True, f"element {number}, {field.group(2)}")
             )
-            # What a person watching would be shown: the machine's whole screen, as it changes.
             frames: list[bytes] = []
             once, twice = asyncio.Event(), asyncio.Event()
 
@@ -414,7 +384,6 @@ async def through_the_engine(
 
             viewer = machine.viewer
             await watching.start_frames(shown, getattr(viewer.quality_levels, viewer.quality))
-            # The first picture is of the screen as it is now, before anything is typed.
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(once.wait(), WAIT_FOR_THE_APP_S)
             await session.toolkit.call("computer_use", {"action": "click", "element": number})
@@ -428,9 +397,6 @@ async def through_the_engine(
             )
             here = machine.computer.model_copy(update={"runs": "machine"})
             if allowed.held(here) or here.any_app:
-                # Rung 4: the driver itself refuses an app the person did not allow. Through the
-                # helper it is the helper's driver that refuses, with the same settings. Where the
-                # person allows any app, the same window is looked at instead.
                 with an_app_not_allowed() as (other, its_pid):
                     await asyncio.sleep(WAIT_FOR_THE_OTHER_APP_S)
                     there = await looked_at(session, its_pid, other)
@@ -453,7 +419,6 @@ async def through_the_engine(
                         )
                     )
             if here.any_app:
-                # An app outside the four the settings name is opened by its name, after a yes.
                 system = next(name for name in BY_NAME if sys.platform.startswith(name))
                 named, shown_as = BY_NAME[system]
                 asked_of_a_person: list[str] = []
@@ -475,7 +440,6 @@ async def through_the_engine(
             if here.any_app and site is not None:
                 rungs.append(await a_site_is_read(session, *site))
             if here.any_app and sys.platform == "win32":
-                # The two apps of Windows that the list of allowed apps cannot name.
                 for program, title in (("explorer.exe", "File Explorer"), ("wt.exe", "")):
                     if shutil.which(program) is None:
                         continue
@@ -489,11 +453,8 @@ async def through_the_engine(
                             " | ".join(there.text.splitlines())[:300],
                         )
                     )
-            # Rung 5: while a person holds the screen, nothing is done for the agent, not even a look.
             look = {"action": "capture", "mode": "ax", "app": app}
             await session.handle({"type": "take_over"})
-            # The engine's own gate makes a call wait for the person. Hermes' gate is asked directly,
-            # as a call that was already on its way would reach it.
             past_the_engine = said(await asyncio.to_thread(computer.computer_use, look, "ladder"))
             await session.handle({"type": "hand_back"})
             after = await session.toolkit.call("computer_use", look)
@@ -532,14 +493,12 @@ async def read_back(
     name = "3, the app itself holds what was typed"
     told = " | ".join(after.splitlines())[:600]
     if sys.platform == "win32":
-        # Notepad marks a document that was changed with a star before its name.
         return (
             name,
             "*Untitled" in after,
             "its title bar says the document was changed" if "*Untitled" in after else told,
         )
     if sys.platform.startswith("linux"):
-        # The dialog prints its field when OK is pressed: a click by number, and the text comes out.
         button = OK_BUTTON.search(after)
         if button is None:
             return name, False, told
@@ -592,7 +551,6 @@ def main(arguments: list[str] | None = None) -> int:
     )
     asked = parser.parse_args(arguments)
     site = (asked.site[0], asked.site[1], asked.site[2]) if asked.site and asked.any_app else None
-    # What a screen holds is printed as it is, on a console of any encoding.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -623,7 +581,6 @@ def main(arguments: list[str] | None = None) -> int:
     rungs.append(("1, the pinned driver is installed and answers", problem is None, problem or str(binary)))
     with contextlib.ExitStack() as held:
         if asked.through_helper and problem is None:
-            # The engine reaches this machine as it would reach one elsewhere: through the helper.
             config = held.enter_context(a_helper_here(config))
             rungs.append(
                 (
@@ -659,7 +616,6 @@ def a_helper_here(config: Config) -> Iterator[Config]:
         env={
             **os.environ,
             "BAP_BROWSER__COMPUTER__HELPER_PORT": str(port),
-            # The helper holds the engine to the apps of its own settings: the ladder's app is one.
             "BAP_BROWSER__COMPUTER__BASE__ALSO_ALLOWED": json.dumps(config.computer.base.also_allowed),
         },
         stdout=subprocess.DEVNULL,
@@ -691,13 +647,10 @@ def climb(
 ) -> None:
     """Rungs 2 and 3, added to what was climbed so far."""
     problem = None if installed else "not installed"
-    # With a screen the engine starts itself, there is none until its session has begun: the
-    # captures of rung 2 are then the ones rung 3 takes.
     if problem is None and not config.computer.base.virtual_screen:
         with computer.base(config):
             status = permissions.computer_use_status()
             if status["can_grant"] and not status["ready"]:
-                # Asking for a capture now would only make macOS put its question on the screen.
                 waiting = "macOS has not allowed the driver. Run: bap-browser computer permissions grant"
                 rungs.append(("2, a capture in each mode", False, waiting))
                 modes: tuple[str, ...] = ()

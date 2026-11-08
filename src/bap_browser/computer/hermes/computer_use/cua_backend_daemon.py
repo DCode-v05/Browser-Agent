@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend_daemon.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Private embedded cua-driver daemon for non-standard permission modes, plus the macOS CuaDriver.app identity
 checks its launch path depends on. Config/policy helpers are looked up lazily through the facade."""
@@ -23,8 +22,6 @@ from bap_browser.computer.hermes.computer_use.permissions import CUA_DRIVER_BUND
 
 logger = logging.getLogger("bap_browser.computer.hermes.computer_use.cua_backend")
 
-# The only bundle identity the private daemon may launch through, and the teams that sign official
-# releases. Exact matches only: a suffixed identifier or other team is an impostor.
 _CUA_DRIVER_BUNDLE_ID = CUA_DRIVER_BUNDLE_ID
 _CUA_DRIVER_TEAM_IDS = ("4YEC26S9KF", "YCK386LBJ7")
 _QUIET_ERRORS = (OSError, subprocess.SubprocessError)
@@ -57,8 +54,8 @@ def validate_cua_driver_app_signature(app_path: str) -> None:
         raise RuntimeError(f"could not verify CuaDriver.app signature: {exc}") from exc
     if proc.returncode != 0:
         raise RuntimeError(f"CuaDriver.app at {app_path} is not code-signed; refusing to launch it ({(proc.stderr or '').strip()})")
-    parts = [line.partition("=") for line in (proc.stderr or "").splitlines()]  # codesign -dv reports on stderr
-    fields = {k.strip(): v.strip() for k, sep, v in reversed(parts) if sep}  # first occurrence of a key wins
+    parts = [line.partition("=") for line in (proc.stderr or "").splitlines()]
+    fields = {k.strip(): v.strip() for k, sep, v in reversed(parts) if sep}
     identifier, team = fields.get("Identifier", ""), fields.get("TeamIdentifier", "")
     if identifier != _CUA_DRIVER_BUNDLE_ID:
         raise RuntimeError(f"CuaDriver.app at {app_path} has identifier {identifier!r}, expected {_CUA_DRIVER_BUNDLE_ID!r}; "
@@ -115,7 +112,6 @@ class EmbeddedCuaDaemon:
         if manifest and not os.path.isfile(manifest):
             raise ValueError(f"capability manifest not found: {manifest}")
         self.capability_manifest: Optional[str] = manifest or None
-        # bounded always forwards (driver validates it); other modes accept only v3 — a legacy manifest aborts startup.
         self.manifest_applies = bool(manifest) and (
             permission_mode == "bounded" or _cb()._manifest_is_mode_independent(manifest))
         if manifest and not self.manifest_applies:
@@ -154,16 +150,11 @@ class EmbeddedCuaDaemon:
                       self.permission_mode, *(["--dangerously-bypass-approvals"] if self.permission_mode == "unrestricted" else [])]
         if self.manifest_applies:
             serve_args += ["--capability-manifest", str(self.capability_manifest), "--approve-capability-manifest"]
-        # The private daemon owns the cursor overlay, so the overlay policy must apply to this long-lived serve
-        # process, not only its MCP proxy. Appended BEFORE the macOS app-launch wrapping so the flag travels inside
-        # `open ... --args` with the rest of the serve args.
         return _driver._mcp_args_with_overlay_flag(serve_args, driver_cmd=self._command)
 
     def start(self) -> None:
         if self._running:
             return
-        # Keep an explicit command fixed, but reselect managed drivers on every
-        # launch: PM may have acquired a new pin since construction or last stop.
         driver_cmd = self._driver_cmd or _driver.resolve_cua_driver_cmd()
         if not driver_cmd:
             raise RuntimeError(_driver.cua_driver_install_hint())
@@ -178,7 +169,6 @@ class EmbeddedCuaDaemon:
         deadline = time.monotonic() + self._START_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
             return_code = self._process.poll()
-            # `open` exits 0 once LaunchServices took the request: on macOS only a non-zero exit means the daemon died.
             if return_code is not None and (sys.platform != "darwin" or return_code != 0):
                 self._startup_failure("embedded cua-driver exited during startup", "no diagnostic output")
             if self._socket_ready(env):

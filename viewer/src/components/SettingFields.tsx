@@ -1,5 +1,3 @@
-// The settings a person types: a list of sites, and one web address.
-
 import { useId, useState } from 'react';
 
 import type { Setting, SettingValue } from '../settings/types';
@@ -31,7 +29,6 @@ export function SiteList({ setting, labelledBy, onSave, lockedWords }: { setting
         value={text}
         disabled={setting.locked}
         onChange={(event) => setText(event.target.value)}
-        // What was typed stays in the box when it is refused, so it can be corrected.
         onBlur={() => {
           if (text !== saved) void onSave(text.split('\n').map((line) => line.trim()).filter(Boolean));
         }}
@@ -56,7 +53,6 @@ export function AddressField({ setting, labelledBy, describedBy, onSave }: { set
       value={text}
       disabled={setting.locked}
       onChange={(event) => setText(event.target.value)}
-      // What was typed stays in the field when it is refused, so it can be corrected.
       onBlur={() => {
         if (text.trim() !== saved) void onSave(text.trim());
       }}

@@ -20,13 +20,6 @@ from bap_browser import private_file
 from bap_browser.config_computer import Computer
 
 FILE = "allowed.json"
-# What each app the settings can allow is on each system, as the driver itself names it: a bundle on
-# macOS, the identity the driver lists on Windows, a program on Linux. On Windows the text editor and
-# the calculator are the ones the driver was seen to allow by these names (Windows Server 2025). The
-# windows of File Explorer and Windows Terminal carry no identity the pinned driver compares with
-# this list: neither the names it lists for them nor the paths of their programs, plain or in the
-# long form Windows itself uses, let it read them (tried on a runner). Those two cannot be allowed
-# with this driver.
 APPS: dict[str, dict[str, str]] = {
     "text_editor": {
         "darwin": "com.apple.TextEdit",
@@ -41,8 +34,6 @@ APPS: dict[str, dict[str, str]] = {
     },
     "terminal": {"darwin": "com.apple.Terminal", "linux": "xterm"},
 }
-# The driver's own tools that Hermes' backend calls. None of them updates the driver, changes its
-# settings for good, runs a command or reads the clipboard.
 TOOLS = (
     "start_session",
     "end_session",
@@ -99,7 +90,6 @@ def manifest(
         if not on:
             continue
         named = APPS[name].get(system)
-        # An identity is its own name. A program is named by where it is, with every link followed.
         full = find(named) if named and system == "linux" else named
         if full:
             apps.append(an_app(os.path.realpath(full) if os.path.exists(full) else full))
@@ -108,9 +98,6 @@ def manifest(
         "version": 3,
         "expires_after": computer.base.allowed_for,
         "idle_timeout": computer.base.allowed_idle,
-        # The display may be looked at as a whole: the driver lists the windows before every capture,
-        # and the person's live picture is of the whole screen. A window is read, and acted in, only
-        # when its app is among `apps`.
         "resources": {"apps": apps, "desktop": {"display": True}},
         "allow": {"tools": list(TOOLS)},
     }

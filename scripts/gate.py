@@ -21,9 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# The words a tool says its result in.
 RESULT = re.compile(r"\b(passed|failed|built|errors?|formatted|No new|Tests)\b")
-# What a stage printed last, shown when it fails.
 LINES_SHOWN = 40
 
 
@@ -82,7 +80,6 @@ def main(arguments: list[str] | None = None) -> int:
     for number, stage in enumerate(stages, 1):
         print(f"[{number}/{len(stages)}] {stage.name} ...", end=" ", flush=True)
         passed, took, said = run(stage)
-        # The last line a stage printed is its own word on how it went: shown, never assumed.
         last = _its_word(said)
         print(f"{'passed' if passed else 'FAILED'} in {took:.0f} s. {last[:100]}")
         if not passed:

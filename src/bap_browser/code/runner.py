@@ -24,7 +24,6 @@ from bap_browser.config import Code
 from bap_browser.results import ToolResult
 
 WORKER = Path(__file__).with_name("worker.py")
-# The methods of `browser` in a script (spec 7.2): these tools, where the deployment offers them.
 IN_A_SCRIPT = (
     "navigate",
     "go_back",
@@ -53,14 +52,10 @@ IN_A_SCRIPT = (
     "evaluate",
     "upload_file",
 )
-# These take `find="…"` in place of a ref: the best match for the words is looked up first.
 FIND_FIRST = frozenset({"click", "type"})
-# A line of what `browser_find` answers: the kind of element, its name, and its ref when it has one.
 FOUND = re.compile(r'^- (\w+)(?: "((?:[^"\\]|\\.)*)")?.*?\[ref=((?:f\d+)?e\d+)\]', re.MULTILINE)
-# What can be typed into. `browser.type(find=…)` takes the best match among these.
 TAKES_TEXT = frozenset({"textbox", "searchbox", "combobox", "spinbutton"})
 NOT_UNDONE = "Earlier steps were carried out and are not undone."
-# What the worker needs from the environment to start at all. Nothing else is handed to it.
 KEPT_IN_THE_ENVIRONMENT = ("SYSTEMROOT",)
 
 Step = Callable[[str, dict[str, Any]], Awaitable[ToolResult]]
@@ -89,9 +84,7 @@ class ScriptRunner:
         self._step = step
         self._methods = methods
         self._worker: asyncio.subprocess.Process | None = None
-        # One script at a time: the worker runs one, and `state` is one.
         self._turn = asyncio.Lock()
-        # The worker was ended, so what earlier scripts kept in `state` is gone.
         self._state_lost = False
 
     async def run(self, code: str, timeout_s: int | None) -> Ran:
@@ -106,7 +99,6 @@ class ScriptRunner:
             try:
                 return await self._run(code, budget, settings)
             except asyncio.CancelledError:
-                # Whoever asked has gone. The script must not go on by itself.
                 await self._end_worker()
                 raise
 
@@ -129,7 +121,6 @@ class ScriptRunner:
             while True:
                 waited_since = time.monotonic()
                 try:
-                    # Only the script's own computing counts. A step in the browser has its own limits.
                     async with asyncio.timeout(left):
                         message = await self._hear(worker)
                 except TimeoutError:
@@ -173,7 +164,6 @@ class ScriptRunner:
             ref = None if found.is_error else _best(found.text, words, typing=name == "type")
             if ref is None:
                 nothing = f'Nothing on the page matches "{words}".'
-                # The step the script asked for was not done, and is listed as that.
                 steps.append((False, nothing))
                 return {"failed": True, "text": nothing}
             arguments["ref"] = ref
@@ -196,7 +186,6 @@ class ScriptRunner:
         where = f" at line {done['line']}" if isinstance(done.get("line"), int) else ""
         undone = f" {NOT_UNDONE}" if steps else ""
         failure: str | None = None
-        # What came of it comes first, in one line. What the script printed can hold anything a page says.
         if isinstance(done.get("step_failed"), str):
             failure = "a step failed"
             said = done["step_failed"].split("\n", 1)[0].rstrip()
@@ -230,14 +219,12 @@ class ScriptRunner:
         try:
             self._worker = await asyncio.create_subprocess_exec(
                 sys.executable,
-                # Isolated, and without the site packages: the worker is the standard library alone.
                 "-I",
                 "-S",
                 str(WORKER),
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
-                # No secret reaches it, and no token: it is handed almost nothing.
                 env={name: os.environ[name] for name in KEPT_IN_THE_ENVIRONMENT if name in os.environ},
                 cwd=tempfile.gettempdir(),
                 limit=settings.max_message_chars + settings.result_room * settings.max_output_chars,
@@ -314,7 +301,6 @@ async def _gone(worker: asyncio.subprocess.Process) -> None:
     if worker.stdin is not None:
         worker.stdin.close()
     await worker.wait()
-    # The transport holds the pipes. Left to the collector, it warns that it was never closed.
     transport = getattr(worker, "_transport", None)
     if transport is not None:
         transport.close()

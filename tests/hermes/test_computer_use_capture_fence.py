@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_capture_fence.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """A frame captured across a human takeover never leaves the process: the lease fence runs as soon as the
 backend hands the frame back, before it is persisted to the media cache, spilled, or routed to aux vision."""

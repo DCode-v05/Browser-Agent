@@ -44,9 +44,7 @@ def test_signing_in_gives_a_token_for_the_visit_in_that_role(make_config: MakeCo
     admin, user = accounts.sign_in("admin", ADMINS), accounts.sign_in("user", USERS)
     assert admin and user and admin != user and len(admin) >= 32
     assert accounts.role_of(admin) == "admin" and accounts.role_of(user) == "user"
-    # One role's password opens nothing of the other's.
     assert accounts.sign_in("admin", USERS) is None and accounts.sign_in("user", ADMINS) is None
-    # Fewer tries than hold sign-in back: that is another test's matter.
     for wrong in ("", ADMINS + " ", None):
         assert accounts.sign_in("admin", wrong) is None
     accounts.sign_out(user)
@@ -63,10 +61,8 @@ def test_only_a_salted_hash_is_kept_for_the_person_alone_to_read(
     kept = json.loads(file.read_text(encoding="utf-8"))
     assert ADMINS not in file.read_text(encoding="utf-8")
     assert set(kept) == {"admin", "user"} and set(kept["admin"]) == {"salt", "hash"}
-    # The same password twice is not the same hash: each has a salt of its own.
     assert kept["admin"]["hash"] != kept["user"]["hash"]
     assert stat.S_IMODE(file.stat().st_mode) == 0o600
-    # It is there the next time the service starts. A visit is not: it lives in memory.
     visit = accounts.sign_in("admin", ADMINS)
     later = Accounts(config.auth)
     assert later.has("admin") and later.sign_in("admin", ADMINS) and later.role_of(visit) is None
@@ -94,11 +90,9 @@ def test_too_many_wrong_passwords_hold_sign_in_back_for_a_while(
     with pytest.raises(LockedOut) as locked:
         accounts.sign_in("admin", ADMINS)
     assert 0 < locked.value.wait_s <= config.auth.lock_s
-    # The right password does not open it either, until the wait is over. The other role is not held.
     assert accounts.sign_in("user", USERS)
     clock.now += config.auth.lock_s + 1
     assert accounts.sign_in("admin", ADMINS)
-    # A right password in between starts the count again.
     for _ in range(config.auth.max_failures - 1):
         assert accounts.sign_in("admin", "another guess") is None
     assert accounts.sign_in("admin", ADMINS)
@@ -121,7 +115,6 @@ def test_a_visit_runs_out_and_a_new_password_ends_the_visits_made_with_the_old(
     clock.now += 2
     assert accounts.role_of(admin) is None and accounts.role_of(user) is None
     assert accounts.role_of(late) == "user"
-    # The admin gives users a new password: whoever signed in with the old one signs in again.
     admin = accounts.sign_in("admin", ADMINS)
     accounts.set_password("user", "a new one for the users")
     assert accounts.role_of(late) is None and accounts.role_of(admin) == "admin"
@@ -135,5 +128,4 @@ def test_a_file_that_cannot_be_read_holds_no_account(make_config: MakeConfig, tm
         Path(config.auth.file).write_text(spoiled, encoding="utf-8")
         accounts = Accounts(config.auth)
         assert not accounts.has("admin")
-        # A record that is there and makes no sense opens nothing.
         assert accounts.sign_in("user", "anything at all") is None

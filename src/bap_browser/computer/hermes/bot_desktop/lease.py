@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/lease.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Who may drive a profile's Bot Desktop screen: the agent (default) or exactly one human viewer.
 
@@ -34,8 +33,8 @@ from bap_browser.computer.seams.home import get_hermes_home, hermes_home_key, se
 
 try:
     import fcntl
-except ImportError:  # Windows/macOS without fcntl: computer_use imports this module on every call, and no
-    fcntl = None     # multi-process Bot Desktop exists there, so the cross-process lock degrades to a no-op.
+except ImportError:
+    fcntl = None
 
 logger = logging.getLogger(__name__)
 
@@ -163,15 +162,12 @@ def on_change(listener: Callable[[str, Lease], None]) -> Callable[[], None]:
 
 
 def _notify(key: str, lease: Lease) -> None:
-    # Snapshot under the lock: a viewer disconnecting on another thread runs unsubscribe()
-    # concurrently with this loop; removing an entry from the live list mid-iteration skips
-    # the next listener, and a still-connected viewer misses the lease transition.
     with _lock:
         listeners = list(_listeners)
     for cb in listeners:
         try:
             cb(key, lease)
-        except Exception:  # a broken subscriber must not wedge the handoff
+        except Exception:
             pass
 
 
@@ -194,9 +190,7 @@ def acquire(viewer_id: str, *, profile_key: Optional[str] = None, reason: str = 
     RFB bridge closes the evicted socket so its UI drops to view-only."""
     def _m(lease: Lease) -> bool:
         if lease.holder == HUMAN and lease.viewer_id == viewer_id:
-            return False  # already theirs: no epoch bump, `since` and the reason on screen stay put
-        # The agent's ask ("please log in to X") stays as the takeover reason: the human needs it
-        # on screen WHILE they act, not only before they clicked Take over.
+            return False
         lease.holder, lease.viewer_id, lease.since = HUMAN, viewer_id, time.time()
         lease.reason = reason or ""
         return True
@@ -215,13 +209,9 @@ def release(viewer_id: Optional[str] = None, *, profile_key: Optional[str] = Non
             logger.info("bot-desktop lease: bare release ignored, a human holds")
             return False
         if viewer_id is not None and lease.holder == HUMAN and lease.viewer_id != viewer_id:
-            # Ignored, not an error: the returned lease still shows the real holder. Logged so a
-            # caller that never inspects the return value leaves a trace.
             logger.info("bot-desktop lease: release by %r ignored, another viewer holds", viewer_id)
             return False
         if lease.holder == AGENT:
-            # Already the agent's. Bumping the epoch here would make a legitimately admitted in-flight
-            # agent action (a double-clicked Hand back, a stray CLI stop) look overtaken and get voided.
             return False
         lease.holder, lease.viewer_id, lease.since, lease.reason = AGENT, None, time.time(), ""
         return True

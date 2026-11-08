@@ -1,45 +1,29 @@
-// Plays a recorded session with no service (spec 9.11), and answers the viewer's commands the way
-// the service will: it waits at an approval, hands control over, pauses, stops.
-
 import type { ClientCommand, ControlState, ServerEvent, TaskSite } from '../protocol';
 import type { Connection, ConnectionHandlers } from './connection';
 
-/** An event as it is recorded: its time is filled in when it is played. */
 export type EventDraft = ServerEvent extends infer E ? (E extends ServerEvent ? Omit<E, 'ts' | 'since'> : never) : never;
 
 export interface Beat {
-  /** Milliseconds after the previous beat. */
   after: number;
-  /** A picture to show, before the event. */
   frame?: string;
   event?: EventDraft;
-  /** What follows an approval request, by the person's answer. */
   approval?: { allowed: Beat[]; denied: Beat[] };
-  /** What follows a request for help, by the person's answer. `personFrame` is shown once the person starts typing. */
   help?: { done: Beat[]; couldNot: Beat[]; personFrame?: string };
 }
 
 export interface RecordedSession {
   name: string;
   beats: Beat[];
-  /** Answers given for the person, so a recording can run past a wait by itself. */
   auto?: { approval?: 'allow' | 'deny'; help?: 'done' | 'could_not' };
-  /** Commands sent once the recording has played, to reach a state such as paused. */
   commands?: ClientCommand[];
-  /** How the connection ends up, for the disconnected state. */
   afterwards?: 'reconnecting';
-  /** The picture stops being confirmed as current, for the stale state. */
   stalls?: boolean;
 }
 
 export interface DemoOptions {
-  /** Real milliseconds per recorded millisecond. 1 is real pace; 0 plays at once. */
   pace?: number;
-  /** The session clock's starting time, in seconds. */
   startAt?: number;
-  /** Real time in milliseconds. */
   realNow?: () => number;
-  /** How often to say the picture is still current, as the service does for a still page. 0 means never. */
   heartbeatMs?: number;
 }
 
@@ -79,13 +63,10 @@ export class DemoConnection implements Connection {
   private readonly heartbeatMs: number;
   private waiting: Waiting | null = null;
   private held: 'paused' | 'person' | null = null;
-  /** The task's sites, kept so `drop_site` can answer with the rest of them. */
   private sites: TaskSite[] = [];
-  /** The picture on screen, which a step that finishes now keeps. */
   private shown: string | undefined;
   private over = false;
   private readonly startAt: number | undefined;
-  /** The session clock at the last beat, in seconds, and the real time of that beat. */
   private base = 0;
   private realBase = 0;
 
@@ -100,7 +81,6 @@ export class DemoConnection implements Connection {
     this.rewind();
   }
 
-  /** Back to the start of the recording, so the connection can be opened again. */
   private rewind(): void {
     this.queue = [...this.session.beats];
     this.waiting = null;
@@ -162,7 +142,6 @@ export class DemoConnection implements Connection {
         if (this.held !== 'person' && this.waiting?.kind !== 'approval') this.hold('person');
         break;
       case 'hand_back':
-        // Handing back without an answer leaves a request for help open.
         if (this.held === 'person') this.release(this.waiting?.kind === 'help' ? 'person_requested' : 'agent');
         break;
       case 'done':
@@ -218,7 +197,6 @@ export class DemoConnection implements Connection {
   private play(): void {
     const beat = this.queue.shift();
     if (!beat || this.over) return;
-    // The clock follows the recording, so a recorded gap is a gap whatever the pace.
     this.base = Math.max(this.now(), this.base + beat.after / 1000);
     this.realBase = this.realNow();
     if (beat.frame) this.show(beat.frame, this.base);
@@ -291,7 +269,6 @@ export class DemoConnection implements Connection {
     this.schedule();
   }
 
-  /** A recording has no page to type into, so the first key or click shows the recorded result of typing. */
   private showPersonFrame(): void {
     const waiting = this.waiting;
     if (this.held !== 'person' || waiting?.kind !== 'help' || waiting.personFrameShown) return;

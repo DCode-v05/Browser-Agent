@@ -75,7 +75,6 @@ async def test_the_agent_writes_a_file_on_the_desktop_and_the_person_has_it(
         typed = await use(action="type", text="Milk, eggs, bread")
         assert "Milk" not in typed
         await use(action="key", keys="ctrl+s")
-        # The editor asks where to save: into the shared folder. The box is the window in front now.
         await use(action="wait", seconds=1)
         await use(action="capture", mode="ax", app="mousepad")
         await use(action="type", text="~/Files/list.txt")
@@ -90,11 +89,9 @@ async def test_the_agent_writes_a_file_on_the_desktop_and_the_person_has_it(
 
         seen = await call("computer_use", {"action": "capture", "mode": "vision"})
         assert seen.picture is not None
-        # The window's title now names the file: something changed on the screen.
         assert "list.txt" in (await call("computer_list_apps", {})).text
     finally:
         await session.close()
-    # Nothing of the desktop is left running.
     left = subprocess.run(
         ["docker", "ps", "-q", "--filter", "name=bap-browser-desktop-e2e"], capture_output=True, check=False
     )
@@ -106,7 +103,6 @@ async def test_the_desktop_has_no_network_unless_a_person_allows_it(make_config,
     driver = HermesDriver(config, "e2e-net")
     await driver.start()
     try:
-        # With no network there is no route anywhere: the table has its heading line and nothing more.
         routes = await driver.desktop.run("cat", "/proc/net/route")
         assert len(routes.decode().strip().splitlines()) == 1, routes
     finally:
@@ -164,7 +160,6 @@ async def test_a_menu_item_that_opens_a_box_is_pressed_by_its_number_and_the_app
         await use(action="click", element=int(page.group(1)))
         await use(action="type", text="kept")
         closed = await use(action="capture", mode="ax", app="mousepad")
-        # An item of a menu that is not open is not on the screen, and is not named.
         assert "Save As" not in closed and "not on the screen" in closed
 
         await use(action="click", element=numbered(closed, "File"))
@@ -214,7 +209,6 @@ async def test_a_desktop_that_stops_answering_is_put_right_and_worked_on_after(
 
         began = time.perf_counter()
         again = await call("computer_use", {"action": "capture", "mode": "ax", "app": "mousepad"})
-        # The editor was left open: its page is there, with no app to open again.
         assert not again.is_error and A_PAGE.search(again.text) is not None, again.text
         assert time.perf_counter() - began < 20, "the desktop was still slow after it was put right"
     finally:
@@ -295,7 +289,6 @@ async def test_an_app_that_will_not_close_does_not_hold_the_next_task(make_confi
     await session.start()
     try:
         desktop = session.browser.started_driver.desktop  # pyright: ignore[reportOptionalMemberAccess, reportAttributeAccessIssue]
-        # A program under the editor's name that takes no notice of being asked to end.
         stuck = "cp /bin/sleep /tmp/mousepad && (trap '' TERM; /tmp/mousepad 600 >/dev/null 2>&1 &) ; sleep 0.3; pgrep -x mousepad"
         assert (await desktop.run("sh", "-c", stuck)).strip()
 
@@ -340,5 +333,4 @@ async def test_every_desktop_task_is_solved_by_its_reference_solution(
     failed = {row["id"]: row["trials"][0]["why"] for row in report["tasks"] if not row["trials"][0]["passed"]}
     assert failed == {}
     assert report["totals"]["tasks"] == len(tasks)
-    # A file of the person's beside Practice is never touched by a run.
     assert not (Path(config.computer.folder) / "Practice").exists() or report["tasks"]

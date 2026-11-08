@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/runtime.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop runtime: one headless Xfce desktop per Hermes profile, served over RFB on a private
 Unix socket, viewed and driven from Hermes Desktop.
@@ -35,24 +34,15 @@ logger = logging.getLogger(__name__)
 
 _LAUNCHER = Path(__file__).with_name("launcher.sh")
 
-# Display numbers below 10 collide with real seats and default Xvfb recipes (:99 is popular too); scan a
-# private band and record the choice so restarts reuse it.
 _DISPLAY_MIN, _DISPLAY_MAX = 20, 89
 
-# Binaries the launcher execs; the package hint is per distro family.
 REQUIRED_BINARIES = ("Xvnc", "xfwm4", "xfce4-panel", "xfdesktop", "xfsettingsd", "dbus-run-session",
                      "xauth", "xdpyinfo", "setxkbmap", "xprop")
 
-# Which package in each distro list ships each required binary. Fedora retired the xorg-x11-utils /
-# xorg-x11-server-utils umbrellas (per-binary packages since F35) and dnf5 refuses the whole transaction on
-# one unknown name, so every binary must map to a package that still resolves; the test suite checks that
-# each mapped package is in PACKAGES for its manager.
 BINARY_PACKAGES = {
     "apt": {"Xvnc": "tigervnc-standalone-server", "xfwm4": "xfwm4", "xfce4-panel": "xfce4-panel",
             "xfdesktop": "xfdesktop4", "xfsettingsd": "xfce4-settings", "dbus-run-session": "dbus-x11",
             "xauth": "xauth", "xdpyinfo": "x11-utils", "setxkbmap": "x11-xkb-utils", "xprop": "x11-utils"},
-    # tigervnc-x11-server is the real package (tigervnc-server-minimal is only a Provides on it); dbus-run-session
-    # is in dbus-daemon (dbus-x11 ships dbus-launch only).
     "dnf": {"Xvnc": "tigervnc-x11-server", "xfwm4": "xfwm4", "xfce4-panel": "xfce4-panel",
             "xfdesktop": "xfdesktop", "xfsettingsd": "xfce4-settings", "dbus-run-session": "dbus-daemon",
             "xauth": "xorg-x11-xauth", "xdpyinfo": "xdpyinfo", "setxkbmap": "setxkbmap", "xprop": "xprop"},
@@ -143,12 +133,12 @@ class DesktopStatus:
     socket: Optional[str]
     geometry: str
     install_command: Optional[str]
-    browser: Optional[str]  # headed Chromium the dock's Browser icon and agent-browser share; None = no headed browser
-    blocker: Optional[str] = None  # why start() would refuse right now (memory); None = may start
+    browser: Optional[str]
+    blocker: Optional[str] = None
     memory_available_mb: Optional[int] = None
     memory_limit_mb: Optional[int] = None
-    placement: str = "gateway"  # "gateway" | "terminal:<backend>" — where Xvnc runs
-    image_switch: Optional[dict[str, object]] = None  # pending default-image switch the pane can approve
+    placement: str = "gateway"
+    image_switch: Optional[dict[str, object]] = None
 
     def as_dict(self) -> dict[str, object]:
         return dict(self.__dict__)
@@ -201,8 +191,8 @@ def _recorded_launcher_pid() -> Optional[int]:
     return int(pid_s) if pid_s.isdigit() and born_s else None
 
 
-_X_LOCK_DIR = Path("/tmp")  # no-tmp: ok — X servers write .X<n>-lock here by protocol (tests point it at a scratch dir)
-_X_UNIX_TABLE = Path("/proc/net/unix")  # the kernel's list of bound Unix sockets (tests point it at a fixture)
+_X_LOCK_DIR = Path("/tmp")
+_X_UNIX_TABLE = Path("/proc/net/unix")
 
 
 def _x_lock_pid(num: int) -> Optional[int]:
@@ -220,7 +210,6 @@ def _x_socket_bound(num: int) -> bool:
         lines = _X_UNIX_TABLE.read_text(encoding="utf-8-sig").splitlines()
     except OSError:
         return False
-    # no-tmp: ok — detects the X server's display socket at the path the X11 protocol fixes
     return any(line.split()[-1].lstrip("@") == f"/tmp/.X11-unix/X{num}" for line in lines if line.strip())
 
 
@@ -253,12 +242,12 @@ def _reap_orphaned_server(sd: Path) -> bool:
             return False
     launcher = _recorded_launcher_pid()
     try:
-        pgid = os.getpgid(pid)  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start/stop)
+        pgid = os.getpgid(pid)
         cmdline = psutil.Process(pid).cmdline()
     except (ProcessLookupError, psutil.Error):
         return False
     if pgid != launcher and not _binds_our_socket(cmdline):
-        return False  # somebody else's server took the number after we died; never touch it
+        return False
     logger.warning("Bot Desktop launcher %s is gone but its X server (pid %s) survived on :%s; reaping",
                    launcher, pid, recorded or "?")
     _kill_group_then_wait(pgid if pgid == launcher else None, pid)
@@ -274,16 +263,14 @@ def _kill_group_then_wait(pgid: Optional[int], pid: int, grace: float = 2.0) -> 
     def _signal(sig: int) -> None:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             if pgid is not None:
-                os.killpg(pgid, sig)  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start/stop)
+                os.killpg(pgid, sig)
             else:
                 os.kill(pid, sig)
     def _anything_left() -> bool:
-        # The leader dying first is the common case (bash exits on TERM, Xvnc traps it); the group is
-        # done only when killpg(0) finds nobody, else a TERM-ignoring descendant keeps the display.
         if pgid is None:
             return _pid_alive(pid)
         try:
-            os.killpg(pgid, 0)  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start/stop)
+            os.killpg(pgid, 0)
         except ProcessLookupError:
             return False
         except PermissionError:
@@ -291,10 +278,8 @@ def _kill_group_then_wait(pgid: Optional[int], pid: int, grace: float = 2.0) -> 
         return True
 
     def _reap_if_ours() -> None:
-        # The launcher was Popen'd by whichever gateway started it; a later gateway that stops it holds
-        # no Popen, so the dead leader would sit as a zombie in our table (and count as "left").
         with contextlib.suppress(ChildProcessError, OSError):
-            os.waitpid(pid, os.WNOHANG)  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start/stop)
+            os.waitpid(pid, os.WNOHANG)
 
     _signal(signal.SIGTERM)
     deadline = time.monotonic() + grace
@@ -303,21 +288,18 @@ def _kill_group_then_wait(pgid: Optional[int], pid: int, grace: float = 2.0) -> 
         if not _anything_left():
             return
         time.sleep(0.05)
-    _signal(signal.SIGKILL)  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start/stop)
+    _signal(signal.SIGKILL)
     time.sleep(0.1)
     _reap_if_ours()
 
 
-# Host-wide (every profile allocates from one band), so it lives outside any profile home. A predictable
-# name must not be squattable: XDG_RUNTIME_DIR is the boundary — 0700 from logind, or from
-# docker/stage2-hook.sh in containers, which have none.
 _ALLOC_LOCK = Path(os.environ.get("XDG_RUNTIME_DIR") or Path.home() / ".cache") / "hermes-bot-desktop-alloc.lock"
 
 
 @contextlib.contextmanager
 def _flocked(path: Path):
-    import fcntl  # windows-footgun: ok — Linux-only runtime (is_supported_host gates start)
-    with open(path, "a+", encoding="utf-8") as fh:  # windows-footgun: ok — Linux-only runtime
+    import fcntl
+    with open(path, "a+", encoding="utf-8") as fh:
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
             yield fh
@@ -350,11 +332,11 @@ def desktop_env(base_env: Optional[dict[str, str]] = None) -> dict[str, str]:
     env = dict(os.environ if base_env is None else base_env)
     published = published_env()
     if published:
-        touch_activity()  # a browser / cua-driver spawn is the agent using its screen
+        touch_activity()
         env.update(published)
-        env.pop("WAYLAND_DISPLAY", None)  # X11 desktop; a leaked Wayland socket flips GTK/Chromium backends
+        env.pop("WAYLAND_DISPLAY", None)
         from bap_browser.computer.hermes.bot_desktop.browser import env_for_agent
-        env_for_agent(env)  # same binary + user-data-dir as the dock's Browser icon
+        env_for_agent(env)
     return env
 
 
@@ -372,7 +354,7 @@ def ensure_started_for_tool() -> None:
         return
     where = placement.resolve()
     if where.where == placement.REFUSED:
-        return  # tool_placement() raises the reason at the spawn site
+        return
     if where.where == placement.TERMINAL:
         try:
             start()
@@ -413,11 +395,6 @@ def _should_auto_start(env: dict[str, str]) -> bool:
     return bool(cfg.get("auto_start", False))
 
 
-# ---- idle auto-stop -------------------------------------------------------------------------------
-# A desktop nobody is using still holds ~220 MiB (plus whatever browser was left open). Every use —
-# a computer_use action, a browser spawn onto the screen, a viewer attached, a human takeover — stamps
-# ``activity``; the gateway's display watcher stops a screen idle past ``bot_desktop.idle_stop_minutes``
-# unless a human holds it. The next use starts it again (auto_start or the pane's Start).
 DEFAULT_IDLE_STOP_MINUTES = 30
 
 
@@ -564,8 +541,6 @@ def status(profile: Optional[str] = None) -> DesktopStatus:
     from bap_browser.computer.hermes.bot_desktop import sandbox_host
     where = placement.resolve()
     if where.where == placement.TERMINAL or sandbox_host._read_marker():
-        # A screen already running inside a sandbox is reported (and stoppable) even after the placement
-        # setting moved: the recorded owner wins over the current policy until it is stopped.
         return _sandbox_status(profile, where)
     missing: list[str] = missing_binaries() if is_supported_host() else list(REQUIRED_BINARIES)
     pid = _launcher_pid()
@@ -584,7 +559,6 @@ def status(profile: Optional[str] = None) -> DesktopStatus:
         geometry=geometry(),
         install_command=install_command() if missing else None,
         browser=_bd_browser.executable() if is_supported_host() else None,
-        # A running screen is never "blocked": the check guards the allocation, not the session.
         blocker=None if running or missing or not is_supported_host() else resources.memory_blocker(mem),
         memory_available_mb=mem.available_mb,
         memory_limit_mb=mem.limit_mb,
@@ -599,8 +573,6 @@ def _sandbox_status(profile: Optional[str], where) -> DesktopStatus:
     missing = sandbox_host.missing_binaries(env) if env is not None else []
     published = sandbox_host.published_env(env, profile or _profile_name()) if env is not None else {}
     running = bool(published.get("DISPLAY"))
-    # No install_command: the pane's Install button runs apt on the HOST, which is the wrong machine here.
-    # A sandbox missing the stack is a blocker (shown in place of Start) naming the image that has it.
     blocker = None
     image_switch = None
     if missing:
@@ -608,8 +580,6 @@ def _sandbox_status(profile: Optional[str], where) -> DesktopStatus:
                    f"{sandbox_host.SANDBOX_IMAGE_HINT} as terminal.{where.backend}_image (the default sandbox base "
                    f"plus the desktop stack), or set bot_desktop.placement: gateway.")
         if where.backend == "docker":
-            # The usual reason on an upgraded install: the persisted container predates the default
-            # flip and was kept on purpose. The pane offers the switch instead of a config hint.
             from bap_browser.computer.seams.sandbox import pending
             sw = pending()
             if sw is not None:
@@ -646,12 +616,6 @@ def _profile_name() -> str:
         return "default"
 
 
-# The gate lives in ``resources`` so start() and status() cannot disagree about it. Measured in the
-# official image: gateway idle 304 MiB, +216 for Xvnc/Xfce, 1073 MiB with one Chromium page. The OOM
-# killer picks by score, so on a small instance the casualty is the dashboard or the gateway, not the
-# desktop that caused the pressure.
-
-
 def start(*, wait_seconds: float = 15.0) -> DesktopStatus:
     """Start this profile's desktop (idempotent). Blocks until the launcher publishes its env file or
     ``wait_seconds`` pass; raises ``RuntimeError`` naming the blocker.
@@ -674,7 +638,6 @@ def start(*, wait_seconds: float = 15.0) -> DesktopStatus:
         raise RuntimeError("Bot Desktop runs on Linux gateway hosts only")
     missing = missing_binaries()
     if missing:
-        # Three dead ends: an operator told "unprivileged, no sudo" while running as root hunts the wrong bug.
         need = f"Bot Desktop needs {', '.join(missing)} on the gateway host"
         if package_manager() is None:
             raise RuntimeError(
@@ -707,8 +670,6 @@ def start(*, wait_seconds: float = 15.0) -> DesktopStatus:
         try:
             return _spawn_and_wait(sd, wait_seconds)
         except RuntimeError:
-            # _pick_display reuses the recorded number first: left in place after a failed launch (e.g. Xvnc
-            # 'server already running' on it), every retry would pick the same number and the profile wedges.
             (sd / "display").unlink(missing_ok=True)
             raise
 
@@ -722,8 +683,6 @@ def _spawn_and_wait(sd: Path, wait_seconds: float) -> DesktopStatus:
         env_file = sd / "env"
         env_file.unlink(missing_ok=True)
 
-        # The agent drives this desktop and its dock opens a terminal, so it starts from the
-        # scrubbed child env like any other agent child, keeping the user's HOME.
         from bap_browser.computer.seams.process import served_profile_child_env
         child_env = served_profile_child_env(inherit_credentials=False)
         child_env["HOME"] = child_env["HERMES_REAL_HOME"]
@@ -740,12 +699,10 @@ def _spawn_and_wait(sd: Path, wait_seconds: float) -> DesktopStatus:
         })
         from bap_browser.computer.hermes.bot_desktop.browser import dock_exec_line, dock_launch
         if (browser := dock_launch()) is not None:
-            # The bare executable (the launcher checks it exists) and the ready-made, spec-quoted Exec= line.
             child_env["HERMES_BD_BROWSER_EXEC"] = browser[0]
             child_env["HERMES_BD_BROWSER_EXEC_LINE"] = dock_exec_line(*browser)
-        # Truncated per start: the log is a diagnostic for THIS launch, and nothing rotates it otherwise.
         log = open(sd / "launcher.log", "wb")
-        proc = subprocess.Popen(  # windows-footgun: ok — Linux-only runtime (is_supported_host)
+        proc = subprocess.Popen(
             ["bash", str(_LAUNCHER)], env=child_env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
             start_new_session=True, close_fds=True)
         log.close()
@@ -755,7 +712,7 @@ def _spawn_and_wait(sd: Path, wait_seconds: float) -> DesktopStatus:
         deadline = time.monotonic() + wait_seconds
         while time.monotonic() < deadline:
             if _x_lock_pid(num) is not None:
-                alloc.close()  # the number is Xvnc's now; other profiles may allocate (idempotent)
+                alloc.close()
             if proc.poll() is not None:
                 tail = (sd / "launcher.log").read_bytes()[-2000:].decode("utf-8", "replace")
                 raise RuntimeError(f"Bot Desktop launcher exited with {proc.returncode}:\n{tail}")
@@ -764,9 +721,6 @@ def _spawn_and_wait(sd: Path, wait_seconds: float) -> DesktopStatus:
                 touch_activity()
                 return status()
             time.sleep(0.1)
-        # Giving up must take the launch down: left alone, the launcher publishes DISPLAY and rfb.sock a moment
-        # later and a screen whose start() reported failure stays up as "running". The launcher is its own
-        # session leader, so its group is exactly this launch (Xvnc, dbus, Xfce) and nothing else.
         _kill_group_then_wait(proc.pid, proc.pid)
         proc.wait()
         for name in ("launcher.pid", "env", "rfb.sock"):
@@ -789,8 +743,6 @@ def _start_in_sandbox(wait_seconds: float) -> DesktopStatus:
     sd.mkdir(parents=True, exist_ok=True)
     os.chmod(sd, 0o700)
     with _flocked(sd / "start.lock"):
-        # The dock's Browser icon runs the sandbox's own Playwright Chromium on the profile agent-browser
-        # uses there: the human's browser is the bot's browser, as on the host.
         from bap_browser.computer.hermes.bot_desktop.browser import dock_exec_line
         exe = sandbox_host.chromium_executable(env)
         browser = (exe, dock_exec_line(exe, sandbox_host.browser_profile_dir(env), sandbox_bypass=True)) if exe else (None, None)
@@ -815,8 +767,6 @@ def stop() -> bool:
     was signalled."""
     from bap_browser.computer.hermes.bot_desktop import sandbox_host
     if sandbox_host._read_marker() or placement.resolve().where == placement.TERMINAL:
-        # The marker names the sandbox that owns the screen; stop THAT one (re-attaching after a restart),
-        # whatever the placement setting says now. A marker whose sandbox is gone is simply dropped.
         env = _owned_sandbox_env()
         stopped = sandbox_host.stop(env, _profile_name()) if env is not None else False
         sandbox_host._marker().unlink(missing_ok=True)
@@ -837,7 +787,6 @@ def _stop_locked(sd: Path) -> bool:
         reaped = _reap_orphaned_server(sd)
         (sd / "env").unlink(missing_ok=True)
         return reaped
-    # The launcher runs in its own session; killing the group takes Xvnc, dbus and Xfce with it.
     _kill_group_then_wait(pid, pid, grace=5.0)
     for name in ("launcher.pid", "env", "activity"):
         (sd / name).unlink(missing_ok=True)

@@ -1,5 +1,3 @@
-// The small pieces the cards of the systems are made of (spec 9.17).
-
 import type { ReactNode } from 'react';
 
 import { Icon, type IconName } from '../components/Icon';
@@ -15,9 +13,7 @@ export const BACKEND_ICON: Record<Backend, IconName> = {
   bundled_chromium: 'monitor',
   contained_desktop: 'computer',
 };
-/** The states in which a system has no session. */
 export const NOT_RUNNING = new Set(['starting', 'waiting', 'failed', 'off', 'ended']);
-/** How many lines of a log are shown at once. The file holds the rest. */
 
 export function CardHead({ system, word }: { system: SystemInfo; word: string }) {
   return (
@@ -32,7 +28,6 @@ export function CardHead({ system, word }: { system: SystemInfo; word: string })
   );
 }
 
-/** A switch that works: it is drawn only for what the person may turn on and off. */
 export function Switch({ label, on, locked, onChange }: { label: string; on: boolean; locked?: boolean; onChange(next: boolean): void }) {
   return (
     <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} disabled={locked} onClick={() => onChange(!on)}>
@@ -44,8 +39,6 @@ export function Switch({ label, on, locked, onChange }: { label: string; on: boo
   );
 }
 
-/** A table wider than its card is scrolled sideways, not squeezed until its words break. The
- *  keyboard reaches it, to scroll it. */
 export function TableScroll({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="system-table-scroll" role="group" aria-label={label} tabIndex={0}>
@@ -54,7 +47,6 @@ export function TableScroll({ label, children }: { label: string; children: Reac
   );
 }
 
-/** A switch with its name and a line saying what it does. */
 export function SwitchRow({ title, description, label, on, onChange }: { title: string; description: string; label: string; on: boolean; onChange(next: boolean): void }) {
   return (
     <div className="system-row">

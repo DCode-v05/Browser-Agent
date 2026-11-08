@@ -61,7 +61,6 @@ class Pictured(Desk):
         return super().capture(mode, app, pid, window_id)
 
 
-# The smallest picture there is, which is all a picture of the screen needs to be here.
 A_PICTURE = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 
@@ -110,7 +109,6 @@ def test_a_person_on_the_engines_page_moves_and_presses_where_they_point(tmp_pat
         ("scroll", -40, 0),
         ("key", 0, False, 0, "a"),
     ]
-    # The person is told a hand is on their machine, and when it is gone. What was typed is not said.
     assert any("mouse and keyboard" in line for line in said)
     assert not any("'a'" in line or " a " in line for line in said)
 
@@ -156,8 +154,6 @@ async def test_the_engine_lends_the_persons_hand_while_they_have_taken_over_and_
             await driver.control_is("person")
             assert driver.takes_a_hand()
             wide, high = await driver.viewport()
-            # The machine's screen is pictured afresh, larger than the size the page was told at the
-            # start: the page still works in the size it was told.
             await driver.screenshot(full_page=False, annotate=False)
             await driver.pointer("down", wide / 2, high / 4, "left")
             await driver.key("down", "a")

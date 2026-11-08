@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_ax_walk_bound.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bound on the driver's accessibility-tree walk per capture (``computer_use.ax_max_elements``).
 
@@ -50,7 +49,6 @@ class TestAxWalkBound:
         assert cua_backend._cua_configured_ax_max_elements() == 350
         stub = _StubCapture()
         assert stub._gws_args()["max_elements"] == 350
-        # ... and capture() forwards the bound it actually sent onto the CaptureResult
         monkeypatch.setattr(stub, "_capture_window_state", lambda: (None, None, [], ""))
         assert stub.capture("ax").ax_max_elements == 350
 

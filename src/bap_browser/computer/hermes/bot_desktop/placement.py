@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/placement.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Where this profile's desktop lives: the gateway host or inside the configured terminal backend.
 
@@ -32,9 +31,9 @@ _STREAM_BACKENDS = ("docker", "ssh", "singularity")
 
 @dataclass(frozen=True)
 class Placement:
-    where: str            # GATEWAY | TERMINAL | REFUSED
-    backend: str          # terminal.backend as configured
-    reason: str = ""      # human sentence when REFUSED (or why TERMINAL was not possible)
+    where: str
+    backend: str
+    reason: str = ""
 
 
 def _setting() -> str:
@@ -50,8 +49,6 @@ def _terminal_backend() -> str:
 
 
 def resolve() -> Placement:
-    # Backend first (env only): a local terminal IS the gateway host whatever the setting says, and that is
-    # the common case — it must not cost a config load (this runs on every browser / cua-driver spawn).
     backend = _terminal_backend()
     if backend == "local":
         return Placement(GATEWAY, backend, "terminal.backend is local, so the terminal IS the gateway host")
@@ -75,8 +72,6 @@ def terminal_environment(*, create: bool = True) -> Optional[Any]:
         env = tt._lookup_active_env(task_id, None)
     if env is not None or not create:
         return env
-    # Acquire through the same planner the terminal tool uses so the container carries the same mounts,
-    # limits and identity label; a trivial command warms it.
     tt.terminal_tool("true", task_id=None)
     with tt._env_lock:
         return tt._lookup_active_env(task_id, None)

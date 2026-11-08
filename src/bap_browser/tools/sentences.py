@@ -360,7 +360,6 @@ def _app(arguments: Mapping[str, Any]) -> str:
     name = arguments.get("app")
     if not isinstance(name, str) or not name.replace(" ", "").replace("_", "").isalpha():
         return "an app"
-    # A name longer than a row is cut where the row is fitted.
     return name.strip()
 
 
@@ -422,7 +421,6 @@ def _direction(arguments: Mapping[str, Any]) -> str:
 
 
 def _awaited(arguments: Mapping[str, Any]) -> str:
-    # The text waited for may be something the agent typed: the row says only that it waits for text.
     if isinstance(arguments.get("text"), str):
         return " for text to appear"
     if isinstance(arguments.get("text_gone"), str):
@@ -449,7 +447,6 @@ def _element(arguments: Mapping[str, Any], target: Located | None) -> str:
     if target is not None:
         return f'"{target.name}"' if target.name else f"a {target.role}"
     ref = arguments.get("ref")
-    # Anything else an agent put there is not a ref, and is not repeated to the person watching.
     return ref if isinstance(ref, str) and re.fullmatch(REF_PATTERN, ref) else ""
 
 

@@ -1,6 +1,3 @@
-// The task sets of a browser (spec 12.7): tasks with a known right end, run on the practice site
-// and graded by code. A person starts a run, watches where it is, stops it, and reads how it went.
-
 import { useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '../components/Icon';
@@ -14,12 +11,10 @@ import { useWords } from '../words';
 
 const S = W.systems.suite;
 
-/** The day and the time a run began. */
 function when(seconds: number): string {
   return new Date(seconds * 1000).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-/** What a run of a set came to, in the one number the set is for; and whether that is good. */
 export function headline(set: SetName, totals: SuiteTotals): { text: string; tone: 'success' | 'danger' } {
   if (set === 'attack') {
     return { text: S.followed(totals.attacks_followed, totals.attacks, percent(totals.attack_rate)), tone: totals.attacks_followed > 0 ? 'danger' : 'success' };
@@ -33,7 +28,6 @@ export function headline(set: SetName, totals: SuiteTotals): { text: string; ton
   return { text: errors > 0 ? `${passed} ${S.couldNotRun(errors)}` : passed, tone: totals.passed < totals.trials ? 'danger' : 'success' };
 }
 
-/** The one number of a run, for a table that compares browsers. */
 export function short(set: SetName, totals: SuiteTotals): string {
   if (set === 'attack') return S.cell.attack(percent(totals.attack_rate));
   if (set === 'confirm') return S.cell.confirm(percent(totals.ask_recall));
@@ -46,7 +40,6 @@ export function SuiteCard({ system, api }: { system: string; api: SystemsApi }) 
   const [note, setNote] = useState('');
   const [trials, setTrials] = useState<number | null>(null);
   const [open, setOpen] = useState<SetName | null>(null);
-  /** The run a person has just asked for, until the service says it is under way. */
   const [asking, setAsking] = useState<SetName | null>(null);
 
   const show = useCallback((told: SuiteAnswer | null) => {
@@ -62,7 +55,6 @@ export function SuiteCard({ system, api }: { system: string; api: SystemsApi }) 
     };
   }, [api, show, system]);
 
-  // While a run is under way, where it is is asked again and again.
   const running = suite?.running ?? null;
   const underWay = running !== null;
   useEffect(() => {
@@ -247,7 +239,6 @@ function Tasks({ set, run }: { set: SetName; run: SuiteRun }) {
   );
 }
 
-/** The newest run of each set on each browser, side by side: the admin's view of the whole. */
 export function ParityCard({ overall, nameOf, onRefresh }: { overall: SuiteOverall | null; nameOf(system: string): string; onRefresh(): void }) {
   const P = S.parity;
   const ran = overall?.systems.some((system) => Object.keys(system.runs).length > 0) ?? false;

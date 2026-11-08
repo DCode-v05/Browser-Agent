@@ -62,7 +62,6 @@ def test_the_demonstration_runs_from_one_command_and_leaves_its_steps_in_the_log
     make_config(tmp_path)
     done = run(tmp_path, "--demo", "--exit-when-done", "--pace", "0")
     assert done.returncode == 0, done.stderr
-    # The answer is the only thing on standard output; everything else is for the person at the terminal.
     assert done.stdout.strip() == ANSWER
 
     viewer = re.search(r"^Viewer: (http://127\.0\.0\.1:\d+/#token=(\S+))$", done.stderr, re.MULTILINE)
@@ -87,7 +86,6 @@ def test_the_demonstration_runs_from_one_command_and_leaves_its_steps_in_the_log
     ]
     assert all(line["ok"] for line in lines)
     assert token not in log
-    # The address that lets a person in is kept for the local user only while the service runs.
     assert not (tmp_path / ".bap-browser" / "service.json").exists()
 
 
@@ -123,7 +121,6 @@ def test_the_key_comes_from_dot_env_and_the_model_does_the_task(
     assert first["body"]["input"] == [{"role": "user", "content": "What is on the page?"}]
     assert second["body"]["input"][-1]["type"] == "function_call_output"
     assert second["body"]["input"][-1]["output"].startswith("Page: ")
-    # The key is in the request to the provider and nowhere else.
     log = (tmp_path / "events.jsonl").read_text(encoding="utf-8")
     assert key not in done.stdout and key not in done.stderr and key not in log
 

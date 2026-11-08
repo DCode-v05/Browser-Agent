@@ -1,8 +1,4 @@
 #!/bin/sh
-# Starts the micro VM's service (spec 21.12). Given a Tailscale key in TS_AUTHKEY, the VM first joins
-# the person's tailnet as a node that leaves it when the VM ends, serves the viewer and the tools to
-# the tailnet only, and reaches the tailnet through Tailscale's local proxy. Without a key it runs the
-# service as it is.
 set -eu
 if [ -n "${TS_AUTHKEY:-}" ]; then
   if ! command -v tailscaled >/dev/null 2>&1; then
@@ -11,7 +7,6 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
   fi
   sock=/tmp/tailscaled.sock
   proxy=localhost:1055
-  # The node's state is kept in memory. Its HTTPS certificate needs a folder: one that goes with the VM.
   certs=$(mktemp -d)
   tailscaled --tun=userspace-networking --state=mem: --statedir="$certs" --socket="$sock" \
     --outbound-http-proxy-listen="$proxy" --socks5-server="$proxy" >/tmp/tailscaled.log 2>&1 &
@@ -21,7 +16,6 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
   fi
   unset TS_AUTHKEY
   name=$(tailscale --socket="$sock" status --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
-  # The tailnet reaches the service through Tailscale, over HTTPS, and nothing else reaches it.
   tailscale --socket="$sock" serve --bg --https=443 http://127.0.0.1:8765 >&2
   export BAP_BROWSER__SERVER__HOST=127.0.0.1
   export BAP_BROWSER__SERVER__PUBLIC_URL="https://$name"
@@ -29,8 +23,6 @@ if [ -n "${TS_AUTHKEY:-}" ]; then
   export HTTP_PROXY="http://$proxy" HTTPS_PROXY="http://$proxy"
   echo "Joined the tailnet as $name. The viewer is at https://$name" >&2
 fi
-# A desktop's apps tell the driver of computer use what they hold over the session's bus (spec 22.2.2).
-# An image with a desktop has one to give; one without does not need it.
 if command -v dbus-run-session >/dev/null 2>&1; then
   exec dbus-run-session -- "$@"
 fi

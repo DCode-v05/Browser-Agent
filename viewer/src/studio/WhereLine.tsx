@@ -1,5 +1,3 @@
-// The line on the computer page that says where its engine runs and what it works on (spec 22.6).
-
 import { useEffect, useState } from 'react';
 
 import type { Surface } from '../protocol';
@@ -37,7 +35,6 @@ export function WhereLine({ runs, settings, surface, systems }: { runs: string |
   );
 }
 
-/** The mark on every page and chat: which machine the engine is on, whatever the page drives. */
 export function EngineMark({ system }: { system: string | undefined }) {
   return (
     <p className="engine-mark" data-testid="engine-mark">

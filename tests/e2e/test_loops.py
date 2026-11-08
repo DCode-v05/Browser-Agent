@@ -100,7 +100,6 @@ async def test_a_page_too_busy_to_answer_is_not_waited_for(
     try:
         await busy.navigate(f"{site}/attacks/loop.html")
         assert await busy.change_mark() is not None
-        # The page is put into a loop that never ends: it answers nothing from here on.
         stuck = asyncio.ensure_future(busy.page.evaluate("() => { for (;;) {} }"))
         await asyncio.sleep(0.3)
         loop = asyncio.get_running_loop()
@@ -117,7 +116,6 @@ async def tools(
     driver: PlaywrightDriver, make_config: Callable[..., Config], tmp_path: Path
 ) -> AsyncIterator[Toolkit]:
     session = BrowserSession(make_config(tmp_path), driver)
-    # The module's browser is already running: the session only has to know it.
     await session.driver()
     yield Toolkit(session)
 
@@ -130,14 +128,12 @@ async def test_an_agent_that_presses_a_dead_button_is_told_and_then_held_back(
     results: list[str] = []
     for _ in range(6):
         results.append((await tools.call("browser_click", {"ref": dead})).text.split("\n[tabs]")[0])
-        # An agent reads in between. That makes the step no newer.
         await tools.call("browser_snapshot", {})
     pressed = f'Clicked {dead} (button "Load more")'
     notice = (
         "\n[notice] This is the 3rd identical step and the page has not changed. Something else is needed."
     )
     assert results == [
-        # The press puts the focus on the button, and that is no change: a pointer did it.
         pressed + NOTHING,
         pressed + NOTHING,
         pressed + NOTHING + notice,

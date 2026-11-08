@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_browser.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """The dock's Browser and agent-browser resolve to one identity: same executable, same user-data-dir —
 and when a human opened that browser first, the agent attaches to it instead of launching a second one
@@ -82,13 +81,11 @@ def test_running_instance_port_requires_live_pid_and_open_port(tmp_path):
         _fake_running_instance(tmp_path, os.getpid(), port)
         assert browser.running_instance_cdp_port(str(tmp_path)) == port
 
-        # Both files outlive a closed Chromium: a dead pid must not be trusted.
         os.unlink(tmp_path / "SingletonLock")
         os.symlink("host-2147483000", tmp_path / "SingletonLock")
         assert browser.running_instance_cdp_port(str(tmp_path)) is None
     finally:
         listener.close()
-    # Live pid, port no longer accepting: still not attachable.
     os.unlink(tmp_path / "SingletonLock")
     os.symlink(f"host-{os.getpid()}", tmp_path / "SingletonLock")
     assert browser.running_instance_cdp_port(str(tmp_path)) is None
@@ -159,7 +156,7 @@ def test_unprivileged_user_under_apparmor_userns_restriction_gets_the_system_bro
     assert browser.executable() == sys_exe
 
     monkeypatch.setattr(browser, "_userns_restricted", lambda: False)
-    assert browser.executable() == pw_exe  # unrestricted host: Playwright's build as before
+    assert browser.executable() == pw_exe
 
     _install_browsers(tmp_path / "only-pw", monkeypatch, playwright=True, system=False)
     monkeypatch.setattr(browser, "_userns_restricted", lambda: True)
@@ -188,8 +185,6 @@ def test_root_dock_browser_starts_with_the_same_sandbox_args_as_the_agents_brows
     assert agent_flags, "root must inject sandbox flags for agent-browser"
     assert agent_flags <= set(browser.dock_argv("/opt/chrome", "/p/dir"))
 
-    # Same policy for the NON-root container case (the official image runs the gateway as uid 10000 in
-    # Docker): agent-browser bypasses the sandbox there, and the dock icon must too or it dies on click.
     monkeypatch.setattr(session.os, "geteuid", lambda: 10000)
     monkeypatch.setattr(browser.os, "geteuid", lambda: 10000)
     monkeypatch.setattr(session._install, "_running_in_docker", lambda: True)
@@ -198,7 +193,7 @@ def test_root_dock_browser_starts_with_the_same_sandbox_args_as_the_agents_brows
     assert set(docker_env["AGENT_BROWSER_ARGS"].split(",")) <= set(browser.dock_argv("/opt/chrome", "/p/dir"))
     monkeypatch.setattr(session._install, "_running_in_docker", lambda: False)
     monkeypatch.setattr(session, "apparmor_restricts_unprivileged_userns", lambda: False)
-    assert "--no-sandbox" not in browser.dock_argv("/opt/chrome", "/p/dir")  # seated non-root host: sandboxed
+    assert "--no-sandbox" not in browser.dock_argv("/opt/chrome", "/p/dir")
 
 
 def test_status_reports_the_headed_browser_or_its_absence(monkeypatch):
@@ -225,7 +220,7 @@ def test_dock_exec_line_survives_spaces_in_the_executable_and_profile_paths():
     profile = '/home/a b/.hermes/browser "x"/profile'
     line = browser.dock_exec_line(exe, profile)
     assert line.startswith('Exec="/opt/Google Chrome/chrome" ')
-    assert r'"--user-data-dir=/home/a b/.hermes/browser \\"x\\"/profile"' in line  # spec: \" quoted, then \ string-escaped
+    assert r'"--user-data-dir=/home/a b/.hermes/browser \\"x\\"/profile"' in line
     assert "--remote-debugging-port=0" in line
 
 
@@ -244,7 +239,7 @@ def test_headless_shell_override_is_not_a_headed_browser(tmp_path, monkeypatch):
 
     _, sys_exe = _install_browsers(tmp_path / "with-sys", monkeypatch, playwright=False, system=True)
     monkeypatch.setenv("AGENT_BROWSER_EXECUTABLE_PATH", str(shell))
-    assert browser.executable() == sys_exe  # a real headed browser elsewhere still wins over the override
+    assert browser.executable() == sys_exe
 
 
 def test_headless_override_does_not_hide_pm_headed_browser(tmp_path, monkeypatch):
@@ -261,7 +256,7 @@ def test_headless_override_does_not_hide_pm_headed_browser(tmp_path, monkeypatch
     monkeypatch.setattr(browser, "_system_executable", lambda: None)
     monkeypatch.setattr(browser, "_userns_restricted", lambda: False)
 
-    assert chromium_executable() == str(headless)  # ordinary headless browsing keeps its override
+    assert chromium_executable() == str(headless)
     dock = browser.dock_launch()
     assert dock is not None and dock[0] == str(headed)
     assert browser.env_for_agent({})["AGENT_BROWSER_EXECUTABLE_PATH"] == str(headed)
@@ -355,8 +350,6 @@ def test_a_headless_shell_pin_is_replaced_while_a_screen_is_up(tmp_path, monkeyp
     monkeypatch.setattr(runtime, "state_dir", lambda: tmp_path / "bot-desktop")
     monkeypatch.setattr(browser, "_managed_executable", lambda: str(headed))
     monkeypatch.delenv("AGENT_BROWSER_PROFILE", raising=False)
-    # Unpinned, the ubuntu runner (non-root, userns-restricted) flips executable() to
-    # its own /usr/bin/google-chrome; host policy is not the subject here.
     monkeypatch.setattr(browser, "_userns_restricted", lambda: False)
 
     agent_env = browser.env_for_agent({"AGENT_BROWSER_EXECUTABLE_PATH": str(shell)})

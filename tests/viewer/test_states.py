@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 
-# Test files cannot import each other (pytest's importlib mode), so the fixture's type is spelled here.
 OpenView = Callable[..., Awaitable[Any]]
 SIZES = ["desktop", "phone"]
 
@@ -82,7 +81,6 @@ async def test_inside_a_client_the_product_name_is_dropped(open_view: OpenView) 
 
 
 async def test_at_twice_the_text_size_the_layout_reflows_to_one_column(browser, viewer_url: str) -> None:
-    # 200% zoom on a 1360 px wide window lays the page out at 680 px.
     page = await browser.new_page(viewport={"width": 680, "height": 425})
     try:
         await page.goto(f"{viewer_url}?state=waiting_approval")
@@ -111,7 +109,6 @@ async def test_opened_without_its_link_it_says_what_to_do_and_shows_no_session(
     await view.page.get_by_role("heading", name="This link can't open the session").wait_for()
     assert await view.page.get_by_text("Open it again from where you started the session.").count() > 0
     assert await view.page.get_by_role("button", name="Stop session").count() == 0
-    # The instruction is the whole point of this screen, so none of it may be cut off.
     assert await view.page.evaluate(
         "[...document.querySelectorAll('.status-detail')].every((e) => e.scrollWidth <= e.clientWidth)"
     )

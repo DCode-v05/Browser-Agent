@@ -1,6 +1,3 @@
-// Recorded sessions (spec 9.11): one full run, and one short recording for each state of spec 9.3.
-// The pictures and the boxes of the elements come from `scripts/record_demo.py`.
-
 import type { Beat, EventDraft, RecordedSession } from '../connection/demo';
 import type { Box } from '../protocol';
 import boxes from './boxes.json';
@@ -18,9 +15,7 @@ const VERIFY = 'https://example.com/verify';
 const HOME = 'https://example.com/home';
 
 interface StepOptions {
-  /** Milliseconds the agent takes before starting the step. */
   think?: number;
-  /** Milliseconds the step takes. */
   takes?: number;
   target?: Box;
   frame?: string;
@@ -63,7 +58,6 @@ const SESSION_STARTED: Beat = {
   },
 };
 
-// Named points in the run, so the single-state recordings can stop exactly there.
 const OPENING: Beat[] = [
   SESSION_STARTED,
   tab('New tab', 'about:blank'),
@@ -121,7 +115,6 @@ const TO_BLOCKED: Beat[] = [
 ];
 
 const TO_DIALOG: Beat[] = [
-  // The agent thinks for a while here, which shows as an idle divider.
   ...step(14, 'browser_click', 'Clicking "Download invoice"', 'Clicked "Download invoice" (link)', { think: 12_000, target: boxes.invoice, takes: 180, url: HOME }),
   { after: 300, event: { type: 'download_saved', name: 'INV-1042.pdf', size: 48_211 } },
   start(15, 'browser_click', 'Clicking "Account"', { think: 1300 }),
@@ -138,7 +131,6 @@ const ENDING: Beat[] = [
 
 const FULL_RUN: Beat[] = [...OPENING, ...TO_UPLOAD, APPROVAL, ...TO_VERIFY, HELP, ...TO_BLOCKED, ...TO_DIALOG, ...ENDING];
 
-/** The whole run, at real pace. A person answers the approval and the request for help. */
 export const SIGNUP_SESSION: RecordedSession = { name: 'signup', beats: FULL_RUN };
 
 const TAKEOVER_CHROME_START: Beat = {
@@ -146,7 +138,6 @@ const TAKEOVER_CHROME_START: Beat = {
   event: { ...(SESSION_STARTED.event as Extract<EventDraft, { type: 'session_started' }>), backend: 'takeover_chrome', browser: 'Chrome 154' },
 };
 
-/** A chat session whose browser is a window on the person's own screen. */
 const BESIDE: Beat[] = [
   { after: 0, event: { ...(SESSION_STARTED.event as Extract<EventDraft, { type: 'session_started' }>), chat: true, on_screen: true } },
   tab('Online check-in', 'https://example.com/checkin'),
@@ -156,8 +147,6 @@ const BESIDE: Beat[] = [
   ...step(2, 'browser_type', 'Typing 6 characters into "Booking reference"', 'Typed 6 characters into "Booking reference"', { url: 'https://example.com/checkin' }),
   start(3, 'browser_click', 'Clicking "Find booking" (button)'),
 ];
-
-// Auto Mode and safeguards (spec 18.10): the same signup run, with the new events layered on.
 
 const AUTO_ON: Beat[] = [
   SESSION_STARTED,
@@ -233,7 +222,6 @@ const EXTENDED_APPROVAL: Beat[] = [
   },
 ];
 
-/** One recording per state of spec 9.3 (and a few more), each stopping in that state. */
 export const STATES: Record<string, RecordedSession> = {
   no_agent: { name: 'no_agent', beats: [] },
   empty: { name: 'empty', beats: [SESSION_STARTED, tab('New tab', 'about:blank')] },
@@ -257,7 +245,6 @@ export const STATES: Record<string, RecordedSession> = {
   denied: { name: 'denied', beats: [...OPENING, ...TO_UPLOAD, APPROVAL, start(7, 'browser_click', 'Clicking "I accept the terms"', { target: boxes.terms })], auto: { approval: 'deny' } },
   ended: { name: 'ended', beats: FULL_RUN, auto: { approval: 'allow', help: 'done' } },
   disconnected: { name: 'disconnected', beats: [...OPENING, CHOOSING_COUNTRY], afterwards: 'reconnecting' },
-  // Eight quiet seconds after the last picture: longer than `viewer.stale_after_s`.
   stale: { name: 'stale', beats: [...OPENING, CHOOSING_COUNTRY, { after: 8000 }], stalls: true },
   beside: { name: 'beside', beats: BESIDE },
   own_browser: {

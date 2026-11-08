@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_rfb_filter_limits.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """RFB client-message framing at the bridge: a client-declared ClientCutText length is bounded at the header
 (the bridge must not buffer up to 2 GiB for a viewer that holds a ticket but no lease), and every message
@@ -28,8 +27,6 @@ def test_oversized_clipboard_is_rejected_at_header_without_waiting_for_payload(l
 
 
 def set_desktop_size(width, height, screens=1):
-    # RFB 7.5.x SetDesktopSize: type, pad, u16 width, u16 height, u8 nScreens, pad, then 16 bytes per screen
-    # (u32 id, u16 x, u16 y, u16 w, u16 h, u32 flags).
     head = bytes([251, 0]) + width.to_bytes(2, "big") + height.to_bytes(2, "big") + bytes([screens, 0])
     return head + b"".join(i.to_bytes(4, "big") + b"\x00\x00\x00\x00" + width.to_bytes(2, "big") + height.to_bytes(2, "big")
                            + b"\x00\x00\x00\x00" for i in range(screens))

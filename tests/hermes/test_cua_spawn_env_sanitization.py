@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_cua_spawn_env_sanitization.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Regression tests: every remaining cua-driver spawn site must sanitize the
 subprocess environment.
@@ -43,9 +42,7 @@ def _assert_sanitized(captured):
     env = captured["env"]
     assert env is not None, "subprocess must receive an explicit env="
     assert "ANTHROPIC_API_KEY" not in env
-    # Sanitization filters secrets, not everything — ordinary vars survive.
     _assert_path_preserved(env)
-    # Confirms the telemetry helper still ran (default: telemetry disabled).
     assert env.get("CUA_DRIVER_RS_TELEMETRY_ENABLED") == "0"
 
 
@@ -126,8 +123,6 @@ def test_cli_fallback_sanitizes_env_and_hides_console_on_windows(monkeypatch):
 
     captured = {}
     _patch_windows_hide_flags(monkeypatch, cua_backend_session)
-    # Hermetic CI has no cua-driver binary; pin the resolver so the test
-    # exercises the spawn-env path instead of the install-hint early exit.
     monkeypatch.setattr(
         cua_backend_driver, "resolve_cua_driver_cmd", lambda override=None: "cua-driver"
     )
@@ -159,8 +154,6 @@ def test_permissions_run_sanitizes_env(monkeypatch):
 
     permissions._run("cua-driver", "doctor", "--json", timeout=1.0)
     _assert_sanitized(captured)
-
-
 
 
 def test_doctor_spawn_sanitizes_env_and_hides_console_on_windows(monkeypatch):

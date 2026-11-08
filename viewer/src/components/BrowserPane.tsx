@@ -1,5 +1,3 @@
-// The browser column: tabs, address, and the live picture with who is driving on its border.
-
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react';
 
 import { matchesChord, type ViewerOptions } from '../options';
@@ -26,7 +24,6 @@ interface Props {
   showPointer: boolean;
   options: ViewerOptions;
   onCommand(command: ClientCommand): void;
-  /** The release chord was pressed while a person drives. */
   onRelease(): void;
 }
 
@@ -61,9 +58,7 @@ export function BrowserPane({ state, view, now, showPointer, options, onCommand,
 }
 
 function AddressBar({ state, view, now }: { state: ViewerState; view: StateView; now: number }) {
-  // A desktop has no address: the bar says what is shown instead.
   const desktop = state.session?.backend === 'contained_desktop';
-  // A desktop has no address: the bar says which desktop it is, the contained one or the person's own Mac.
   const url = desktop ? state.session?.browser || W.parts.desktop : state.url || 'about:blank';
   const blocked = view.key === 'blocked';
   return (
@@ -108,10 +103,8 @@ function FrameBadge({ state, view, now }: { state: ViewerState; view: StateView;
   }
 }
 
-/** The tools that press a mouse button. */
 const CLICKS = new Set(['browser_click']);
 
-/** The element the agent acted on most recently. A step on something off screen has none. */
 function lastTarget(steps: readonly Step[]): Box | undefined {
   for (let index = steps.length - 1; index >= 0; index -= 1) {
     const target = steps[index]?.target;
@@ -129,7 +122,6 @@ type FrameProps = Omit<Props, 'now'>;
 function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: FrameProps) {
   const L = useWords();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  /** The keys the person is holding down in the page: where each is on the keyboard, and its name. */
   const held = useRef(new Map<string, string>());
   const size = state.session?.viewport ?? { width: 1280, height: 800 };
   const src = state.frame?.src;
@@ -163,7 +155,6 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
     );
   }
 
-  /** Where the pointer is, in page pixels. */
   const pagePoint = (event: PointerEvent<HTMLCanvasElement> | WheelEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const scaleX = rect.width ? size.width / rect.width : 1;
@@ -180,15 +171,12 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
       if (action === 'down') onRelease();
       return;
     }
-    // Tab still moves focus, so a person is never stuck in the picture.
     if (event.key === 'Tab') return;
     event.preventDefault();
     if (action === 'down') held.current.set(event.code, event.key);
     else held.current.delete(event.code);
     onCommand({ type: 'key', action, key: event.key, code: event.code });
   };
-  // A key that comes up while the picture does not have the focus is never seen here, and would
-  // stay down in the page.
   const letGo = () => {
     for (const [code, name] of held.current) onCommand({ type: 'key', action: 'up', key: name, code });
     held.current.clear();
@@ -200,10 +188,8 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
   const last = state.steps.at(-1);
   const acting = view.key === 'agent' || view.key === 'paused' || view.key === 'waiting_approval';
   const shown = showPointer && acting;
-  // The outline is on the element while the step runs, and stays a moment after it has finished.
   const target = shown ? last?.target : undefined;
   const acted = last?.status !== 'running';
-  // The agent's pointer stays where it last acted and moves from there to the next target.
   const at = shown ? centre(lastTarget(state.steps)) : undefined;
   const clicked = Boolean(target) && acted && last?.status === 'ok' && CLICKS.has(last.tool);
   const active = state.tabs.find((tab) => tab.active);
@@ -234,7 +220,6 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
       />
       {target && last && (
         <span
-          // A new step draws a new outline, so its fade starts again.
           key={`target-${last.n}-${last.status}`}
           className="target"
           data-tone={view.tone}
@@ -258,7 +243,6 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
           className="agent-pointer"
           data-tone={view.tone}
           aria-hidden="true"
-          // Moved with a transform, so the pointer glides from where it was (spec 9.10).
           style={{ transform: `translate(${(at.x / size.width) * 100}%, ${(at.y / size.height) * 100}%)` }}
         >
           <Icon name="pointer" size="large" />
@@ -266,7 +250,6 @@ function LiveFrame({ state, view, showPointer, options, onCommand, onRelease }: 
       )}
       {view.working && view.frame === 'live' && <span className="frame-glow" aria-hidden="true" />}
       {dimmed && <div className="frame-veil">{view.frame === 'connecting' && <span>{W.frame.connecting}</span>}</div>}
-      {/* An agent that waits for a task is not paused: it keeps its own mark. */}
       {view.label && <FrameLabel tone={view.tone} label={view.label} icon={view.key === 'agent' ? 'agent' : undefined} />}
       {driving && <p className="frame-hint">{L.takeover.release(options.releaseChord)}</p>}
     </div>

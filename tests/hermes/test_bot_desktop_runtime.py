@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_runtime.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop runtime: thumbnail and display-number allocation invariants."""
 
@@ -36,15 +35,13 @@ def test_the_image_bakes_the_same_apt_packages_the_runtime_would_install() -> No
     baked = {tok for tok in re.split(r"[\s\\&]+", body) if tok and not tok.startswith("-")}
     required = set(runtime.PACKAGES["apt"])
     assert required <= baked, f"the image would not install: {sorted(required - baked)}"
-    # apt `chromium` on top of the operator's list: a headed browser for the dock's Browser icon that
-    # does not depend on Playwright's copy being unpacked yet.
     assert baked - required <= {"chromium"}, f"unexpected extra packages: {sorted(baked - required)}"
 
 
 def test_no_running_screen_returns_none_without_grabbing(monkeypatch):
     monkeypatch.setattr(runtime, "published_env", lambda: {"DISPLAY": ":99"})
     monkeypatch.setattr(runtime, "_launcher_pid", lambda: None)
-    monkeypatch.setitem(sys.modules, "PIL.ImageGrab", None)  # an import would now fail loudly
+    monkeypatch.setitem(sys.modules, "PIL.ImageGrab", None)
     assert thumbnail.thumbnail_data_url() is None
 
 
@@ -56,9 +53,9 @@ def test_recycled_pid_is_not_our_launcher(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runtime, "state_dir", lambda: tmp_path)
     pidfile = tmp_path / "launcher.pid"
-    pidfile.write_text(f"{os.getpid()} 12345.0", encoding="utf-8")  # alive, wrong birth
+    pidfile.write_text(f"{os.getpid()} 12345.0", encoding="utf-8")
     assert runtime._launcher_pid() is None
-    pidfile.write_text(str(os.getpid()), encoding="utf-8")  # pre-identity format
+    pidfile.write_text(str(os.getpid()), encoding="utf-8")
     assert runtime._launcher_pid() is None
     pidfile.write_text("9" * 40 + " 1.0", encoding="utf-8")
     assert runtime._launcher_pid() is None
@@ -73,7 +70,7 @@ def test_recorded_display_held_by_a_live_server_is_not_reused(tmp_path, monkeypa
 
     monkeypatch.setattr(runtime, "state_dir", lambda: tmp_path)
     (tmp_path / "display").write_text("37", encoding="utf-8")
-    live = {37: os.getpid()}  # :37 is owned by a running server (this very process stands in for it)
+    live = {37: os.getpid()}
     monkeypatch.setattr(runtime, "_display_in_use", lambda num: num in live)
     monkeypatch.setattr(runtime, "_ALLOC_LOCK", tmp_path / "alloc.lock")
     assert runtime._allocate_display() != 37
@@ -85,7 +82,7 @@ def test_live_server_without_its_lock_file_still_owns_the_display(tmp_path, monk
     """Regression for #109941: a /tmp reaper removes ``.X<n>-lock`` while Xvnc keeps running. The server's
     abstract socket ``@/tmp/.X11-unix/X<n>`` stays bound for its whole life, so that is the liveness the
     allocator must honour — handing the number out makes the next launcher die with 'server already running'."""
-    monkeypatch.setattr(runtime, "_X_LOCK_DIR", tmp_path / "xlocks")  # no lock file for anyone
+    monkeypatch.setattr(runtime, "_X_LOCK_DIR", tmp_path / "xlocks")
     (tmp_path / "xlocks").mkdir()
     table = tmp_path / "unix"
     table.write_text(
@@ -96,10 +93,9 @@ def test_live_server_without_its_lock_file_still_owns_the_display(tmp_path, monk
     monkeypatch.setattr(runtime, "_X_UNIX_TABLE", table)
     assert runtime._display_in_use(20) is True
     assert runtime._display_in_use(21) is True
-    assert runtime._display_in_use(22) is False  # :200 is not :22 — no prefix matching
+    assert runtime._display_in_use(22) is False
     monkeypatch.setattr(runtime, "_X_UNIX_TABLE", tmp_path / "missing")
     assert runtime._display_in_use(20) is False, "no table (non-Linux procfs) falls back to the lock alone"
-
 
 
 _FAKE_LAUNCHER = """#!/usr/bin/env bash
@@ -113,8 +109,6 @@ printf 'DISPLAY=:%s\\n' "$HERMES_BD_DISPLAY_NUM" > "$HERMES_BD_ENV_FILE"
 sleep 30
 """
 
-# One start() per process: state_dir() is HERMES_HOME-scoped and process-global, so two profiles need two
-# interpreters — which is also how two gateway profiles race on a real host.
 _DRIVER = """
 import json, os, sys
 from pathlib import Path
@@ -163,7 +157,7 @@ def start_in_fresh_process(tmp_path):
 
 def _collect(procs):
     import json
-    out = [json.loads(p.stdout.readline()) for p in procs]  # every driver holds its launcher until released
+    out = [json.loads(p.stdout.readline()) for p in procs]
     assert all("error" not in o for o in out), out
     return out
 
@@ -226,7 +220,7 @@ def in_process_runtime(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime, "state_dir", lambda: home / "bot-desktop")
     monkeypatch.setattr(runtime, "_LAUNCHER", tmp_path / "launcher.sh")
     monkeypatch.setattr(runtime, "_X_LOCK_DIR", tmp_path / "xlocks")
-    monkeypatch.setattr(runtime, "_X_UNIX_TABLE", tmp_path / "unix")  # the host's real X servers stay out of the band
+    monkeypatch.setattr(runtime, "_X_UNIX_TABLE", tmp_path / "unix")
     monkeypatch.setattr(runtime, "_ALLOC_LOCK", tmp_path / "alloc.lock")
     monkeypatch.setattr(runtime, "missing_binaries", list)
     monkeypatch.setattr(runtime, "geometry", lambda: "800x600")
@@ -234,13 +228,13 @@ def in_process_runtime(tmp_path, monkeypatch):
     yield tmp_path
     with contextlib.suppress(Exception):
         runtime.stop()
-    for lock in (tmp_path / "xlocks").glob(".X*-lock"):  # anything the code under test failed to reap
+    for lock in (tmp_path / "xlocks").glob(".X*-lock"):
         with contextlib.suppress(OSError, ValueError):
             os.kill(int(lock.read_text(encoding="utf-8-sig")), 9)
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.live_system_guard_bypass  # the orphan is reparented to init: signalling it is the point
+@pytest.mark.live_system_guard_bypass
 def test_orphaned_x_server_of_a_dead_launcher_is_reaped_on_next_start(in_process_runtime):
     """SIGKILL the launcher and its Xvnc survives, holding the display and rfb.sock. status() keys on the
     launcher pid and says stopped; start() must find that orphan through the recorded display's X lock
@@ -253,7 +247,7 @@ def test_orphaned_x_server_of_a_dead_launcher_is_reaped_on_next_start(in_process
     first = runtime.start(wait_seconds=10)
     lock = scratch / "xlocks" / f".X{first.display.lstrip(':')}-lock"
     orphan = int(lock.read_text(encoding="utf-8-sig"))
-    os.kill(first.pid, signal.SIGKILL)  # windows-footgun: ok — Linux-only test requires an uncatchable launcher death
+    os.kill(first.pid, signal.SIGKILL)
     assert _wait_until(lambda: _gone(first.pid))
     assert not _gone(orphan), "the X server outlives its launcher (that is the bug's precondition)"
     assert runtime.status().running is False
@@ -265,7 +259,7 @@ def test_orphaned_x_server_of_a_dead_launcher_is_reaped_on_next_start(in_process
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.live_system_guard_bypass  # the orphan is reparented to init: signalling it is the point
+@pytest.mark.live_system_guard_bypass
 def test_orphaned_x_server_is_found_by_its_socket_when_the_lock_file_is_gone(tmp_path, monkeypatch):
     """Case B of #109941: the launcher was SIGKILLed AND a /tmp reaper removed ``.X<n>-lock`` (or the failed
     launch dropped ``display``). The lock was the reaper's only handle, so the live Xvnc leaked forever and
@@ -276,12 +270,9 @@ def test_orphaned_x_server_is_found_by_its_socket_when_the_lock_file_is_gone(tmp
     sd = tmp_path / "bot-desktop"
     sd.mkdir()
     (sd / "rfb.sock").touch()
-    (sd / "launcher.pid").write_text("1 0.0", encoding="utf-8")  # a dead launcher, not our process group
-    monkeypatch.setattr(runtime, "_X_LOCK_DIR", tmp_path / "xlocks")  # no lock file at all
+    (sd / "launcher.pid").write_text("1 0.0", encoding="utf-8")
+    monkeypatch.setattr(runtime, "_X_LOCK_DIR", tmp_path / "xlocks")
     (tmp_path / "xlocks").mkdir()
-    # argv[0] names the fake Xvnc and argv carries our socket path, exactly what launcher.sh's Xvnc shows.
-    # Python is the portable long-lived payload here: Nix's multicall coreutils dispatches from argv[0], so
-    # executing `tail` under the Xvnc spelling exits immediately instead of establishing the precondition.
     orphan = subprocess.Popen([str(tmp_path / "Xvnc"), "-c", "import time; time.sleep(60)", str(sd / "rfb.sock")], executable=sys.executable,
                               start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
@@ -317,7 +308,7 @@ wait
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.live_system_guard_bypass  # the launcher's group must really be signalled
+@pytest.mark.live_system_guard_bypass
 def test_readiness_timeout_terminates_the_launch_it_gave_up_on(in_process_runtime):
     """When the launcher misses the readiness deadline start() raises — and must take the launch down with
     it. It used to leave the launcher running; the child then published DISPLAY/rfb.sock a moment later and
@@ -331,7 +322,7 @@ def test_readiness_timeout_terminates_the_launch_it_gave_up_on(in_process_runtim
         runtime.start(wait_seconds=0.05)
     launcher = runtime._recorded_launcher_pid()
     assert launcher is None or _gone(launcher), "the timed-out launcher must be reaped, not left to publish later"
-    time.sleep(1.5)  # past the slow launcher's publish time
+    time.sleep(1.5)
     assert not (sd / "env").exists() and not (sd / "rfb.sock").exists()
     assert runtime.status().running is False
     for lock in (scratch / "xlocks").glob(".X*-lock"):
@@ -365,7 +356,6 @@ def test_allocation_lock_is_released_once_xvnc_claims_the_number(in_process_runt
     import fcntl
 
     scratch = in_process_runtime
-    # X lock at once, env file only much later: the lock must be free in between.
     (scratch / "launcher.sh").write_text(
         '#!/usr/bin/env bash\necho $$ > "$HERMES_BD_XLOCK_DIR/.X${HERMES_BD_DISPLAY_NUM}-lock"\n'
         'sleep 1.5\n: > "$HERMES_BD_SOCKET"\nprintf \'DISPLAY=:%s\\n\' "$HERMES_BD_DISPLAY_NUM" > "$HERMES_BD_ENV_FILE"\nsleep 30\n',
@@ -376,7 +366,7 @@ def test_allocation_lock_is_released_once_xvnc_claims_the_number(in_process_runt
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             if list((scratch / "xlocks").glob(".X*-lock")):
-                time.sleep(0.2)  # let start() notice the claim
+                time.sleep(0.2)
                 with open(scratch / "alloc.lock", "a+", encoding="utf-8") as fh:
                     try:
                         fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -416,7 +406,7 @@ def test_a_running_desktop_is_never_refused_for_the_memory_it_is_using(tmp_path,
     """The gate guards the allocation, not the session: a running desktop is itself what consumes the
     memory, so checking before the running-check made Start fail on a healthy screen."""
     _startable_host(monkeypatch, tmp_path, running=True)
-    runtime.start()  # returns status(); must not raise about headroom
+    runtime.start()
 
 
 def test_a_root_host_without_a_package_manager_is_told_the_truth(tmp_path, monkeypatch):
@@ -462,7 +452,7 @@ def test_a_tight_but_sufficient_start_is_logged(tmp_path, monkeypatch, caplog):
     from bap_browser.computer.hermes.bot_desktop import resources
 
     spawned = _startable_host(monkeypatch, tmp_path)
-    monkeypatch.setattr(resources, "min_free_mb", lambda: 1536)  # threshold -> 2048
+    monkeypatch.setattr(resources, "min_free_mb", lambda: 1536)
     monkeypatch.setattr(resources, "memory_info",
                         lambda: resources.MemoryInfo(available_mb=1800, limit_mb=2048))
     with caplog.at_level("WARNING", logger="bap_browser.computer.hermes.bot_desktop.runtime"):

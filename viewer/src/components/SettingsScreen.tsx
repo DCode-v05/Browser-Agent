@@ -1,6 +1,3 @@
-// The settings screen (spec 9.12), drawn from the settings answer. A change is saved as soon as it
-// is made; a locked setting is shown with its reason, never hidden.
-
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { Surface } from '../protocol';
@@ -17,7 +14,6 @@ import { useWords } from '../words';
 interface Props {
   source: SettingsSource;
   surface: Surface;
-  /** Goes up when the settings changed elsewhere, so they are read again. */
   version: number;
   onClose(): void;
   onChanged(answer: SettingsAnswer): void;
@@ -30,16 +26,13 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   const [answer, setAnswer] = useState<SettingsAnswer | null>(null);
   const [failed, setFailed] = useState(false);
   const [groupId, setGroupId] = useState<string | null>(null);
-  /** Below 700 px the groups and one group's settings take turns on screen. */
   const [pane, setPane] = useState<'groups' | 'settings'>('groups');
   const [status, setStatus] = useState<RowStatus | null>(null);
   const [asking, setAsking] = useState<Setting | null>(null);
-  /** The "Ask before" setting, while the first-time notice asks whether to turn Auto on. */
   const [turningOnAuto, setTurningOnAuto] = useState<Setting | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const backButton = useRef<HTMLButtonElement>(null);
   const lastSave = useRef<Promise<boolean> | null>(null);
-  /** A person chose the pane, so the focus must follow it. */
   const paneChosen = useRef(false);
 
   useEffect(() => {
@@ -56,13 +49,11 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
   const group = answer?.groups.find((item) => item.id === groupId) ?? answer?.groups[0];
   const loaded = answer !== null;
 
-  // Focus goes to the chosen group once the settings have arrived.
   useEffect(() => {
     if (loaded) dialog.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
   }, [loaded]);
 
   function save(setting: Setting, value: SettingValue): Promise<boolean> {
-    // Turning Auto on shows the first-time notice, once per person and browser (spec 18.10).
     if (setting.id === 'ask_before' && value === 'auto' && !autoNoticeAccepted()) {
       setTurningOnAuto(setting);
       return Promise.resolve(false);
@@ -73,12 +64,10 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
 
   async function change(setting: Setting, value: SettingValue) {
     let result: ChangeResult;
-    // The service saves it. Until it has answered, the row says so and does not say Saved.
     setStatus({ id: setting.id, tone: 'saving', text: W.settings.saving });
     try {
       result = await source.change(surface, { [setting.id]: value });
     } catch {
-      // The service did not answer. Nobody may believe the change was saved.
       setStatus({ id: setting.id, tone: 'refused', text: W.settings.notSaved });
       return false;
     }
@@ -87,7 +76,6 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
       onChanged(result.answer);
       setStatus({ id: setting.id, tone: 'saved', text: setting.applies === 'next_session' ? W.settings.savedNext : W.settings.saved });
     } else {
-      // A user is told it is the admin who holds the setting, not an organisation somewhere.
       setStatus({ id: setting.id, tone: 'refused', text: (answer?.role === 'user' ? W.systems.user.refused : W.settings.refused)[result.reason] });
     }
     return result.ok;
@@ -98,15 +86,12 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
     try {
       await source.run(surface, setting.id);
     } catch {
-      // Nobody may believe the data is gone when it is not.
       setStatus({ id: setting.id, tone: 'refused', text: W.settings.clear.failed });
       return;
     }
     if (setting.id === 'clear_browsing_data') onToast(W.settings.clear.done);
   }
 
-  // A site list saves when the focus leaves it. Closing the screen must save it too, and an entry
-  // that is refused must be seen: otherwise a person believes a site is blocked when it is not.
   async function close() {
     const active = document.activeElement;
     if (active instanceof HTMLTextAreaElement && dialog.current?.contains(active)) {
@@ -121,7 +106,6 @@ export function SettingsScreen({ source, surface, version, onClose, onChanged, o
     onClose();
   }
 
-  // On a narrow screen the groups and one group's settings take turns, and the focus goes with them.
   function showPane(next: 'groups' | 'settings') {
     paneChosen.current = true;
     setPane(next);
@@ -250,15 +234,11 @@ interface RowProps {
   onSave(value: SettingValue): Promise<boolean>;
   onAct(): void;
   onToast(text: string): void;
-  /** Who holds a setting that cannot be changed here. */
   lockedWords: string;
-  /** A line under the description: who else the setting reaches. */
   note?: string;
-  /** A setting that cannot be changed here is said in words, not drawn as a control that does nothing. */
   lockedAsWords?: boolean;
 }
 
-/** One setting: its name, one line saying what it does, and its control. */
 export function SettingRow({ setting, status, source, onSave, onAct, onToast, lockedWords, note, lockedAsWords }: RowProps) {
   const titleId = useId();
   const descriptionId = useId();

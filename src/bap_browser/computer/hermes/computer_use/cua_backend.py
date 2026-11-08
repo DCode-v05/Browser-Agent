@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Cua-driver backend (macOS, Windows, Linux): MCP over stdio to `cua-driver`. The async `mcp` SDK runs on a
 background loop (``cua_backend_session``); the same tool surface works on all three platforms, and per-host gaps
@@ -32,7 +31,6 @@ from bap_browser.computer.hermes.computer_use.cua_backend_parse import _action_r
 from bap_browser.computer.hermes.computer_use.cua_backend_session import _AsyncBridge, _CuaDriverSession
 
 logger = logging.getLogger(__name__)
-# cua-driver's anonymous PostHog telemetry gate ("0" disables; absent => ON upstream).
 _CUA_TELEMETRY_ENV_VAR = "CUA_DRIVER_RS_TELEMETRY_ENABLED"
 _CUA_NATIVE_WAYLAND_ENV_VAR = "CUA_DRIVER_RS_ENABLE_WAYLAND"
 
@@ -57,13 +55,6 @@ def _cua_no_overlay() -> bool:
         return bool(val) if val is not None else sys.platform == "darwin"
     wsl = is_wsl()
     return wsl or not os.environ.get("DISPLAY") or (
-        # Linux/X11: the cursor overlay is a fullscreen, always-on-top, all-workspaces X11 window
-        # (save-unders path). An unclean session end (agent interrupted mid-capture, stale target window)
-        # can leave it stuck above every app on every workspace, wedging desktop input until the app
-        # restarts — the same failure class as the HUD window on Mutter/X11 (#83473). There is no
-        # compositor-owned surface to tear down with the client connection, so default the overlay off on
-        # X11 too; set computer_use.no_overlay: false to keep the cursor. Wayland keeps it: the compositor
-        # owns the overlay surface lifecycle there.
         os.environ.get("XDG_SESSION_TYPE") != "wayland" and not os.environ.get("WAYLAND_DISPLAY"))
 
 
@@ -78,10 +69,6 @@ def _cua_configured_permission_mode() -> str:
     raw = str(_computer_use_cfg().get("permission_mode", "standard") or "").strip().lower()
     return "bounded" if raw == "bounded" else "standard"
 
-# ``computer_use.ax_max_elements``: bound on the DRIVER's accessibility-tree walk per capture. The
-# visible-element cap in tool.py (_DEFAULT_MAX_ELEMENTS) trims the RESPONSE only, so without this an
-# unbounded walk pays for nodes the model never sees; 0 disables the bound (driver default: 2,000
-# elements / depth 25).
 _DEFAULT_AX_MAX_ELEMENTS = 200
 
 def _cua_configured_ax_max_elements() -> int:
@@ -142,8 +129,6 @@ def cua_driver_child_env(base_env: Optional[dict[str, str]] = None) -> dict[str,
     the child has a Wayland display). Used by every spawn site (MCP, status, doctor, install) so CLI and gateway
     runtimes share one policy."""
     env = dict(os.environ if base_env is None else base_env)
-    # A running Bot Desktop for this profile owns the agent's screen: DISPLAY/XAUTHORITY/DBUS point there so
-    # cua-driver never acts on a seat the human is sitting at (#90374 class) and headless hosts get a display.
     from bap_browser.computer.hermes.bot_desktop.runtime import desktop_env as _bot_desktop_env
     env = _bot_desktop_env(env)
     if _cua_telemetry_disabled():
@@ -179,8 +164,6 @@ def sanitized_cua_driver_env() -> dict[str, str]:
     never inherit API keys. Falls back to the unsanitized telemetry env if the sanitizer can't import."""
     env = cua_driver_child_env()
     with contextlib.suppress(Exception):
-        # cua-driver is a third-party binary — never hand it provider API keys via inherited env (same
-        # policy as the manifest probe and MCP spawn; #53503/#55709/#58889 lineage).
         from bap_browser.computer.seams.process import sanitize_subprocess_env
         return sanitize_subprocess_env(env)
     return env
@@ -221,8 +204,6 @@ def _linux_session_locked() -> Optional[bool]:
     """Is the graphical session locked? (Linux; best-effort.) A locked KDE/GNOME session freezes renderers and
     half-disables the AX tree, so discovery legitimately returns nothing — which otherwise reads as a driver bug.
     True/False when loginctl answers, None when unavailable (non-Linux, no systemd-logind, probe failure)."""
-    # Auto-detect: macOS overlay can peg a core indefinitely after a computer_use session (#47032). Prefer
-    # off until the driver teardown is solid; set computer_use.no_overlay: false to keep the cursor.
     if sys.platform != "linux":
         return None
     try:
@@ -242,7 +223,7 @@ def _empty_discovery_reason() -> str:
                 "a locked compositor hides windows and freezes app renderers")
     if sys.platform == "linux" and not os.environ.get("DISPLAY"):
         return "no DISPLAY is set — X11/XWayland is not reachable from this process"
-    if sys.platform == "darwin":  # headless Mac / asleep panel: ScreenCaptureKit has 0 shareable displays while TCC looks fine
+    if sys.platform == "darwin":
         return ("window discovery returned no windows; on macOS this usually means no shareable display (headless Mac or "
                 "panel asleep) — wake the display or attach a monitor/HDMI dummy, then run `bap-browser computer doctor`")
     return "window discovery returned no windows; run `bap-browser computer doctor` (display reachability, AX capability)"
@@ -256,22 +237,13 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         self.permission_mode = permission_mode
         self._embedded_daemon: Optional[EmbeddedCuaDaemon] = None
         if permission_mode != "standard":
-            # Manifest: mandatory for bounded (the daemon validates it), optional for unrestricted where it still
-            # caps what an approval-bypassed run may touch.
             raw = _computer_use_cfg().get("capability_manifest")
-            # Resolve at daemon launch, after start() reconciles the PM pin.
             self._embedded_daemon = EmbeddedCuaDaemon(
                 "", permission_mode,
                 capability_manifest=raw.strip() if isinstance(raw, str) and raw.strip() else None)
         self._bridge = _AsyncBridge()
         self._session = _CuaDriverSession(self._bridge, self._embedded_daemon)
-        # Sticky target (set by capture()/focus_app(), used by actions): `_active_pid`, `_active_window_id`, `_last_app`,
-        # `_last_target` (exact identity for capture_after — Linux app names may be generic, e.g. several unrelated Qt
-        # windows all say Qt6Application), `_snapshot_tokens` (element_index -> element_token, attached to actions so
-        # cua-driver reports "stale" instead of silently re-resolving).
         self._clear_active_target()
-        # Public session label (one per Hermes run) sent as `session` on every call: owns the cursor color and
-        # gives config/recording state a stable owner across transport restarts. Part of the 0.20 runtime contract.
         self._session_id: str = f"hermes-{uuid.uuid4().hex[:12]}"
         self._session.set_transport_reset_callback(self._handle_transport_reset)
 
@@ -280,10 +252,6 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         self._clear_active_target()
 
     def start(self) -> None:
-        # Driver inside the terminal backend: the sandbox image pins its own cua-driver; the host
-        # binary (if any) is not the one that will run, so neither its acquisition nor its contract
-        # matters. On the host, runtime acquisition is on-demand, never the explicit install command
-        # (which may elevate for host setup and bypass the lazy-install gate).
         if sandbox_mcp_invocation() is not None:
             contract = {"ready": True}
         else:
@@ -296,46 +264,31 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
                                + ("Update the binary selected by BAP_BROWSER_CUA_DRIVER_CMD or remove that override."
                                   if os.environ.get(_CUA_DRIVER_CMD_ENV, "").strip() else "Run `bap-browser computer install` to repair it."))
 
-        # The MCP client SDK (`mcp`) is an optional dependency (the
-        # `computer-use` / `mcp` extras), not part of Hermes' minimal core.
-        # Lazy-install it on first use — the same pattern every other optional
-        # backend uses — so users never hit an opaque `No module named 'mcp'`
-        # at invoke time. Auto-install is gated by `security.allow_lazy_installs`
-        # (default on); when it's disabled or fails, ensure_import() raises
-        # InstallError explaining why PM could not enable the SDK,
-        # which surfaces via the backend-unavailable path in tool.py.
         from bap_browser.computer.seams.driver_package import ensure_import
         ensure_import("computer-use")
-        # A just-installed package may not be importable until the import
-        # machinery's caches are refreshed within this process.
         import importlib
         importlib.invalidate_caches()
-        with contextlib.ExitStack() as rollback:  # a failed start stops the private daemon, then re-raises
+        with contextlib.ExitStack() as rollback:
             if self._embedded_daemon is not None:
                 rollback.callback(self._embedded_daemon.stop) and self._embedded_daemon.start()
             self._session.start()
             rollback.pop_all()
-        # Declare this run's identity. Non-fatal: cua-driver accepts anonymous calls (cursor won't render), so degrade.
         self._best_effort("start_session failed (continuing anonymous)",
                           self._session.call_tool, "start_session", {"session": self._session_id})
-        # Post-handshake tuning guards on `_started`: before the handshake flips it, call_tool would re-enter
-        # session.start() (stubbed start() recurses).
         if self._session._started:
             max_dim = _computer_use_max_image_dimension()
-            if max_dim:  # smaller screenshots cost less over the daemon socket and per turn
+            if max_dim:
                 self._best_effort("set_config(max_image_dimension) failed",
                                   self.set_config, max_image_dimension=max_dim)
-            if _cua_no_overlay():  # belt-and-suspenders when --no-overlay is unsupported or ignored
+            if _cua_no_overlay():
                 self._best_effort("set_agent_cursor_enabled failed",
                                   self.set_agent_cursor_enabled, False, cursor_id=self._session_id)
 
     def stop(self) -> None:
-        # Best-effort end_session so the driver cleans per-session state (cursor overlay, recording ownership,
-        # config overrides); the connection drop below releases daemon-side state regardless.
         if self._session._started:
             self._best_effort("end_session failed (continuing teardown)",
                               self._session.call_tool, "end_session", {"session": self._session_id})
-        with contextlib.ExitStack() as teardown:  # every step runs even if one raised (LIFO: session, bridge, daemon)
+        with contextlib.ExitStack() as teardown:
             self._embedded_daemon is None or teardown.callback(self._embedded_daemon.stop)
             teardown.callback(self._bridge.stop)
             teardown.callback(self._session.stop)
@@ -349,22 +302,17 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
             logger.debug("cua-driver %s: %s", what, e)
 
     def is_available(self) -> bool:
-        return sys.platform in ("darwin", "win32", "linux") and cua_driver_binary_available()  # other Unix-likes untested E2E
+        return sys.platform in ("darwin", "win32", "linux") and cua_driver_binary_available()
 
     def _clear_active_target(self) -> None:
         """Forget a capture/focus target so a failed lookup cannot misroute input."""
         self._active_pid = self._active_window_id = self._last_app = self._last_target = None
-        # Surface 6 of NousResearch/hermes-agent#47072: per-snapshot `element_index -> element_token` map
-        # populated on capture(). Action tools (click/scroll/set_value/...) attach the matching token
-        # alongside `element_index` so cua-driver detects "stale" explicitly instead of silently
-        # re-resolving to a different element. Cleared whenever a fresh capture overwrites the snapshot
-        # context.
         self._snapshot_tokens: dict[int, str] = {}
 
     def _set_active_target(self, target: dict[str, Any]) -> None:
         self._active_pid = target["pid"]
         self._active_window_id = target["window_id"]
-        self._snapshot_tokens = {}  # prior snapshot's tokens: disarm before any capture so an exception can't pair them
+        self._snapshot_tokens = {}
         self._last_target = {"pid": self._active_pid, "window_id": self._active_window_id}
 
     def launch_app(self, *, bundle_id: Optional[str] = None, name: Optional[str] = None,
@@ -384,7 +332,6 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
     def bring_to_front(self, *, pid: int, window_id: Optional[int] = None) -> ActionResult:
         """Activate a window so subsequent foreground-dispatched input lands on it."""
         args: dict[str, Any] = {"pid": int(pid), **({} if window_id is None else {"window_id": int(window_id)})}
-        # Strict live schema with no session property: a standalone native focus op, not a session-scoped input action.
         return self._action("bring_to_front", args, inject_session=False)
 
     def set_agent_cursor_enabled(self, enabled: bool, *, cursor_id: Optional[str] = None) -> ActionResult:
@@ -404,18 +351,12 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         return self._session.call_tool(name, payload, timeout=timeout)
 
     def _action(self, name: str, args: dict[str, Any], *, inject_session: bool = True) -> ActionResult:
-        # Attach the snapshot's `element_token` to an `element_index` call so a superseded snapshot yields an explicit
-        # 'stale' error. Two ways to establish support, the live input schema first: cua-driver 0.21+ stopped
-        # publishing per-tool `capabilities[]` while still accepting `element_token` in its schema, and it REFUSES a
-        # bare `element_index` (`snapshot_id_required`) — gating on the capability alone broke EVERY element click and
-        # left only pixel clicks working. The capability check stays so older drivers that shipped the vocabulary keep
-        # working; drivers advertising neither (`additionalProperties: false`) must never see the property.
         idx = args.get("element_index")
         token = self._snapshot_tokens.get(idx) if isinstance(idx, int) else None
         if token and (self._session.supports_input_property(name, "element_token")
                       or self._session.supports_capability("accessibility.element_tokens", tool=name)):
             args["element_token"] = token
-        if inject_session:  # setdefault preserves any explicit session a caller already supplied
+        if inject_session:
             args.setdefault("session", self._session_id)
         try:
             out = self._session.call_tool(name, args)
@@ -426,7 +367,6 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         structured = out.get("structuredContent") or {}
         message = (str(data.get("message", "")) if isinstance(data, dict) else data if isinstance(data, str) else "") \
             or (str(structured.get("message", "")) if isinstance(structured, dict) else "")
-        # Merge data + structuredContent into meta, structured winning on overlap (canonical verdict surface).
         meta = {k: v for part in (data, structured) if isinstance(part, dict) for k, v in part.items()}
         return _action_result_from(name, not out["isError"], message, meta, structured,
                                    requested_delivery=args.get("delivery_mode"))

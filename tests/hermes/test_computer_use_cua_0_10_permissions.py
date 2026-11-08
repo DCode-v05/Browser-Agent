@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_cua_0_10_permissions.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Behavior contracts for cua-driver 0.10 permission-mode integration."""
 
@@ -54,7 +53,6 @@ def test_gateway_session_key_yolo_maps_to_unrestricted_mode():
     token = approval_context.set_current_session_key(gateway_key)
     try:
         approval.enable_session_yolo(gateway_key)
-        # Tool dispatch passes the (different) DB session id.
         assert computer_use._cua_permission_mode("db-sid-xyz") == "unrestricted"
         approval.disable_session_yolo(gateway_key)
         assert computer_use._cua_permission_mode("db-sid-xyz") == "standard"
@@ -155,10 +153,6 @@ def test_unrestricted_embedded_daemon_uses_private_socket_and_two_part_ack():
         "_resolve_mcp_invocation",
         return_value=("/opt/cua-driver", ["mcp"]),
     ), patch.object(
-        # This test pins the socket/ack contract, not overlay policy. Pin the
-        # policy off so the environment-dependent auto-detect (headless CI vs
-        # Wayland dev box) can't add a `--help` capability-probe subprocess.run
-        # call that the fixed two-entry side_effect below doesn't budget for.
         cua_backend, "_cua_no_overlay", return_value=False,
     ), patch.object(cua_backend.subprocess, "Popen", return_value=process) as popen, patch.object(
         cua_backend.subprocess, "run", side_effect=[status, stopped]
@@ -245,9 +239,6 @@ def test_retired_browser_grant_cannot_change_standard_runtime(tmp_path, monkeypa
 
     assert captured["command"] == "/opt/cua-driver"
     assert captured["args"] == ["mcp"]
-
-
-# ── the escalation is at least audible ──────────────────────────────────
 
 
 def test_bypass_escalation_is_warned_once_per_session(caplog):

@@ -19,7 +19,6 @@ from pathlib import Path
 import markdown
 
 HERE = Path(__file__).parent
-# The page's name above its contents list, whatever the name is.
 CONTENTS_OPEN = re.compile(r'<span class="name">[^<]*</span>\n')
 CONTENTS_CLOSE = "</nav>\n</details>\n<main>\n"
 TEXT_CLOSE = "</main>"
@@ -45,7 +44,6 @@ def main(source: Path, page: Path) -> None:
     written = CHIP.sub(_chip, written)
     written = written.replace("<li>[ ] ", '<li class="ck"><span class="box" aria-hidden="true"></span>')
     written = written.replace("<li>[x] ", '<li class="ck done"><span class="box" aria-hidden="true"></span>')
-    # A table whose heading row is empty has no heading row.
     written = re.sub(r"<thead>\s*<tr>\s*(?:<th></th>\s*)+</tr>\s*</thead>", "", written)
     header = (
         '<header class="doc-head">\n'
@@ -74,7 +72,6 @@ def _parts(text: str) -> tuple[str, list[str], str, str]:
     return title, meta, intro, "\n".join(lines[first_section:])
 
 
-# A table cell that begins by saying when a thing is built shows that as a chip.
 CHIP = re.compile(
     r"<td>(?:(Milestone (\d)|M(\d)|Next|Later|Not building)(?:[.,:]? +|(?=</td>))|(No)(?:[.,] +|(?=</td>)))"
 )

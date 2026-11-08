@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/schema.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Schema for the generic `computer_use` tool (model-facing; value is byte-frozen —
 the schema goes to the model every turn, so prompt-cache parity depends on it).
@@ -12,10 +11,6 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-# One consolidated tool with an `action` discriminator keeps the schema compact
-# and the per-turn token cost low. Property groups: capture (mode, app, pid,
-# window_id) / targeting (element, coordinate, button, modifiers) / drag / scroll /
-# set_value / type-key-wait / focus_app / delivery ladder / return shape.
 _PROPERTIES: dict[str, Any] = {
     "action": {
         "type": "string",

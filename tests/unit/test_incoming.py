@@ -7,8 +7,6 @@ import pytest
 from bap_browser.config_safeguards import Incoming
 from bap_browser.safeguards import incoming
 
-# -- without_invisible ------------------------------------------------------------------------
-
 
 def test_plain_ascii_text_is_returned_untouched_by_the_fast_path() -> None:
     text = "Hello, world! Line one.\nLine two.\tTabbed."
@@ -26,7 +24,6 @@ def test_200_000_ascii_characters_are_handled_in_well_under_50ms() -> None:
 
 
 def test_tag_characters_are_removed_and_counted() -> None:
-    # U+E0041 is a tag character (part of the tag block used to spell hidden ASCII).
     text = "abc\U000e0041def"
     assert incoming.without_invisible(text) == ("abcdef", 1)
 
@@ -37,12 +34,10 @@ def test_supplement_variation_selectors_are_removed_and_counted() -> None:
 
 
 def test_a_direction_override_is_removed_but_not_counted() -> None:
-    # U+202E RIGHT-TO-LEFT OVERRIDE.
     assert incoming.without_invisible("a\U0000202eb") == ("ab", 0)
 
 
 def test_the_soft_hyphen_is_removed() -> None:
-    # U+00AD SOFT HYPHEN.
     assert incoming.without_invisible("soft\U000000adhyphen") == ("softhyphen", 0)
 
 
@@ -53,14 +48,14 @@ def test_the_escape_character_is_removed() -> None:
 @pytest.mark.parametrize(
     "filler",
     [
-        "\U0000115f",  # HANGUL CHOSEONG FILLER
-        "\U00001160",  # HANGUL JUNGSEONG FILLER
-        "\U00003164",  # HANGUL FILLER
-        "\U0000ffa0",  # HALFWIDTH HANGUL FILLER
-        "\U00002800",  # BRAILLE PATTERN BLANK
-        "\U0000034f",  # COMBINING GRAPHEME JOINER
-        "\U000017b4",  # KHMER VOWEL INHERENT AQ
-        "\U000017b5",  # KHMER VOWEL INHERENT AA
+        "\U0000115f",
+        "\U00001160",
+        "\U00003164",
+        "\U0000ffa0",
+        "\U00002800",
+        "\U0000034f",
+        "\U000017b4",
+        "\U000017b5",
     ],
 )
 def test_fillers_that_draw_nothing_are_removed(filler: str) -> None:
@@ -70,13 +65,13 @@ def test_fillers_that_draw_nothing_are_removed(filler: str) -> None:
 @pytest.mark.parametrize(
     "kept",
     [
-        "\U00000600",  # ARABIC NUMBER SIGN
-        "\U00000601",  # ARABIC SIGN SANAH
-        "\U00000605",  # ARABIC NUMBER MARK ABOVE
-        "\U000006dd",  # ARABIC END OF AYAH
-        "\U0000070f",  # SYRIAC ABBREVIATION MARK
-        "\U000008e2",  # ARABIC DISPUTED END OF AYAH
-        "\U000110bd",  # KAITHI NUMBER SIGN
+        "\U00000600",
+        "\U00000601",
+        "\U00000605",
+        "\U000006dd",
+        "\U0000070f",
+        "\U000008e2",
+        "\U000110bd",
     ],
 )
 def test_format_characters_that_are_drawn_are_always_kept(kept: str) -> None:
@@ -89,7 +84,6 @@ def test_zwj_between_two_latin_letters_is_removed() -> None:
 
 
 def test_zwnj_between_devanagari_letters_is_kept() -> None:
-    # KA, ZWNJ, RA: the joiner is needed by the script and must survive.
     text = "\U00000915\U0000200c\U00000930"
     assert incoming.without_invisible(text) == (text, 0)
 
@@ -99,13 +93,11 @@ def test_zwnj_between_latin_letters_is_removed_even_though_it_is_kept_for_arabic
 
 
 def test_zwj_between_two_emoji_is_kept() -> None:
-    # MAN, ZWJ, WOMAN: a family sequence that must stay joined.
     text = "\U0001f468\U0000200d\U0001f469"
     assert incoming.without_invisible(text) == (text, 0)
 
 
 def test_zwj_right_after_a_variation_selector_on_an_emoji_is_kept() -> None:
-    # HEAVY BLACK HEART, VS16, ZWJ, FIRE: VS16 right before the joiner counts as emoji.
     text = "\U00002764\U0000fe0f\U0000200d\U0001f525"
     assert incoming.without_invisible(text) == (text, 0)
 
@@ -137,9 +129,6 @@ def test_ordinary_non_ascii_text_with_nothing_invisible_is_unchanged() -> None:
     assert incoming.without_invisible(text) == (text, 0)
 
 
-# -- carries_hidden_characters ------------------------------------------------------------------
-
-
 def test_a_tag_character_alone_carries_hidden_characters_however_high_the_threshold() -> None:
     assert incoming.carries_hidden_characters("x\U000e0041y", hidden_message_chars=100)
 
@@ -156,9 +145,6 @@ def test_enough_invisible_characters_in_all_carries_hidden_characters() -> None:
 
 def test_ordinary_text_does_not_carry_hidden_characters() -> None:
     assert not incoming.carries_hidden_characters("nothing hidden here", hidden_message_chars=1)
-
-
-# -- shown_address ----------------------------------------------------------------------------
 
 
 def _settings(**overrides: object) -> Incoming:
@@ -205,9 +191,6 @@ def test_shown_address_never_raises_on_garbage() -> None:
     assert incoming.shown_address("http://[::1", _settings()) == "http://[::1"
 
 
-# -- address_words ------------------------------------------------------------------------------
-
-
 def test_address_words_reads_the_fixed_separators_as_spaces() -> None:
     words = incoming.address_words("https://example.com/ignore-previous-instructions")
     assert words.split() == ["ignore", "previous", "instructions"]
@@ -223,9 +206,6 @@ def test_address_words_does_not_touch_the_scheme_or_the_host() -> None:
     assert "ignore" not in words
 
 
-# -- new_token --------------------------------------------------------------------------------
-
-
 def test_new_token_is_six_small_letters_and_digits() -> None:
     import re
 
@@ -236,9 +216,6 @@ def test_new_token_is_never_one_that_occurs_in_inside(monkeypatch: pytest.Monkey
     scripted = iter(list("aaaaaa") + list("bbbbbb"))
     monkeypatch.setattr(incoming.secrets, "choice", lambda alphabet: next(scripted))
     assert incoming.new_token("before aaaaaa after") == "bbbbbb"
-
-
-# -- marked -------------------------------------------------------------------------------------
 
 
 def test_marked_wraps_the_page_text_with_the_token_and_the_note() -> None:
@@ -286,9 +263,6 @@ def test_unseen_colon_is_defanged_only_at_the_start_of_a_line() -> None:
 def test_marked_reports_no_fake_engine_words_when_there_are_none() -> None:
     _, found = incoming.marked("Just ordinary text about tabs and events.", "qqqqqq")
     assert found is False
-
-
-# -- quoted_name --------------------------------------------------------------------------------
 
 
 def test_quoted_name_removes_its_own_double_quotes() -> None:

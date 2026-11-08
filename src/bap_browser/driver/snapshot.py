@@ -38,7 +38,6 @@ def snapshot_arguments(
 
 
 REF = re.compile(r"\[ref=([^\]]+)\]")
-# A whole page is searched, however long it is: only the lines that match come back.
 WHOLE_PAGE = 10**9
 
 
@@ -61,7 +60,6 @@ def matching_lines(page: str, query: str, limit: int) -> tuple[list[str], int]:
         ref = named.group(1) if named else None
         around = {level: held for level, held in around.items() if level < depth}
         around[depth] = ref
-        # The ref is not part of what the element says: e250 is no match for "250".
         low = REF.sub("", line, count=1).lower()
         score = sum(word in low for word in words)
         if not score:

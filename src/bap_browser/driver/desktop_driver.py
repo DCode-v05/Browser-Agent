@@ -40,12 +40,9 @@ from bap_browser.driver.contained_desktop import App, ContainedDesktop, Desktop
 from bap_browser.driver.screen_here import ScreenHere
 from bap_browser.errors import BadInput
 
-# The one thing a desktop has where a browser has tabs.
 SCREEN = "desktop"
 BUTTON_NUMBER: dict[MouseButton, str] = {"left": "1", "middle": "2", "right": "3"}
-# The wheel, as buttons: up, down, left, right.
 WHEEL_UP, WHEEL_DOWN, WHEEL_LEFT, WHEEL_RIGHT = "4", "5", "6", "7"
-# Key names as the rest of the code writes them (`bap_browser.keys`), as the desktop takes them.
 HELD = {
     "Control": "ctrl",
     "ControlOrMeta": "ctrl",
@@ -76,7 +73,6 @@ NAMED = {
     "Alt": "Alt_L",
     "Meta": "Super_L",
 }
-# The characters that are a key by a name of their own.
 SIGNS = {
     "+": "plus",
     "-": "minus",
@@ -140,7 +136,6 @@ class DesktopDriver:
         self._frames: asyncio.Task[None] | None = None
         self._last_shot: tuple[int, int] | None = None
 
-    # The session.
 
     async def start(self) -> None:
         await self.desktop.start()
@@ -174,7 +169,6 @@ class DesktopDriver:
     def guard_files(self, judge: FileGuard) -> None:
         """No file arrives from a site. What the desktop writes stays in its one shared folder."""
 
-    # What the driver of a real desktop gives: `driver/hermes_driver.py`.
 
     async def windows(self) -> list[str]:
         raise NotImplementedError
@@ -194,7 +188,6 @@ class DesktopDriver:
     def page_point(self, x: float, y: float) -> tuple[float, float]:
         return x, y
 
-    # What an agent does on a desktop goes through the tool `computer_use`, never through these.
 
     async def zoom(self, region: tuple[float, float, float, float]) -> Shot:
         self._no_page()
@@ -221,7 +214,6 @@ class DesktopDriver:
     async def drag(self, start: Place, end: Place) -> Dragged:
         self._no_page()
 
-    # The live picture.
 
     async def start_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         await self.stop_frames()
@@ -237,7 +229,6 @@ class DesktopDriver:
     async def _send_frames(self, on_frame: Callable[[bytes], None], level: QualityLevel) -> None:
         raise NotImplementedError
 
-    # What a person does with the mouse and the keyboard while they are in control.
 
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None:
         line = f"mousemove {int(x)} {int(y)}"
@@ -257,7 +248,6 @@ class DesktopDriver:
         if moved:
             await self.desktop.send(f"mousemove {int(x)} {int(y)} click {button}")
 
-    # What only a page has.
 
     def _no_page(self) -> NoReturn:
         raise BadInput(NO_PAGE, reason="a desktop has no page")
@@ -343,7 +333,6 @@ class DesktopDriver:
         return None
 
     async def dialog_opened(self) -> None:
-        # No page opens a dialog here: whoever waits for one waits until they stop waiting.
         await asyncio.Event().wait()
 
     async def answer_dialog(self, accept: bool, text: str | None) -> PageDialog:

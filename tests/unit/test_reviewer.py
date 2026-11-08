@@ -21,7 +21,6 @@ from bap_browser.safeguards.reviewer import (
 
 SPEC = Path(__file__).parents[2] / "docs" / "bap-browser-spec.md"
 
-# The table of 18.4, row by row: the risk, then what each answer to "asked for" leads to.
 TABLE = {
     "low": {"exactly": "run", "in_substance": "run", "loosely": "run", "no": "run"},
     "medium": {"exactly": "run", "in_substance": "run", "loosely": "ask", "no": "ask"},
@@ -45,7 +44,6 @@ def test_the_table_turns_a_rating_into_what_happens(risk: str, asked_for: str) -
 def test_on_a_flagged_page_a_step_nobody_asked_for_is_treated_one_step_harder() -> None:
     assert ruling(verdict("low", "no"), held_high=False, page_flagged=True) == "ask"
     assert ruling(verdict("medium", "no"), held_high=False, page_flagged=True) == "refuse"
-    # What was asked for is not made harder by the page it is on.
     assert ruling(verdict("low", "loosely"), held_high=False, page_flagged=True) == "run"
     assert ruling(verdict("medium", "exactly"), held_high=False, page_flagged=True) == "run"
 
@@ -56,9 +54,7 @@ def test_a_step_of_a_kind_no_model_may_let_run_is_never_run_whatever_the_model_s
     risk: str, asked_for: str
 ) -> None:
     expected = "ask" if asked_for in ("exactly", "in_substance") else "refuse"
-    # The fixed rules found that the step pays, sends, deletes, grants or carries text across sites.
     assert ruling(verdict(risk, asked_for), held_high=True, page_flagged=False) == expected
-    # Or the model itself named such a category, and gave it a low risk.
     for category in HELD_HIGH:
         assert ruling(verdict(risk, asked_for, category), held_high=False, page_flagged=False) == expected
 

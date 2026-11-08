@@ -24,7 +24,6 @@ def a_config(tmp_path: Path, runs: str, **base: object) -> Config:
 def test_every_desktop_is_driven_through_hermes_driver(runs: str, tmp_path: Path) -> None:
     config = a_config(tmp_path, runs)
 
-    # The driver, the tools offered and what the model is told are the same wherever the desktop is.
     assert isinstance(desktop_driver_for(config), HermesDriver)
     assert "computer_use" in [tool.name for tool in computer_tools_for(config)]
     assert "computer_use" in instructions_for(config)

@@ -19,8 +19,6 @@ SHOTS = ROOT / ".bap-browser" / "viewer-shots"
 
 SIZES = {"desktop": (1360, 850), "phone": (400, 820)}
 
-# The controls on a page that do not say what they do. A control says it with a line under its name,
-# a line for the group it is in, or a hint when the pointer rests on it.
 SILENT_CONTROLS = """
 () => {
   const says = (e) => {

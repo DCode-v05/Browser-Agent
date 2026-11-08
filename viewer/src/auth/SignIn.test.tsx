@@ -28,13 +28,11 @@ describe('the two sign-in pages (spec 4.11)', () => {
     expect(screen.getByRole('heading', { name: S.title.user })).toBeInTheDocument();
     expect(screen.getByText(S.role.user)).toBeInTheDocument();
     const box = screen.getByLabelText(S.password);
-    // What is typed is not shown, and the page starts where the person types.
     expect(box).toHaveAttribute('type', 'password');
     expect(box).toHaveFocus();
     await user.type(box, 'what users sign in with{Enter}');
     expect(api.signIn).toHaveBeenCalledWith('user', 'what users sign in with');
     expect(onSignedIn).toHaveBeenCalledWith('a-visit');
-    // The other page is one press away.
     expect(screen.getByRole('link', { name: S.other.user })).toHaveAttribute('href', '/admin');
   });
 
@@ -92,7 +90,6 @@ describe('the first time: the admin’s password is made (spec 4.11)', () => {
     await user.type(screen.getByLabelText(S.newPassword), 'the admin’s own words');
     await user.type(screen.getByLabelText(S.again), 'the admin’s own word');
     await user.click(screen.getByRole('button', { name: S.createButton }));
-    // Typed twice, and not the same: nothing is made of it.
     expect(await screen.findByRole('alert')).toHaveTextContent(S.notTheSame);
     expect(api.setPassword).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText(S.again), 's');
@@ -132,10 +129,8 @@ describe('what a sign-in page asks the service', () => {
   it('asks whether there is a password yet, and who its own token speaks for', async () => {
     const fetched = answering({ status: 200, body: BOTH_SET }, { status: 200, body: { accounts: false } }, { status: 404 }, { status: 500 });
     expect(await authFrom(PAGE).state('a-token')).toEqual(BOTH_SET);
-    // The admin's page is one step below the service's own address: the API is beside it, not under it.
     expect(fetched.mock.calls[0][0]).toBe('http://127.0.0.1:8765/api/auth');
     expect(fetched.mock.calls[0][1]).toMatchObject({ headers: { Authorization: 'Bearer a-token' } });
-    // A service nobody signs in to says so, and one that fails is not taken for one.
     expect(await authFrom(PAGE).state(null)).toBe('no_accounts');
     expect(await authFrom(PAGE).state(null)).toBe('no_accounts');
     expect(await authFrom(PAGE).state(null)).toBeNull();

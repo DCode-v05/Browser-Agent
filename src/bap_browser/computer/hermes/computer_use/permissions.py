@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/permissions.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Cross-platform Computer Use readiness + macOS permission helpers. "Ready to drive" differs per platform: macOS
 needs explicit TCC grants (Accessibility + Screen Recording) via cua-driver ``permissions status`` / ``permissions
@@ -18,10 +17,10 @@ from typing import Any, Dict, Optional
 
 from bap_browser.computer.seams.process import windows_hide_flags
 
-_RUNTIME_PLATFORMS = frozenset({"darwin", "win32", "linux"})  # mirrors the toolset platform_gate
+_RUNTIME_PLATFORMS = frozenset({"darwin", "win32", "linux"})
 _BOOLS = ("accessibility", "screen_recording", "screen_recording_capturable")
-CUA_DRIVER_BUNDLE_ID = "com.trycua.driver"  # the only identity TCC rows and the private daemon are keyed to
-_TCC_SERVICES = {"accessibility": "Accessibility", "screen_recording": "ScreenCapture"}  # status field -> tccutil service
+CUA_DRIVER_BUNDLE_ID = "com.trycua.driver"
+_TCC_SERVICES = {"accessibility": "Accessibility", "screen_recording": "ScreenCapture"}
 TCC_FIELDS = tuple(_TCC_SERVICES)
 
 def stale_tcc_grant_hint(*missing: str) -> str:
@@ -76,7 +75,7 @@ def _mac_permissions(binary: str, out: dict[str, Any]) -> None:
         data = _json_out(binary, "permissions", "status", "--json", timeout=10)
     except subprocess.TimeoutExpired:
         out["error"] = "cua-driver permissions status timed out"
-    except Exception as exc:  # spawn failure or malformed JSON
+    except Exception as exc:
         out["error"] = f"cua-driver permissions status failed: {exc}"
     else:
         if isinstance(data, dict):
@@ -89,13 +88,13 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> dict[str, Any]:
     UI keys off: macOS = both TCC grants, elsewhere = driver health (no TCC model); ``None`` = unknown (binary missing /
     probe failed). ``can_grant`` is macOS-only."""
     from bap_browser.computer.seams.provider import DEFAULT_BACKEND, configured_backend_name, get_active_provider
-    from bap_browser.computer.hermes.computer_use.cua_backend_driver import resolve_cua_driver_cmd  # same resolver as the tool itself
+    from bap_browser.computer.hermes.computer_use.cua_backend_driver import resolve_cua_driver_cmd
     plat, name = sys.platform, configured_backend_name()
     binary = resolve_cua_driver_cmd(driver_cmd) if name == DEFAULT_BACKEND else None
     out: dict[str, Any] = {"platform": plat, "platform_supported": plat in _RUNTIME_PLATFORMS,
                            "installed": bool(binary), "version": None, "ready": None, "can_grant": plat == "darwin",
                            "checks": [], "source": None, "error": None, **{k: None for k in _BOOLS}}
-    if name != DEFAULT_BACKEND:  # another driver is selected: cua-driver probes and TCC grants do not apply
+    if name != DEFAULT_BACKEND:
         out.update(platform_supported=True, can_grant=False)
         try:
             provider = get_active_provider()
@@ -117,7 +116,7 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> dict[str, Any]:
         if out["error"] is None:
             out["ready"] = out["accessibility"] is True and out["screen_recording"] is True
     elif doctor is not None:
-        out["ready"] = doctor["ok"]  # no TCC model off macOS
+        out["ready"] = doctor["ok"]
     return out
 
 def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:

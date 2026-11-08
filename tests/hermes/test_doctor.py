@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/computer_use/test_doctor.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Tests for ``bap_browser.computer.hermes.computer_use.doctor``.
 
@@ -28,9 +27,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-
-# ── helpers ────────────────────────────────────────────────────────────────
 
 
 def _pm_driver(binary: str):
@@ -103,9 +99,6 @@ def _default_cli_version_matches_report(monkeypatch):
     )
 
 
-# ── exit codes ─────────────────────────────────────────────────────────────
-
-
 class TestDoctorExitCodes:
     def test_ok_exits_0(self):
         from bap_browser.computer.hermes.computer_use import doctor
@@ -170,7 +163,7 @@ class TestDoctorExitCodes:
         proc = MagicMock()
         proc.stdin = MagicMock()
         proc.stdout = MagicMock()
-        proc.stdout.readline = MagicMock(return_value="")  # EOF on initialize
+        proc.stdout.readline = MagicMock(return_value="")
         proc.stderr = MagicMock()
         proc.stderr.read = MagicMock(return_value="boom\n")
         proc.wait = MagicMock(return_value=0)
@@ -180,12 +173,8 @@ class TestDoctorExitCodes:
              patch("subprocess.Popen", return_value=proc):
             code = doctor.run_doctor()
         assert code == 2
-        # stderr should mention the failure
         captured = capsys.readouterr()
         assert "cua-driver" in captured.err.lower() or "health_report" in captured.err.lower()
-
-
-# ── response-shape parsing ─────────────────────────────────────────────────
 
 
 class TestResponseShapeParsing:
@@ -205,9 +194,6 @@ class TestResponseShapeParsing:
         assert "method not found" in capsys.readouterr().err
 
 
-# ── args / arg passthrough ─────────────────────────────────────────────────
-
-
 class TestArgPassthrough:
     def test_include_passed_through_to_tools_call(self):
         from bap_browser.computer.hermes.computer_use import doctor
@@ -221,15 +207,11 @@ class TestArgPassthrough:
              patch("sys.stdout", new_callable=StringIO):
             doctor.run_doctor(include=["binary_version", "tcc_accessibility"])
 
-        # Inspect the second write to stdin — the tools/call payload.
         writes = [call.args[0] for call in proc.stdin.write.call_args_list]
         call_payload = next(json.loads(w) for w in writes if "tools/call" in w)
         assert call_payload["params"]["arguments"]["include"] == [
             "binary_version", "tcc_accessibility",
         ]
-
-
-# ── json output ────────────────────────────────────────────────────────────
 
 
 class TestJsonOutput:
@@ -244,17 +226,12 @@ class TestJsonOutput:
              patch("subprocess.Popen", return_value=proc), \
              patch("sys.stdout", new_callable=StringIO) as out:
             doctor.run_doctor(json_output=True)
-        # Verify the captured text round-trips through json.loads. Upstream
-        # health_report keys are preserved; Hermes adds hermes_identity.
         parsed = json.loads(out.getvalue())
         report = _ok_report()
         for key, value in report.items():
             assert parsed[key] == value
         assert "hermes_identity" in parsed
         assert parsed["hermes_identity"]["resolved_binary"]
-
-
-# ── BAP_BROWSER_CUA_DRIVER_CMD resolution ───────────────────────────────────────
 
 
 class TestDriverCmdResolution:
@@ -292,9 +269,6 @@ class TestDriverCmdResolution:
         monkeypatch.setenv("PATH", str(self._executable(tmp_path / "bin" / "cua-driver").parent))
 
         assert self._inspected_binary() == Path("/pm/store/cua-driver")
-
-
-# ── cua-driver 0.10 unclassified health_report fallback ────────────────────
 
 
 def _unclassified_health_result() -> dict:
@@ -353,9 +327,6 @@ class TestHealthReportFallback:
         assert "Permission denied" in str(ei.value) or "unclassified" in str(ei.value).lower() or "risk" in str(ei.value).lower()
 
 
-# ── binary identity (CLI --version vs health_report) ───────────────────────
-
-
 class TestDoctorVersionIdentity:
     def test_header_prefers_cli_version_on_mismatch(self):
         """Windows has been observed reporting 0.8.3 via health_report while
@@ -366,7 +337,6 @@ class TestDoctorVersionIdentity:
             {"jsonrpc": "2.0", "id": 1, "result": {}},
             {"jsonrpc": "2.0", "id": 2, "result": {"structuredContent": _ok_report()}},
         )
-        # _ok_report claims 0.5.8; CLI says 0.12.6
         with _pm_driver("/fake/cua-driver"), \
              patch("subprocess.Popen", return_value=proc), \
              patch.object(doctor, "_read_cli_version", return_value="cua-driver 0.12.6"), \
@@ -376,7 +346,7 @@ class TestDoctorVersionIdentity:
         text = out.getvalue()
         assert "0.12.6" in text
         assert "version mismatch" in text.lower()
-        assert "0.5.8" in text  # health_report value still shown
+        assert "0.5.8" in text
 
 
     def test_matching_versions_no_mismatch_flag(self):

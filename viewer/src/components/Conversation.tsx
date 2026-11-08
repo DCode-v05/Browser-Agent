@@ -1,7 +1,3 @@
-// The viewer as one conversation, for when the browser itself is on the person's screen and this
-// page sits beside it: in a window of its own, or in the extension's side panel (spec 9.14, 9.15).
-// What the person asked, the steps the agent took, what it answered; one box to write in under it.
-
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 
 import type { ClientCommand } from '../protocol';
@@ -20,15 +16,10 @@ import { useWords } from '../words';
 interface Props {
   state: ViewerState;
   view: StateView;
-  /** The longest task the service takes. */
   maxChars: number;
-  /** Shown inside another app's page, which has its own name: the chat drops the product's. */
   embedded?: boolean;
-  /** The step whose evidence is open. */
   selected: number | null;
-  /** The cards that need a person: an approval, a request for help, a blocked page, the summary. */
   cards: ReactNode;
-  /** The step's evidence, when one is open. It covers the conversation. */
   drawer: ReactNode;
   onCommand(command: ClientCommand): void;
   onOpenStep(step: number): void;
@@ -38,7 +29,6 @@ interface Props {
   titleRef?: Ref<HTMLHeadingElement>;
   settingsRef?: Ref<HTMLButtonElement>;
   stopRef?: Ref<HTMLButtonElement>;
-  /** Which machine the engine is on and which it controls, where the chat is of a real machine's desktop. */
   where?: ReactNode;
 }
 
@@ -68,7 +58,6 @@ function StepRows({ steps, selected, onOpen }: { steps: Step[]; selected: number
 export function Conversation({ state, view, maxChars, embedded = false, selected, cards, drawer, onCommand, onOpenStep, onHandBack, onStopSession, onOpenSettings, titleRef, settingsRef, stopRef, where }: Props) {
   const L = useWords();
   const [draft, setDraft] = useState('');
-  /** The groups of steps a person opened or closed by hand. The rest follow the work. */
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
   const end = useRef<HTMLDivElement>(null);
 
@@ -77,13 +66,10 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
   const lastSteps = items.findLast((item) => item.kind === 'steps')?.key;
   const open = state.connection === 'connected' && !state.ended;
   const onATask = state.chat.working && open;
-  // The steps of the work under way are shown; those of work that is over fold away.
   const isShown = (key: string) => toggled[key] ?? (key === lastSteps && onATask);
-  // A step that is running says what the agent is doing. Between steps it is thinking.
   const newest = items.at(-1);
   const runningInSight = newest?.kind === 'steps' && isShown(newest.key) && newest.steps.at(-1)?.status === 'running';
 
-  // The newest thing is at the bottom, and it is kept in sight.
   const tail = `${items.length}:${state.steps.length}:${state.steps.at(-1)?.status}:${onATask}`;
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: 'nearest' });
@@ -97,7 +83,6 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
     setDraft('');
   };
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends; Shift+Enter starts a new line. While text is being composed, Enter belongs to that.
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     send();
@@ -142,7 +127,6 @@ export function Conversation({ state, view, maxChars, embedded = false, selected
           </Button>
         );
       case 'stop':
-        // Ending the whole session is in the head of the page, apart from the rest.
         return null;
     }
   };

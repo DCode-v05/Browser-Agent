@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_display_count_guard.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """macOS ScreenCaptureKit display_count=0 diagnosability.
 
@@ -42,7 +41,6 @@ def test_positive_display_count_untouched():
 
 def test_already_failed_check_not_rewritten():
     out = _apply_display_count_guard(_report(status="fail", count=0, overall="degraded"))
-    # Guard only flips pass->fail; an existing failure keeps its message.
     assert out["checks"][0]["message"] == "ScreenCaptureKit reachable"
 
 
@@ -57,6 +55,5 @@ def test_missing_data_and_other_checks_ignored():
 
 def test_overall_failed_not_upgraded():
     out = _apply_display_count_guard(_report(count=0, overall="failed"))
-    # fail-worse states are never softened to degraded.
     assert out["overall"] == "failed"
     assert out["checks"][0]["status"] == "fail"

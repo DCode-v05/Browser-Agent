@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_browser_fence.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """The bot's browser tools obey the screen lease: while a human holds the shared browser, nothing is
 dispatched, and a command whose run crossed a takeover loses its result."""
@@ -107,7 +106,7 @@ def test_browser_result_crossing_a_takeover_is_discarded(monkeypatch):
 
     def spawn_then_takeover(*args):
         lease.acquire("human-viewer")
-        lease.release("human-viewer")  # a full cycle, control is back — the frame is still theirs
+        lease.release("human-viewer")
         return {"success": True, "data": {"secret": "WHAT-THE-HUMAN-TYPED"}}
 
     monkeypatch.setattr(session, "_spawn_and_collect", spawn_then_takeover)
@@ -201,8 +200,8 @@ def test_secret_write_re_admits_after_a_takeover_during_the_code_prompt(monkeypa
             return {"ok": True, "result": "{}"}
 
     monkeypatch.setattr(vault, "_ensure_supervisor", lambda tid: Sup())
-    assert vault._eval_js_secret("default", "fill()")["success"] is True  # agent holds: writes
-    lease.acquire("human")  # takeover while the prompt was open
+    assert vault._eval_js_secret("default", "fill()")["success"] is True
+    lease.acquire("human")
     res = vault._eval_js_secret("default", "fill()")
     assert res["success"] is False and res["error_type"] == "human_has_control"
     assert evaluated == ["fill()"], "the credential must not reach the page under a human lease"

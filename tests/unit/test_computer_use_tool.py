@@ -175,7 +175,6 @@ def test_the_timeline_says_what_was_done_on_the_machine_and_never_what_was_typed
     assert summary_for("computer_use", {"action": "key", "keys": "cmd+s"}, None, None) == "Pressed cmd+s"
     assert summary_for("computer_use", {"action": "key", "keys": "x"}, None, None) == "Pressed a key"
     assert summary_for("computer_use", {"action": "set_value", "value": "Blue"}, None, None) == "Set a value"
-    # The log keeps the length of what is typed or set, never the text.
     assert masked({"action": "type", "text": "my secret"}, lambda text: text) == {
         "action": "type",
         "text": "<9 characters>",
@@ -221,7 +220,6 @@ async def test_a_deployment_that_denies_the_tool_runs_none_of_it(make_config, tm
         await session.close()
 
     assert seen.is_error
-    # The viewer may look at the whole screen. The agent's own capture, of a window, did not run.
     assert [how for how in did(desk, "capture") if how["mode"] == "ax"] == []
 
 
@@ -257,7 +255,6 @@ def test_the_model_is_given_this_engines_rules_and_then_hermes_own_manual(
     ours, theirs = told.index("computer_request_human"), told.index("The verify → escalate ladder")
     assert ours < theirs
     assert "Capture first" in told
-    # The manual's own heading for a skill of Hermes is not an instruction to this model.
     assert not told.lstrip().startswith("---")
 
 
@@ -270,7 +267,6 @@ def test_where_any_app_is_allowed_the_model_is_told_it_may_open_any_and_how_to_r
     assert "opens any app on this computer by its name" in told
     assert "address bar" in told and "browser" in told
     assert "an app the person allowed" not in told
-    # A password, a sign-in or a payment is still the person's to do.
     assert "computer_request_human" in told
 
 
@@ -322,7 +318,6 @@ class Screen(Desk):
     def capture(
         self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
     ) -> CaptureResult:
-        # A real PNG's first bytes and size, then what the test says is on the screen.
         png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (64).to_bytes(4, "big") * 2 + self.showing
         return CaptureResult(
             mode=mode, width=64, height=64, png_b64=base64.b64encode(png).decode(), app="screen"
@@ -349,7 +344,6 @@ async def test_a_screen_that_stands_still_is_shown_once_and_again_when_it_change
     try:
         await driver.start_frames(shown, config.viewer.quality_levels.standard)
         await asyncio.wait_for(first.wait(), 10)
-        # Long enough for many more looks at a screen that does not change.
         for _ in range(20):
             await asyncio.sleep(0.01)
         still = len(frames)
@@ -400,7 +394,6 @@ async def test_the_page_of_an_app_is_named_before_its_menus(make_config, tmp_pat
 
     assert "#200 text" in seen and "#201 push button 'Close'" in seen
     assert seen.index("#200 text") < seen.index("menu item")
-    # The menus are still counted, and how to see them is said.
     assert "200 menu items" in seen
 
 
@@ -497,7 +490,6 @@ class NothingOpen(Desk):
         self, mode: str = "som", app: str | None = None, pid: int | None = None, window_id: int | None = None
     ) -> CaptureResult:
         if app == "screen":
-            # The person's own look at the whole screen, which needs no window.
             return super().capture(mode, app, pid, window_id)
         raise RuntimeError(
             "window discovery returned no windows; on macOS this usually means no shareable display "
@@ -524,7 +516,6 @@ async def test_a_desktop_with_no_window_says_so_in_words_a_model_can_act_on(
 
     assert seen.is_error
     assert "No window is open" in seen.text and "computer_open_app" in seen.text
-    # The engine's own system, and a command for a person, are nothing a model can use.
     assert "macOS" not in seen.text and "doctor" not in seen.text
 
 
@@ -631,9 +622,7 @@ async def test_where_nobody_sits_a_click_by_number_is_a_click_of_the_pointer_at_
         await session.close()
 
     assert not clicked.is_error and "pointer pressed element 1" in clicked.text
-    # The middle of each, on the screen: 310 + 40, 210 + 12; then 310 + 310, 250 + 100, twice.
     assert own.sent == ["mousemove 350 222 click --repeat 1 1", "mousemove 620 350 click --repeat 2 1"]
-    # The accessibility bus pressed nothing. What the second press changed was looked at after it.
     assert did(desk, "click") == []
     assert (
         "#1 push button 'Save'" in twice.text
@@ -652,7 +641,6 @@ async def test_an_app_that_does_not_say_where_its_elements_are_is_pressed_the_dr
     finally:
         await session.close()
 
-    # A corner two elements share is nobody's place: the pointer is not sent anywhere on a guess.
     assert not clicked.is_error and own.sent == []
     assert [how.get("element") for how in did(desk, "click")] == [1]
 
@@ -717,10 +705,7 @@ async def test_a_driver_that_stops_answering_on_the_engines_own_desktop_is_start
         await session.close()
 
     assert seen.is_error and "The desktop stopped answering" in seen.text
-    # The model is told what it can do next, not the driver's own words about a session.
     assert "MCP" not in seen.text and "Capture again" in seen.text
-    # The driver is ended, and the program it pictures a window with, which can hold the screen.
-    # The desktop's apps are left as they are.
     assert [command[-1] for command in own.ran] == ["import", "cua-driver"]
 
 
@@ -757,7 +742,6 @@ async def test_on_a_persons_machine_a_lost_driver_session_is_begun_afresh_and_no
     failed: list[str] = []
 
     def a_backend() -> WithAMenu:
-        # The driver's sessions begun before the loss are gone; one begun after it answers.
         return WithAMenu() if failed else Gone(said, failed)
 
     session = ServiceSession(
@@ -795,7 +779,6 @@ async def captured(make_config, tmp_path: Path, asked: dict[str, Any], **base: A
     finally:
         await session.close()
     assert not result.is_error, result.text
-    # The person's live picture is a capture of the whole screen, and is not the agent's.
     return next(how for how in reversed(did(machine, "capture")) if how["app"] != "screen")
 
 
@@ -911,7 +894,6 @@ async def test_a_task_on_a_desktop_is_given_with_what_is_open_so_that_it_carries
     )
     await session.start()
     try:
-        # A desktop with nothing open adds nothing.
         assert await as_it_begins("Open Chrome", session) == "Open Chrome"
         desk.opened.append("Google Chrome")
         assert await as_it_begins("search for the weather", session) == (
@@ -993,10 +975,8 @@ async def test_where_nobody_sits_plain_text_is_typed_with_the_desktops_own_keybo
 
     assert not typed.is_error and "keyboard typed" in typed.text
     assert "new ~/a.txt" not in typed.text
-    # The text goes to the keyboard's program as its input, never as a word of its command.
     assert own.given == [b"new ~/a.txt"]
     assert all("new" not in word for command in own.ran for word in command)
-    # Letters this keyboard does not have are typed the driver's own way.
     assert not other.is_error and [how.get("text") for how in did(desk, "type")] == ["caf\u00e9"]
 
 

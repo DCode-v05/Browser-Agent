@@ -100,7 +100,6 @@ class ScriptedModel:
         if not self._steps:
             return Reply(NO_MORE_STEPS)
         if self._pause_s:
-            # A person watching a demonstration needs time to see each step.
             await asyncio.sleep(self._pause_s)
         return self._steps.pop(0)(last_page(messages))
 

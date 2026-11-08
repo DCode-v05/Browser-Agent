@@ -63,7 +63,6 @@ async def test_the_person_takes_over_does_the_step_and_says_done(make_config, tm
         ]
         await session.handle({"type": "take_over"})
         assert session.control == "person"
-        # The browser is the person's while they work: what they do reaches the page.
         await session.handle({"type": "pointer", "action": "down", "x": 40, "y": 30, "button": 0})
         assert ("pointer", ("down", 40, 30, "left")) in driver.calls
         driver.url = "https://example.com/account"
@@ -78,7 +77,6 @@ async def test_the_person_takes_over_does_the_step_and_says_done(make_config, tm
         )
         assert session.control == "agent"
         assert events(session, "help_closed") == [{"type": "help_closed", "id": "h1", "outcome": "done"}]
-        # The button the person still held was let go for them.
         assert ("pointer", ("up", 40, 30, "left")) in driver.calls
     finally:
         await session.close()
@@ -106,7 +104,6 @@ async def test_with_no_answer_in_time_the_agent_goes_on(make_config, tmp_path: P
         assert result.text.startswith("timed_out: nobody answered in time.")
         assert session.control == "agent"
         assert events(session, "help_closed")[0]["outcome"] == "timed_out"
-        # A late answer changes nothing.
         await session.handle({"type": "done"})
         assert session.control == "agent"
     finally:

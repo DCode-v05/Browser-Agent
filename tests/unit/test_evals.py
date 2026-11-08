@@ -22,7 +22,6 @@ from bap_browser.results import ToolResult
 from bap_browser.tools import ToolDefinition
 
 MakeConfig = Callable[..., Config]
-# A reply of a model that goes on to call a tool, and says what it used.
 A_REPLY = Reply("", (ToolCall("c", "x", {}),), Usage(1000, 50))
 PRICED = {"model": "model-a", "input_price_per_million": 2.0, "output_price_per_million": 10.0}
 
@@ -41,7 +40,6 @@ class Tools:
         self.called.append(name)
         await asyncio.sleep(0.02)
         if name == "browser_upload_file":
-            # A person took a while to allow it.
             self._waits(0.015)
         return ToolResult(f"did {name}", is_error=name == "browser_click")
 
@@ -109,11 +107,8 @@ async def test_a_task_is_kept_with_its_time_its_steps_its_tokens_and_its_trace(
     )
     assert (done["steps"], done["steps_failed"], done["model_calls"]) == (2, 1, 2)
     assert done["tokens_known"] is True and (done["input_tokens"], done["output_tokens"]) == (2000, 100)
-    # 2,000 tokens in at 2 dollars a million, 100 out at 10.
     assert done["cost_usd"] == pytest.approx(0.005)
-    # Each time is kept to a tenth of a millisecond, so the parts may add up a hair over the whole.
     assert done["duration_ms"] + 1 >= done["model_ms"] + done["tool_ms"] > 0
-    # The trace: every reply of the model and every step, in the order they happened.
     assert [(span["kind"], span["name"], span["ok"]) for span in done["spans"]] == [
         ("model", "model-a", True),
         ("tool", "browser_navigate", True),
@@ -135,13 +130,10 @@ async def test_what_a_person_typed_never_reaches_the_record(make_config: MakeCon
         make_config, tmp_path, evals={"max_task_chars": 20, "dir": str(tmp_path / "e")}
     )
     done = await a_task(recorder, config)
-    # The task's own words are kept cut short, and with what the deployment hides taken out.
     assert done["task"] == "Find the cheapest fa" and done["answer"] == "The cheapest fare to"
     assert "Lisbon" not in (recorder.folder / "tasks.jsonl").read_text(encoding="utf-8")
-    # Where the log is turned off for a browser, the words are not kept at all: only the numbers.
     silent = await a_task(recorder, config, keep_words=False)
     assert (silent["task"], silent["answer"]) == ("", "") and silent["steps"] == 2
-    # A step is kept by its tool's name, its time and whether it worked. Never by what it was given.
     assert set(done["spans"][1]) == {
         "kind",
         "name",
@@ -173,7 +165,6 @@ async def test_a_model_that_does_not_say_its_tokens_has_no_cost(
     assert failed["outcome"] == "failed" and failed["spans"] == [
         {**failed["spans"][0], "kind": "model", "ok": False}
     ]
-    # With no price given, tokens are counted and no cost is made up.
     unpriced, plain = recorder_in(make_config, tmp_path, agent={"model": "model-a"})
     assert (await a_task(plain, unpriced))["cost_usd"] is None
     assert cost_of(1_000_000, 0, config.agent) == 2.0 and cost_of(5, 5, unpriced.agent) is None
@@ -221,16 +212,13 @@ async def test_the_records_add_up_to_latency_time_cost_and_how_tasks_ended(
 
     latency = told["latency"]
     assert latency["tool"]["count"] == 6 and latency["model"]["count"] == 7
-    # How fast the machine is does not matter here: only that the three are in their order.
     assert 15 <= latency["tool"]["p50_ms"] <= latency["tool"]["p95_ms"] <= latency["tool"]["max_ms"]
-    # The tool most used comes first, each with how often it failed.
     assert [(row["tool"], row["count"], row["failed"]) for row in latency["by_tool"]] == [
         ("browser_navigate", 3, 0),
         ("browser_click", 1, 1),
         ("browser_upload_file", 1, 0),
         ("browser_snapshot", 1, 0),
     ]
-    # What a step waited for a person is taken out of that step's time.
     upload = next(row for row in latency["by_tool"] if row["tool"] == "browser_upload_file")
     waited = next(span for span in last["spans"] if span["name"] == "browser_upload_file")
     assert waited["waited_ms"] == pytest.approx(15, abs=1)
@@ -245,7 +233,6 @@ async def test_the_records_add_up_to_latency_time_cost_and_how_tasks_ended(
     assert (cost["tasks_counted"], cost["input_tokens"], cost["output_tokens"]) == (3, 6000, 300)
     assert cost["usd"] == pytest.approx(0.015) and cost["usd_per_task"] == pytest.approx(0.005)
 
-    # The newest task first, each without its trace, which is asked for by itself.
     assert told["recent"][0]["id"] == last["id"] and "spans" not in told["recent"][0]
     assert [span["name"] for span in (trace_among([recorder], first["id"], None) or {})["spans"]] == [
         "model-a",
@@ -265,7 +252,6 @@ async def test_a_person_says_whether_an_answer_was_good(make_config: MakeConfig,
     assert (told["tasks"]["rated_good"], told["tasks"]["rated_bad"]) == (1, 1)
     assert {row["id"]: row["rating"] for row in told["recent"]} == {good["id"]: "good", bad["id"]: "bad"}
     assert (trace_among([recorder], bad["id"], None) or {})["rating"] == "bad"
-    # A person takes their word back.
     assert recorder.rate(bad["id"], None)
     assert summarise(recorder, config.evals, "model-a")["tasks"]["rated_bad"] == 0
 
@@ -312,7 +298,6 @@ async def test_a_task_is_read_afterwards_with_what_the_log_kept_of_its_own_time(
     read = trace_among([recorder], done["id"], log)
 
     assert read is not None and read["id"] == done["id"]
-    # The calls of this task alone, with what the log keeps of each: never what was typed.
     assert [line["tool"] for line in read["log"]] == ["browser_navigate"]
     assert trace_among([recorder], done["id"], None)["log"] == []  # pyright: ignore[reportOptionalSubscript]
     assert trace_among([recorder], "no-such-task", log) is None

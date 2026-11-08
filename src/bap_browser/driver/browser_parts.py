@@ -33,17 +33,13 @@ from bap_browser.errors import ConfigError
 
 PROXY_USERNAME_ENV = "BAP_BROWSER_PROXY_USERNAME"
 PROXY_PASSWORD_ENV = "BAP_BROWSER_PROXY_PASSWORD"
-# A ref inside a frame: the frame's name, then the element's.
 FRAME_REF = re.compile(r"(f\d+)e\d+")
-# The operations that give a point of the page, and the one that gives a box.
 GIVE_A_POINT = frozenset({"prepare", "wheelPoint"})
 GIVE_A_BOX = frozenset({"locate"})
-# Before these, a frame that is out of sight is brought into view: the pointer has to reach it.
 NEED_THE_FRAME_IN_VIEW = frozenset({"prepare", "wheelPoint"})
 NOT_STARTED = "The browser has not been started."
 NO_TAB = "No tab is open. Open a page with browser_navigate."
 DIALOG_KINDS: tuple[DialogKind, ...] = ("alert", "confirm", "prompt", "beforeunload")
-# How the browser names what a page writes to its console, as the levels a call may ask for.
 CONSOLE_LEVELS: dict[str, LogLevel] = {
     "error": "error",
     "assert": "error",
@@ -51,7 +47,6 @@ CONSOLE_LEVELS: dict[str, LogLevel] = {
     "debug": "debug",
     "trace": "debug",
 }
-# What a file name may not hold, on any system a browser runs on.
 NOT_IN_A_FILE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 NAMELESS_DOWNLOAD = "download"
 
@@ -71,8 +66,6 @@ def launch_options(config: Config, env: Mapping[str, str]) -> dict[str, Any]:
     elif browser.channel == "custom":
         raise ConfigError("browser.channel is 'custom' but browser.executable_path is not set")
     elif browser.channel != "chromium" or (browser.user_data_dir and browser.headless):
-        # A kept profile may hold an extension, and the browser's small build for running without a
-        # window cannot run one: the whole browser is named, so that it is the one started.
         options["channel"] = browser.channel
     if browser.proxy.server:
         proxy = {"server": browser.proxy.server}
@@ -117,7 +110,6 @@ def first_line(error: Exception) -> str:
     return str(error).splitlines()[0]
 
 
-# Why a page did not open, for the person watching. The agent gets the browser's own words.
 LOAD_FAILURES = {
     "ERR_NAME_NOT_RESOLVED": "the site was not found",
     "ERR_CONNECTION_REFUSED": "the site refused the connection",

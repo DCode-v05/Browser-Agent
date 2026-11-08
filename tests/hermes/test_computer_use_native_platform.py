@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_native_platform.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Exercise existing computer-use actions on the actual Windows/macOS CI hosts."""
 
@@ -14,8 +13,6 @@ from bap_browser.computer.hermes.computer_use import tool
 def backend(monkeypatch):
     tool.reset_backend_for_tests()
     monkeypatch.setattr(tool, "_new_backend", lambda mode: tool._NoopBackend())
-    # Input actions are approval-gated; a CI runner has no approver, so the gate would block
-    # before the dispatch this test is about. Same seam the capture-fence tests use.
     monkeypatch.setattr(tool, "_request_approval", lambda *a, **k: None)
     value = tool._get_backend()
     yield value

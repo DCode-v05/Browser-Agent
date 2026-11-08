@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_placement.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop placement: the screen (and with it computer_use and the browser) follows the terminal backend.
 
@@ -56,7 +55,7 @@ class _FakeDocker:
     _container_id = "c0ffee"
 
     def get_temp_dir(self):
-        return "/tmp"  # no-tmp: ok — sandbox-side path
+        return "/tmp"
 
 
 def test_sandbox_rfb_and_cua_ride_the_exec_prefix(monkeypatch):
@@ -81,7 +80,7 @@ def test_sandbox_rfb_and_cua_ride_the_exec_prefix(monkeypatch):
     command, args = sandbox_host.cua_mcp_invocation(env, "p1", {"DISPLAY": ":20"})
     assert command == "docker" and args[:5] == ["exec", "-i", "-u", "pn", "c0ffee"]
     assert "cua-driver mcp" in args[-1] and "export DISPLAY=:20" in args[-1]
-    assert not isinstance(env, DockerEnvironment)  # the fake never touched a real daemon
+    assert not isinstance(env, DockerEnvironment)
 
 
 def test_sandbox_status_offers_the_image_switch_instead_of_a_config_hint(monkeypatch):
@@ -117,7 +116,7 @@ def test_remote_command_survives_the_ssh_remote_shell_reparse():
     from bap_browser.computer.seams.sandbox.ssh import SSHEnvironment
 
     class _FakeSSH(SSHEnvironment):
-        def __init__(self):  # no daemon, no key: only the exec prefix is exercised
+        def __init__(self):
             self.host, self.user, self.port = "sandbox.example", "pn", 22
 
         def _build_ssh_command(self, extra_args=None, send_env=()):
@@ -128,7 +127,7 @@ def test_remote_command_survives_the_ssh_remote_shell_reparse():
 
     over_ssh = streams.remote_command(_FakeSSH(), argv, child_env=child_env)
     assert over_ssh[:2] == ["ssh", "pn@sandbox.example"] and len(over_ssh) == 3
-    remote_word = " ".join(over_ssh[2:])  # what sshd hands the login shell
+    remote_word = " ".join(over_ssh[2:])
     out = subprocess.run(["bash", "-c", remote_word], capture_output=True, text=True, check=True).stdout
     assert out == "hello world|it's $HOME"
     env_out = subprocess.run(["bash", "-c", " ".join(streams.remote_command(
@@ -180,7 +179,7 @@ def test_terminal_placement_starts_the_sandbox_screen_instead_of_running_on_the_
                         ["docker", "exec", "-i", "-u", user, e._container_id])
     (command, args), child_env = cb.sandbox_mcp_invocation()
     assert command == "docker" and "cua-driver mcp" in args[-1] and "export DISPLAY=:20" in args[-1]
-    assert set(child_env) == {"PATH"}  # the host driver's env never reaches the sandbox driver
+    assert set(child_env) == {"PATH"}
 
 
 def test_refused_placement_never_falls_back_to_the_host(monkeypatch, isolated_home):
@@ -245,7 +244,7 @@ def test_marker_survives_a_gateway_restart_while_the_container_lives(monkeypatch
 
     def _env(*, create):
         created.append(create)
-        return _FakeDocker() if create else None  # nothing registered in this (fresh) process
+        return _FakeDocker() if create else None
     monkeypatch.setattr(runtime, "_sandbox_env", _env)
 
     assert runtime.sandbox_screen_running() is True
@@ -254,10 +253,9 @@ def test_marker_survives_a_gateway_restart_while_the_container_lives(monkeypatch
     stopped: list[object] = []
     monkeypatch.setattr(sandbox_host, "stop", lambda env, profile: stopped.append(env) or True)
     assert runtime.stop() is True
-    assert isinstance(stopped[0], _FakeDocker) and created[-1] is True  # re-attached, then stopped THAT sandbox
+    assert isinstance(stopped[0], _FakeDocker) and created[-1] is True
     assert not sandbox_host._marker().exists()
 
-    # The container was removed out from under us: the marker is stale and goes; nothing is (re)built.
     sandbox_host._marker().write_text('{"display": ":20", "backend": "DockerEnvironment", "container": "dead00", "docker": "docker"}')
     alive["running"] = False
     sandbox_host._ALIVE_CACHE.clear()

@@ -65,7 +65,6 @@ class TargetArgs(PlaceArgs):
 class ClickArgs(TargetArgs):
     button: Literal["left", "right", "middle"] = "left"
     click_count: int = Field(default=1, ge=1, le=3)
-    # Pydantic copies the default for each call. A plain default, unlike a factory, appears in the schema.
     modifiers: list[Modifier] = Field(default=[])
 
 

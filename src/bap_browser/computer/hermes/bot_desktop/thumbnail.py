@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/thumbnail.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Thumbnail of a bot's screen: one JPEG grab of the profile's Xvnc display.
 
@@ -33,11 +32,8 @@ def thumbnail_data_url(max_size: tuple[int, int] = THUMB_MAX, quality: int = 72)
         return "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii") if jpeg else None
     if runtime._launcher_pid() is None:
         return None
-    from PIL import ImageGrab  # Pillow is a hard dependency; import lazily to keep status calls cheap
+    from PIL import ImageGrab
 
-    # Xlib reads XAUTHORITY from the process env; the launcher publishes a per-profile cookie file.
-    # The swap is process-wide, so two profiles grabbed on worker threads at once serialise here or
-    # one would grab with the other's cookie and restore the wrong value.
     with _grab_lock:
         previous = os.environ.get("XAUTHORITY")
         if env.get("XAUTHORITY"):

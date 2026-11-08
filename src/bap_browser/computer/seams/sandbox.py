@@ -8,7 +8,6 @@ from typing import Any
 
 CHROMIUM_SANDBOX_BYPASS_ARGS: tuple[str, ...] = ()
 NO_SANDBOX = "This engine keeps no desktop inside a terminal's sandbox."
-# Hermes' names for the lock and the lookup of its terminal's sandbox. There is none to find.
 _env_lock = threading.Lock()
 
 

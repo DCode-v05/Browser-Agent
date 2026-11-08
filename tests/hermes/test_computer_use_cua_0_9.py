@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_cua_0_9.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Behavior contracts for cua-driver's verify/escalate and typed-browser ladder.
 
@@ -75,11 +74,6 @@ def _make_backend(session: _FakeSession):
     return backend
 
 
-# ---------------------------------------------------------------------------
-# Selected live schema and foreground delivery
-# ---------------------------------------------------------------------------
-
-
 def test_foreground_support_is_discovered_from_tool_input_schema():
     from bap_browser.computer.hermes.computer_use.cua_backend_session import _CuaDriverSession
 
@@ -120,11 +114,6 @@ def test_invalid_delivery_mode_is_rejected_before_driver_call():
     assert result.ok is False
     assert result.code == "bad_delivery_mode"
     assert session.calls == []
-
-
-# ---------------------------------------------------------------------------
-# Deterministic verdict precedence and backend isolation
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -289,7 +278,6 @@ def test_persistent_focus_has_a_separate_approval_scope(monkeypatch):
     seen = []
 
     def approve(command, description, **kw):
-        # The shared gate prompts once per scope key: the click itself, then the separate bring_to_front scope.
         action = description.split("`")[1]
         seen.append(action)
         return "once" if action == "click" else "deny"

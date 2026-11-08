@@ -50,24 +50,16 @@ def write_config(folder: Path, **sections: Any) -> Path:
     """A config.json in `folder` that keeps every file the engine writes inside that folder."""
     data: dict[str, Any] = {"data_dir": str(folder), "logging": {"event_log": str(folder / "events.jsonl")}}
     data.update(sections)
-    # The file that says where a service is, too: the developer may have a service of their own running.
     data["server"] = {"state_file": str(folder / "service.json"), **data.get("server", {})}
-    # And what a person saved in the settings screen: the developer's own must not reach a test.
     data["settings"] = {"file": str(folder / "settings.json"), **data.get("settings", {})}
-    # And the records of what each browser of the window did, and their logs.
     data["evals"] = {"dir": str(folder / "evals"), **data.get("evals", {})}
-    # And who may sign in: a test never reads or changes the developer's own passwords.
     data["auth"] = {"file": str(folder / "accounts.json"), **data.get("auth", {})}
     data["logging"] = {"systems_dir": str(folder / "logs"), **data.get("logging", {})}
-    # The desktop of computer use is started only by the tests that are about it: elsewhere it has
-    # no container program, so its page is the same on every machine. Its shared folder stays here.
     data["computer"] = {
         "container_command": NO_CONTAINER_PROGRAM,
         "folder": str(folder / "computer-files"),
         **data.get("computer", {}),
     }
-    # Most tests say exactly what a result holds. The marks around what a page wrote (spec 18.5) are
-    # left out of those, and tested where they are what the test is about.
     guards = dict(data.get("safeguards", {}))
     guards["incoming"] = {"mark_page_text": False, **guards.get("incoming", {})}
     data["safeguards"] = guards

@@ -104,7 +104,6 @@ class Actions(Section):
             "unsubscribe",
             "deactivate",
             "close account",
-            # What a desktop calls throwing a file away, and emptying where it went (spec 22.7).
             "to trash",
             "empty trash",
             "wastebasket",

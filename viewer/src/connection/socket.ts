@@ -1,11 +1,7 @@
-// The live connection: one WebSocket to the session service (spec 4.8). Text messages are events,
-// binary messages are picture frames, and the first message the viewer sends carries the token.
-
 import { PAGE } from '../options';
 import type { ClientCommand, ServerEvent } from '../protocol';
 import type { Connection, ConnectionHandlers } from './connection';
 
-/** The part of a WebSocket this connection uses. */
 export interface SocketLike {
   binaryType: string;
   readyState: number;
@@ -17,28 +13,19 @@ export interface SocketLike {
 }
 
 export interface SocketOptions {
-  /** The session's WebSocket address. The token is never part of it. */
   url: string;
   token: string;
   createSocket?: (url: string) => SocketLike;
-  /** How long to wait before each new attempt after the connection is lost. The last delay repeats. */
   reconnectMs?: number[];
-  /**
-   * How long a live picture's address is kept after a newer picture replaced it. The page may still
-   * be loading the older one, and releasing its address at once would fail that load.
-   */
   releaseAfterMs?: number;
-  /** Whether the page is the one in front, and word when that changes. By default, the document's. */
   inFront?: InFront;
 }
 
 export interface InFront {
   now(): boolean;
-  /** Calls the listener when the page comes to the front or goes behind. Gives a way to stop. */
   onChange(listener: () => void): () => void;
 }
 
-/** The document in front, or behind another tab or window. */
 const THE_DOCUMENT: InFront = {
   now: () => typeof document === 'undefined' || document.visibilityState === 'visible',
   onChange: (listener) => {
@@ -48,10 +35,7 @@ const THE_DOCUMENT: InFront = {
   },
 };
 
-/** What the wire says in numbers: a socket that is open, and a message that is a picture. */
 const WIRE = { open: 1, picture: 1 } as const;
-/** The close codes after which trying again changes nothing: a token the service does not accept,
- * and a session it does not have. */
 const FINAL = [4401, 4404];
 const DEFAULT_RECONNECT_MS = [500, 1000, 2000, 5000];
 
@@ -64,16 +48,12 @@ export class SocketConnection implements Connection {
   private retry: ReturnType<typeof setTimeout> | undefined;
   private attempt = 0;
   private closed = false;
-  /** Seconds to add to this machine's clock to get the service's clock. */
   private clockOffset = 0;
-  /** False while the service replays what had already happened. The replay carries no pictures. */
   private caughtUp = false;
   private session: string | undefined;
   private lastFrame: Blob | undefined;
   private live: string | undefined;
-  /** Live pictures that were replaced and are waiting to be released. */
   private readonly leaving = new Map<string, ReturnType<typeof setTimeout>>();
-  /** Each finished step's picture, by step number. They outlive the live picture and a lost connection. */
   private readonly kept = new Map<number, string>();
   private readonly inFront: InFront;
   private stopSeeing: (() => void) | undefined;
@@ -85,7 +65,6 @@ export class SocketConnection implements Connection {
     this.inFront = options.inFront ?? THE_DOCUMENT;
   }
 
-  /** Watch mode (spec 22.7): the service counts a page as watched only while it is in front. */
   private sayWhetherSeen(): void {
     this.send({ type: 'seen', visible: this.inFront.now() });
   }
@@ -132,7 +111,6 @@ export class SocketConnection implements Connection {
     socket.onopen = () => {
       this.attempt = 0;
       this.caughtUp = false;
-      // What was on screen before the connection was lost says nothing about a step that finishes now.
       this.lastFrame = undefined;
       socket.send(JSON.stringify({ type: 'auth', token: this.options.token }));
       this.sayWhetherSeen();
@@ -196,7 +174,6 @@ export class SocketConnection implements Connection {
     }
   }
 
-  /** A step that finishes now keeps its own copy of the picture. A replayed step keeps the one it had. */
   private pictureFor(step: number): string | undefined {
     if (this.caughtUp && this.lastFrame) this.kept.set(step, URL.createObjectURL(this.lastFrame));
     return this.kept.get(step);
@@ -217,7 +194,6 @@ function parse(text: string): Message | null {
       return value as Message;
     }
   } catch {
-    // Not an event. The connection carries on.
   }
   return null;
 }

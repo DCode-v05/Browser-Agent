@@ -36,11 +36,8 @@ GROUPS = (
     "Advanced",
 )
 CLOUD = "remote_headless"
-# The backends that are a browser, for the settings that are a browser's alone.
 BROWSERS = (CLOUD, "takeover_chrome", "bundled_chromium")
-# The desktop of computer use (spec 21), which is no browser.
 COMPUTER = "contained_desktop"
-# The name of the event log, in the data folder, for a person who turns it on where the deployment has none.
 EVENT_LOG_NAME = "events.jsonl"
 
 
@@ -190,13 +187,11 @@ class Choice(Entry):
             if option.hint:
                 choice["hint"] = option.hint
             if self._too_loose(option.value, config):
-                # Shown, so that a person sees why it is not possible.
                 choice["disabled"] = True
             choices.append(choice)
         return {"choices": choices}
 
 
-# How much each way of asking asks: the least first.
 ASKS = {"auto": 0, "risky": 1, "every_action": 2}
 
 
@@ -320,7 +315,6 @@ class ActivityLog(Switch):
         return config.logging.event_log is not None
 
     def patch(self, value: Value, config: Config, system: str | None = None) -> Patch:
-        # A browser among several writes a log of its own (spec 9.17).
         fallback = Path(config.logging.systems_dir) / f"{system}.jsonl" if system else None
         where = config.logging.event_log or str(fallback or Path(config.data_dir) / EVENT_LOG_NAME)
         return {self.key: where if value else None}
@@ -358,7 +352,6 @@ class SiteList(Entry):
         if self.adds_to_deployment:
             return None
         deployment = self._deployment(config)
-        # With a list of the deployment's, a person narrows it: each of their sites lies inside it.
         inside = all(any(_inside(site, wide) for wide in deployment) for site in sites)
         if self.must_narrow and deployment and not inside:
             return "would_loosen"
@@ -372,7 +365,6 @@ class SiteList(Entry):
         deployment = self._deployment(config)
         if self.adds_to_deployment:
             return {self.key: [*deployment, *(site for site in sites if site not in deployment)]}
-        # A person with no list of their own narrows nothing: the deployment's list holds.
         return {self.key: list(sites) or deployment}
 
     def shown(self, value: Value, config: Config) -> Value:

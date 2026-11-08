@@ -55,8 +55,6 @@ class AnthropicModel(HostedModel):
     def _messages(self, messages: Sequence[Message]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         turn = 0
-        # Only the newest picture goes with the conversation: an older one has been seen, and
-        # would be paid for again each time.
         newest = next(
             (m for m in reversed(messages) if isinstance(m, ToolOutput) and m.picture is not None), None
         )

@@ -1,7 +1,3 @@
-// The pop-up that asks a person to do what the agent must not do itself (spec 8.4, 9.16): a sign-in,
-// a human check such as a CAPTCHA, a payment, or anything else it asked for. It comes up over the
-// page, on every backend, the moment the agent asks.
-
 import { useEffect, useRef } from 'react';
 
 import type { HelpKind } from '../protocol';
@@ -23,11 +19,9 @@ const KIND_ICON: Record<HelpKind, IconName> = {
 interface Props {
   help: HelpRequest;
   now: number;
-  /** The browser is a window on the person's own screen: they do the step there, not in a picture here. */
   ownBrowser: boolean;
   onTakeOver(): void;
   onCouldNot(): void;
-  /** The person wants to look at the page first. The request stays open, as a card. */
   onLater(): void;
 }
 

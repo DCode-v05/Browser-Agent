@@ -1,6 +1,3 @@
-// The chat above every app (spec 22.3.1): the page asks the service on this machine for a window of
-// its own, and where there is none to give it opens the chat in a window of the browser's.
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { besideOpener, roomsIn } from './rooms';

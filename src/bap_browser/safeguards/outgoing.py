@@ -21,7 +21,6 @@ from urllib.parse import unquote, urlsplit
 
 from bap_browser.config_safeguards import ArrivingFiles, Outgoing
 
-# How the first bytes of a program look: Windows, Linux, macOS, and a script that names its interpreter.
 PROGRAM_BEGINNINGS = (
     b"MZ",
     b"\x7fELF",
@@ -48,7 +47,6 @@ SIGNS = {
 }
 CODES = ("INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "SGD", "AED", "CHF", "CNY")
 _MARK = "[" + "".join(map(re.escape, SIGNS)) + "]|(?<![A-Za-z])(?:" + "|".join(CODES) + r"|Rs\.?)(?![A-Za-z])"
-# Digits with their grouping marks: 1,234,567.89 and 12,34,567.89 and 1.234.567,89 and 1 234 567,89.
 _NUMBER = r"\d+(?:[.,]\d+|[ \xa0]\d{3}(?!\d))*"
 _AMOUNT = re.compile(
     rf"(?P<before>{_MARK})\s?(?P<after_mark>{_NUMBER})|(?P<before_mark>{_NUMBER})\s?(?P<after>{_MARK})",
@@ -106,7 +104,6 @@ class CopyMemory:
 
     def __init__(self, settings: Callable[[], Outgoing]) -> None:
         self._settings = settings
-        # The built-in hash is keyed for this process. This keeps two memories apart as well.
         self._salt = secrets.randbits(63)
         self._sites: OrderedDict[str, _Read] = OrderedDict()
 
@@ -128,7 +125,6 @@ class CopyMemory:
                 self._sites.popitem(last=False)
         self._sites.move_to_end(site)
         if read.bits is None or read.taken + len(normal) > settings.remember_chars_per_site:
-            # The newest text is the text remembered.
             read.bits, read.taken = bytearray(settings.filter_bits // 8), 0
         read.taken += len(normal)
         bits, count, hashes = read.bits, len(read.bits) * 8, range(settings.filter_hashes)
@@ -338,7 +334,6 @@ def judged_file(
     name: str, first_bytes: bytes, settings: ArrivingFiles, *, own_machine: bool
 ) -> Literal["risky", "ask", "keep"]:
     """What is done with a file that arrived: never kept, asked about, or kept."""
-    # Windows takes no notice of dots and spaces at the end of a name.
     name = name.rstrip(". ")
     ending = name.rsplit(".", 1)[1].lower() if "." in name else ""
     if ending in settings.risky_extensions or first_bytes.startswith(PROGRAM_BEGINNINGS):

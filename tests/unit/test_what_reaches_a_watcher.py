@@ -39,8 +39,6 @@ def watched(make_config: Callable[..., Config], folder: Path, **sections: Any) -
 
 
 SECRET = "hunter2"
-# Each of these is opened by a browser as a page with the name "admin" and the password "hunter2",
-# or is close enough to one that a person might paste it.
 ADDRESSES = [
     f"https://admin:{SECRET}@93.184.216.34/login",
     f"admin:{SECRET}@93.184.216.34/login",

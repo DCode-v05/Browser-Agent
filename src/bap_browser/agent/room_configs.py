@@ -6,7 +6,6 @@ from pathlib import Path
 
 from bap_browser.config import Config
 
-# The folder, inside the data folder, where the built-in browser keeps its sign-ins.
 BUILT_IN_PROFILE = "built-in-browser"
 
 

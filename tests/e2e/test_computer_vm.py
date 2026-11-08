@@ -80,7 +80,6 @@ async def vm() -> AsyncIterator[tuple[str, str, str]]:
 async def test_an_agent_outside_the_vm_works_on_its_desktop(vm: tuple[str, str, str]) -> None:
     address, token, name = vm
     async with (
-        # The client's own HTTP library, which its signature names: it carries the token.
         httpx2.AsyncClient(headers={"Authorization": f"Bearer {token}"}, timeout=30) as http,
         Client(streamable_http.streamable_http_client(f"{address}/mcp", http_client=http)) as client,
     ):

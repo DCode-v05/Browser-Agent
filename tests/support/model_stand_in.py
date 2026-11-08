@@ -125,7 +125,6 @@ class ModelStandIn:
                     self.end_headers()
                     self.wfile.write(data)
                 except OSError:
-                    # The caller stopped waiting for a slow reply and hung up.
                     self.close_connection = True
 
             def log_message(self, format: str, *args: Any) -> None:

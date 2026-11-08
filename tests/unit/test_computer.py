@@ -41,7 +41,6 @@ def test_the_timeline_says_what_happened_on_the_desktop_and_never_what_was_typed
     assert summary_for("computer_open_app", {"app": "Terminal"}, None, "the app is not allowed") == (
         "Could not open Terminal: the app is not allowed"
     )
-    # The log keeps the length of typed text, never the text.
     assert masked({"text": "my secret"}, lambda text: text) == {"text": "<9 characters>"}
 
 
@@ -56,7 +55,6 @@ async def test_an_app_that_is_not_allowed_is_not_opened(make_config, tmp_path: P
         opened = await session.toolkit.call("computer_open_app", {"app": "Text editor"})
         assert not opened.is_error, opened.text
         assert len(desk.opened) == 1
-        # The title of a window is written by what is open in it: it is marked as such.
         assert f"Untitled 1 - {desk.opened[0]}" in opened.text and "[tabs]" not in opened.text
     finally:
         await session.close()

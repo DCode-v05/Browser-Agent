@@ -48,8 +48,6 @@ async def test_what_is_typed_stays_out_of_the_log_and_out_of_element_names(
     make_config: Callable[..., Config], tmp_path: Path, site: str
 ) -> None:
     card, note = "4111 1111 1111 1111", "my pin is 9731"
-    # Nobody watches here, and a card number is a person's to allow (spec 18.6). This test is about
-    # what is kept of what was typed, so the deployment waves that question through.
     unasked = {"outgoing": {"sensitive_fields": False}}
     async with open_session(make_config(tmp_path, safeguards=unasked)) as session:
         tools = Toolkit(session)
@@ -58,7 +56,6 @@ async def test_what_is_typed_stays_out_of_the_log_and_out_of_element_names(
         box = ref_of(page.text, "textbox")
         await tools.call("browser_type", {"ref": box, "text": note})
         again = await tools.call("browser_type", {"ref": box, "text": "second", "clear": False})
-        # The agent may see what a field holds; that is how it checks its own work.
         filled = await tools.call("browser_snapshot", {})
         assert f'value="{card}"' in filled.text
     assert again.text.startswith(f"Typed 6 characters into {box} (textbox)\n"), again.text
@@ -93,7 +90,6 @@ async def test_a_browser_that_went_away_is_said_to_be_gone_and_a_navigation_star
 
         again = await tools.call("browser_navigate", {"url": f"{site}/form.html"})
         assert again.text.startswith(f"Navigated to {site}/form.html\nPage: Sign up\n")
-        # The new browser's elements get new refs: one from the browser that closed can never match.
         old = ref_of(page.text, 'button "Create account"')
         assert ref_of(again.text, 'button "Create account"') != old
 
@@ -101,7 +97,6 @@ async def test_a_browser_that_went_away_is_said_to_be_gone_and_a_navigation_star
 async def test_a_form_is_filled_in_one_call_and_submitted_with_a_key(
     make_config: Callable[..., Config], tmp_path: Path, site: str
 ) -> None:
-    # A password is a person's to allow (spec 18.6), and nobody watches here: see the test above.
     unasked = {"outgoing": {"sensitive_fields": False}}
     async with open_session(make_config(tmp_path, safeguards=unasked)) as session:
         tools = Toolkit(session)

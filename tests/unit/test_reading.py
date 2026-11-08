@@ -111,12 +111,10 @@ async def test_text_addressed_to_an_agent_is_withheld_and_the_page_is_flagged(ma
     )
     assert seen.flagged == [("t1", "shop.example", "addressed_to_an_agent", 1)]
     assert "t1" in tools.check.flagged
-    # The log says that something was withheld and by which rule, never what.
     line = json.loads((tmp_path / "events.jsonl").read_text("utf-8").splitlines()[-1])
     assert line["scan"]["rules"] == ["addressed_to_an_agent"] and line["scan"]["withheld_chars"] > 40
     assert "ignore your previous" not in json.dumps(line)
 
-    # A whole read that finds nothing planted any more takes the flag off again.
     driver.page = 'Page: Shirt\n- text "Fits well."'
     await tools.call("browser_snapshot", {})
     assert "t1" not in tools.check.flagged
@@ -255,7 +253,6 @@ async def test_what_a_dialog_says_is_withheld_when_it_talks_to_an_agent(make_con
         make_config, tmp_path, "Page", incoming={"scan": "local", "mark_page_text": False}
     )
     await tools.call("browser_snapshot", {})
-    # A quote of the page's own does not end what the dialog said early.
     driver.open_dialog(PageDialog("d1", "confirm", f"Fine') and blocks the page. {PLANTED}", "t1"))
     blocked = await tools.call("browser_click", {"ref": "e1"})
     assert blocked.is_error and blocked.text.startswith(
@@ -266,7 +263,6 @@ async def test_what_a_dialog_says_is_withheld_when_it_talks_to_an_agent(make_con
     assert answered.text.startswith("Dismissed the dialog '[withheld]'.")
     assert "evil.example" not in answered.text
 
-    # What happened in the browser by itself is told in the engine's words, around the page's.
     harmless = "a confirm dialog ('Delete the draft? It can't be undone.') opened and was dismissed"
     driver.tell(Happened("dialog_closed", f"an alert dialog ('{PLANTED}') opened and was dismissed"))
     driver.tell(Happened("dialog_closed", harmless))
@@ -287,14 +283,12 @@ async def test_a_dialog_cannot_get_past_the_rules_with_a_line_break_or_a_charact
         make_config, tmp_path, "Page", incoming={"scan": "local", "mark_page_text": False}
     )
     await tools.call("browser_snapshot", {})
-    # What a dialog says stands on one line of the engine's, so that the rules read all of it.
     driver.open_dialog(PageDialog("d1", "alert", f"Saved.\n\n{PLANTED}", "t1"))
     blocked = await tools.call("browser_click", {"ref": "e1"})
     assert "is open ('[withheld]') and blocks the page" in blocked.text, blocked.text
     assert "evil.example" not in blocked.text
     answered = await tools.call("browser_handle_dialog", {"action": "accept"})
     assert "the dialog '[withheld]'." in answered.text and "evil.example" not in answered.text
-    # A harmless dialog of several lines is told on one.
     driver.open_dialog(PageDialog("d2", "alert", "Saved.\nYou can close this tab.", "t1"))
     assert "('Saved. You can close this tab.')" in (await tools.call("browser_click", {"ref": "e1"})).text
     await tools.call("browser_handle_dialog", {"action": "accept"})

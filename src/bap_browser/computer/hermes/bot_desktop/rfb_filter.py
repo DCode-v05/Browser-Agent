@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/bot_desktop/rfb_filter.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Byte-level RFB client→server gate for the Bot Desktop WebSocket bridge.
 
@@ -19,25 +18,21 @@ from __future__ import annotations
 
 from typing import Callable
 
-_INPUT_TYPES = {4, 5, 6, 251, 255}  # KeyEvent, PointerEvent, ClientCutText, SetDesktopSize, QEMU Extended KeyEvent
+_INPUT_TYPES = {4, 5, 6, 251, 255}
 
-# Fixed-length client messages: type -> total length including the type byte.
 _FIXED = {
-    0: 20,   # SetPixelFormat
-    3: 10,   # FramebufferUpdateRequest
-    4: 8,    # KeyEvent
-    5: 6,    # PointerEvent
-    150: 10, # EnableContinuousUpdates
-    255: 12, # QEMU client message; sub-type 0 = Extended KeyEvent (the only one noVNC sends)
+    0: 20,
+    3: 10,
+    4: 8,
+    5: 6,
+    150: 10,
+    255: 12,
 }
 _SET_ENCODINGS = 2
 _CLIENT_CUT_TEXT = 6
 _FENCE = 248
-_SET_DESKTOP_SIZE = 251  # u8 type, pad, u16 width, u16 height, u8 nScreens, pad, then 16 bytes per screen
+_SET_DESKTOP_SIZE = 251
 
-# TigerVNC's default MaxCutText, and the value launcher.sh passes as ``-MaxCutText`` so Xvnc and
-# the bridge agree (keep the two in sync). The length is client-declared (int32); without a cap a
-# watcher with a ticket but no lease could make the bridge buffer ~2 GiB waiting for a payload.
 _MAX_CUT_TEXT = 256 * 1024
 
 
@@ -51,7 +46,7 @@ class RfbClientFilter:
     def __init__(self, allow_input: Callable[[], bool]) -> None:
         self._allow_input = allow_input
         self._buf = bytearray()
-        self._handshake_left = 12 + 1 + 1  # version + security type + ClientInit(shared flag)
+        self._handshake_left = 12 + 1 + 1
 
     def feed(self, chunk: bytes) -> bytes:
         self._buf += chunk
@@ -60,8 +55,6 @@ class RfbClientFilter:
             take = min(self._handshake_left, len(self._buf))
             if take:
                 head = bytes(self._buf[:take])
-                # ClientInit shared-flag: force shared so a human viewer never disconnects the agent's
-                # watcher or another observer (Xvnc also runs -AlwaysShared; belt and braces at zero cost).
                 if self._handshake_left - take == 0 and take >= 1:
                     head = head[:-1] + b"\x01"
                 out += head
@@ -93,7 +86,6 @@ class RfbClientFilter:
             if len(self._buf) < 8:
                 return None
             n = int.from_bytes(self._buf[4:8], "big", signed=True)
-            # Extended clipboard (RFB 3.8 + TigerVNC): negative length, |n| bytes follow.
             if abs(n) > _MAX_CUT_TEXT:
                 raise ValueError("clipboard message too large")
             return 8 + abs(n)
@@ -105,6 +97,4 @@ class RfbClientFilter:
             if len(self._buf) < 8:
                 return None
             return 8 + 16 * self._buf[6]
-        # Unknown client message: we cannot frame it, and forwarding blind would let an input message
-        # hide behind it. Drop the rest of the stream; the viewer reconnects.
         raise ValueError(f"unknown RFB client message type {t}")

@@ -60,7 +60,6 @@ class ScreenHere:
                 )
             await asyncio.sleep(pause)
         await self._keep("openbox")
-        # The window manager paints the background when it starts: the colour is set after it.
         await asyncio.sleep(settings.settle_ms / 1000)
         await self._call("xsetroot", "-solid", BACKGROUND)
 
@@ -91,7 +90,6 @@ class ScreenHere:
     async def start_app(self, app: App) -> None:
         if not self._running:
             raise BrowserError("The desktop is not running.", reason="the desktop closed")
-        # An app a person has not allowed is not started, and an app this machine lacks cannot be.
         if app not in allowed_apps(self._settings) or shutil.which(app.command) is None:
             raise BrowserError(f"{app.name} is not on this desktop.", reason="the app is not here")
         await self._keep(app.command)

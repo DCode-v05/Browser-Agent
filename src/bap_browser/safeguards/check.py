@@ -51,7 +51,6 @@ NOT_DONE = (
     "Not done: {why}. Do not reach the same end another way. Go on with a step that is safe, or say "
     "what you need from the person."
 )
-# What the agent is told when an action was not approved, and the same in a few words for the person.
 NOT_APPROVED = {
     "denied": ("The person did not allow this action." + NO_OTHER_WAY, "the person did not allow it"),
     "expired": (
@@ -64,9 +63,7 @@ NOT_APPROVED = {
     ),
 }
 COULD_NOT_RUN = "the check could not run"
-# The tool that opens an app on the desktop of computer use.
 OPENS_AN_APP = "computer_open_app"
-# The reviewer's category for what a fixed rule found, for when the model names none.
 CATEGORY_OF = {
     "paying_step": "pays",
     "sending_step": "sends",
@@ -120,14 +117,10 @@ class Check(Findings):
         self._observer = observer
         self.spend = Spend()
         """What the engine's own model calls have cost in this session (spec 18.8)."""
-        # The tools a person allowed on a site for the rest of the session: "Allow on this site".
         self._grants: set[tuple[str, str]] = set()
-        # The newest steps that ran: the tool, the site and the timeline sentence.
         self._ran: deque[tuple[str, str, str]] = deque(maxlen=64)
-        # Auto Mode: the reviewer's refusals, and what a person allowed once.
         self._refused_in_a_row = 0
         self._refused_in_all = 0
-        # The steps the reviewer refused: what makes each the same step, its label and its site.
         self._refused: dict[str, tuple[str, str, str]] = {}
         self._allowed_once: dict[str, float] = {}
         self._reviewer: ModelClient | None = None
@@ -149,7 +142,6 @@ class Check(Findings):
         key, label, site = entry
         self._allowed_once[key] = self._clock() + self._session.config.safety.auto_mode.allow_once_s
         if self._settled.get(("site_outside_task", site)) is False:
-            # The refusal had settled the site as outside the task. The person's word is above it.
             del self._settled[("site_outside_task", site)]
         self._session.note(
             f"the person allowed a step that was refused: {label}. Do it again if it is still needed"
@@ -179,10 +171,8 @@ class Check(Findings):
         if step.site:
             self._visited.add(step.site)
             if not self.task.is_own(step.address):
-                # From here on the agent may have read what a stranger wrote.
                 self.task.read_a_page = True
 
-    # The stages.
 
     async def before(self, step: Step) -> Decision:
         began = self._clock()
@@ -190,7 +180,6 @@ class Check(Findings):
         policy = config.safety.action_policies.get(step.tool, config.safety.default_action_policy)
         any_app = config.computer.runs not in ("container", "here") and config.computer.any_app
         if step.tool == OPENS_AN_APP and (config.computer.ask_before_apps or any_app) and policy != "deny":
-            # A person's yes before the agent opens an app on the desktop (spec 21.7).
             policy = "confirm"
         if policy == "deny":
             return self._decided(
@@ -215,7 +204,6 @@ class Check(Findings):
         unsure = [finding for finding in findings if finding.outcome == "unsure"]
         confirm = policy == "confirm" or (self.mode == "every_action" and step.acts)
         if unsure and not asking and not confirm and self._allowed_now(step):
-            # Their yes to this very step settles what a yes to a question about it settles.
             self._agreed(step, unsure)
             return self._decided(step, began, "person", True, unsure)
         if asking or (unsure and (confirm or self.auto_state()[0] != "on")):
@@ -233,7 +221,6 @@ class Check(Findings):
         if ask is None or not step.on_a_site:
             return None
         if step.opens is not None and not (await self._session.policy.check(step.opens)).allowed:
-            # The core's own policy refuses it: the person is not asked about what cannot be done.
             return None
         return await ask("act" if step.acts else "read", step.address, step.label)
 
@@ -250,7 +237,6 @@ class Check(Findings):
             )
         else:
             try:
-                # A step with no site, such as one on a desktop, is allowed for itself only.
                 question = Question(step.tool, self._summary(step), step.host, every_time=not step.host)
                 answer = await ask(question)
             except BapError as exc:
@@ -307,7 +293,6 @@ class Check(Findings):
         try:
             verdict = await self._verdict(step, findings)
         except ModelError as failed:
-            # The cause is for whoever runs the service. The person is asked instead.
             logger.warning("The check could not run: %s", failed)
             could_not = Finding("check_failed", "unsure", COULD_NOT_RUN)
             return await self._ask(step, began, [*findings, could_not])
@@ -333,7 +318,6 @@ class Check(Findings):
         self._agreed(step, findings, by_the_check=True)
         return self._decided(step, began, "reviewer", True, findings, record=record)
 
-    # What a decision leads to.
 
     def _agreed(self, step: Step, findings: Sequence[Finding], *, by_the_check: bool = False) -> None:
         """A person said yes, or the reviewer let the step run: what that settles."""
@@ -355,7 +339,6 @@ class Check(Findings):
     def _declined(self, step: Step, findings: Sequence[Finding]) -> None:
         for finding in findings:
             if finding.id == "site_outside_task":
-                # One site is settled once for the task: it is not asked about at every call.
                 self._settled[(finding.id, step.site)] = False
 
     def _refuse(
@@ -370,7 +353,6 @@ class Check(Findings):
     ) -> Decision:
         refused_id: str | None = None
         if verdict is not None:
-            # What the reviewer refused, a person may allow once. A hard stop has no such way round.
             refused_id = f"r{len(self._refused) + self._refused_in_all + 1}"
             self._refused[refused_id] = (self._same_step(step), step.label, step.site)
             self._count_a_refusal()
@@ -452,7 +434,6 @@ class Check(Findings):
         until = self._allowed_once.pop(self._same_step(step), None)
         return until is not None and self._clock() <= until
 
-    # The reviewer.
 
     def _client(self) -> ModelClient:
         config = self._session.config
@@ -521,7 +502,6 @@ class Check(Findings):
             findings=told,
             page_flagged=tripped,
         )
-        # The marks are made with a token that occurs nowhere in what they are put around.
         token = new_token(given(token=""))
         answer = await self._client().ask(
             INSTRUCTIONS, given(token=token), name="verdict", schema=VERDICT_SCHEMA

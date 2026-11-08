@@ -16,8 +16,6 @@
 <iframe id="nested" title="Outer" src="nested.html"></iframe>
 <iframe id="far" title="Far down" src="welcome.html"></iframe>
 <script>
-// A frame from another site: the same server under its other name. The browser keeps it in a
-// process of its own.
 const other = document.createElement('iframe');
 other.id = 'other';
 other.title = 'Other site';

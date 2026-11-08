@@ -34,16 +34,10 @@ from bap_browser.settings.catalogue import BY_ID, CATALOGUE, ENABLED, FREE
 from bap_browser.settings.kinds import COMPUTER, GROUPS, SURFACES, Entry, Reason, Value
 
 Role = Literal["admin", "user"]
-# Where a value comes from when nobody said: the configuration file or the environment.
 UNKNOWN_SOURCE = "configuration"
-# In the saved file: the systems' own values, the user's part, and the admin's policy.
 SYSTEMS, USER, POLICY = "systems", "user", "policy"
-# The user's preferred browser, kept with their settings. It is no setting of the catalogue: its
-# choices are the systems the service has, which the catalogue does not know.
 PREFERRED = "preferred_browser"
 A_SYSTEMS_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
-# What of a system's evaluations a user may be shown, in the words of the admin's screen, and
-# whether it is shown until the admin says otherwise.
 SEES: Mapping[str, tuple[str, bool]] = {
     "evaluations": ("Evaluations of the browsers they use", True),
     "cost": ("What the tasks cost", True),
@@ -51,7 +45,6 @@ SEES: Mapping[str, tuple[str, bool]] = {
     "checklist": ("Run the checklist", True),
     "log": ("The log of the agent's steps", False),
 }
-# What each of them is, for the admin who decides it.
 SEEN: Mapping[str, str] = {
     "evaluations": (
         "On: a user has the Evaluations view under each browser they may use, with how its tasks went and "
@@ -122,7 +115,6 @@ class SettingsStore:
         self.backends: dict[str, str] = {}
         """Where each of those systems is, for the settings that are one backend's alone."""
 
-    # The two layers.
 
     def _held(self, entry: Entry, config: Config, layer: _Layer, system: str | None) -> tuple[bool, Value]:
         """Whether a saved value holds for this setting in one layer, and the value that holds.
@@ -176,11 +168,9 @@ class SettingsStore:
 
     def _above_users(self, system: str | None) -> Config:
         """The configuration as the admin has it, which a user's settings are held against."""
-        # The system's own backend: a setting of the desktop alone is laid for the desktop.
         backend = self.backends.get(system or "", self._config.backend.kind)
         return self._laid(self._config, backend, system, "admin")
 
-    # The settings screen.
 
     def answer(self, surface: str, system: str | None = None, role: Role = "admin") -> dict[str, Any]:
         """What the settings screen is drawn from: the groups and their settings on this surface.
@@ -217,7 +207,6 @@ class SettingsStore:
                     "applies": entry.applies,
                 }
                 if system is not None:
-                    # Whether a change is this browser's alone, or every browser's.
                     setting["scope"] = "system" if entry.per_system else "all"
                 settings.append(setting)
             if settings:
@@ -276,7 +265,6 @@ class SettingsStore:
         they turn it off."""
         return self._admins(ENABLED, self._config, system)[1] is not False
 
-    # The admin's policy for users (spec 4.11).
 
     def users_may_use(self, system: str) -> bool:
         """Whether a user may use this browser: it is turned on, and the admin lets users in."""
@@ -300,7 +288,6 @@ class SettingsStore:
                 {
                     "id": entry.id,
                     "title": entry.title,
-                    # What the setting is, so that the admin knows what they are letting users change.
                     "description": entry.description,
                     "allowed": self.user_may_change(entry.id),
                 }
@@ -332,7 +319,6 @@ class SettingsStore:
             self._policy[part] = {**self._policy[part], **lines}
         self._save()
 
-    # The user's preferred browser.
 
     def allowed_systems(self, role: Role) -> list[str]:
         """The browsers a person may use: all of them for the admin, and for a user those that
@@ -433,7 +419,6 @@ def _read(path: Path) -> tuple[_Layer, _Layer, dict[str, dict[str, bool]], str |
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
-        # Passing over it in silence would drop what a person chose, a blocked site among it.
         raise ConfigError(
             f"{path}: the saved settings are not valid JSON (line {exc.lineno}). Correct the file or remove it"
         ) from exc

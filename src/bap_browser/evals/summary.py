@@ -12,7 +12,6 @@ from typing import Any
 from bap_browser.config import Evals
 from bap_browser.evals.record import OUTCOMES, Recorder
 
-# A record as the window lists it: everything but the trace, which is asked for by itself.
 LISTED = (
     "id",
     "system",
@@ -88,7 +87,6 @@ def overall(recorders: Iterable[Recorder], settings: Evals) -> dict[str, Any]:
                 "input_tokens": one["cost"]["input_tokens"],
                 "output_tokens": one["cost"]["output_tokens"],
                 "usd": one["cost"]["usd"],
-                # The checklist as it was last run there: how many of its checks passed.
                 "checks_passed": checklist.get("passed") if checklist else None,
                 "checks": len(checklist.get("checks", [])) if checklist else None,
             }
@@ -109,7 +107,6 @@ def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], setting
     by_tool: dict[str, dict[str, Any]] = {}
     for record in records:
         for span in _spans(record):
-            # What a step waited for a person is not the browser's time.
             ms = max(_number(span, "ms") - _number(span, "waited_ms"), 0.0)
             if span.get("kind") == "model":
                 model_ms.append(ms)
@@ -135,7 +132,6 @@ def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], setting
         "tasks": {
             "count": len(records),
             **outcomes,
-            # Of the tasks that ran to an end of their own. None before there is one.
             "success_rate": round(answered / len(records), 3) if records else None,
             "steps": int(steps),
             "steps_failed": int(sum(_number(record, "steps_failed") for record in records)),
@@ -153,7 +149,6 @@ def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], setting
         },
         "time": {
             "task": _times([_number(record, "duration_ms") for record in records]),
-            # Where the time of the tasks went, as shares of the whole.
             "model_share": round(spent["model_ms"] / in_all, 3) if in_all else None,
             "tool_share": round(spent["tool_ms"] / in_all, 3) if in_all else None,
             "waiting_share": round(spent["waited_ms"] / in_all, 3) if in_all else None,
@@ -162,7 +157,6 @@ def _added_up(records: list[dict[str, Any]], ratings: Mapping[str, Any], setting
             "tasks_counted": len(known),
             "input_tokens": int(sum(_number(record, "input_tokens") for record in known)),
             "output_tokens": int(sum(_number(record, "output_tokens") for record in known)),
-            # None where the deployment gave no price (`agent.input_price_per_million`).
             "usd": cost,
             "usd_per_task": round(cost / len(priced), 6) if cost is not None and priced else None,
         },

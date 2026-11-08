@@ -86,8 +86,6 @@ class Acting(Watching):
         if not embedded:
             tab.unseen = []
         tab.unseen += [str(text) for text in data.get("unseen", ())]
-        # Numbering continues across navigations, tabs and frames, so an old ref can never point at a
-        # new element.
         self._next_ref = data["next"]
         text: str = data["text"]
         depth = frame.depth if frame else 0
@@ -107,9 +105,7 @@ class Acting(Watching):
                     tab, inner, mode, None, left, include_bboxes, embedded=True, indent=met["indent"] + 1
                 )
             except BrowserError:
-                # A frame that cannot be read (it is loading, or gone) is listed and left empty.
                 continue
-            # The notice that something was left out is said once, at the end of the whole.
             cut_short = read.endswith(NOTICE)
             read = read.removesuffix(NOTICE).rstrip("\n")
             if read:
@@ -160,8 +156,6 @@ class Acting(Watching):
             wait_ms=frame_ms,
         )
         if not still_there:
-            # Moving the pointer changed the page: a menu it was over has closed, say. The element
-            # is found again where it is now.
             point = await self._prepare(tab, ref)
             await self._move_to(tab, point["x"], point["y"])
         return point
@@ -255,7 +249,6 @@ class Acting(Watching):
                 await keyboard.press("Enter")
 
         try:
-            # Typing with a pause between keys takes that long on top of the time the page may take.
             await self._input(enter(), "the typing", extra_ms=delay * len(text))
         except PlaywrightError as exc:
             raise BrowserError(
@@ -289,7 +282,6 @@ class Acting(Watching):
         finally:
             tab.script.forget_document()
         if tab.commits == commits:
-            # Nothing was loaded: there is no page that way.
             return None
         await self._wait_for_load(tab)
         return tab.page.url
@@ -305,7 +297,6 @@ class Acting(Watching):
         return data["text"], data["more"]
 
     async def find(self, query: str, limit: int) -> Found:
-        # The whole page with its frames, read in the browser and searched here.
         page = await self._read(
             self._current(), None, "all", None, WHOLE_PAGE, False, embedded=False, indent=0
         )
@@ -345,7 +336,6 @@ class Acting(Watching):
             sx, sy = start
             source = await self._describe_at(tab, sx, sy)
         if isinstance(end, str):
-            # Bringing the source into view may have moved the page: the target is looked for where it is now.
             found = await self._locate(tab, end)
             target = f'{found.role} "{found.name}"' if found.name else found.role
             if found.box is None:
@@ -370,7 +360,6 @@ class Acting(Watching):
         try:
             await self._input(pull(), "the drag")
         except (PlaywrightError, BrowserError) as exc:
-            # A drag that failed part-way leaves the button held, and every move after it would drag.
             with contextlib.suppress(BrowserError, PlaywrightError):
                 await self._input(mouse.up(), "the drag")
             if isinstance(exc, BrowserError):
@@ -439,7 +428,6 @@ class Acting(Watching):
                 except PlaywrightError as exc:
                     if "Unknown key" not in str(exc) or len(keys) != 1:
                         raise
-                    # A character that is on no key of the keyboard Playwright knows is put in as text.
                     await keyboard.insert_text(keys)
 
         async def release() -> None:
@@ -449,8 +437,6 @@ class Acting(Watching):
         try:
             await self._input(press(), "the key press")
         except (PlaywrightError, BrowserError) as exc:
-            # A press that failed part-way leaves its modifiers held down, and every click after it
-            # would be a click with Control held.
             with contextlib.suppress(BrowserError, PlaywrightError):
                 await self._input(release(), "the key press")
             if isinstance(exc, BrowserError):
@@ -499,7 +485,6 @@ class Acting(Watching):
                 reason="there is no such option",
             )
         self._raise_for(chosen, ref)
-        # A page may load another one as soon as an option is chosen.
         await self._settle(tab, navigations, commits)
         return Selected(chosen["describe"], chosen["selected"])
 
@@ -549,8 +534,6 @@ class Acting(Watching):
                     wait_ms=remaining_ms,
                 )
             except BrowserError:
-                # The page was replaced, or was too busy to answer. The wait goes on in what is there
-                # now, for as long as there is time.
                 if loop.time() >= deadline:
                     return False
                 await asyncio.sleep(timeouts.frame_ms / 1000)
@@ -575,8 +558,6 @@ class Acting(Watching):
         waiting: asyncio.Future[FileChooser] = asyncio.get_running_loop().create_future()
         tab.choosing = waiting
         try:
-            # The element is clicked as a person would click it, and the file chooser that opens is
-            # given the files. No chooser is ever shown on a screen.
             await self._click(tab, point["x"], point["y"], ref, "left", 1, ())
             chooser = await asyncio.wait_for(waiting, self._config.browser.timeouts.settle_ms / 1000)
         except TimeoutError:
@@ -588,7 +569,6 @@ class Acting(Watching):
         finally:
             tab.choosing = None
         if len(paths) > 1 and not chooser.is_multiple():
-            # The chooser is closed with nothing chosen: one left open would keep the next from opening.
             with contextlib.suppress(PlaywrightError):
                 await chooser.set_files([])
             raise BadInput(

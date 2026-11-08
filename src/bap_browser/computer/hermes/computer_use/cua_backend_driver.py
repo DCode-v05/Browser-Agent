@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tools/computer_use/cua_backend_driver.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """PM-backed cua-driver selection, MCP discovery and the runtime contract gate.
 Config-derived policy (``_cua_no_overlay``, ``_run_driver`` ...) is looked up lazily through the facade."""
@@ -18,12 +17,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("bap_browser.computer.hermes.computer_use.cua_backend")
 
-# PM owns the pinned binary; an explicit override remains externally owned.
 _CUA_DRIVER_CMD_ENV = "BAP_BROWSER_CUA_DRIVER_CMD"
 _CUA_DRIVER_DEFAULT_CMD = "cua-driver"
-_CUA_DRIVER_ARGS = ["mcp"]  # stdio MCP; fallback when the driver has no `manifest` verb
+_CUA_DRIVER_ARGS = ["mcp"]
 _CUA_DRIVER_RUNTIME_CONTRACT_MIN = (0, 20, 0)
-_CUA_DRIVER_RUNTIME_CONTRACT_ARGS = {  # key order feeds the "manifest is missing" text
+_CUA_DRIVER_RUNTIME_CONTRACT_ARGS = {
     "mcp": {"--socket", "--grant"},
     "serve": {"--socket", "--permission-mode", "--capability-manifest", "--approve-capability-manifest", "--embedded"},
     "stop": {"--socket"},
@@ -129,10 +127,6 @@ def _resolve_mcp_invocation(driver_cmd: str, *, timeout: float = 6.0) -> tuple[s
     args = _valid_mcp_args(invocation)
     command = invocation.get("command") if args is not None and isinstance(invocation, dict) else None
     args = list(_CUA_DRIVER_ARGS) if args is None else args
-    # Translate a Windows ``C:\...`` command for WSL BEFORE the separator check (backslash is not a separator on
-    # POSIX). A generic ``cua-driver`` name would lose the resolved user-local path under a GUI's thin PATH, so only
-    # a concrete (path-bearing) command replaces the one we verified — and THAT binary is probed for `--no-overlay`,
-    # not the system one.
     command = _wsl_windows_path_to_posix(command) if isinstance(command, str) and command else ""
     command = command if command and _has_path_separator(command) else driver_cmd
     return command, _mcp_args_with_overlay_flag(args, driver_cmd=command)

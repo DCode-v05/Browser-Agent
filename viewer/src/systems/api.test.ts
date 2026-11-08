@@ -23,7 +23,6 @@ describe('what the window asks the service of its systems (spec 9.17)', () => {
     const [address, how] = fetched.mock.calls[0];
     expect(address).toBe('http://127.0.0.1:8765/api/systems');
     expect(how).toMatchObject({ headers: { Authorization: 'Bearer the-token' }, cache: 'no-store' });
-    // A service that has no systems, or does not answer, has none to list.
     expect(await api().list()).toBeNull();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('no network')));
     expect(await api().list()).toBeNull();

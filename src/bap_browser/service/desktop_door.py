@@ -17,7 +17,6 @@ from bap_browser.errors import BapError
 from bap_browser.service.accounts import Role
 from bap_browser.service.session import ServiceSession
 
-# The addresses a call from this machine itself comes from.
 THIS_MACHINE = frozenset({"127.0.0.1", "::1", "localhost"})
 
 

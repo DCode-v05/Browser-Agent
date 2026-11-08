@@ -65,18 +65,10 @@ from bap_browser.tools.computer_tools import computer_tools_for
 logger = logging.getLogger(__name__)
 
 CLOUD, CHROME, BUILT_IN, COMPUTER = "cloud", "chrome", "builtin", "computer"
-# Which pages the window has (spec 9.16), and whether the admin's own tools (Systems,
-# Configuration, Evaluations) show beside them: every page, as today (`full`); the three browsers
-# and computer use, with no admin tools, for a deployment that is a browser alone (`browser`); or
-# the desktop app's own browser, attached to the window the app itself shows, and computer use
-# alone, also with no admin tools (`desktop`).
 RoomsMode = Literal["full", "browser", "desktop"]
-# The backend of the page that is no browser: the contained desktop of computer use (spec 21).
 DESKTOP = "contained_desktop"
 ONLY_A_BROWSER = "The checklist is for a browser. The desktop of computer use is checked with its task sets."
-# What a person needs the agent's attention for.
 NEEDS_A_PERSON = ("person_requested", "waiting_approval")
-# What the page of the person's own Chrome says when that Chrome has no window to work in.
 NO_WINDOW = "Your Chrome has no window open. Open a window in Chrome: the agent works in a tab of it."
 
 
@@ -84,7 +76,6 @@ async def paired_or_asked(room: Room, config: Config) -> None:
     """Waits until a person asks for a new session, or, for the desktop on This Mac, until the
     driver is installed and allowed (spec 22.3)."""
     if config.computer.runs == "machine":
-        # It goes on by itself once the driver is installed and, on macOS, allowed.
         await machine_setup.until_ready(config, room.restart)
         room.restart.clear()
         return
@@ -100,13 +91,10 @@ def kind_of(room: Room) -> Kind:
 def said_of(failed: BaseException) -> str:
     """Why a browser could not be started, in words a person can act on."""
     words = str(failed)
-    # Chrome says this when it runs with no window open. It is the person's to open one.
     return NO_WINDOW if "No current window" in words else words
 
 
-# What a person may do with a browser of the window, besides setting it up.
 ACTIONS = ("start", "stop", "restart", "install", "allow")
-# What the summary of an ended session says, in place of "You stopped it."
 STOPPED = "You stopped this browser from the Systems page."
 TURNED_OFF = "This browser was turned off."
 RESTARTED = "It was ended to start a new session."
@@ -150,7 +138,6 @@ class Room:
         if self.note:
             told["note"] = self.note
         if self.id == CHROME:
-            # Where the extension is, for the person to load it into their Chrome.
             told["extension"] = str(extension)
         return told
 
@@ -183,31 +170,24 @@ class Studio:
                 Room(COMPUTER, DESKTOP),
             ]
         self._recorders = {room.id: Recorder(config.evals, room.id, room.backend) for room in self.rooms}
-        # The settings know which browsers there are: a user's preferred one is among them.
         settings.systems = tuple(room.id for room in self.rooms)
         settings.backends = {room.id: room.backend for room in self.rooms}
-        # A checklist runs on one browser at a time, and not on one that is being checked already.
         self._checking: set[str] = set()
-        # The task sets (spec 12.7): each browser's reports, and the run that is under way on it.
         self._reports = {room.id: Reports(config.evals, room.id) for room in self.rooms}
         self._runs: dict[str, Progress] = {}
         self._running: set[asyncio.Task[None]] = set()
         self.service: Service | None = None
 
-    # What the window asks (the HTTP surface).
 
     def pages(self) -> list[dict[str, Any]]:
         """The pages of the window, for its tabs (spec 9.16). The desktop's says where it works."""
         told = [room.described(self._extension) for room in self.rooms]
         for page, room in zip(told, self.rooms, strict=True):
-            # Which system the engine runs: each page says where it is hosted.
             page["engine_system"] = sys.platform
             if room.backend == DESKTOP:
                 page["runs"] = self._configured(room).computer.runs
-                # Whether what a person does on the picture reaches the screen (spec 22.3.1).
                 driver = room.session.browser.started_driver if room.session is not None else None
                 page["hand"] = isinstance(driver, HermesDriver) and driver.takes_a_hand()
-                # Which system the machine it controls runs: said on the page.
                 if isinstance(driver, HermesDriver) and driver.system_known is not None:
                     page["driven_system"] = driver.system_known
         return told
@@ -223,7 +203,6 @@ class Studio:
                     **room.described(self._extension),
                     "enabled": self._settings.enabled(room.id),
                     "model": config.agent.model,
-                    # Where this browser's log is written. None when a person turned it off.
                     "log": str(Path(log).resolve()) if log else None,
                     "records": str(self._recorders[room.id].folder.resolve()),
                     **({"runs": config.computer.runs} if room.backend == DESKTOP else {}),
@@ -250,7 +229,6 @@ class Studio:
         if not wanted:
             await self._end(room, TURNED_OFF)
         if wanted == (room.phase == "off"):
-            # Whether it is wanted has changed: its loop looks again.
             room.restart.set()
 
     async def manage(self, system: str, action: str) -> str | None:
@@ -264,7 +242,6 @@ class Studio:
         if action in ("install", "allow"):
             if room.backend != DESKTOP or (room.session is not None and room.session.control != "ended"):
                 return "This is for a machine that is not being worked on yet."
-            # A download, or macOS's question: neither is waited for on the loop.
             return await asyncio.to_thread(machine_setup.make_ready, self._configured(room), action)
         running = room.session is not None and room.session.control != "ended"
         if action == "stop":
@@ -342,7 +319,6 @@ class Studio:
         self._recorders[system].keep_checklist(result)
         return result
 
-    # The task sets (spec 12.7).
 
     def suite(self, system: str) -> dict[str, Any]:
         """The task sets of a browser: what each is, how its newest run went, and the run under way."""
@@ -373,14 +349,12 @@ class Studio:
                     **told["last"]["totals"],
                     "mode": told["last"]["mode"],
                     "started": told["last"]["started"],
-                    # How many times each task was tried, not how many tries there were in all.
                     "trials": told["last"]["trials"],
                     "stopped": told["last"]["stopped"],
                 }
                 for name, told in latest.items()
             }
             lines.append({"system": room.id, "runs": runs})
-        # Every set of every system: the desktop has one the browsers do not (spec 21.9).
         listed = [set_described(name) for name in SETS]
         listed += [set_described(name, "desktop") for name in DESKTOP_SETS if name not in SETS]
         return {"sets": listed, "systems": lines}
@@ -414,7 +388,6 @@ class Studio:
             return False
         progress.stop.set()
         if room.session is not None:
-            # The task it is on is stopped as a person stops one from the chat.
             await room.session.handle({"type": "stop_task"})
         return True
 
@@ -425,11 +398,7 @@ class Studio:
         by_the_agent = progress.mode == "agent"
 
         async def do(words: str) -> Any:
-            # Whoever watches the page sees each task in the chat, as if a person had sent it.
             session.said("person", words)
-            # Each task starts with nothing remembered of the one before it: a conversation of its
-            # own, and a model client of its own, which keeps the turns of one conversation.
-            # The desktop's own instructions, as in its chat: a run measures what a person would get.
             system = instructions_for(session.config, driven(session)) if room.backend == DESKTOP else SYSTEM
             return await do_task(
                 words, session, self._model_for(service), session.config, [], recorder, system
@@ -456,7 +425,6 @@ class Studio:
         finally:
             self._runs.pop(room.id, None)
 
-    # The browsers themselves.
 
     def _given(self, room: Room) -> Config:
         """What the deployment gives this browser, before a person's settings."""
@@ -466,7 +434,6 @@ class Studio:
         elif room.id == BUILT_IN:
             config = built_in_config(config, keep_cdp=self._rooms_mode == "desktop")
         elif room.id == COMPUTER:
-            # Its picture is sent to whoever watches, as a headless browser's is.
             config = cloud_config(config)
         return with_its_own_log(config, room.id)
 
@@ -496,7 +463,6 @@ class Studio:
         """Waits until a session is wanted on the page: a person turned the browser on, or asked
         for a new session."""
         while not self._settings.enabled(room.id):
-            # Turned off: there is nothing on its page, and nobody is connected to it.
             gone = self.sessions.pop(room.id, None)
             room.session, room.phase, room.note = None, "off", ""
             if gone is not None:
@@ -544,7 +510,6 @@ class Studio:
             room.phase, room.note = "starting", ""
             room.restart.clear()
             given = self._given(room)
-            # The desktop is started as a person has set it up: its network and its shared folder.
             as_set = self._settings.apply_to(given, room.backend, room.id)
             tasks: asyncio.Queue[str] = asyncio.Queue()
             session = ServiceSession(
@@ -563,8 +528,6 @@ class Studio:
             except BapError as failed:
                 await session.close()
                 room.session, room.phase, room.note = None, "failed", str(failed)
-                # A person can try again from the Systems page. On This Mac it goes on by itself as
-                # soon as a helper pairs.
                 await paired_or_asked(room, as_set)
                 continue
             self._take_place(room, session)
@@ -593,7 +556,6 @@ class Studio:
             except BapError as failed:
                 await session.close()
                 room.session, room.phase, room.note = None, "failed", str(failed)
-                # A person can try again from the Systems page.
                 await self._asked_again(room)
                 continue
             self._take_place(room, session)
@@ -613,7 +575,6 @@ class Studio:
             room.restart.clear()
             if not await self._paired_or_unwanted(room):
                 continue
-            # The driver attaches to the tab through this process's own end of the bridge.
             given = self._given(room)
             browser = given.browser.model_copy(update={"cdp_url": service.bridge_cdp_address})
             attached = given.model_copy(update={"browser": browser})
@@ -625,13 +586,11 @@ class Studio:
                 agent=AGENT_NAME,
                 name=room.id,
                 on_task=tasks.put_nowait,
-                # The person looks at their own browser: no picture of it is sent across the bridge.
                 pictures=False,
                 backend=room.backend,
                 on_restart=room.restart.set,
                 settings=self._settings,
             )
-            # Which sites the agent may read and act on is decided on the person's machine.
             session.browser.ask_site = bridge.permit
             session.browser.site_done = bridge.permit_done
             try:
@@ -643,7 +602,6 @@ class Studio:
                 continue
             room.note = ""
             self._take_place(room, session)
-            # The side panel in that Chrome shows this page's chat.
             panel = f"{service.address}/?session={room.id}#token={service.token}"
             browser_extension.announce(self._extension, panel, bridge=service.bridge_address)
             await self._talk(room, tasks, session)

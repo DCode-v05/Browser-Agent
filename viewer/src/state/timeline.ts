@@ -1,10 +1,6 @@
-// Steps become timeline rows (spec 9.7): one sentence per step, consecutive reads collapsed into
-// one row with a count, and a divider where the session sat idle.
-
 import { W } from '../wording';
 import type { Step, StepMark, UnansweredMarker } from './reducer';
 
-/** A step's mark in its timeline row (spec 18.10): checked, allowed, or why it was refused. */
 export function markText(mark: StepMark): string {
   switch (mark.kind) {
     case 'checked':
@@ -22,7 +18,6 @@ export type Row =
   | {
       kind: 'step';
       key: string;
-      /** The step the row stands for; the newest one when several are collapsed. */
       step: Step;
       steps: Step[];
       text: string;
@@ -31,7 +26,6 @@ export type Row =
       status: Step['status'];
     }
   | { kind: 'idle'; key: string; seconds: number }
-  /** "Nobody is answering" (spec 18.10). */
   | { kind: 'unanswered'; key: string; count: number };
 
 function endOf(step: Step): number {
@@ -43,7 +37,6 @@ function isQuietRead(step: Step): boolean {
 }
 
 export function buildRows(steps: Step[], idleDividerS: number, unanswered: UnansweredMarker[] = []): Row[] {
-  // Steps and "nobody is answering" markers are merged by when each happened.
   type Entry = { at: number; order: number; step?: Step; marker?: UnansweredMarker };
   const entries: Entry[] = [
     ...steps.map((step, order): Entry => ({ at: step.startedAt, order, step })),
@@ -71,7 +64,6 @@ export function buildRows(steps: Step[], idleDividerS: number, unanswered: Unans
     } else {
       rows.push({
         kind: 'step',
-        // Keyed by its first step, so the row keeps its identity while later reads join it.
         key: `step-${step.n}`,
         step,
         steps: [step],

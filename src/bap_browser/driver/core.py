@@ -71,7 +71,6 @@ class DriverCore:
         self._version = ""
         self._tabs: dict[str, OpenTab] = {}
         self._active: OpenTab | None = None
-        # Tab ids are never used twice in a session, and neither are refs, in any tab.
         self._tab_count = 0
         self._next_ref = 1
         self._next_frame = 1
@@ -81,23 +80,17 @@ class DriverCore:
         self._on_event: Callable[[Happened], None] | None = None
         self._guard: Guard | None = None
         self._judge_file: FileGuard | None = None
-        # The dialogs that wait for an answer, oldest first.
         self._dialogs: list[OpenDialog] = []
         self._dialog_count = 0
         self._dialog_open = asyncio.Event()
         self._no_dialog = asyncio.Event()
         self._no_dialog.set()
         self._downloads: list[SavedFile] = []
-        # Windows that a page has opened and that have not been handed over yet, and windows that
-        # were handed over before their page said it was opening them.
         self._opening = 0
         self._early = 0
         self._arrived = asyncio.Event()
-        # Pages this driver is opening itself. They are not windows that a page opened.
         self._own_pages = 0
-        # Tabs this driver is closing itself: whoever asked is told by the answer, not as news.
         self._closing: set[str] = set()
-        # The tab the live picture is of.
         self._pictured: OpenTab | None = None
 
     def guard(self, judge: Guard) -> None:
@@ -193,7 +186,6 @@ class DriverCore:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await self._stack.aclose()
-        # A file nobody said yes to does not outlive the session.
         for place, file in enumerate(self._downloads):
             if file.state == "held":
                 try:
@@ -215,7 +207,6 @@ class DriverCore:
     def is_alive(self) -> bool:
         if self._browser is not None:
             return self._browser.is_connected()
-        # A browser with a kept profile is gone when its one context has closed.
         return self._context is not None
 
     def description(self) -> str:
@@ -283,7 +274,6 @@ class DriverCore:
     async def _viewport(self, tab: OpenTab) -> tuple[int, int]:
         size = tab.page.viewport_size
         if size is None:
-            # No fixed size was asked for: the page is as large as its window.
             size = await tab.page.evaluate("({ width: innerWidth, height: innerHeight })")
         return size["width"], size["height"]
 
@@ -293,7 +283,6 @@ class DriverCore:
         try:
             allowed, reason = await self._guard(url) if self._guard else (True, "")
         except Exception:
-            # What cannot be judged is not loaded.
             allowed, reason = False, "the address could not be checked"
         try:
             if allowed:
@@ -301,14 +290,12 @@ class DriverCore:
                 return
             await tab.cdp.send("Fetch.failRequest", {"requestId": request, "errorReason": "BlockedByClient"})
         except PlaywrightError:
-            # The tab closed, or went elsewhere, while the address was being judged.
             return
         if paused.get("resourceType") != "Document":
             return
         shown = capped(without_credentials(url), self._config.browser.snapshot.max_text_chars)
         in_frame = paused.get("frameId") != tab.main_frame_id
         if tab.opening is not None and not in_frame:
-            # The agent's own navigation ran into it: that call says so itself.
             tab.opening.append((shown, reason))
             return
         self._tell(told_refused(shown, reason, " in a frame" if in_frame else ""))
@@ -379,7 +366,6 @@ class DriverCore:
                 await around.call("intoView", {"ref": inner.owner})
             box = await around.call("frameBox", {"ref": inner.owner})
             if box.get("error"):
-                # The frame's own element is gone, and everything inside it with it.
                 raise StaleRef(ref)
             dx, dy = dx + box["x"], dy + box["y"]
         return dx, dy
@@ -432,7 +418,6 @@ class DriverCore:
                 own = await tab.page.context.new_cdp_session(frame)
                 root = (await own.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
             except PlaywrightError:
-                # A frame in the page's own process has no session of its own.
                 continue
             tab.apart[frame] = (root, own)
             if root == frame_id:
@@ -510,12 +495,8 @@ class DriverCore:
         """Waits for a navigation the action started, and for a window it opened. Returns the new
         address of the tab, or None if it went nowhere."""
         timeouts = self._config.browser.timeouts
-        # The page is given its turn to do what the action set going. It says at once when it sets
-        # out for another page or opens a window, and what it says arrives here before the answer
-        # to this question does: so nothing has to be waited for that is not happening (spec 11.3).
         document_alive = await tab.script.turn_passed()
         if tab.id not in self._tabs:
-            # The action closed its own tab.
             return None
         if tab.navigations != navigations_before or not document_alive:
             await self._wait_for_commit(tab, commits_before, timeouts.settle_ms)
@@ -537,7 +518,6 @@ class DriverCore:
                 await asyncio.wait_for(tab.committed.wait(), remaining)
 
     async def _wait_for_load(self, tab: OpenTab) -> None:
-        # Some pages never fire the load event. The wait has a ceiling, and reaching it is not a failure.
         with contextlib.suppress(PlaywrightTimeoutError):
             await tab.page.wait_for_load_state("load", timeout=self._config.browser.timeouts.load_wait_ms)
 
@@ -560,7 +540,5 @@ class DriverCore:
         if frame == tab.page.main_frame:
             tab.commits += 1
             tab.committed.set()
-            # Another document: its frames are other frames.
             tab.frames.clear()
-        # A frame that went to another site may have moved to another process, or back.
         tab.apart.pop(frame, None)

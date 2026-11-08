@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_bot_desktop_idle.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Bot Desktop idle auto-stop: a screen nobody used past ``bot_desktop.idle_stop_minutes`` is stopped,
 one a human holds or that saw recent use is not."""
@@ -32,11 +31,11 @@ def test_idle_screen_is_stopped_but_a_used_or_held_one_is_not(tmp_path, monkeypa
     sd, stops = _running(monkeypatch, tmp_path)
     monkeypatch.setattr(lease, "get", lambda profile_key=None: lease.Lease(holder=lease.AGENT))
 
-    _age(sd / "env", 5)  # just started, never stamped: ages from publish
+    _age(sd / "env", 5)
     assert runtime.stop_if_idle() is False and stops == []
 
     _age(sd / "env", 3600)
-    runtime.touch_activity()  # a computer_use action / browser spawn a moment ago
+    runtime.touch_activity()
     assert runtime.stop_if_idle() is False and stops == []
 
     _age(sd / "activity", 3600)

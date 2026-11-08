@@ -62,10 +62,8 @@ def test_each_system_and_all_of_them_add_up(tmp_path: Path) -> None:
             "claude-opus-5-5": {"tasks": 1, "input_tokens": 100_000, "output_tokens": 2_000, "cost_usd": 0.44}
         },
     }
-    # A task kept before the prices were set is costed at today's price for its model.
     assert used["systems"]["chrome"]["cost_usd"] == 0.22
     assert used["systems"]["builtin"]["tasks"] == 0
-    # A model with no price here is counted in tokens, and said to be uncosted.
     assert used["systems"]["computer"]["cost_unknown"] == 1
     assert used["total"]["tasks"] == 4
     assert used["total"]["input_tokens"] == 360_000

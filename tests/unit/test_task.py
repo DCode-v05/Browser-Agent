@@ -14,7 +14,6 @@ from bap_browser.safeguards.task import TaskBook, TaskSite, sites_in
         ("shop.example, then shop.example again", ["shop.example"]),
         ("Find the cheapest flight to Oslo.", []),
         ("Version 2.5 costs 3.99 and file v1.2.3 is old", []),
-        # The end of an email address names nobody's site.
         ("Send the report to bob@partner.example", []),
         ("Mail bob@partner.example about docs.partner.example", ["partner.example"]),
     ],

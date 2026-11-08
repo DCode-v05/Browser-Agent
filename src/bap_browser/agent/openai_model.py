@@ -33,7 +33,6 @@ class OpenAIModel(HostedModel):
                     "name": tool.name,
                     "description": tool.description,
                     "parameters": tool.input_schema,
-                    # Strict mode wants every argument required; these tools have optional ones.
                     "strict": False,
                 }
                 for tool in tools
@@ -65,8 +64,6 @@ class OpenAIModel(HostedModel):
     def _input(self, messages: Sequence[Message]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         turn = 0
-        # The conversation is sent again on every turn. Only the newest picture goes with it: an
-        # older one has been seen, and would be paid for again each time.
         newest = next(
             (m for m in reversed(messages) if isinstance(m, ToolOutput) and m.picture is not None), None
         )

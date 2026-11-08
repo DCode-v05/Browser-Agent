@@ -1,4 +1,3 @@
-/* A made-up website for the recorded demo pictures. It is the site the agent visits, not part of the viewer. */
 * { box-sizing: border-box; }
 body { margin: 0; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; color: #1c2430; background: #f3f0ea; }
 header { display: flex; align-items: center; gap: 28px; padding: 16px 40px; background: #fff; border-bottom: 1px solid #e3ded3; }

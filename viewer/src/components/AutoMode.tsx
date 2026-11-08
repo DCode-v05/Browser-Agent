@@ -1,6 +1,3 @@
-// Auto Mode and safeguards, as a person sees them (spec 18.10): the mode chip, the task line, the
-// first-time notice, the "Refused" list, a flagged page, Auto paused, and a limit reached.
-
 import { useEffect, useRef } from 'react';
 
 import type { ClientCommand } from '../protocol';
@@ -10,7 +7,6 @@ import { Icon } from './Icon';
 import { Button } from './StatusPanel';
 import { trapTab } from './focus';
 
-/** Remembers that a person has seen the first-time notice, once per person and browser. */
 const AUTO_NOTICE_KEY = 'bap-browser.auto-notice-accepted';
 
 export function autoNoticeAccepted(): boolean {
@@ -25,11 +21,9 @@ export function acceptAutoNotice(): void {
   try {
     localStorage.setItem(AUTO_NOTICE_KEY, 'true');
   } catch {
-    // Nothing is kept: the notice would show again next time, which is safe.
   }
 }
 
-/** What the mode chip says, for the mode itself and, in Auto Mode, for its run state (spec 18.10). */
 function modeText(auto: AutoInfo): string {
   if (auto.mode !== 'auto') return W.autoMode.mode[auto.mode];
   switch (auto.state) {
@@ -44,7 +38,6 @@ function modeText(auto: AutoInfo): string {
   }
 }
 
-/** The chip in the head of the chat and in the top bar (spec 18.10). Nothing before `auto_changed` arrives. */
 export function ModeChip({ auto, onClick }: { auto: AutoInfo | null; onClick(): void }) {
   if (!auto) return null;
   return (
@@ -54,7 +47,6 @@ export function ModeChip({ auto, onClick }: { auto: AutoInfo | null; onClick(): 
   );
 }
 
-/** The task line under the head, and its sites as chips (spec 18.3, 18.10). */
 export function TaskLine({ task, onDrop }: { task: TaskInfo | null; onDrop(host: string): void }) {
   if (!task) return null;
   return (
@@ -79,7 +71,6 @@ export function TaskLine({ task, onDrop }: { task: TaskInfo | null; onDrop(host:
   );
 }
 
-/** Shown once per person and browser, when Auto is chosen for the first time (spec 18.10). */
 export function FirstTimeNotice({ onAccept, onDismiss }: { onAccept(): void; onDismiss(): void }) {
   const safe = useRef<HTMLButtonElement>(null);
   useEffect(() => safe.current?.focus(), []);
@@ -118,7 +109,6 @@ export function FirstTimeNotice({ onAccept, onDismiss }: { onAccept(): void; onD
   );
 }
 
-/** A bar shown while the newest `auto_changed` has state `paused` (spec 18.4, 18.10). */
 export function AutoPausedBar({ why, onResume }: { why?: string; onResume(): void }) {
   return (
     <div className="card" data-tone="waiting" role="group" aria-label={W.autoMode.paused.resume}>
@@ -136,7 +126,6 @@ export function AutoPausedBar({ why, onResume }: { why?: string; onResume(): voi
   );
 }
 
-/** A bar shown while a limit of the session or the task is reached (spec 18.8, 18.10). */
 export function LimitBar({ limit, onExtend, onEndTask }: { limit: LimitInfo; onExtend(): void; onEndTask(): void }) {
   const text =
     limit.kind === 'calls'
@@ -161,7 +150,6 @@ export function LimitBar({ limit, onExtend, onEndTask }: { limit: LimitInfo; onE
   );
 }
 
-/** A warning that a page's hidden instructions were found and withheld (spec 18.5, 18.10). It can be closed. */
 export function FlaggedNotice({ site, onClose }: { site: string; onClose(): void }) {
   return (
     <div className="card" data-tone="danger" role="group" aria-label={W.autoMode.flagged.title}>
@@ -179,7 +167,6 @@ export function FlaggedNotice({ site, onClose }: { site: string; onClose(): void
   );
 }
 
-/** The "Refused" list, in the step drawer and under the chat (spec 18.4, 18.10). */
 export function RefusedList({ refused, onAllow }: { refused: RefusedStep[]; onAllow(id: string): void }) {
   return (
     <div className="card" role="group" aria-label={W.autoMode.refusedList.title}>
@@ -209,8 +196,6 @@ export function RefusedList({ refused, onAllow }: { refused: RefusedStep[]; onAl
   );
 }
 
-/** What the check asks of a person beside the timeline: a pause to lift, a limit to raise, and
- * the refused steps they may allow once (spec 18.10). */
 export function CheckBars({
   auto,
   limit,

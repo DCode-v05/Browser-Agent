@@ -16,12 +16,8 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from bap_browser.service.events import FellBehind, Subscriber
 from bap_browser.service.session import ServiceSession
 
-# The first byte of a binary message says what it carries.
 PICTURE = b"\x01"
-# A person's command is a few dozen bytes. Nothing larger is taken from a viewer.
 LARGEST_VIEWER_MESSAGE = 64 * 1024
-
-# Close codes the viewer acts on.
 
 
 class Close(IntEnum):
@@ -61,18 +57,13 @@ async def serve_viewer(
                     door.set_result(leave)
                 return
             if command.get("type") == "seen":
-                # Only what the person sees: no turn to wait, and nothing for the session to do.
                 subscriber.in_front = command.get("visible") is not False
             elif command.get("type") == "stop":
-                # Stop never waits its turn: a pause or a take-over ahead of it may be waiting for an
-                # action that does not end.
                 await session.handle(command)
             elif waiting.qsize() < backlog:
                 waiting.put_nowait(command)
-            # Past the limit a command is dropped: the page is not keeping up with what is sent.
 
     async def act() -> None:
-        # One at a time and in order: what a person types must reach the page as it was typed.
         while True:
             await session.handle(await waiting.get())
 
@@ -91,7 +82,6 @@ async def serve_viewer(
         None,
     )
     if isinstance(failure, FellBehind):
-        # The viewer stopped reading. It connects again and is sent everything from the start.
         await socket.close(Close.START_OVER)
     elif failure is not None and not isinstance(failure, WebSocketDisconnect):
         raise failure

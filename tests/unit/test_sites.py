@@ -18,21 +18,16 @@ REGISTRABLE_NAME: list[tuple[str, str]] = [
     ("www.example.com", "example.com"),
     ("example.com", "example.com"),
     ("localhost", "localhost"),
-    # A host that is itself a public suffix is its own site.
     ("co.uk", "co.uk"),
     ("github.io", "github.io"),
-    # The real list's *.ck wildcard rule and its !www.ck exception.
     ("www.ck", "www.ck"),
     ("foo.bar.ck", "foo.bar.ck"),
     ("foo.www.ck", "www.ck"),
     ("ck", "ck"),
-    # Trailing dots and upper case are ignored.
     ("www.example.com.", "example.com"),
     ("WWW.EXAMPLE.COM", "example.com"),
-    # An IDN host and its xn-- form are the same site; registrable_name keeps the spelling given.
     ("bücher.example", "bücher.example"),
     ("xn--bcher-kva.example", "xn--bcher-kva.example"),
-    # Garbage still gets an answer, never an exception.
     ("", ""),
     ("not a hostname at all!!", "not a hostname at all!!"),
 ]
@@ -88,13 +83,9 @@ def test_registrable_name_of_an_ip_address_is_the_address_itself() -> None:
 SITE_OF: list[tuple[str, str]] = [
     ("https://www.example.com/path", "example.com"),
     ("http://a.shop.co.uk:8080/x", "shop.co.uk"),
-    # A port does not change the site.
     ("https://example.com:8443/", "example.com"),
-    # Neither does a user and a password.
     ("https://user:pass@example.com/", "example.com"),
-    # The site of a blob: address is the site of the address it was made from.
     ("blob:https://shop.example/9b1f3e2a-uuid", "shop.example"),
-    # These have no host at all.
     ("about:blank", ""),
     ("data:text/html,hello", ""),
     ("file:///C:/pages/a.html", ""),
@@ -110,10 +101,8 @@ def test_site_of(address: str, site: str) -> None:
 
 ORIGIN_OF: list[tuple[str, str]] = [
     ("http://127.0.0.1:8765/path", "http://127.0.0.1:8765"),
-    # The usual port is written out even when the address does not give it.
     ("https://example.com/path", "https://example.com:443"),
     ("http://example.com/path", "http://example.com:80"),
-    # A user and a password are not part of the origin.
     ("https://user:pass@example.com:8443/x", "https://example.com:8443"),
     ("http://[::1]:9000/", "http://[::1]:9000"),
     ("about:blank", ""),
@@ -129,7 +118,6 @@ def test_origin_of(address: str, origin: str) -> None:
 TO_LATIN: list[tuple[str, str]] = [
     ("paypal", "paypal"),
     ("PayPal", "paypal"),
-    # Five Cyrillic letters and the palochka letter, read as the Latin letters they look like.
     ("\u0440\u0430\u0443\u0440\u0430\u04cf", "paypal"),
     ("123-abc", "123-abc"),
 ]

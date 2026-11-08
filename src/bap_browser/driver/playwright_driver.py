@@ -42,15 +42,12 @@ class PlaywrightDriver(ForTheCheck):
             browser: Browser | None = None
             attach = self._config.browser.cdp_url
             if attach:
-                # A browser that is already running, started by someone else. It is driven, and on
-                # close it is let go of, not ended: the page stays where the agent left it.
                 browser = await playwright.chromium.connect_over_cdp(
                     attach, timeout=timeouts.launch_ms, headers=self._cdp_headers or None
                 )
                 self._stack.push_async_callback(browser.close)
                 context, page = self._page_to_drive(browser)
             elif profile:
-                # A profile that is kept: its sign-ins, and an extension loaded into it, are there next time.
                 context = await playwright.chromium.launch_persistent_context(
                     profile, **launch, **context_options(self._config)
                 )
@@ -65,7 +62,6 @@ class PlaywrightDriver(ForTheCheck):
             context.set_default_navigation_timeout(timeouts.navigation_ms)
             self._browser, self._context = browser, context
             tab = await self._add_tab(page)
-            # A browser with a kept profile is not handed over as an object of its own, so its version is asked for.
             product = browser.version if browser else (await tab.cdp.send("Browser.getVersion"))["product"]
         except PlaywrightError as exc:
             await self._stack.aclose()
@@ -77,7 +73,6 @@ class PlaywrightDriver(ForTheCheck):
         self._active = tab
         self._version = product.rpartition("/")[2]
         if self._frames is not None:
-            # A browser that was started again goes on sending pictures to whoever was watching.
             await self._begin_pictures(self._frames[1])
 
     async def _add_tab(self, page: Page) -> OpenTab:
@@ -87,7 +82,6 @@ class PlaywrightDriver(ForTheCheck):
             raise BrowserError(NOT_STARTED)
         self._tab_count += 1
         tab_id = f"t{self._tab_count}"
-        # First of all: a dialog that nobody listens for is dismissed by the browser's driver at once.
         page.on("dialog", lambda dialog: self._on_dialog(tab_id, dialog))
         cdp = await self._context.new_cdp_session(page)
         tab = OpenTab(
@@ -103,9 +97,6 @@ class PlaywrightDriver(ForTheCheck):
         page.on("close", lambda _: self._forget(tab))
         page.on("crash", lambda _: self._crashed(tab))
         page.on("download", lambda download: self._spawn(self._save(download)))
-        # Listened for from the start, so that the browser hands every file chooser to this driver.
-        # One that is asked for only at the moment of an upload can open before the browser has
-        # heard that it is wanted, and is then never seen (and no later one opens).
         page.on("filechooser", lambda chooser: self._on_file_chooser(tab, chooser))
         if browser.capture.console:
             page.on("console", lambda message: self._on_console(tab, message))
@@ -114,9 +105,6 @@ class PlaywrightDriver(ForTheCheck):
             page.on("response", lambda response: self._on_response(tab, response))
             page.on("requestfailed", lambda request: self._on_request_failed(tab, request))
         if self._guard is not None:
-            # Every document this tab sets out to load is judged first, whoever started it: a link, a
-            # redirect, a frame, a script. Only documents are held up, unless the deployment asks for
-            # everything: holding up every request makes a page load much slower (spec 8.1).
             everything = self._config.safety.enforce_on_subresources
             wanted = {"urlPattern": "*"} if everything else {"urlPattern": "*", "resourceType": "Document"}
             cdp.on("Fetch.requestPaused", lambda paused: self._spawn(self._judge_request(tab, paused)))
@@ -124,8 +112,6 @@ class PlaywrightDriver(ForTheCheck):
         cdp.on("Page.screencastFrame", lambda frame: self._on_picture(tab, frame))
         cdp.on("Page.windowOpen", lambda _: self._window_opening())
         cdp.on("Page.frameRequestedNavigation", lambda asked: self._on_leaving(tab, asked))
-        # The page says when it opens a window, or sets out for another page, only to one who has
-        # asked to hear about the page.
         await cdp.send("Page.enable")
         tab.main_frame_id = (await cdp.send("Page.getFrameTree"))["frameTree"]["frame"]["id"]
         self._tabs[tab_id] = tab
@@ -246,11 +232,9 @@ class PlaywrightDriver(ForTheCheck):
             if focus:
                 await self._show(tab)
             now = " and is now the active tab" if focus else ""
-            # A page can make its own address as long as it likes.
             address = capped(without_credentials(page.url), browser.snapshot.max_text_chars)
             self._tell(Happened("tab_opened", f"tab {tab.id} opened{now}: {address}"))
         except (PlaywrightError, BrowserError):
-            # It closed again before it could be taken in.
             return
         finally:
             if self._opening:
@@ -267,16 +251,12 @@ class PlaywrightDriver(ForTheCheck):
             await tab.page.goto(url, wait_until="domcontentloaded")
         except PlaywrightError as exc:
             if tab.navigations != navigations:
-                # The browser shows its own error page for an address it could not load. A
-                # navigation started before that page arrives would be interrupted by it.
                 await self._wait_for_commit(tab, commits, self._config.browser.timeouts.settle_ms)
             if refused:
-                # The address led, by a redirect, to one the policy refuses.
                 led_to, reason = refused[-1]
                 raise PolicyBlocked(
                     f"navigation to {led_to} blocked: {reason}", url=led_to, reason=reason.split(" (")[0]
                 ) from exc
-            # The browser's own words repeat the address, which may hold a name and password.
             shown = without_credentials(url)
             raise BrowserError(
                 f"Could not open {shown}: {first_line(exc).replace(url, shown)}", reason=load_failure(exc)

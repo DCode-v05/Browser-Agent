@@ -16,7 +16,6 @@ def run_approval_gate(
     action = pattern_key.split(":")[1] if pattern_key.count(":") >= 1 else pattern_key
     theirs = more.get("approval_callback")
     if callable(theirs):
-        # Hermes' own way of naming who answers (`set_approval_callback`), which its tests use.
         answer = theirs(more.get("display_target", ""), description)
         if answer in ("once", "session", "always"):
             return {"approved": True}

@@ -48,20 +48,14 @@ from bap_browser.safeguards.task import TaskBook
 FindingOutcome = Literal["refuse", "person", "unsure"]
 AutoState = Literal["off", "on", "paused", "waiting_for_task", "unavailable"]
 
-# The tools that press a control, whose name can say what pressing it does.
 PRESS = frozenset({"browser_click", "browser_set_checked", "browser_select_option"})
-# The same on a desktop: the tool, and its actions that press one element (spec 22.7).
 PRESS_ON_A_DESKTOP = frozenset(
     ("computer_use", action) for action in ("click", "double_click", "right_click", "middle_click")
 )
-# The tools that put text into a field.
 TYPE = frozenset({"browser_type", "browser_fill_form", "browser_press_key"})
-# The keys that press the control that has the focus.
 PRESSING_KEYS = frozenset({"Enter", "Space", " "})
 OPENS_AN_ADDRESS = frozenset({"browser_navigate", "browser_tabs"})
-# Addresses that are a page with no site of its own.
 NO_SITE_OF_ITS_OWN = ("data:", "blob:")
-# The finding each class of step is, and what a person is told of it.
 DOES: dict[ActionClass, tuple[str, str]] = {
     "pays": ("paying_step", "this step pays for or orders something"),
     "sends": ("sending_step", "this step sends something to other people"),
@@ -159,17 +153,11 @@ class Findings:
         self._clock = clock
         self.task = TaskBook()
         self.memory = CopyMemory(lambda: self._session.config.safeguards.outgoing)
-        # The tabs whose page holds a planted instruction: the rule that found it, and the page.
         self.flagged: dict[str, tuple[str, str]] = {}
-        # The sites a page of which was opened in this session.
         self._visited: set[str] = set()
-        # What was settled about a site, for the task: the finding, the site, and the answer.
         self._settled: dict[tuple[str, str], bool] = {}
-        # What a host looks like, measured against the protected names of the moment.
         self._measured: dict[tuple[str, tuple[str, ...]], tuple[str | None, bool]] = {}
-        # Why Auto Mode is paused, when it is.
         self._paused = ""
-        # What the paying steps a person approved add up to.
         self._paid = Decimal(0)
 
     def judge_file(self, name: str, first_bytes: bytes) -> tuple[Literal["keep", "ask", "delete"], str]:
@@ -187,13 +175,11 @@ class Findings:
             return "delete", "this kind of file can run programs"
         return ("ask", "") if what == "ask" else ("keep", "")
 
-    # The mode.
 
     @property
     def mode(self) -> str:
         safety = self._session.config.safety
         if safety.ask_before == "auto" and not safety.auto_mode.offered:
-            # A choice kept from a time when Auto was offered.
             return "risky"
         return safety.ask_before
 
@@ -210,7 +196,6 @@ class Findings:
             return "waiting_for_task", ""
         return "on", ""
 
-    # The findings.
 
     def _does(self, step: Step) -> ActionClass | None:
         """What the step does: the class of the control it presses, or sending a message."""
@@ -241,7 +226,6 @@ class Findings:
             is_message_box(role, [label], actions, multiline=multiline, search=search)
             for role, label, multiline, search in control.sends_form
         ):
-            # The button of a form that holds a message sends it, whatever the button is called.
             return "sends"
         return does
 
@@ -308,7 +292,6 @@ class Findings:
             )
             if does == "pays" and not own:
                 found += self._money(step, amount)
-        # A desktop has no site, and so no page of the core's own: what goes out there is looked at.
         if own and step.on_a_site:
             return found
         found += self._what_goes_out(step)
@@ -413,7 +396,6 @@ class Findings:
                             "unsure",
                             f"this step carries text that was read on {copy.site} to {step.site}",
                             held_high=True,
-                            # The person is shown what would leave as it would leave, not as it is compared.
                             sample=leaving,
                             leaves=(copy.site, step.site),
                         )
@@ -479,8 +461,6 @@ class Findings:
             )
         kind = self._kind_of_site(host)
         state = self.auto_state()[0]
-        # Paused, the mode is still Auto: what it watches is still watched. Only who is asked
-        # changes, from the reviewer to the person (spec 18.4).
         auto = state in ("on", "paused")
         if kind is not None:
             if not self._is_settled("sensitive_site", site):
@@ -492,7 +472,6 @@ class Findings:
             elif step.acts and auto:
                 found.append(Finding("step_on_sensitive_site", "unsure", f"this step acts on {host}, {kind}"))
         pressing_or_typing = step.tool in PRESS or step.tool in TYPE
-        # A weak sign by itself: it is for the reviewer to weigh, not for a person to be asked about.
         if (
             state == "on"
             and sites.ip_hosts

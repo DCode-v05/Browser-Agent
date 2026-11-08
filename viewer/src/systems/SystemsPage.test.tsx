@@ -17,7 +17,6 @@ function setting(id: string, title: string, more: Partial<Setting>): Setting {
   return { id, title, description: `What "${title}" does.`, control: 'switch', value: true, default: true, locked: false, applies: 'now', scope: 'system', ...more };
 }
 
-/** The settings of one system, as the service answers them, kept here. */
 function settingsOf(system: string, refuse?: ChangeResult) {
   const settings: Setting[] = [
     setting('system_enabled', 'Use this browser', {}),
@@ -86,7 +85,6 @@ const TASK = { id: 't1', started: 1_791_280_000, task: 'Find the cheapest fare',
 
 const COST: Cost = { tasks_counted: 4, input_tokens: 142_300, output_tokens: 3120, usd: 0.41, usd_per_task: 0.1025 };
 
-/** What the admin lets users use, change and see, as the service answers it. */
 const POLICY: Policy = {
   systems: [
     { id: 'cloud', allowed: true },
@@ -147,7 +145,6 @@ const LOG: LogAnswer = {
   ],
 };
 
-/** The task sets of a browser on which none has been run. */
 const suite: SuiteAnswer = {
   system: 'cloud',
   model: 'gpt-test',
@@ -157,7 +154,6 @@ const suite: SuiteAnswer = {
   max_trials: 10,
 };
 
-/** A stand-in for the service: it answers as the service would, and remembers what it was asked to change. */
 function standIn(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = [cloud, chrome, builtIn]) {
   const sources = new Map<string, ReturnType<typeof settingsOf>>();
   const evals = { ...EVALS };
@@ -191,7 +187,6 @@ function standIn(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = 
     policy: vi.fn(async () => policy),
     changePolicy: vi.fn(async (changes: PolicyChange) => {
       policyChanges.push(changes);
-      // Each line the admin changed, as the service would answer it.
       policy = {
         systems: policy.systems.map((line) => ({ ...line, allowed: changes.systems?.[line.id] ?? line.allowed })),
         may_change: policy.may_change.map((line) => ({ ...line, allowed: changes.may_change?.[line.id] ?? line.allowed })),
@@ -205,7 +200,6 @@ function standIn(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = 
   return { api, policyChanges, changedOn: (system: string) => sources.get(system)?.changed ?? [] };
 }
 
-/** The Systems page: what is not one browser's alone. */
 function open(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = [cloud, chrome, builtIn]) {
   const made = standIn(over, systems);
   const user = userEvent.setup();
@@ -215,7 +209,6 @@ function open(over: Partial<SystemsApi> = {}, systems: SystemInfo[] | null = [cl
   return { ...made, user, passwords, onOpen };
 }
 
-/** The admin, under one browser's own tab. */
 function asAdmin(view: 'configuration' | 'evaluations', system = 'cloud', over: Partial<SystemsApi> = {}) {
   const made = standIn(over);
   const user = userEvent.setup();
@@ -247,18 +240,14 @@ describe('one browser’s configuration, for the admin (spec 9.17)', () => {
     await user.click(downloads);
     await waitFor(() => expect(downloads).not.toBeChecked());
     expect(await within(cloudCard).findByText(W.settings.saved)).toBeInTheDocument();
-    // A choice is taken on the page too: there is no screen to open for it.
     await user.click(within(cloudCard).getByRole('radio', { name: /Every action/ }));
     await waitFor(() => expect(within(cloudCard).getByRole('radio', { name: /Every action/ })).toBeChecked());
     expect(changedOn('cloud')).toEqual([{ allow_downloads: false }, { ask_before: 'every_action' }]);
     expect(changedOn('builtin')).toEqual([]);
-    // A list of sites is typed here, with the entries config.json holds kept as they are.
     expect(within(cloudCard).getByRole('textbox', { name: 'Blocked sites' })).toHaveValue('ads.example');
     expect(within(cloudCard).getByText('internal.example')).toBeInTheDocument();
-    // The window is told what the settings are now: the colour mode is the whole window's.
     expect(onSettings).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // Every row says what its control does.
     for (const row of cloudCard.querySelectorAll('.setting')) expect(row.querySelector('.setting-description')).not.toBeEmptyDOMElement();
   });
 
@@ -296,11 +285,9 @@ describe('one browser’s configuration, for the admin (spec 9.17)', () => {
     const cloudCard = await card('Cloud browser');
     const noteOf = (title: string) => within(cloudCard).getByText(title).closest('.setting')?.querySelector('.setting-note')?.textContent ?? null;
     await within(cloudCard).findByText('Ask before');
-    // Users may change this one, and are held at the admin's value for that one.
     await waitFor(() => expect(noteOf('Ask before')).toBe(W.systems.usersMay));
     expect(noteOf('Picture quality')).toBe(W.systems.usersHeld);
     expect(noteOf('Show where the agent is acting')).toBe(W.systems.everyBrowser);
-    // What is the admin's alone has no line about users.
     expect(noteOf('Let the agent download files')).toBeNull();
     expect(within(cloudCard).getByText(W.systems.forUsersLead)).toBeInTheDocument();
   });
@@ -315,7 +302,6 @@ describe('one browser’s configuration, for the admin (spec 9.17)', () => {
     await waitFor(() => expect(kept).toBeChecked());
     expect(policyChanges).toEqual([{ systems: { builtin: true } }]);
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-    // Whether a browser runs at all is another switch, and stays as it was.
     expect(within(builtInCard).getByRole('switch', { name: 'Use this browser: Built-in browser' })).toBeChecked();
   });
 
@@ -407,7 +393,6 @@ describe('the settings on the page follow what changed elsewhere (spec 4.11)', (
     const made = settingsOf('cloud');
     const { rerender } = render(list(1, made));
     expect(await screen.findByRole('switch', { name: 'Let the agent download files' })).toBeChecked();
-    // The admin holds it now: a user is shown the admin's value in words, and no control.
     Object.assign(made.settings.find((one) => one.id === 'allow_downloads')!, { value: false, locked: true });
     rerender(list(2, made));
     await waitFor(() => expect(screen.queryByRole('switch', { name: 'Let the agent download files' })).not.toBeInTheDocument());
@@ -418,7 +403,6 @@ describe('the settings on the page follow what changed elsewhere (spec 4.11)', (
 
   it('does not put back an older answer over a change that is being saved', async () => {
     const made = settingsOf('cloud');
-    // The answer to what was asked before the change arrives after the change was saved.
     let late: (answer: SettingsAnswer) => void = () => undefined;
     const before = await made.source.load('web');
     const source: SettingsSource = { ...made.source, load: vi.fn(made.source.load) };
@@ -458,7 +442,6 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
     expect(screen.getByRole('tab', { name: W.systems.view.users })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getAllByRole('article').map((one) => one.getAttribute('aria-label'))).toEqual([A.title]);
     expect(screen.getByText(W.systems.lead)).toBeInTheDocument();
-    // What the agent may do in a browser is set under that browser's tab, and nowhere else.
     expect(screen.queryByRole('switch', { name: /Let the agent download files/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: /Use this browser/ })).not.toBeInTheDocument();
   });
@@ -498,7 +481,6 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
       .getAllByRole('listitem')
       .filter((row) => within(row).queryByRole('button', { name: new RegExp(`^${A.open}`) }));
     expect(rows.map((row) => row.querySelector('.system-row-name')?.textContent)).toEqual([`Cloud browser${A.allowed}`, `My Chrome${A.allowed}`, `Built-in browser${A.kept}`]);
-    // It is changed in one place: on that browser's own configuration.
     expect(within(users).queryByRole('switch', { name: /Let users use this browser/ })).not.toBeInTheDocument();
     await user.click(within(users).getByRole('button', { name: `${A.open}: Built-in browser` }));
     expect(onOpen).toHaveBeenCalledWith('builtin', 'configuration');
@@ -516,7 +498,6 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
     await user.type(box, 'what users sign in with');
     await user.click(within(users).getByRole('button', { name: A.set.user }));
     expect(await within(users).findByText(A.saved.user)).toBeInTheDocument();
-    // The page does not keep what was typed.
     expect(box).toHaveValue('');
     expect(passwords.set.mock.calls).toEqual([
       ['user', 'short'],
@@ -539,7 +520,6 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
       ['My Chrome', 'waiting', V.on, V.usersYes, 'model-a'],
       ['Built-in browser', 'ended', V.on, V.usersNo, 'model-a'],
     ]);
-    // Nothing is changed here: each browser is set up under its own tab.
     expect(within(browsers).queryByRole('switch')).not.toBeInTheDocument();
     await user.click(within(browsers).getByRole('button', { name: V.evaluations('Cloud browser') }));
     await user.click(within(browsers).getByRole('button', { name: V.configuration('Built-in browser') }));
@@ -559,7 +539,6 @@ describe('what is not one browser’s: the Systems page (spec 4.11)', () => {
     const rows = within(within(all).getByRole('table')).getAllByRole('row').slice(1);
     expect(rows.map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))).toEqual([
       ['4', '75%', '14.0 s', '145,420', '$0.4100', '10 of 11 passed'],
-      // A system with no price set and no checklist run says so, and makes nothing up.
       ['2', '100%', '9.0 s', '9,200', '–', W.systems.overall.notRun],
     ]);
     expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(['Cloud browser', 'Built-in browser']);
@@ -610,12 +589,10 @@ describe('a user, under a browser’s own tab (spec 4.11)', () => {
     await user.click(within(cloudCard).getByRole('radio', { name: /Every action/ }));
     await waitFor(() => expect(within(cloudCard).getByRole('radio', { name: /Every action/ })).toBeChecked());
     expect(changedOn('cloud')).toEqual([{ allow_downloads: false }, { ask_before: 'every_action' }]);
-    // A choice looser than the admin has it is shown, and is not theirs to take.
     const never = within(cloudCard).getByRole('radio', { name: /Never/ });
     expect(never).toBeDisabled();
     expect(never.closest('label')).toHaveTextContent(U.fixed);
     for (const one of within(cloudCard).getAllByRole('switch')) expect(one).toBeEnabled();
-    // A setting that is not this browser's alone says so.
     expect(within(cloudCard).getByText('Show where the agent is acting').closest('.setting')).toHaveTextContent(U.everyBrowser);
     for (const row of cloudCard.querySelectorAll('.setting')) expect(row.querySelector('.setting-description')).not.toBeEmptyDOMElement();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -652,7 +629,6 @@ describe('a user, under a browser’s own tab (spec 4.11)', () => {
     const cloudCard = await card('Cloud browser');
     const E = W.systems.evals;
     expect(screen.getByText(W.systems.panel.lead.evaluations.user)).toBeInTheDocument();
-    // How the tasks went is there. What they cost, the checklist and the tasks themselves are not.
     expect(await within(cloudCard).findByText(E.tasksLine(4, 20))).toBeInTheDocument();
     expect(within(cloudCard).getByText(E.latency)).toBeInTheDocument();
     expect(within(cloudCard).queryByText(E.cost)).not.toBeInTheDocument();
@@ -674,7 +650,6 @@ describe('a user, under a browser’s own tab (spec 4.11)', () => {
     const { api, as } = asUser('evaluations');
     await within(await card('Cloud browser')).findByText(W.systems.evals.tasksLine(4, 20));
     expect(api.evals).toHaveBeenCalledTimes(1);
-    // The same as before: nothing is asked.
     as({ ...ME });
     as({ ...ME, sees: { ...ME.sees, cost: false } });
     await waitFor(() => expect(api.evals).toHaveBeenCalledTimes(2));
@@ -714,7 +689,6 @@ describe('one browser’s evaluations (spec 12.6)', () => {
     expect(said.getByText('71% the model, 22% the browser, 7% waiting for you')).toBeInTheDocument();
     expect(said.getByText('142,300 tokens in, 3,120 out')).toBeInTheDocument();
     expect(said.getByText('$0.4100 in all, $0.1025 a task')).toBeInTheDocument();
-    // Performance by tool: how often, how long, how often it failed.
     const row = within(said.getByRole('table')).getByRole('row', { name: /click/ });
     expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['9', '70 ms', '300 ms', '2']);
   });
@@ -742,7 +716,6 @@ describe('one browser’s evaluations (spec 12.6)', () => {
     const lines = within(cloudCard).getAllByRole('listitem').filter((line) => line.className === 'system-check');
     expect(lines.map((line) => line.getAttribute('data-state'))).toEqual(['ok', 'ok', 'failed', 'skipped']);
     expect(lines[0]).toHaveTextContent('Passed: The browser answers12 ms');
-    // What failed says why, and what was passed over says why too.
     expect(lines[2]).toHaveTextContent('Failed: Types into a fieldthe form has no field to type into');
     expect(lines[3]).toHaveTextContent('Skipped: A person can be askedno one is watching this browser');
   });
@@ -786,7 +759,6 @@ describe('one browser’s evaluations (spec 12.6)', () => {
       ['tool', 'false'],
     ]);
     expect(spans[0]).toHaveTextContent(`${E.theModel}1.9 s${E.spanTokens('1,200', '40')}`);
-    // A step that waited for a person says how much of its time was that wait.
     expect(spans[1]).toHaveTextContent(`upload_file3.0 s${E.waited('1.2 s')}`);
     expect(api.trace).toHaveBeenCalledWith('cloud', 't1');
     await user.click(within(cloudCard).getByRole('button', { name: E.hideTrace }));

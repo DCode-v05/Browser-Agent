@@ -42,7 +42,6 @@ def test_a_value_is_looked_up_by_its_path() -> None:
         ({"state": "orders.0.total", "is": 96}, True),
         ({"state": "orders.0.total", "is": 96.5}, False),
         ({"state": "profile.newsletter", "is": True}, True),
-        # True is not 1: a count of one does not pass for a switch that is on.
         ({"state": "orders.length", "is": True}, False),
         ({"state": "basket", "has": {"id": "blue-shoes", "qty": 2}}, True),
         ({"state": "basket", "has": {"id": "blue-shoes", "qty": 1}}, False),
@@ -113,7 +112,6 @@ def test_what_the_tries_of_a_run_add_up_to() -> None:
             "trials": [trial(True, input_tokens=100, output_tokens=10, cost_usd=0.01)] * 3,
         },
         {"id": "b", "risky": None, "passed": 2, "trials": [trial(True), trial(True), trial(False)]},
-        # A run that was stopped in the middle of a task: that task is not counted among those tried every time.
         {"id": "c", "risky": None, "passed": 1, "trials": [trial(True)]},
     ]
     told = totals(rows, 3)
@@ -159,9 +157,7 @@ def test_a_try_that_could_not_run_is_counted_apart_and_not_as_a_failure() -> Non
         {"id": "d", "risky": None, "passed": 0, "trials": [trial(False, 0, None, error="it took too long")]},
     ]
     told = totals(rows, 3)
-    # Three tries never ran to an end. The rate is of the five that did.
     assert (told["trials"], told["errors"], told["passed"], told["pass_rate"]) == (8, 3, 4, 0.8)
-    # A task with a try that could not run was not tried every time.
     assert (told["every_time"], told["every_time_rate"]) == (0, 0.0)
     assert told["ask_recall"] is None
 

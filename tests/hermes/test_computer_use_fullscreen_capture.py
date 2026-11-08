@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_fullscreen_capture.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Full-screen vs desktop-shell capture routing (#60081, wallpaper-only bug).
 
@@ -20,7 +19,6 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-# 8×8 transparent PNG — decodes cleanly for dimension sniffing.
 _PNG_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAADUlEQVR4nG"
     "NgGAUgAAABCAABgukLHQAAAABJRU5ErkJggg=="
@@ -155,7 +153,6 @@ class TestFullScreenLane:
 
         cap = backend.capture(mode="vision", app="screen")
 
-        # The 8×8 PNG's real dimensions win over structuredContent.
         assert (cap.width, cap.height) == (8, 8)
         assert cap.png_bytes_len == len(base64.b64decode(_PNG_B64))
 

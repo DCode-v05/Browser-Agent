@@ -19,8 +19,6 @@ class Subscriber:
     """One viewer's queue. Events keep their order; a picture not sent yet is replaced by a newer one."""
 
     def __init__(self, limit: int | None) -> None:
-        # Whether the viewer's page is the one in front, as the page last said. A page says so when
-        # it connects and whenever that changes.
         self.in_front = True
         self._items: deque[Item] = deque()
         self._limit = limit
@@ -121,8 +119,6 @@ class EventHub:
         if self._started is not None:
             replay.append(self._started)
         if self._overflowed:
-            # The events that said who is driving and which page is open may have been dropped.
-            # They go first, so that anything newer in the history still has the last word.
             replay += [
                 event
                 for event in (self._control, self._tabs)

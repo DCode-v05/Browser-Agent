@@ -116,7 +116,6 @@ class Window:
         try:
             return status, json.loads(said or b"null")
         except ValueError:
-            # Not an answer of the API: a page of the viewer's own files.
             return status, said.decode(errors="replace")
 
     async def ask(
@@ -135,8 +134,6 @@ class Window:
                     )
                 )[0] == 200
                 if whose == "admin":
-                    # Once the admin's password exists, the operator's token may no longer
-                    # speak for the admin (spec 4.11): sign in with the password just made.
                     status, said = await self.ask(
                         "POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None
                     )
@@ -235,7 +232,6 @@ async def window(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIte
 
 async def test_the_first_time_the_admins_password_is_made_with_the_services_own_link(window: Open) -> None:
     one = await window()
-    # A sign-in page asks this before anyone has signed in.
     assert await one.ask("GET", "/api/auth", token=None) == (
         200,
         {"accounts": True, "admin_set": False, "user_set": False, "role": None, "operator": False},
@@ -247,7 +243,6 @@ async def test_the_first_time_the_admins_password_is_made_with_the_services_own_
         "role": "admin",
         "operator": True,
     }
-    # Nobody else makes a password, and nobody signs in before there is one.
     assert (await one.ask("POST", "/api/auth/password", {"role": "admin", "password": ADMINS}, token=None))[
         0
     ] == 401
@@ -263,7 +258,6 @@ async def test_the_first_time_the_admins_password_is_made_with_the_services_own_
         200,
         {"admin_set": True, "user_set": False},
     )
-    # The password now exists: the operator's token no longer speaks for the admin.
     status, said = await one.ask(
         "POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None
     )
@@ -276,10 +270,8 @@ async def test_the_first_time_the_admins_password_is_made_with_the_services_own_
 
 async def test_the_operators_token_stops_signing_in_as_admin_once_a_password_is_set(window: Open) -> None:
     one = await window()
-    # Before a password exists, the operator's token is the only way in: it still works.
     assert (await one.ask("GET", "/api/auth"))[1]["role"] == "admin"
     await one.ask("POST", "/api/auth/password", {"role": "admin", "password": ADMINS})
-    # Once a real password is set, the operator's token no longer bypasses sign-in.
     assert (await one.ask("GET", "/api/auth"))[1]["role"] is None
     assert (await one.ask("GET", "/api/sessions"))[0] == 401
 
@@ -306,11 +298,9 @@ async def test_the_admin_and_the_user_each_sign_in_their_own_way(window: Open) -
         "role": "user",
         "operator": False,
     }
-    # The page of each: one address for users, another for the admin, the same page behind both.
     for page in ("/", "/admin"):
         status, said = await one.ask("GET", page, token=None)
         assert status == 200 and "<!doctype html>" in said.lower()
-    # Signed out, the token opens nothing more.
     assert (await one.ask("POST", "/api/auth/sign-out", token=user))[0] == 200
     assert (await one.ask("GET", "/api/sessions", token=user))[0] == 401
     assert (await one.ask("GET", "/api/sessions", token=admin))[0] == 200
@@ -351,11 +341,9 @@ async def test_what_is_the_admins_alone_is_refused_to_a_user(window: Open) -> No
         assert (await one.ask(method, path, body, token=None))[0] == 401, path
     assert one.running.asked == [] and one.settings.user_sees("cost")
     assert one.accounts.sign_in("user", USERS), "the users' password is still the one the admin set"
-    # The admin may.
     assert (await one.ask("GET", "/api/admin/policy", token=admin))[0] == 200
     assert (await one.ask("GET", "/api/evals", token=admin))[1]["tasks"] == {"count": 3}
     assert (await one.ask("GET", "/api/systems/cloud/log", token=admin))[0] == 200
-    # The service's own token no longer speaks for the admin once a real password is set.
     assert (await one.ask("GET", "/api/admin/policy", token=OPERATOR))[0] == 401
 
 
@@ -374,7 +362,6 @@ async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Ope
 
     status, policy = await one.ask("PATCH", "/api/admin/policy", {"systems": {"builtin": False}}, token=admin)
     assert status == 200 and {"id": "builtin", "allowed": False} in policy["systems"]
-    # For a user that browser is now not there: not on a tab, not behind an address, not on a socket.
     told = (await one.ask("GET", "/api/sessions", token=user))[1]
     assert [room["id"] for room in told["rooms"]] == ["cloud", "chrome"]
     assert [session["id"] for session in told["sessions"]] == ["cloud", "chrome"]
@@ -387,7 +374,6 @@ async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Ope
     assert (await one.ask("GET", "/api/settings?surface=web&system=builtin", token=user))[0] == 400
     assert await one.socket_closes_with("builtin", user) == 4404
     assert await one.socket_closes_with("cloud", "not a token") == 4401
-    # The admin still has all three.
     told = (await one.ask("GET", "/api/sessions", token=admin))[1]
     assert told["role"] == "admin" and [room["id"] for room in told["rooms"]] == list(NAMES)
     assert await one.socket_closes_with("builtin", admin) is None
@@ -395,8 +381,6 @@ async def test_a_user_is_shown_the_browsers_the_admin_lets_users_use(window: Ope
 
 async def test_a_viewer_that_may_no_longer_be_on_a_browser_is_shown_out(window: Open) -> None:
     now = [1000.0]
-    # --dev: this test's last check is that the service's own token has no session that times
-    # out, which only holds once a password is set when --dev keeps the bypass alive.
     one = await window(clock=lambda: now[0], auth={"session_hours": 1}, dev=True)
     admin = await one.signed_in("admin")
 
@@ -407,25 +391,20 @@ async def test_a_viewer_that_may_no_longer_be_on_a_browser_is_shown_out(window: 
         asked = {"systems": {name: not out}}
         assert (await one.ask("PATCH", "/api/admin/policy", asked, token=admin))[0] == 200
 
-    # While nothing changes, a viewer stays where it is.
     user = await one.signed_in("user")
     assert await one.closes_after("builtin", user, nothing) is None
-    # The admin keeps users out of a browser: a user on it is no longer on it, as if it were not there.
     assert await one.closes_after("builtin", user, lambda: keep_users_out_of("builtin")) == 4404
-    # A user on another browser is left where they are, and so is the admin on that one.
     await keep_users_out_of("builtin", out=False)
     assert await one.closes_after("cloud", user, lambda: keep_users_out_of("builtin")) is None
     await keep_users_out_of("builtin", out=False)
     assert await one.closes_after("builtin", admin, lambda: keep_users_out_of("builtin")) is None
     await keep_users_out_of("builtin", out=False)
 
-    # Signing out ends the visit on every page it was open on.
     assert (
         await one.closes_after("cloud", user, lambda: one.ask("POST", "/api/auth/sign-out", token=user))
         == 4401
     )
 
-    # A new password for users: whoever signed in with the old one signs in again.
     user = await one.signed_in("user")
 
     def new_password_for(whose: str) -> Callable[[], Awaitable[Any]]:
@@ -433,17 +412,14 @@ async def test_a_viewer_that_may_no_longer_be_on_a_browser_is_shown_out(window: 
         return lambda: one.ask("POST", "/api/auth/password", asked, token=admin)
 
     assert await one.closes_after("cloud", user, new_password_for("user")) == 4401
-    # The admin who changes their own password stays where they are.
     assert await one.closes_after("cloud", admin, new_password_for("admin")) is None
 
-    # A visit ends by itself when its time is up. Nothing it asks for after that is done.
     async def an_hour_passes() -> None:
         now[0] += 3601
 
     late = one.accounts.visit("user")
     assert await one.closes_after("cloud", late, an_hour_passes, says="pause") == 4401
     assert one.sessions["cloud"].control == "agent"
-    # The service's own token has no end.
     assert await one.closes_after("cloud", OPERATOR, an_hour_passes, says="resume") is None
 
 
@@ -453,10 +429,8 @@ async def test_a_user_prefers_a_browser_and_starts_it_when_it_has_stopped(window
     status, me = await one.ask("PATCH", "/api/me", {"preferred": "builtin"}, token=user)
     assert status == 200 and me["preferred"] == "builtin"
     assert (await one.ask("GET", "/api/me", token=user))[1]["preferred"] == "builtin"
-    # A user starts the browser they prefer. Stopping one is the admin's.
     assert (await one.ask("POST", "/api/systems/builtin/start", token=user))[0] == 200
     assert one.running.asked == [("start", "builtin")]
-    # A browser that is not theirs to use is not theirs to prefer.
     await one.ask("PATCH", "/api/admin/policy", {"systems": {"chrome": False}}, token=admin)
     assert await one.ask("PATCH", "/api/me", {"preferred": "chrome"}, token=user) == (
         409,
@@ -478,13 +452,11 @@ async def test_a_users_settings_are_theirs_and_held_inside_the_admins(window: Op
     assert (await one.ask("PATCH", "/api/settings", change, token=user))[0] == 200
     assert one.sessions["cloud"].config.safety.ask_before == "every_action"
     assert one.sessions["builtin"].config.safety.ask_before == "risky"
-    # What the agent may do is not a user's to change.
     for admins_setting in ({"page_scripts": True}, {"system_enabled": False}, {"allow_downloads": False}):
         refused = await one.ask("PATCH", "/api/settings", {**change, "changes": admins_setting}, token=user)
         assert refused[0] == 409 and refused[1]["reason"] == "not_on_this_surface"
     assert one.running.asked == [("settings_changed", "cloud")]
 
-    # The admin takes the setting out of the users' hands: the user's value no longer holds, at once.
     assert (await one.ask("PATCH", "/api/admin/policy", {"may_change": {"ask_before": False}}, token=admin))[
         0
     ] == 200
@@ -493,7 +465,6 @@ async def test_a_users_settings_are_theirs_and_held_inside_the_admins(window: Op
         409,
         {"setting": "ask_before", "reason": "locked"},
     )
-    # The admin turns on what only the admin may, and it holds for that browser's session.
     admins = {"surface": "web", "system": "cloud", "changes": {"page_scripts": True}}
     assert (await one.ask("PATCH", "/api/settings", admins, token=admin))[0] == 200
     assert "browser_evaluate" in {tool.name for tool in one.sessions["cloud"].toolkit.definitions()}
@@ -508,17 +479,14 @@ async def test_a_user_sees_of_the_evaluations_what_the_admin_lets_users_see(wind
     assert evals["may"] == {"cost": True, "traces": True, "checklist": True}
     assert (await one.ask("GET", "/api/systems/cloud/evals/t1", token=user))[1]["cost_usd"] == 0.02
     assert (await one.ask("POST", "/api/systems/cloud/checks", token=user))[0] == 200
-    # The task sets go with the checklist: who may run the one may run the other.
     run = {"set": "short", "trials": 1, "mode": "reference"}
     assert (await one.ask("GET", "/api/systems/cloud/suite", token=user))[0] == 200
     assert (await one.ask("POST", "/api/systems/cloud/suite", run, token=user))[0] == 202
-    # Where a system's files are is the admin's to know.
     listed = (await one.ask("GET", "/api/systems", token=user))[1]["systems"][0]
     assert "log" not in listed and "records" not in listed
 
     await one.ask("PATCH", "/api/admin/policy", {"sees": {"cost": False}}, token=admin)
     evals = (await one.ask("GET", "/api/systems/cloud/evals", token=user))[1]
-    # Taken out of the answer, not merely left undrawn by the page.
     assert evals["cost"] is None and evals["recent"] == [{**TASK, "cost_usd": None}]
     assert evals["may"]["cost"] is False and evals["tasks"] == {"count": 1}
     assert (await one.ask("GET", "/api/systems/cloud/evals/t1", token=user))[1]["cost_usd"] is None
@@ -540,7 +508,6 @@ async def test_a_user_sees_of_the_evaluations_what_the_admin_lets_users_see(wind
     status, log = await one.ask("GET", "/api/systems/cloud/log", token=user)
     assert status == 200 and log["path"] == "/logs/cloud.jsonl"
     assert "log" in (await one.ask("GET", "/api/systems", token=user))[1]["systems"][0]
-    # The admin sees all of it whatever the policy says, and the whole as one.
     evals = (await one.ask("GET", "/api/systems/cloud/evals", token=admin))[1]
     assert evals["cost"]["usd"] == 0.02 and evals["recent"] == [TASK] and evals["checklist"]["passed"] == 11
     assert evals["may"] == {"cost": True, "traces": True, "checklist": True}
@@ -567,7 +534,6 @@ async def test_a_policy_that_is_not_one_is_refused(window: Open) -> None:
 
 async def test_a_service_nobody_signs_in_to_has_its_own_token_and_nothing_else(window: Open) -> None:
     one = await window(with_accounts=False)
-    # It says so, rather than refuse the question: the page that asks shows no error for it.
     assert await one.ask("GET", "/api/auth", token=None) == (200, {"accounts": False})
     assert (await one.ask("POST", "/api/auth/sign-in", {"role": "admin", "password": ADMINS}, token=None))[
         0

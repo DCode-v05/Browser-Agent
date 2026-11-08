@@ -1,6 +1,3 @@
-// What one browser's tasks took, its checklist, its task sets and the trace of each task (spec 12.6,
-// 12.7). Drawn from what the service answers, and from what the admin lets this person see.
-
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { Icon } from '../components/Icon';
@@ -12,7 +9,6 @@ import { clock, count, dollars, percent, spanOf } from './format';
 import { CardHead, TableScroll } from './parts';
 import { useWords } from '../words';
 
-/** One line of what a system's tasks took, with what the line is. */
 function Fact({ name, hint, children }: { name: string; hint: string; children: ReactNode }) {
   return (
     <div className="system-fact">
@@ -32,7 +28,6 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
   const [checking, setChecking] = useState(false);
   const [note, setNote] = useState('');
   const [trace, setTrace] = useState<TaskTrace | null>(null);
-  // What the admin lets this person see. When that changes, what is shown is asked for again.
   const seen = sees ? Object.values(sees).join() : '';
 
   const show = useCallback((told: Evals | null) => {
@@ -59,7 +54,6 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
   }
 
   async function rate(task: TaskRow, rating: 'good' | 'bad') {
-    // Pressed again, a person takes their word back.
     await api.rate(system.id, task.id, task.rating === rating ? null : rating);
     await load();
   }
@@ -70,7 +64,6 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
 
   const name = W.backend[system.backend];
   const E = L.systems.evals;
-  // What this person may be shown. The admin is shown all of it.
   const may = evals?.may ?? { cost: true, traces: true, checklist: true };
   return (
     <article className="system-card" aria-label={name}>
@@ -162,7 +155,6 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
             </>
           )}
 
-          {/* The desktop of computer use has no checklist: its task sets are its check (spec 21.9). */}
           {may.checklist && system.backend !== 'contained_desktop' && (
             <>
               <h4 className="system-section">{E.checklist}</h4>
@@ -209,7 +201,6 @@ export function Evaluation({ system, api, word, sees }: { system: SystemInfo; ap
                       {task.cost_usd !== null && `, ${dollars(task.cost_usd)}`}
                     </p>
                     <div className="system-actions">
-                      {/* The one a person chose is the solid one. Pressed again, it is taken back. */}
                       <Button icon="check" kind={task.rating === 'good' ? 'primary' : 'plain'} hint={E.goodHint} onClick={() => void rate(task, 'good')}>
                         {E.good}
                       </Button>
@@ -248,7 +239,6 @@ function CheckLine({ check }: { check: Check }) {
   );
 }
 
-/** Every reply of the model and every step of one task, each as a bar where and as long as it was. */
 function Trace({ trace }: { trace: TaskTrace }) {
   const L = useWords();
   const E = L.systems.evals;

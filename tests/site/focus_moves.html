@@ -8,7 +8,6 @@
 <p><label for="search">Search</label> <input id="search"></p>
 <p><label for="password">Password</label> <input id="password" type="password"></p>
 <script>
-// A page that sends the focus elsewhere, as focus traps and self-advancing fields do.
 document.getElementById('password').addEventListener('focus', () => document.getElementById('search').focus());
 </script>
 </body>

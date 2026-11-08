@@ -71,15 +71,11 @@ class Limits:
         self._more_calls = 0
         self._more_minutes = 0
         self._task_since: float | None = None
-        # When each call of the last minute was let in.
         self._lately: deque[float] = deque()
-        # The acting step that was last repeated with nothing changed, and how often in a row.
         self._step: str | None = None
         self._times = 0
-        # The reading call that last gave the same result, and how often in a row.
         self._reading: tuple[str, int] | None = None
         self._readings = 0
-        # How deep the engine's own work on the session is under way. Its calls are no agent's steps.
         self._own_work = 0
 
     @contextmanager
@@ -162,7 +158,6 @@ class Limits:
         self._calls += 1
         return None
 
-    # Steps that go round in circles.
 
     def goes_in_circles(self, step: str) -> str | None:
         """What the agent is told instead, when this acting step has been done so often with nothing

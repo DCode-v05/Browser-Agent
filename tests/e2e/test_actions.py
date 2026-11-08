@@ -166,8 +166,6 @@ async def test_an_element_that_never_stops_moving_fails_within_the_time_limit(
     impatient_driver: PlaywrightDriver, site: str
 ) -> None:
     await impatient_driver.navigate(f"{site}/moving.html")
-    # A browser that has only just started draws no frame for a moment, and the animation begins
-    # with the first frame. The button "never stops moving" only once it has started to move.
     await impatient_driver.page.wait_for_function(
         "document.getAnimations().some((animation) => animation.currentTime > 0)", timeout=10_000
     )

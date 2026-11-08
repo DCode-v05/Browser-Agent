@@ -41,7 +41,6 @@ async def watched(make_config: Callable[..., Config], tmp_path: Path) -> AsyncIt
         await session.close()
 
 
-# The viewers of the session of each test, so that a test can have them leave.
 WATCHING: dict[str, list[Any]] = {}
 
 
@@ -91,9 +90,6 @@ def begin(session: ServiceSession, name: str, arguments: dict[str, Any]) -> "asy
     return asyncio.create_task(session.toolkit.call(name, arguments))
 
 
-# What a step does.
-
-
 @pytest.mark.parametrize(
     ("control", "why"),
     [
@@ -113,7 +109,6 @@ async def test_a_step_that_pays_sends_deletes_grants_or_confirms_is_asked_about_
     request, result = await answer(session, begin(session, "browser_click", {"ref": "e20"}))
     assert request["why"] == [why] and request["every_time"] is True
     assert not result.is_error and done(driver, "click") == 1
-    # "Allow on this site" is not on offer for such a step: the next one is asked about again.
     _, again = await answer(session, begin(session, "browser_click", {"ref": "e20"}), "deny", count=2)
     assert again.is_error and again.text.startswith("The person did not allow this action.")
     assert done(driver, "click") == 1
@@ -147,7 +142,6 @@ async def test_enter_on_the_button_that_has_the_focus_presses_it(watched: Watche
     driver.focused = Located("button", "Delete account", BOX)
     request, _ = await answer(session, begin(session, "browser_press_key", {"keys": "Enter"}), "deny")
     assert request["why"] == ["this step deletes something"]
-    # Another key presses nothing.
     assert not (await unasked(session, "browser_press_key", {"keys": "Tab"})).is_error
 
 
@@ -183,9 +177,6 @@ async def test_a_message_is_sent_by_enter_by_submit_and_by_the_button_of_its_for
         assert not (await unasked(session, name, arguments)).is_error, (name, arguments)
 
 
-# Who is asked, and when nobody is there.
-
-
 async def test_with_nobody_watching_a_question_a_rule_raised_is_refused_whatever_the_deployment_says(
     watched: Watched,
 ) -> None:
@@ -198,7 +189,6 @@ async def test_with_nobody_watching_a_question_a_rule_raised_is_refused_whatever
     assert refused.is_error
     assert refused.text.startswith("This action needs a person's approval and no one is watching")
     assert done(driver, "click") == 0
-    # A tool the deployment wants confirmed is the deployment's to wave through.
     assert not (await session.toolkit.call("browser_hover", {"ref": "e1"})).is_error
 
 
@@ -237,9 +227,6 @@ async def test_every_decision_is_in_the_log_and_nothing_that_was_typed(
     ]
     assert all(isinstance(check["ms"], float) for check in checks)
     assert "48151623" not in (tmp_path / "events.jsonl").read_text("utf-8")
-
-
-# What goes out.
 
 
 @pytest.mark.parametrize(
@@ -308,7 +295,6 @@ async def test_text_read_on_one_site_and_typed_on_another_is_shown_to_the_person
     assert request["leaves"]["from_site"] == "mail.example" and request["leaves"]["to_site"] == "shop.example"
     assert "gate closes at 18:45" in request["leaves"]["text"]
     assert done(driver, "type") == 0
-    # The same text typed back where it was read goes nowhere.
     driver.url = "https://mail.example/inbox"
     assert not (await unasked(session, "browser_type", {"ref": "e3", "text": letter})).is_error
 
@@ -346,7 +332,6 @@ async def test_a_very_long_address_on_a_site_that_is_new_here_is_asked_about_onc
     ]
     assert not opened.is_error
     assert not (await unasked(session, "browser_navigate", {"url": long + "&again=1"})).is_error
-    # A site the session has been to is not new.
     driver.url = HERE
     await unasked(session, "browser_snapshot", {})
     assert not (await unasked(session, "browser_navigate", {"url": HERE + "?" + "x" * 300})).is_error
@@ -356,7 +341,6 @@ async def test_agreeing_to_give_an_app_access_is_a_persons_to_allow(watched: Wat
     session, driver = await watched()
     driver.elements["e20"] = Located("button", "Allow", BOX)
     driver.elements["e21"] = Located("button", "Continue", BOX)
-    # An ordinary page with an "Allow" button: cookies, notifications.
     assert not (await unasked(session, "browser_click", {"ref": "e20"})).is_error
     driver.said = ["Mailtidy wants to access your Google Account", "Allow", "Cancel"]
     request, _ = await answer(session, begin(session, "browser_click", {"ref": "e20"}), "deny")
@@ -366,9 +350,6 @@ async def test_agreeing_to_give_an_app_access_is_a_persons_to_allow(watched: Wat
     session.toolkit.check._settled[("sensitive_site", "google.com")] = True
     request, _ = await answer(session, begin(session, "browser_click", {"ref": "e21"}), "deny", count=2)
     assert "this step gives an app access to an account" in request["why"]
-
-
-# Money.
 
 
 async def test_a_paying_step_shows_the_amount_the_page_shows(watched: Watched) -> None:
@@ -393,16 +374,12 @@ async def test_an_amount_over_the_cap_is_refused_and_no_amount_under_a_cap_is_as
     )
     request, _ = await answer(session, begin(session, "browser_click", {"ref": "e7"}), "deny")
     assert "a spending limit is set and the page shows no amount" in request["why"]
-    # Two steps of forty are approved; a third would pass what the session may spend in all.
     for count in (2, 3):
         _, paid = await answer(session, begin(session, "browser_click", {"ref": "e21"}), count=count)
         assert not paid.is_error
     third = await unasked(session, "browser_click", {"ref": "e21"})
     assert "would take this session over its spending limit of 100" in third.text
     assert done(driver, "click") == 2
-
-
-# Where the browser goes.
 
 
 async def test_a_site_that_looks_like_a_protected_one_is_asked_about_once(watched: Watched) -> None:
@@ -412,7 +389,6 @@ async def test_a_site_that_looks_like_a_protected_one_is_asked_about_once(watche
     assert request["why"] == ["paypa1.com looks like paypal.com and is not it"]
     assert not opened.is_error
     assert not (await unasked(session, "browser_snapshot", {})).is_error
-    # A name the person pasted is measured like any other: they may have been sent it.
     session.toolkit.check.task.person_said("Sign in at paypal-secure-login.example", HERE)
     lure = {"url": "https://paypal-secure-login.example/"}
     request, _ = await answer(session, begin(session, "browser_navigate", lure), "deny", count=2)
@@ -422,7 +398,6 @@ async def test_a_site_that_looks_like_a_protected_one_is_asked_about_once(watche
 
 async def test_a_page_the_browser_was_brought_to_is_judged_at_the_agents_next_call(watched: Watched) -> None:
     session, driver = await watched()
-    # A link, a redirect or a person's own hands: nothing asked the tool layer.
     driver.url = "https://amaz0n.com/deal"
     request, read = await answer(session, begin(session, "browser_snapshot", {}), "deny")
     assert request["why"] == ["amaz0n.com looks like amazon.com and is not it"]
@@ -434,7 +409,6 @@ async def test_a_sensitive_site_is_entered_with_a_yes_once_for_a_task(watched: W
     request, _ = await answer(session, begin(session, "browser_navigate", {"url": "https://www.paypal.com/"}))
     assert request["why"] == ["www.paypal.com is a money site"]
     assert not (await unasked(session, "browser_click", {"ref": "e1"})).is_error
-    # Another task: the yes was for the last one.
     session.working(True, "Now pay the electricity bill")
     request, _ = await answer(session, begin(session, "browser_snapshot", {}), "deny", count=2)
     assert request["why"] == ["www.paypal.com is a money site"]
@@ -456,7 +430,6 @@ async def test_a_site_that_is_a_bare_number_is_a_weak_sign_and_no_person_is_aske
     watched: Watched,
 ) -> None:
     session, driver = await watched()
-    # In Auto Mode the reviewer weighs it (test_auto_mode.py). A person is not troubled with it.
     driver.url = "https://93.184.216.34/login"
     assert not (await unasked(session, "browser_type", {"ref": "e3", "text": "ada"})).is_error
     assert not (await unasked(session, "browser_click", {"ref": "e1"})).is_error

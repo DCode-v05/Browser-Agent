@@ -1,4 +1,3 @@
-# Taken from NousResearch/hermes-agent at 3569e846: tests/tools/test_computer_use_empty_discovery_diagnosis.py
 # MIT License, Copyright (c) 2025 Nous Research. Changed only by scripts/take_hermes.py.
 """Diagnosability of empty window discovery + CLI-fallback fail-fast.
 
@@ -13,9 +12,6 @@ import pytest
 
 from bap_browser.computer.hermes.computer_use import cua_backend as cb
 from bap_browser.computer.hermes.computer_use import cua_backend_driver as cb_driver
-
-
-# ── _empty_discovery_reason ─────────────────────────────────────────────
 
 
 def test_locked_probe_fails_safe(monkeypatch):
@@ -39,9 +35,6 @@ def test_empty_capture_carries_reason(monkeypatch):
     cap = backend.capture(mode="ax")
     assert cap.width == 0 and cap.height == 0
     assert "LOCKED" in cap.window_title
-
-
-# ── CLI fallback fail-fast on dead daemon ───────────────────────────────
 
 
 class _Proc:

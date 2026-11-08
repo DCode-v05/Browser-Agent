@@ -9,7 +9,6 @@ from typing import Any
 
 from bap_browser.computer.seams.state import current
 
-# `auto` leaves the choice to the copied code, which decides by the system.
 OVERLAY = {"auto": None, "on": False, "off": True}
 
 

@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Starts a Linux desktop on a box with no root, in rootless Docker, joined to the tailnet as a node
-# of its own (spec 22.6). The engine there drives that desktop, and its page is served to the
-# tailnet. A helper beside the desktop lets an engine elsewhere drive it too, for the Tailscale
-# logins named. Run it on the box, once rootless Docker answers (`~/.bap-box/docker-env`):
-#
-#   bash deploy/box-desktop.sh you@example.com
-#
-# It asks for the Tailscale auth key and the Claude key without showing them, and writes neither to
-# a file. The helper's pairing code is made here and kept for the box's user alone.
 set -euo pipefail
 
 allow=${1:-}
@@ -15,7 +6,6 @@ if [ -z "$allow" ]; then
   echo "Give the Tailscale login that may drive this desktop from elsewhere, for example you@example.com" >&2
   exit 2
 fi
-# shellcheck source=/dev/null
 source "$HOME/.bap-box/docker-env"
 image=${BAP_DESK_IMAGE:-bap-desk:latest}
 if ! docker image inspect "$image" >/dev/null 2>&1; then
@@ -48,10 +38,6 @@ BAP_BROWSER_HELPER_TOKEN=$(cat "$code_file")
 export BAP_BROWSER_HELPER_TOKEN
 
 docker rm -f bap-desk >/dev/null 2>&1 || true
-# In the container: the engine's studio starts the desktop's own screen, and once that screen is
-# there, the helper drives it for an engine elsewhere. Tailscale's userspace socket is named, so
-# that the helper can ask who a caller is. What it writes in /data (its task records, settings and
-# sign-ins) is kept in a volume of its own, which the next container finds again.
 docker run -d --name bap-desk --network host \
   -v bap-desk-data:/data \
   -e TS_AUTHKEY -e ANTHROPIC_API_KEY -e BAP_BROWSER_HELPER_TOKEN \

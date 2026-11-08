@@ -40,43 +40,30 @@ Action = Literal[
     "focus_app",
 ]
 Held = Literal["cmd", "shift", "option", "alt", "ctrl", "fn", "win", "windows", "super", "meta"]
-# The actions that only look, or only wait.
 LOOKS = frozenset({"capture", "wait", "list_apps", "list_windows"})
-# The actions whose input is delivered to a window: in the background, or in front.
 DELIVERED = frozenset(
     {"click", "double_click", "right_click", "middle_click", "drag", "scroll", "type", "key"}
 )
-# The actions that press one element.
 PRESSES = frozenset({"click", "double_click", "right_click", "middle_click"})
 NOT_ON_THE_SCREEN = (
     "Element {element} is not on the screen now: it is an item of a menu that is not open, or a hidden "
     "button. Click its menu to open it, capture again, and act on what the capture names."
 )
 LOOK_AGAIN = " Capture to see what it changed."
-# Watch mode: what the agent is told when nobody came to watch an app a person must watch.
 UNWATCHED = (
     "{app} is an app the agent works in only while a person watches its page (watch mode). Nobody "
     "had the page open and in front for {waited} s, so this step was not done. Stop here, and say in "
     "your answer that the person must have the page in front for you to go on in {app}."
 )
 NOT_A_WORD = re.compile(r"[^a-z0-9]+")
-# What Hermes' backend says when the driver has stopped answering, or its session is gone. Seen
-# under a model on Linux, where every call then failed the same way until the session ended; and
-# over the tailnet, where the link's new process could not revive the session the old one had.
 STOPPED_ANSWERING = ("timed out", "never reached ready", "has ended", "not available to this transport")
 STARTED_AGAIN = (
     "The desktop stopped answering and was put right: a fresh session with its driver was begun. What "
     "you asked for may or may not have been done. Capture again to see the desktop as it is."
 )
-# The roles of an app's menus, as the systems name them.
 MENUS = frozenset({"menu", "menu item", "MenuItem", "Menu", "AXMenuItem", "AXMenu", "AXMenuBarItem"})
-# What marks a line of the tool's text that names a file on the engine's machine. No model here
-# can read one, and its path is nothing a result should hold.
 OF_THIS_MACHINE = ("saved to", "read_file", "search_files")
 REFUSALS = {"human_has_control": "a person has the screen"}
-# How Hermes' backend begins what it says of a desktop with no window. What follows it is about the
-# engine's own system and a command for a person: nothing a model can use, and wrong for a desktop
-# that is elsewhere.
 NO_WINDOW = "window discovery returned no windows"
 NOTHING_IS_OPEN = "No window is open on the desktop. Open an app with computer_open_app, then capture."
 
@@ -241,15 +228,12 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if how and args.action in DELIVERED and "delivery_mode" not in asked:
         asked["delivery_mode"] = how
     if in_front and args.action in PRESSES and args.element is not None and args.coordinate is None:
-        # Pressed by its number, a button that opens a box leaves its app not answering until the
-        # box is closed (seen on Linux). On a desktop nobody sits at, the pointer presses it.
         pressed = await driver.press(args.element, args.action)
         if pressed == "nowhere":
             raise BadInput(NOT_ON_THE_SCREEN.format(element=args.element), reason="not on the screen")
         if pressed == "pressed" and not args.capture_after:
             return f"{args.action}: done. The pointer pressed element {args.element}.{LOOK_AGAIN}"
         if pressed == "pressed":
-            # What it changed is looked at the way the tool itself would after an action.
             await asyncio.sleep(session.config.computer.settle_ms / 1000)
             asked = {"action": "capture", "mode": "ax"}
     if in_front and args.action == "type" and args.text and await driver.typed(args.text):
@@ -266,7 +250,6 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
     if shot is not None:
         elements = await asyncio.to_thread(every_element, result)
         summary = str(result.get("text_summary", ""))
-        # Up to a hundred elements the tool's own text stands; past that, ours names the page first.
         text = said(summary, elements) if elements is not None else cleared(summary)
         return Shown(from_page(text), shot.picture)
     answer = json.loads(result) if isinstance(result, str) else result
@@ -285,7 +268,6 @@ async def computer_use(session: BrowserSession, args: ComputerUseArgs) -> str | 
             raise BrowserError(STARTED_AGAIN, reason="the driver stopped answering")
         raise BrowserError(f"{answer['error']}{hint}", reason=reason)
     if answer.get("ok") is False:
-        # The driver answered, and did not do it. That is a failure, with what the driver said.
         raise BrowserError(plain(answer), reason="the machine did not do it")
     return plain(answer)
 

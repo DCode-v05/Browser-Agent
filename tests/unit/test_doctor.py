@@ -39,7 +39,6 @@ async def test_a_machine_with_everything(tmp_path: Path) -> None:
     assert lines[0] == "bap-browser doctor"
     assert "  ok  Browser in use (chromium): Chromium 153.0 launched and opened a page" in lines
     assert "  ok  Browser chrome: Chrome 154.0 launched and opened a page" in lines
-    # A browser that is not on the machine is not a fault.
     assert "  --  Browser msedge: not installed" in lines
     assert "  ok  Model key OPENAI_API_KEY: set" in lines
     assert lines[-1] == "Everything bap-browser needs is in place."

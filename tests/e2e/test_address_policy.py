@@ -72,6 +72,5 @@ async def test_what_is_allowed_opens_exactly_what_was_judged(
         result = await Toolkit(session).call(
             "browser_navigate", {"url": f"http://{host}\\@example.com/../form.html"}
         )
-    # The browser was handed the address as the policy read it: this machine, not example.com.
     assert result.text.startswith(f"Navigated to http://{host}/form.html\nPage: Sign up\n"), result.text
     assert paths[0] == "/form.html"

@@ -19,8 +19,6 @@ from bap_browser.config_doc import reference_markdown
 from bap_browser.env_file import apply_env_file
 from bap_browser.errors import BapError, ConfigError
 
-# Set by the desktop app's own core (desktop/electron/main.cjs) on the backend it starts beside
-# itself, so that invocation serves the backend instead of opening the app a second time.
 DESKTOP_APP_CORE_ENV = "BAP_BROWSER_DESKTOP_APP_CORE"
 
 STARTER: dict[str, Any] = {
@@ -31,7 +29,6 @@ STARTER: dict[str, Any] = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    # Settings and secrets come from the environment, and from a .env file in the folder the command is run in.
     apply_env_file(Path(".env"))
     try:
         return args.run(args)
@@ -248,7 +245,6 @@ def _config_show(args: argparse.Namespace) -> int:
     config, sources = load_config_with_sources(args.config)
     data = config.model_dump()
     if args.tools:
-        # Imported here so that the other config commands start without loading the tools.
         from bap_browser.tools import tools_for
         from bap_browser.tools.registry import tools_hash
 
@@ -288,7 +284,6 @@ def _config_doc(args: argparse.Namespace) -> int:
 
 def _computer(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    # Imported here so that the other commands start without loading computer use.
     from bap_browser.computer import commands
 
     if args.computer_command == "install":
@@ -307,7 +302,6 @@ def _computer(args: argparse.Namespace) -> int:
         except KeyboardInterrupt:
             return 0
     if args.computer_command == "helper":
-        # Imported here: only the helper needs the web server.
         from bap_browser.service.machine_helper import run_helper
 
         with contextlib.suppress(KeyboardInterrupt):
@@ -318,7 +312,6 @@ def _computer(args: argparse.Namespace) -> int:
 
 def _doctor(args: argparse.Namespace) -> int:
     config, sources = load_config_with_sources(args.config)
-    # Imported here so that the config commands start without loading the browser library.
     from bap_browser import doctor
 
     found = asyncio.run(doctor.examine(config, sources, os.environ))
@@ -328,7 +321,6 @@ def _doctor(args: argparse.Namespace) -> int:
 
 def _bench(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    # Imported here so that the config commands start without loading the browser library.
     from bap_browser.bench import runner
 
     lines = runner.load_budget(Path(config.bench.budget_file))
@@ -343,7 +335,6 @@ def _bench(args: argparse.Namespace) -> int:
     print(f"Written to {runner.save(measured, results)}", file=sys.stderr)
     counted = runner.blocking(measured, before)
     if counted:
-        # A failure counts once it has been seen in two runs one after the other (spec 11.2).
         named = ", ".join(f"{m.line} on {m.browser}" for m in counted)
         print(f"Failed in this run and the one before: {named}", file=sys.stderr)
     return 1 if counted else 0
@@ -351,9 +342,7 @@ def _bench(args: argparse.Namespace) -> int:
 
 def _mcp(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    # Standard output carries the protocol, so everything else goes to the error stream.
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
-    # Imported here so that the config commands start without loading the browser and MCP libraries.
     from bap_browser.mcp.server import run_stdio
 
     asyncio.run(run_stdio(config))
@@ -364,13 +353,11 @@ def _serve(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     if args.show_browser:
         config = with_visible_browser(config)
-    # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.mcp.server import run_http
 
     logging.basicConfig(level=config.logging.level, stream=sys.stderr)
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(run_http(config, open_viewer=args.open, desktop=args.desktop))
-    # It runs until it is interrupted, so that is how it always ends.
     return 130
 
 
@@ -450,8 +437,6 @@ def _studio(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     rooms_mode = "browser" if args.browser else "desktop" if args.desktop else "full"
     if rooms_mode == "desktop" and not os.environ.get(DESKTOP_APP_CORE_ENV):
-        # Run directly, not from inside the window of three browsers: this *is* the desktop app,
-        # so open its own window instead of serving a backend for a browser to show.
         from bap_browser.desktop_app import DesktopApp
 
         try:
@@ -463,7 +448,6 @@ def _studio(args: argparse.Namespace) -> int:
         except BapError as wrong:
             raise ConfigError(str(wrong)) from wrong
     key = _key_for_the_model(config)
-    # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser import browser_extension
     from bap_browser.agent.anthropic_model import AnthropicModel
     from bap_browser.agent.command import Interrupted
@@ -490,7 +474,6 @@ def _studio(args: argparse.Namespace) -> int:
                 dev=args.dev,
             )
         )
-    # It runs until it is interrupted, so that is how it always ends.
     return 130
 
 
@@ -511,12 +494,10 @@ def _agent(args: argparse.Namespace) -> int:
             raise ConfigError("the extension shows the chat. Use --extension together with --chat")
         from bap_browser import browser_extension
 
-        # Beside the file that says where the service is: both are this machine's own state.
         extension = browser_extension.install(extension_folder(config))
         config = browser_extension.with_extension(with_visible_browser(config), extension)
     elif args.show_browser:
         config = with_visible_browser(config)
-    # Imported here so that the config commands start without loading the browser and the web server.
     from bap_browser.agent.command import Interrupted, run_with_viewer
     from bap_browser.agent.loop import Unfinished
     from bap_browser.agent.models import Model

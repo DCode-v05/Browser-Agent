@@ -1,7 +1,3 @@
-// One window, three browsers (spec 9.16): the cloud browser, the person's own Chrome and the built-in
-// browser, each a page with its own session and its own chat. The tabs say where each one stands, so
-// a page that needs the person is seen from any other.
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { App, type AppProps } from './App';
@@ -28,22 +24,17 @@ const BACKEND_ICON: Record<Backend, IconName> = {
   contained_desktop: 'computer',
 };
 
-/** What is shown under a browser's tab: the browser itself with its chat, how it is set up, or what its tasks took. */
 export type RoomView = 'agent' | 'configuration' | 'settings' | 'evaluations';
 
-/** The views under a browser's tab (spec 4.11): the admin has its configuration where a user has their own settings. */
 function viewsFor(role: Role, me: Me | null | undefined): RoomView[] {
   if (role === 'admin') return ['agent', 'configuration', 'evaluations'];
-  // What its tasks took is a user's to see only where the admin says so.
   return me?.sees.evaluations ? ['agent', 'settings', 'evaluations'] : ['agent', 'settings'];
 }
 
-/** The agent works on a real machine, whose screen the person watches themselves: theirs, or one elsewhere. */
 const onAMachine = (room: Room): boolean => hasSession(room) && (room.runs === 'machine' || room.runs === 'remote');
 
 export type RoomMood = 'attention' | 'working' | 'ready' | 'person' | 'paused' | 'stopped' | 'off';
 
-/** Where a page stands, in one word and one colour. */
 export function moodOf(room: Pick<Room, 'state' | 'attention' | 'working'>): RoomMood {
   if (room.attention) return 'attention';
   if (!hasSession(room)) return 'off';
@@ -60,7 +51,6 @@ export function wordFor(room: Pick<Room, 'state' | 'attention' | 'working'>): st
   return W.studio.off[state === 'failed' || state === 'waiting' || state === 'off' ? state : 'starting'];
 }
 
-/** The browser a user prefers is started for them when it has stopped, once for each time it stops. */
 function useStartsPreferred(systems: SystemsApi | undefined, room: string, state: string | undefined) {
   const startedFor = useRef('');
   useEffect(() => {
@@ -74,54 +64,36 @@ function useStartsPreferred(systems: SystemsApi | undefined, room: string, state
   }, [systems, room, state]);
 }
 
-/** What the person prefers is the same when nothing of it differs: the window is not drawn again for it. */
 const samePreferences = (one: Preferences, other: Preferences) => one.colourMode === other.colourMode && one.showAgentPointer === other.showAgentPointer;
 
 export interface StudioProps extends Omit<AppProps, 'createConnection' | 'embedded' | 'onOpenSettings'> {
-  /** The pages as the service listed them when the window opened. */
   rooms: Room[];
   loadRooms: LoadRooms;
-  /** Opens the connection of one page's session. */
   connectionFor(room: string): Connection;
-  /** How often the service is asked where the pages stand, in milliseconds. 0 asks once. */
   pollMs: number;
-  /** The page to open on. */
   opensOn?: string;
   onPage?(room: string): void;
-  /** Opens the desktop app, where the service has one to open. */
   openDesktop?: OpenDesktop;
-  /** Opens a page's chat alone in a window of its own, where the page can open one. */
   openBeside?(room: string): void;
-  /** The browsers as systems to set up, manage and evaluate (spec 9.17), where the service has them so. */
   systems?: SystemsApi;
-  /** Who is signed in (spec 4.11). Without it, whoever holds the service's own link: the admin. */
   role?: Role;
-  /** What the person signed in may use and see, and the browser they prefer. */
   me?: Me | null;
-  /** Signs the person out. The window has the button where this is given. */
   onSignOut?(): void;
-  /** For the admin: sets the two passwords. */
   passwords?: Passwords;
 }
 
 export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn, onPage, openDesktop, openBeside, systems, role = 'admin', me: givenMe, onSignOut, passwords, ...app }: StudioProps) {
   const [rooms, setRooms] = useState(given);
   const [me, setMe] = useState(givenMe);
-  // A user's window opens on the browser they prefer.
   const [chosen, setChosen] = useState(role === 'user' ? (givenMe?.preferred ?? opensOn) : opensOn);
-  /** The Systems page is shown in place of a browser's own page. */
   const [onSystems, setOnSystems] = useState(false);
-  /** What is shown under the chosen browser's tab. It stays as it is from one browser to the next. */
   const [wanted, setView] = useState<RoomView>('agent');
   const views = viewsFor(role, me);
   const view = views.includes(wanted) ? wanted : 'agent';
-  // A user the admin lets use no browser has no page at all.
   const room = rooms.find((one) => one.id === chosen) ?? (rooms[0] as Room | undefined);
   const roomId = room?.id ?? '';
   useStartsPreferred(role === 'user' && roomId === me?.preferred ? systems : undefined, roomId, room?.state);
 
-  // What the person prefers is the window's to keep: the colour mode holds on every page of it, not
-  // only on a browser's own.
   const [preferences, setPreferences] = useState(app.preferences ?? DEFAULT_PREFERENCES);
   const prefers = useCallback((next: Preferences) => setPreferences((was) => (samePreferences(was, next) ? was : next)), []);
   useEffect(() => {
@@ -132,8 +104,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   }, [preferences.colourMode]);
 
   const { settings, surface = 'web' } = app;
-  // A user's window follows what the admin allows as it changes (spec 4.11): the browsers they may
-  // use, what they may see, and the settings held at the admin's value.
   const follows = role === 'user' ? systems : undefined;
   useEffect(() => {
     if (!pollMs) return;
@@ -161,18 +131,15 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
     setChosen(id);
     onPage?.(id);
   };
-  // A browser that was turned on or off shows so at once, not at the next time the service is asked.
   const refresh = useCallback(async () => {
     const now = await loadRooms();
     if (now) setRooms(now);
   }, [loadRooms]);
   const showingSystems = onSystems && systems !== undefined && role === 'admin';
   const named = wordsFor(showingSystems ? undefined : room?.backend).product;
-  // The window's own title says what the page shown is for: computer use on the desktop's page.
   useEffect(() => {
     document.title = named;
   }, [named]);
-  // The browser a person prefers is the one their window opens on: it is opened at once, and works.
   const prefer = async (id: string) => {
     const told = await systems?.prefer(id);
     if (!told) return;
@@ -204,7 +171,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
       {openDesktop && <DesktopButton open={openDesktop} />}
     </span>
   );
-  // Who is signed in: at the end of the window's bar, apart from what the page shown does.
   const account = onSignOut && (
     <span className="studio-side">
       <span className="studio-role" data-role={role}>
@@ -218,7 +184,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   );
 
   if (!room) {
-    // A user the admin lets use no browser has nothing to open.
     return (
       <div className="studio">
         <header className="studio-bar">
@@ -273,8 +238,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         </div>
         {account}
       </header>
-      {/* Under each browser: the browser itself, how it is set up, and what its tasks took (spec 9.17);
-          and, at the row's end, what can be done from the page shown. */}
       <nav className="studio-views">
         {systems && !showingSystems && (
           <div className="systems-views" role="tablist" aria-label={W.studio.views(W.backend[room.backend])}>
@@ -287,7 +250,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
                 aria-selected={view === name}
                 title={wordsFor(room.backend).studio.hint.view[name]}
                 onClick={() => {
-                  // Back on the browser's own page, it shows where the browser stands now.
                   if (name === 'agent') void refresh();
                   setView(name);
                 }}
@@ -303,12 +265,10 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
         <WhereLine runs={room.runs} settings={systems?.settings(room.id)} surface={surface} systems={{ engine: room.engineSystem, driven: room.drivenSystem }} />
       )}
       {onAMachine(room) && !room.hand && view === 'agent' && !showingSystems && room.state.startsWith('person') && (
-        // Where the picture cannot be driven, the person at the machine has their own hands.
         <p className="system-note studio-own-hands" role="status">
           {W.studio.beside.yourOwnHands}
         </p>
       )}
-      {/* The window has the page's one bar, its heading and its main part: what is drawn in it has none of its own. */}
       <main className="studio-page">
        <div className="studio-panel" id="studio-page" role="tabpanel" aria-labelledby={showingSystems ? undefined : `studio-tab-${room.id}`} aria-label={showingSystems ? W.systems.title : undefined}>
         <TheWords.Provider value={wordsFor(showingSystems ? undefined : room.backend)}>
@@ -339,14 +299,12 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
             onSettings={(answer) => prefers(preferencesFrom(answer))}
           />
         ) : hasSession(room) ? (
-          // A page keeps nothing of the page before it: each has its own session, and settings of its own.
           <App
             key={room.id}
             {...app}
             preferences={preferences}
             settings={systems ? systems.settings(room.id) : settings}
             createConnection={createConnection}
-            // A browser's settings are on a page of their own, under its tab: the button goes there.
             onOpenSettings={systems ? () => setView(role === 'admin' ? 'configuration' : 'settings') : undefined}
             embedded
             inWindow
@@ -365,7 +323,6 @@ export function Studio({ rooms: given, loadRooms, connectionFor, pollMs, opensOn
   );
 }
 
-/** Opens the desktop app: a window of its own, with its own browser and its own chat (spec 14.3). */
 function DesktopButton({ open }: { open: OpenDesktop }) {
   const [state, setState] = useState<'idle' | 'opening' | 'opened' | 'failed'>('idle');
   const press = async () => {
@@ -386,7 +343,6 @@ function DesktopButton({ open }: { open: OpenDesktop }) {
   );
 }
 
-/** What a page shows while its browser is not there yet. */
 function NoSession({ room, onTurnOn, onManage }: { room: Room; onTurnOn?(): void; onManage?(step: 'install' | 'allow'): Promise<{ ok: true } | { ok: false; why: string }> }) {
   const [copied, setCopied] = useState(false);
   if (room.backend === 'contained_desktop' && room.runs === 'machine' && room.state !== 'off') {
@@ -397,7 +353,6 @@ function NoSession({ room, onTurnOn, onManage }: { room: Room; onTurnOn?(): void
       await navigator.clipboard.writeText(room.extension ?? '');
       setCopied(true);
     } catch {
-      // No clipboard here: the folder is on screen to be read.
     }
   };
   if (room.backend === 'takeover_chrome' && room.state !== 'failed' && room.state !== 'off') {
@@ -427,7 +382,6 @@ function NoSession({ room, onTurnOn, onManage }: { room: Room; onTurnOn?(): void
     );
   }
   if (room.state === 'off') {
-    // A person turned this browser off (spec 9.17). It is turned on here, or on the Systems page.
     return (
       <section className="studio-wait" aria-label={W.backend[room.backend]}>
         <Icon name="pause" size="large" />

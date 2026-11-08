@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Brings the engine up on a Linux machine where you have no root, such as a shared box, joined to
-# your tailnet and driving your Mac through the helper there (spec 22.6.2). Run it from the checkout:
-#
-#   bash deploy/box-up.sh https://your-mac.your-tailnet.ts.net:8796
-#
-# Tailscale is fetched into your own home folder and checked against the checksum Tailscale
-# publishes. The three secrets are typed by you when it asks, and are never written to a file: the
-# Tailscale auth key, the helper's pairing code, and the model's key.
 set -euo pipefail
 
 helper=${1:-}
@@ -38,7 +30,6 @@ fi
 export PATH="$here:$PATH"
 echo "Tailscale $(tailscale version | head -1) is in $here" >&2
 
-# The secrets: from the environment, or typed now. Never echoed, never written.
 ask() {
   local name=$1 what=$2 given
   if [ -z "${!name:-}" ]; then
@@ -71,7 +62,6 @@ export BAP_BROWSER__AGENT__PROVIDER=anthropic
 export BAP_BROWSER__AGENT__MODEL=${BAP_BROWSER__AGENT__MODEL:-claude-opus-5-5}
 export BAP_BROWSER__AGENT__API_KEY_ENV=ANTHROPIC_API_KEY
 export BAP_BROWSER__AGENT__BASE_URL=https://api.anthropic.com/v1
-# Claude Opus 5.5's price, so that each task's cost is kept (spec 12.6).
 export BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION=${BAP_BROWSER__AGENT__INPUT_PRICE_PER_MILLION:-4}
 export BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION=${BAP_BROWSER__AGENT__OUTPUT_PRICE_PER_MILLION:-20}
 exec sh deploy/vm-start.sh uv run bap-browser studio

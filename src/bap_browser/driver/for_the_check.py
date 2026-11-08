@@ -53,6 +53,5 @@ class ForTheCheck(Acting):
         in_the_page = await tab.script.stamp(wait_ms)
         if in_the_page is None:
             return None
-        # A frame that has gone away says nothing, and its going was a change of the page around it.
         in_frames = [await frame.script.stamp(wait_ms) for frame in list(tab.frames.values())]
         return f"{tab.id} {tab.commits} {tab.page.url} {in_the_page} {in_frames}"

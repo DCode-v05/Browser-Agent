@@ -43,7 +43,6 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
     try:
         await page.goto(service.viewer_address)
         await page.get_by_role("heading", name="Agent is working").wait_for()
-        # The token came in the address and is no longer shown there.
         assert page.url == f"{service.address}/"
         assert await page.get_by_text("Reference agent").count() == 1
         await asyncio.wait_for(session.hub.wait_for_viewer(), 5)
@@ -58,13 +57,11 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
             )
         )
 
-        # Steps arrive as sentences, and the picture of the real page is drawn.
         await page.get_by_text('Typed 12 characters into "Full name"').first.wait_for()
         await page.wait_for_function(PICTURE_IS_DRAWN)
         assert await page.get_by_label("Address").text_content() == f"{service.address}/demo-site/signup.html"
         await shot("live-1-agent-working")
 
-        # Pause holds the real agent: no new step arrives while it is paused.
         await page.get_by_role("button", name="Pause").click()
         await page.get_by_role("heading", name="Paused").wait_for()
         assert session.control == "paused"
@@ -75,7 +72,6 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
         assert await steps_shown.count() == before
         await shot("live-2-paused")
 
-        # Take over, click into the page through the picture, and type. It reaches the real page.
         await page.get_by_role("button", name="Take over").click()
         await page.get_by_role("heading", name="You're in control").wait_for()
         assert session.control == "person"
@@ -92,7 +88,6 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
         await remote.wait_for_function("document.getElementById('name').value === 'Ada Lovelace Byron'")
         await shot("live-3-person-in-control")
 
-        # Hand back: the agent goes on from where the person left the page, and finishes.
         await page.get_by_role("button", name="Hand back").click()
         await page.get_by_role("heading", name="Agent is working").wait_for()
         answer = await asyncio.wait_for(agent, 60)
@@ -103,15 +98,11 @@ async def test_a_person_watches_the_agent_pauses_it_takes_over_and_reads_the_sum
         await page.get_by_role("group", name="Session ended").wait_for()
         await shot("live-4-ended")
 
-        # What the person typed while in control was sent to no viewer and written to no log.
         told = repr([item for item in session.hub.subscribe()[0] if isinstance(item, dict)])
         assert "Byron" not in told
         assert "Byron" not in (tmp_path / "events.jsonl").read_text(encoding="utf-8")
         assert errors == []
     finally:
-        # The service ends the viewer's connection before the page goes. A page that is closed first
-        # cuts its connection, and on Windows Python's asyncio can then leave that socket open behind
-        # the test (its transport raises ConnectionResetError before it closes the socket).
         await service.stop()
         await page.close()
         await session.close()
@@ -128,7 +119,6 @@ async def test_a_new_link_opened_in_a_tab_that_already_shows_the_viewer_is_taken
     try:
         await page.goto(f"{service.address}/#token=not-the-token")
         await page.get_by_role("heading", name="This link can't open the session").wait_for()
-        # The right link differs only after the #, so the browser does not load the page again by itself.
         await page.goto(service.viewer_address)
         await page.get_by_text("Reference agent").wait_for()
         assert page.url == f"{service.address}/"

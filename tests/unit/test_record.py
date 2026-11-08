@@ -74,7 +74,6 @@ def test_the_tools_on_offer_have_one_value_that_changes_when_any_of_them_does() 
 
 
 def test_a_line_is_never_broken_at_a_character_inside_it(tmp_path: Path) -> None:
-    # What a page said may hold a line separator, which the log keeps as it is.
     said = "first" + chr(0x2028) + "second" + chr(0x85) + "third"
     log = tmp_path / "events.jsonl"
     kept = json.dumps({"ts": NOW, "result": said}, ensure_ascii=False)

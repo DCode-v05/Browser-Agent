@@ -74,7 +74,6 @@ class Window:
         """Waits until a page of the window is in a state, and gives what the service says of it."""
         async with asyncio.timeout(30):
             while True:
-                # A window whose service has stopped says why, instead of being asked for ever.
                 assert not self.running.done(), self.running.exception()
                 found = next(room for room in await asyncio.to_thread(self.rooms) if room["id"] == name)
                 if found["state"] == state:
@@ -98,8 +97,6 @@ async def window(
     **sections: Any,
 ) -> AsyncIterator[Window]:
     folder = browser_extension.install(tmp_path / "state" / "extension")
-    # The file that says where the service is stays in the test's own folder, apart from a service
-    # the developer may have running.
     server = {"state_file": str(tmp_path / "service.json"), **sections.pop("server", {})}
     config = make_config(tmp_path, server=server, **sections)
     running = asyncio.create_task(
@@ -161,7 +158,6 @@ async def test_the_window_has_a_page_for_each_browser(
     make_config: Callable[..., Config], tmp_path: Path, browser: Browser
 ) -> None:
     async with window(make_config, tmp_path, browser, lambda: ScriptedModel([])) as opened:
-        # Asked from another thread: the service answers on this one.
         rooms = await asyncio.to_thread(opened.rooms)
         assert [(room["id"], room["backend"]) for room in rooms] == [
             ("cloud", "remote_headless"),
@@ -169,7 +165,6 @@ async def test_the_window_has_a_page_for_each_browser(
             ("builtin", "bundled_chromium"),
             ("computer", "contained_desktop"),
         ]
-        # The person's own Chrome is not there until its extension dials in.
         assert rooms[1]["state"] == "waiting" and rooms[1]["extension"] == str(opened.folder)
         page = opened.page
         assert [
@@ -180,8 +175,6 @@ async def test_the_window_has_a_page_for_each_browser(
             "Built-in browser Ready",
             "Computer Could not start",
         ]
-        # The cloud browser's page: its chat, leading, with no picture of its own browser yet (there
-        # is nothing of it to show until a task sends it somewhere: not the demo site).
         await page.get_by_label("Your task").wait_for()
         assert await page.get_by_role("img", name=re.compile("^Live browser view:")).count() == 0
         assert await page.get_by_title("Session", exact=True).inner_text() == "Session\ncloud"
@@ -193,13 +186,11 @@ async def test_the_window_has_a_page_for_each_browser(
         assert await page.locator(".studio-folder code").inner_text() == str(opened.folder)
         assert await page.get_by_label("Your task").count() == 0
 
-        # The built-in browser is another browser with another session, and keeps its sign-ins.
         await opened.open("Built-in browser")
         await page.get_by_label("Your task").wait_for()
         assert await page.get_by_title("Session", exact=True).inner_text() == "Session\nbuiltin"
         assert (tmp_path / "built-in-browser").is_dir(), "the built-in browser keeps a profile of its own"
 
-        # Computer use: a desktop and no browser. Here there is no program to run it, and it says what to do.
         await opened.open("Computer")
         await page.get_by_role("heading", name="The desktop could not be started").wait_for()
         assert "Install Docker" in await page.locator(".studio-wait-lead").inner_text()
@@ -233,13 +224,10 @@ async def test_the_computer_page_set_to_this_machine_says_what_it_lacks_and_offe
         shots.mkdir(parents=True, exist_ok=True)
         await page.screenshot(path=str(shots / "computer-this-machine.png"))
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-        # With no driver there is nothing for macOS to allow yet, and elsewhere nothing to allow at all:
-        # the button says which, and does not fail.
         await page.get_by_role("button", name="Allow it on this Mac").click()
         said = await page.get_by_role("status").inner_text()
         assert "macOS did not show its question" in said or "Only macOS asks for this" in said
         await page.get_by_role("button", name="Install the driver").click()
-        # The machine lacks nothing now: the page becomes the desktop and its chat, unasked.
         await page.get_by_label("Your task").wait_for()
         assert (await opened.room("computer", "agent"))["state"] == "agent"
 
@@ -255,8 +243,6 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
     binary.write_text("", encoding="utf-8")
     monkeypatch.setattr(commands, "not_ready", lambda config, binary: None)
     this_machine = {"runs": "machine", "base": {"home": str(home), "ready_poll_s": 0.1}}
-    # No desktop app is installed for this service: it cannot give a window above every app, and
-    # the chat opens in a window of the browser.
     no_app = {"desktop_dir": str(tmp_path / "no-desktop-app")}
     async with window(
         make_config, tmp_path, browser, asks_then_answers, computer=this_machine, server=no_app
@@ -268,18 +254,15 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
             await page.get_by_role("button", name="Chat beside your screen").click()
         chat = await opening.value
         try:
-            # The window is let in as the page that opened it was, and shows that page's chat alone.
             task = chat.get_by_label("Your task")
             await task.wait_for()
             assert await chat.get_by_role("region", name="Chat").count() == 1
-            # The chat says which machine its engine is on and which it controls, with their systems.
             where = " ".join((await chat.get_by_test_id("where-it-works").inner_text()).split())
             system = {"darwin": "macOS", "linux": "Linux", "win32": "Windows"}[sys.platform]
             assert (
                 where
                 == f"Engine on this computer ({system}) → Controls the engine's own {system} machine: its real screen"
             )
-            # Its settings are the computer's own, not a browser's.
             await chat.get_by_role("button", name="Open settings").click()
             sections = chat.get_by_role("dialog", name="Settings").get_by_role("tab")
             await sections.first.wait_for()
@@ -289,7 +272,6 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
             assert await chat.get_by_role("tablist", name="Where the agent works").count() == 0
             assert await chat.locator("canvas, .live-view img").count() == 0
             assert await chat.evaluate("innerWidth") <= 420
-            # At this width the word that says how the agent stands is still one line.
             stands = await chat.get_by_test_id("agent-status").bounding_box()
             assert stands is not None and stands["width"] > stands["height"]
             assert await chat.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -300,9 +282,7 @@ async def test_on_a_real_machine_the_chat_opens_alone_in_a_narrow_window_to_keep
         finally:
             await chat.close()
 
-        # The contained desktop has its picture on the page alone: no such window is offered for it.
         await opened.open("Cloud browser")
-        # Every page says which machine its engine is on, not only the computer's.
         mark = " ".join((await page.get_by_test_id("engine-mark").inner_text()).split())
         assert mark == f"Engine on this computer ({system})"
         assert await page.get_by_role("button", name="Chat beside your screen").count() == 0
@@ -321,9 +301,7 @@ async def test_a_page_that_needs_a_person_pops_up_and_says_so_on_its_tab(
         popup = page.get_by_role("dialog", name="The agent needs you to sign in")
         await popup.wait_for()
         assert "Sign in to Northfield for me" in await popup.inner_text()
-        # The pop-up holds the answers: they are not offered a second time behind it.
         assert await page.get_by_role("button", name="Take over").count() == 1
-        # Seen from any other page of the window.
         await popup.get_by_role("button", name="Look first").click()
         await popup.wait_for(state="hidden")
         await opened.open("Cloud browser")
@@ -331,7 +309,6 @@ async def test_a_page_that_needs_a_person_pops_up_and_says_so_on_its_tab(
             while await opened.tab("Built-in browser") != "Built-in browser Needs you":
                 await asyncio.sleep(0.1)
 
-        # Back on its page the pop-up asks again, and the person does the step.
         await opened.open("Built-in browser")
         await popup.wait_for()
         await popup.get_by_role("button", name="Take over").click()
@@ -361,14 +338,12 @@ async def test_a_stopped_session_is_started_again_from_its_page(
         assert await opened.tab("Cloud browser") in ("Cloud browser Stopped", "Cloud browser Ready")
         await page.get_by_role("button", name="Start a new session").click()
 
-        # A new browser and a new conversation on the same page of the window.
         await opened.room("cloud", "agent")
         await page.get_by_text("Tell the agent what to do. It answers here when it has finished.").wait_for()
         assert await page.get_by_text("Done.", exact=True).count() == 0
         await task.fill("Say done again")
         await task.press("Enter")
         await page.get_by_text("Done.", exact=True).wait_for()
-        # The other pages were not touched.
         assert (await opened.room("builtin", "agent"))["state"] == "agent"
 
 
@@ -387,22 +362,16 @@ async def test_the_persons_own_chrome_becomes_a_page_once_its_extension_dials_in
                 args=[f"--disable-extensions-except={opened.folder}", f"--load-extension={opened.folder}"],
             )
             try:
-                # The extension's own page, as the person would open its side panel.
                 panel = await chrome.new_page()
                 await panel.goto(f"chrome-extension://{browser_extension.EXTENSION_ID}/panel.html")
                 room = await opened.room("chrome", "agent")
                 assert room["backend"] == "takeover_chrome"
-                # The window's page turns from "connect" into the chat for that Chrome.
                 await page.get_by_label("Your task").wait_for(timeout=20_000)
                 assert await opened.tab("My Chrome") == "My Chrome Ready"
                 await panel.frame_locator("#viewer").get_by_label("Your task").wait_for(timeout=20_000)
-                # Nothing of the person's own browser is navigated until a task sends it somewhere.
                 assert not any(tab.url.endswith("/demo-site/start.html") for tab in chrome.pages)
             finally:
                 await chrome.close()
-
-
-# Each browser of the window is a system of its own (spec 9.17), and is evaluated by itself (spec 12.6).
 
 
 async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
@@ -425,7 +394,6 @@ async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
         systems = {system["id"]: system for system in told["systems"]}
         assert status == 200 and list(systems) == ["cloud", "chrome", "builtin", "computer"]
         assert all(system["enabled"] for system in systems.values())
-        # A log for each browser, in the folder for them, and not one for all.
         assert systems["cloud"]["log"] == str((tmp_path / "logs" / "cloud.jsonl").resolve())
         assert systems["builtin"]["log"] == str((tmp_path / "logs" / "builtin.jsonl").resolve())
         cloud_log = (await opened.ask("GET", "/api/systems/cloud/log"))[1]
@@ -434,7 +402,6 @@ async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
         assert built_in_log["lines"] == []
         assert not (tmp_path / "events.jsonl").exists(), "nothing goes to the one log of a single session"
 
-        # The task is on the record of the browser that did it, and of no other.
         evals = (await opened.ask("GET", "/api/systems/cloud/evals"))[1]
         assert evals["backend"] == "remote_headless" and evals["checking"] is False
         assert (evals["tasks"]["count"], evals["tasks"]["answered"], evals["tasks"]["success_rate"]) == (
@@ -448,14 +415,12 @@ async def test_each_system_has_its_own_log_and_its_own_record_of_a_task(
         assert done["task"] == "Say which page this is" and done["answer"] == "The page is the start page."
         assert (done["steps"], done["model_calls"], done["tokens_known"]) == (1, 2, False)
         assert (await opened.ask("GET", "/api/systems/builtin/evals"))[1]["tasks"]["count"] == 0
-        # Its trace: every reply of the model and every step, in order.
         trace = (await opened.ask("GET", f"/api/systems/cloud/evals/{done['id']}"))[1]
         assert [(span["kind"], span["name"]) for span in trace["spans"]] == [
             ("model", trace["model"]),
             ("tool", "browser_snapshot"),
             ("model", trace["model"]),
         ]
-        # A person says the answer was good, and it counts.
         assert (
             await opened.ask("POST", f"/api/systems/cloud/evals/{done['id']}/rating", {"rating": "good"})
         )[0] == 200
@@ -489,19 +454,15 @@ async def test_the_checklist_runs_real_steps_on_a_system(
         assert all(
             check["ms"] is not None for name, check in checks.items() if name not in ("logged", "person")
         )
-        # The browser is back where it was, for whatever the agent does next.
         async with asyncio.timeout(10):
             while not (await opened.room("builtin", "agent")):
                 await asyncio.sleep(0.1)
         log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
         assert log["lines"][-1]["tool"] == "browser_navigate" and "about:blank" in log["lines"][-1]["result"]
-        # What was typed in the check reached the page, and no log.
         assert "Ada Lovelace" not in json.dumps(log["lines"])
-        # The result is kept, and shown with the rest of what is known of that browser.
         kept = (await opened.ask("GET", "/api/systems/builtin/evals"))[1]["checklist"]
         assert kept["passed"] == 11 and kept["ran"] == result["ran"]
         assert (await opened.ask("GET", "/api/systems/cloud/evals"))[1]["checklist"] is None
-        # A browser that is not there has nothing to check.
         status, why = await opened.ask("POST", "/api/systems/chrome/checks")
         assert status == 409 and why == {"error": "This browser has no session. Start it first."}
 
@@ -523,7 +484,6 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
 
         await page.get_by_label("Times each task is tried").select_option("1")
         await long_tasks.get_by_role("button", name="Run the reference solutions").click()
-        # While it runs the page says where it is, and offers to stop it and nothing else.
         await long_tasks.get_by_role("button", name="Stop the run").wait_for()
         await long_tasks.get_by_text("Passed 4 of 4 tries (100%).").wait_for(timeout=60_000)
         await long_tasks.get_by_text("Done by the reference solutions").wait_for()
@@ -535,19 +495,15 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         assert await view.sideways_overflow() == 0 and view.errors == []
         await view.shot("task-sets-run")
 
-        # The browser is back where it was, and what the run did is in its log like any step.
         await opened.room("builtin", "agent")
         log = (await opened.ask("GET", "/api/systems/builtin/log"))[1]
         assert "about:blank" in log["lines"][-1]["result"]
         assert any("lab/reset.html" in line["result"] for line in log["lines"])
 
-        # The same set done by the agent. This one's model answers at once and does nothing.
         status, told = await opened.ask(
             "POST", "/api/systems/builtin/suite", {"set": "long", "trials": 10, "mode": "agent"}
         )
         assert status == 202 and told["running"]["mode"] == "agent"
-        # One run at a time on a browser, and no checklist under it. Ten tries of each task, so that
-        # the run is still under way when these are asked.
         again = await opened.ask(
             "POST", "/api/systems/builtin/suite", {"set": "short", "trials": 1, "mode": "reference"}
         )
@@ -560,15 +516,12 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
         assert (last["last"]["mode"], last["last"]["trials"], last["last"]["stopped"]) == ("agent", 10, False)
         assert last["last"]["totals"]["passed"] == 0 and last["last"]["totals"]["every_time"] == 0
         assert [run["pass_rate"] for run in last["earlier"]] == [1.0]
-        # Each try of the agent has a record of its own, apart from the records of a person's tasks.
         records = (tmp_path / "evals" / "builtin" / "suite" / "tasks.jsonl").read_text("utf-8").splitlines()
         assert len(records) == 40 and json.loads(records[0])["task"].startswith("Buy the Blue running shoes")
         assert (await opened.ask("GET", "/api/systems/builtin/evals"))[1]["tasks"]["count"] == 0
-        # The chat shows each task as it was given.
         await page.get_by_role("tab", name="Browser and chat").click()
         await page.get_by_text("Go through the inbox: delete the message from Shop Daily").first.wait_for()
 
-        # A run that is stopped keeps what it did.
         await opened.ask(
             "POST", "/api/systems/cloud/suite", {"set": "short", "trials": 10, "mode": "reference"}
         )
@@ -591,7 +544,6 @@ async def test_a_task_set_is_run_from_the_evaluations_view_and_its_result_is_kep
                 0
             ] == 409
 
-        # The admin's overview: the newest run of each set, browser by browser.
         await page.get_by_role("button", name="Systems").click()
         await page.get_by_role("tab", name="All systems").click()
         parity = page.get_by_role("article", name="Task sets, browser by browser")
@@ -617,7 +569,6 @@ async def test_a_system_is_turned_off_and_on_and_stopped_and_started(
         turn = {"surface": "web", "system": "builtin", "changes": {"system_enabled": False}}
         status, shown = await opened.ask("PATCH", "/api/settings", turn)
         assert status == 200 and shown["system"] == "builtin"
-        # Turned off: it has no session, its tab says so, and the other browsers go on.
         off = await opened.room("builtin", "off")
         assert off["working"] is False
         assert (await opened.room("cloud", "agent"))["state"] == "agent"
@@ -632,7 +583,6 @@ async def test_a_system_is_turned_off_and_on_and_stopped_and_started(
         assert (await opened.ask("PATCH", "/api/settings", turn))[0] == 200
         await opened.room("builtin", "agent")
 
-        # Stopped by hand, and started again: a new browser and a new conversation.
         assert (await opened.ask("POST", "/api/systems/cloud/stop"))[0] == 200
         await opened.room("cloud", "ended")
         assert await opened.ask("POST", "/api/systems/cloud/stop") == (
@@ -653,7 +603,6 @@ async def test_a_systems_settings_reach_that_browser_alone(
         block = {"surface": "web", "system": "cloud", "changes": {"activity_log": False}}
         assert (await opened.ask("PATCH", "/api/settings", block))[0] == 200
         systems = {system["id"]: system for system in (await opened.ask("GET", "/api/systems"))[1]["systems"]}
-        # The cloud browser's log is off, and the built-in browser's is still written.
         assert systems["cloud"]["log"] is None
         assert systems["builtin"]["log"] == str((tmp_path / "logs" / "builtin.jsonl").resolve())
         assert (await opened.ask("GET", "/api/systems/cloud/log"))[1] == {
@@ -700,7 +649,6 @@ async def test_the_helpers_address_is_typed_on_the_computers_own_configuration(
         await field.blur()
         await saved(opened, "computer", "computer_helper_url", "https://desk.tail1234.ts.net:8796")
 
-        # What is no web address is refused, in words, and what was typed stays to be corrected.
         await field.fill("desk on my tailnet")
         await field.blur()
         await computer.get_by_text("That doesn't look like a web address.").wait_for()
@@ -761,13 +709,11 @@ async def test_what_the_agent_sees_and_its_pointer_are_chosen_on_the_computers_o
         assert await sees.locator("input:checked").get_attribute("value") == "som"
         assert await pointer.locator("input:checked").get_attribute("value") == "off"
 
-        # Every choice of the two is pressed, and each is what the service then holds.
         for group, setting, values in (
             (sees, "computer_capture_mode", ("vision", "ax", "som", "ax")),
             (pointer, "computer_no_overlay", ("off", "on", "auto", "on")),
         ):
             for value in values:
-                # A choice shows as taken once the service has saved it.
                 await group.locator(f'input[value="{value}"]').click()
                 await saved(opened, "computer", setting, value)
                 await group.locator(f'input[value="{value}"]:checked').wait_for()
@@ -791,8 +737,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await task.press("Enter")
         await page.get_by_text("The page is the start page.").wait_for()
 
-        # The settings button on a browser's page goes to that browser's own configuration: a
-        # setting is in one place, and no second screen opens over the page.
         await page.get_by_role("button", name="Open settings").click()
         await page.get_by_role("heading", name="Configuration of Cloud browser").wait_for()
         assert await page.get_by_role("dialog").count() == 0
@@ -800,7 +744,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         cloud = page.get_by_role("article", name="Cloud browser")
         assert await page.get_by_role("article").count() == 1, "that browser's card, and no other's"
 
-        # What the agent may do in one browser is that browser's alone, and says what it does.
         downloads = cloud.get_by_role("switch", name="Let the agent download files")
         await downloads.wait_for()
         assert await downloads.get_attribute("aria-checked") == "true"
@@ -818,7 +761,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
             for s in g["settings"]
         }
         assert own["allow_downloads"]["value"] is False and others["allow_downloads"]["value"] is True
-        # A choice, a list of sites: every kind of setting is changed on the page itself.
         await cloud.get_by_role("radio", name="Every action").click()
         await saved(opened, "cloud", "ask_before", "every_action")
         await cloud.get_by_role("radio", name="Risky actions").click()
@@ -827,19 +769,15 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await blocked.fill("ads.example")
         await blocked.blur()
         await saved(opened, "cloud", "blocked_sites", ["ads.example"])
-        # What the deployment left off is the admin's to turn on: the switch is a working one.
         scripts = cloud.get_by_role("switch", name="Let the agent run scripts of several steps")
         assert await scripts.get_attribute("aria-checked") == "false"
         assert await scripts.is_enabled()
-        # Every row says what its control does.
         assert await cloud.locator(".setting").count() == await cloud.locator(".setting-description").count()
         assert await cloud.locator(".setting-description:empty").count() == 0
-        # And the admin says, on the same page, whether users may use this browser at all.
         for_users = cloud.get_by_role("switch", name="Let users use this browser: Cloud browser")
         assert await for_users.get_attribute("aria-checked") == "true"
         await cloud.get_by_text("Also on the user's page. Users may set their own").first.wait_for()
 
-        # Its log is a file of its own, and its newest lines are read from here.
         await cloud.get_by_text(str((tmp_path / "logs" / "cloud.jsonl").resolve())).wait_for()
         await cloud.get_by_role("button", name="Show the log").click()
         await cloud.get_by_text("The newest line").wait_for()
@@ -849,15 +787,12 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await page.evaluate("document.querySelector('.systems').scrollTop = 0")
         await page.screenshot(path=str(SHOTS / "system-configuration-under-its-tab.png"))
 
-        # The browser is stopped and started from here.
         await cloud.get_by_role("button", name="Stop").click()
         await opened.room("cloud", "ended")
         await cloud.get_by_role("button", name="Start").click()
         await opened.room("cloud", "agent")
         await cloud.get_by_role("button", name="Restart").wait_for()
 
-        # The view stays from one browser to the next. The built-in browser is turned off from its
-        # own configuration, and the page stays where it is.
         await opened.open("Built-in browser")
         await page.get_by_role("heading", name="Configuration of Built-in browser").wait_for()
         built_in = page.get_by_role("article", name="Built-in browser")
@@ -869,7 +804,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         assert await built_in.get_by_role("button", name="Start").is_disabled()
         assert await opened.tab("Built-in browser") == "Built-in browser Turned off"
 
-        # Evaluations of the cloud browser: what the task took, the checklist, and the trace.
         await opened.open("Cloud browser")
         await page.get_by_role("tab", name="Evaluations").click()
         await page.get_by_role("heading", name="Evaluations of Cloud browser").wait_for()
@@ -879,7 +813,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await cloud.get_by_text("The model did not say how many tokens it used.").wait_for()
         await cloud.get_by_text("Not run yet.").wait_for()
         await cloud.get_by_role("button", name="Run the checklist").click()
-        # Nobody is watching that browser's own page now, so whether a person can be asked is skipped.
         await cloud.get_by_text("10 of 11 passed").wait_for(timeout=60_000)
         assert await cloud.locator('.system-check[data-state="ok"]').count() == 10
         await cloud.get_by_text("Say which page this is").wait_for()
@@ -898,7 +831,6 @@ async def test_each_browser_is_set_up_managed_and_evaluated_under_its_own_tab(
         await page.screenshot(path=str(SHOTS / "system-evaluations-under-its-tab.png"))
         assert await page.get_by_role("article").count() == 1
 
-        # Back on a browser's own page: the one turned off says so, and is turned on from there.
         await opened.open("Built-in browser")
         await page.get_by_role("tab", name="Browser and chat").click()
         await page.get_by_role("heading", name="This browser is turned off").wait_for()
@@ -930,16 +862,13 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         views = systems.get_by_role("tablist", name="What to show of the systems")
         assert await views.get_by_role("tab").all_inner_texts() == ["Users", "All systems"]
 
-        # Users: what a user is allowed. No browser's own settings are repeated here.
         assert [
             await card.get_attribute("aria-label") for card in await systems.get_by_role("article").all()
         ] == ["Users"]
         users = systems.get_by_role("article", name="Users")
         assert await systems.get_by_role("switch", name="Let the agent download files").count() == 0
         assert await systems.get_by_role("switch", name="Use this browser").count() == 0
-        # Every switch says what it lets a user do, and works.
         switches = await users.get_by_role("switch").all()
-        # 17 of the browsers and the window, and one of the desktop of computer use (spec 21.7).
         assert len(switches) == 18
         asks = users.get_by_role("switch", name="What users may change: Ask me before an app opens")
         assert await asks.count() == 1
@@ -959,7 +888,6 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         await page.evaluate("document.querySelector('.systems').scrollTop = 0")
         await page.screenshot(path=str(SHOTS / "systems-users.png"))
 
-        # All systems: where each browser stands, and the tasks of all three as one.
         await views.get_by_role("tab", name="All systems").click()
         browsers = systems.get_by_role("article", name="The browsers and the desktop")
         await browsers.wait_for()
@@ -972,7 +900,6 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
             f"Cloud browser Ready On May use it {model} Configuration Evaluations",
             f"My Chrome Not connected On May use it {model} Configuration Evaluations",
             f"Built-in browser Ready On May use it {model} Configuration Evaluations",
-            # The desktop of computer use: no container program in a test, so it could not start.
             f"Computer Could not start On May use it {model} Configuration Evaluations",
         ]
         assert await browsers.get_by_role("switch").count() == 0, "nothing is changed here"
@@ -982,7 +909,6 @@ async def test_the_systems_page_has_what_is_not_one_browsers_and_repeats_none_of
         assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         await page.screenshot(path=str(SHOTS / "systems-all.png"))
 
-        # From here to a browser's own evaluations, and to its configuration.
         await browsers.get_by_role("button", name="Evaluations of Cloud browser").click()
         await page.get_by_role("heading", name="Evaluations of Cloud browser").wait_for()
         await page.get_by_role("article", name="Cloud browser").get_by_text("1 task, 1 step").wait_for()

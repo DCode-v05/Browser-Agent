@@ -55,7 +55,6 @@ async def test_the_request_is_what_the_provider_documents(provider) -> None:
     assert body["instructions"] == "Be brief."
     assert body["input"] == [{"role": "user", "content": "Say hello"}]
     assert body["max_output_tokens"] == 900
-    # Nothing is kept on the provider's side, so what the model thought has to come back sealed.
     assert body["store"] is False
     assert body["include"] == ["reasoning.encrypted_content"]
     assert [tool["name"] for tool in body["tools"]] == [tool.name for tool in TOOLS]
@@ -103,7 +102,6 @@ async def test_the_next_request_carries_the_whole_turn_back_and_each_result(prov
     assert done == Reply("Done.")
     assert stand_in.requests[1]["body"]["input"] == [
         {"role": "user", "content": "Read the page"},
-        # Exactly as the provider sent them, the sealed thought included.
         *first,
         {"type": "function_call_output", "call_id": "call_a", "output": "Page: Fake"},
     ]
@@ -156,7 +154,6 @@ async def test_another_refusal_passes_on_what_the_provider_said(provider) -> Non
         (404, {"error": {"message": "The model `gpt-9` does not exist.", "type": "invalid_request_error"}}),
         (500, {"unexpected": "shape"}),
     )
-    # Further tries are the client's affair (test_model_client.py). Here each refusal is the last word.
     refused = model(stand_in, retries=0)
     for expected in (
         "The model provider answered HTTP 429: Rate limit reached for gpt-5.6-luna.",
@@ -200,7 +197,6 @@ async def test_the_loop_runs_a_task_with_the_hosted_model(
     tools = Toolkit(BrowserSession(make_config(tmp_path), driver))
     answer = await run_agent("What is on the page?", tools, model(stand_in), Agent())
     assert answer == "The page has one button, Go."
-    # The model was shown the page the tool returned.
     assert stand_in.requests[1]["body"]["input"][-1] == {
         "type": "function_call_output",
         "call_id": "call_a",

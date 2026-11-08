@@ -24,7 +24,6 @@ Place = str | tuple[float, float]
 """An element by its ref, or a point of the page in pixels from the top left of what the browser shows."""
 
 
-# The role of a place an agent names by its position instead of by an element.
 POINT = "point"
 
 
@@ -58,7 +57,6 @@ class Located:
     """A password field. Nothing about what it holds, not even its length, is told to anyone."""
     kind: FieldKind = "other"
     """How it is filled in a form: by typing, by ticking, or by choosing an option."""
-    # What the check needs to know of it besides its name (spec 18.4, 18.6).
     document: str = ""
     """The address of the document it is in: the page's, or a frame's own."""
     input_type: str = ""
@@ -135,7 +133,6 @@ class Dragged:
     navigated_to: str | None = None
 
 
-# Where a file waits, inside the downloads folder, until a person has said that it may stay.
 HELD_FOLDER = "held"
 
 
@@ -339,7 +336,6 @@ class Driver(Protocol):
 
     async def stop_frames(self) -> None: ...
 
-    # What a person does with the mouse and the keyboard while they are in control.
 
     async def pointer(self, action: PointerAction, x: float, y: float, button: MouseButton) -> None: ...
 
@@ -357,7 +353,6 @@ class Driver(Protocol):
         redirect goes, what a frame holds, what a page opens in a new window."""
         ...
 
-    # Pictures. None is taken unless a call asks for one.
 
     async def screenshot(self, *, full_page: bool, annotate: bool) -> Shot:
         """A picture of what the browser shows, or of the whole page. `annotate` draws each
@@ -374,7 +369,6 @@ class Driver(Protocol):
 
     async def drag(self, start: Place, end: Place) -> Dragged: ...
 
-    # Tabs. A window a page opens becomes a tab.
 
     async def new_tab(self) -> str:
         """Opens an empty tab, makes it the active one and returns its id."""
@@ -386,7 +380,6 @@ class Driver(Protocol):
         """Closes a tab, the active one when none is named, and returns its id."""
         ...
 
-    # Dialogs. While one is open its page answers nothing.
 
     def pending_dialog(self) -> PageDialog | None:
         """The dialog that has waited longest for an answer."""
@@ -398,7 +391,6 @@ class Driver(Protocol):
 
     async def answer_dialog(self, accept: bool, text: str | None) -> PageDialog: ...
 
-    # Diagnostics, of the active tab.
 
     def console(self, *, clear: bool) -> list[ConsoleLine]: ...
 
@@ -408,7 +400,6 @@ class Driver(Protocol):
         """Runs a script in the page, among the page's own scripts, and returns its value."""
         ...
 
-    # Files.
 
     async def upload(self, ref: str, paths: Sequence[str]) -> ActionOutcome:
         """Gives files to a file field, or to the file chooser that a button opens."""

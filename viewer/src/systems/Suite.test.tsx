@@ -1,6 +1,3 @@
-// The task sets of a browser (spec 12.7): a person starts a run, sees where it is, stops it, and
-// reads how it went.
-
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -99,7 +96,6 @@ describe('the task sets of a browser', () => {
     expect(within(short).getByText('20 tasks')).toBeInTheDocument();
     expect(within(short).getByText('Whether the agent finishes a small task.')).toBeInTheDocument();
     expect(within(short).getByText('This set has not been run yet.')).toBeInTheDocument();
-    // Both ways of running it say what they do and what they cost.
     expect(within(short).getByRole('button', { name: 'Run with the agent' })).toHaveAttribute('title', expect.stringContaining('uses tokens'));
     expect(within(short).getByRole('button', { name: 'Run the reference solutions' })).toHaveAttribute('title', expect.stringContaining('no model'));
     expect(within(short).queryByRole('button', { name: 'Show the tasks' })).not.toBeInTheDocument();
@@ -113,7 +109,6 @@ describe('the task sets of a browser', () => {
     expect(api.runSuite).toHaveBeenCalledWith('cloud', 'short', 5, 'reference');
     const short = await block('Short tasks');
     expect(within(short).getByRole('status')).toHaveTextContent('Starting…');
-    // While it runs, no other run can be started, on this set or another.
     expect(within(short).queryByRole('button', { name: 'Run with the agent' })).not.toBeInTheDocument();
     expect(within(await block('Planted instructions')).getByRole('button', { name: 'Run with the agent' })).toBeDisabled();
     expect(screen.getByLabelText('Times each task is tried')).toBeDisabled();
@@ -133,7 +128,6 @@ describe('the task sets of a browser', () => {
     expect(within(short).getByText(/Done by the agent, .* each task 3 times, in 2 min 5 s\. Model gpt-test\. 1 of 2 tasks passed every time\. 41,000 tokens in, 900 out\. Cost \$0\.1200\./)).toBeInTheDocument();
     expect(within(short).getByText('Runs before it: 70%.')).toBeInTheDocument();
     const asked = (api.suite as ReturnType<typeof vi.fn>).mock.calls.length;
-    // A run that has ended is not asked about any more.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
@@ -181,7 +175,6 @@ describe('the task sets of a browser', () => {
 describe('what a run came to', () => {
   it('a set of tasks: how many tries passed', () => {
     expect(headline('long', { ...NONE, trials: 4, passed: 4, pass_rate: 1 })).toEqual({ text: 'Passed 4 of 4 tries (100%).', tone: 'success' });
-    // A try that could not run is no failure of the agent: it is said apart, and the share is of the rest.
     expect(headline('short', { ...NONE, trials: 5, errors: 2, passed: 3, pass_rate: 1 })).toEqual({ text: 'Passed 3 of 3 tries (100%). 2 tries could not run.', tone: 'danger' });
     expect(headline('short', { ...NONE, trials: 2, errors: 1, passed: 1, pass_rate: 1 }).text).toBe('Passed 1 of 1 tries (100%). 1 try could not run.');
     expect(headline('short', { ...NONE, trials: 4, passed: 3, pass_rate: 0.75 }).tone).toBe('danger');

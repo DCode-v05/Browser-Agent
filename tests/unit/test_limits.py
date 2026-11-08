@@ -111,7 +111,6 @@ async def test_a_call_too_many_in_one_minute_waits_for_the_minute() -> None:
     assert await paced.admit() is None
     waits.now += 55
     assert await paced.admit() is None
-    # The first call leaves the minute in five seconds: that is waited for.
     assert await paced.admit() is None
     assert waits.taken == [pytest.approx(5)]
 
@@ -208,7 +207,6 @@ def test_a_new_task_forgets_the_steps_of_the_last() -> None:
 
 
 async def test_the_engines_own_work_on_a_session_is_no_agents_step() -> None:
-    # A run of a task set does more in a minute than any agent, and is not an agent (spec 12.7).
     waits = Waits()
     counted = limits(waits, max_calls=3, max_calls_per_minute=2, rate_wait_s=0, repeat_refuse=2)
     with counted.own_work():
@@ -216,6 +214,5 @@ async def test_the_engines_own_work_on_a_session_is_no_agents_step() -> None:
         counted.acted("click e1", changed=False)
         assert counted.goes_in_circles("click e1") is None
     assert waits.taken == [], "it waited for nothing"
-    # An agent's own steps are counted from nothing, and held to the rate, as before.
     assert [await counted.admit() for _ in range(2)] == [None, None]
     assert await counted.admit() == TOO_MANY_CALLS

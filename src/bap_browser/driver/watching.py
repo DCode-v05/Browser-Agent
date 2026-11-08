@@ -74,7 +74,6 @@ class Watching(DriverCore):
                 "label", {"on": True, "fullPage": full_page, "frameMs": frame_ms}, wait_ms=2 * frame_ms
             )
         try:
-            # One pixel of the picture is one pixel of the page, on a screen of any density.
             picture = await self._capture(tab, None, full_page=full_page, every_pixel=False)
         finally:
             if annotate:
@@ -85,7 +84,6 @@ class Watching(DriverCore):
         taken = Taken(x, y, scale, shown_width, shown_height)
         tab.shot = taken
         if not full_page:
-            # From now on a point the agent gives is a point of this picture.
             tab.pixel = 1 / scale
         return Shot(picture, taken.width, taken.height, scaled=scale < 1)
 
@@ -109,7 +107,6 @@ class Watching(DriverCore):
             "width": (x1 - x0) / taken.scale,
             "height": (y1 - y0) / taken.scale,
         }
-        # Every pixel the browser draws for the region, unless that picture would be too large.
         whole = await self._capture(tab, clip, full_page=True, every_pixel=True)
         picture, (width, height) = await self._fitted(tab, whole)
         return Shot(picture, width, height, scaled=size_of(whole) != (width, height))
@@ -125,7 +122,6 @@ class Watching(DriverCore):
         wanted: dict[str, Any] = {
             "type": settings.format,
             "full_page": full_page,
-            # "css": one picture pixel to a page pixel. "device": every pixel a dense screen has.
             "scale": "device" if every_pixel else "css",
             "timeout": limit * 1000,
         }
@@ -166,7 +162,6 @@ class Watching(DriverCore):
         self._dialogs.append(entry)
         self._dialog_open.set()
         self._no_dialog.clear()
-        # The agent is told by the call the dialog interrupts, or by the next one, which is refused.
         shown = {"id": info.id, "kind": kind, "text": text, "expires_in_s": settings.timeout_s}
         self._tell(Happened("dialog_opened", "", shown))
 
@@ -211,7 +206,6 @@ class Watching(DriverCore):
         entry = self._dialogs[0]
         try:
             if accept:
-                # A prompt that is accepted with no text keeps the text the page put there.
                 await entry.dialog.accept(entry.dialog.default_value if text is None else text)
             else:
                 await entry.dialog.dismiss()
@@ -273,8 +267,6 @@ class Watching(DriverCore):
         if tab.choosing is not None and not tab.choosing.done():
             tab.choosing.set_result(chooser)
             return
-        # Nobody asked for it: a click opened it. It is closed with nothing chosen, and the agent
-        # is told how a file is given.
         self._spawn(self._close_chooser(chooser))
         self._tell(
             Happened(
@@ -328,7 +320,6 @@ class Watching(DriverCore):
             self._downloads[place] = SavedFile(name, "failed", reason=why)
             self._tell(Happened("download", f'the download of "{name}" was refused: {why}'))
             return
-        # A file that waits for a person's yes is kept apart from the ones the agent may use.
         folder = settings.dir if verdict == "keep" else str(Path(settings.dir) / HELD_FOLDER)
         try:
             target = await asyncio.to_thread(free_path, folder, name)
@@ -363,7 +354,6 @@ class Watching(DriverCore):
             try:
                 await asyncio.to_thread(held.unlink, True)
             except OSError:
-                # Another program holds it. It stays where no tool reads, and is not kept.
                 logger.warning("A downloaded file that was not kept could not be deleted.")
             not_kept(reason)
             return
@@ -371,7 +361,6 @@ class Watching(DriverCore):
             target = await asyncio.to_thread(free_path, self._config.browser.downloads.dir, name)
             await asyncio.to_thread(held.replace, target)
         except OSError:
-            # It was taken away, or another program holds it, while the person decided.
             not_kept("it could not be saved in the downloads folder")
             return
         self._downloads[place] = SavedFile(target.name, "saved", str(target), file.size)
@@ -452,8 +441,6 @@ class Watching(DriverCore):
             except PlaywrightError as exc:
                 if "Unknown key" not in str(exc):
                     raise
-                # A character that is on no key of the keyboard Playwright knows, such as é, is put in
-                # as text. A name that is no key and no character, such as "Dead", is left out.
                 if action == "down" and len(key) == 1:
                     await keyboard.insert_text(key)
 

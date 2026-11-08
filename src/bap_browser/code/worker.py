@@ -28,7 +28,6 @@ from typing import Any
 SCRIPT = "<script>"
 ENTRY = "__script__"
 
-# What a script may call by name (spec 7.2), besides what it defines itself.
 BUILTINS: dict[str, Any] = {
     name: getattr(builtins, name)
     for name in (
@@ -54,7 +53,6 @@ BUILTINS: dict[str, Any] = {
         "all",
         "isinstance",
         "repr",
-        # To tell one failure from another in `except`.
         "Exception",
         "ValueError",
         "KeyError",
@@ -63,8 +61,6 @@ BUILTINS: dict[str, Any] = {
     )
 }
 
-# The three modules a script has are these functions of them and nothing else: the modules
-# themselves hold other modules, and through those the whole machine.
 MODULES: dict[str, SimpleNamespace] = {
     "re": SimpleNamespace(
         findall=re.findall,
@@ -90,7 +86,6 @@ MODULES: dict[str, SimpleNamespace] = {
 }
 GIVEN = ("browser", "state", "print", "StepError")
 
-# What no script may hold: imports, classes, and the statements that reach outside a function.
 FORBIDDEN: dict[type[ast.AST], str] = {
     ast.Import: "a script cannot import; re, json and math are there already",
     ast.ImportFrom: "a script cannot import; re, json and math are there already",
@@ -103,9 +98,7 @@ FORBIDDEN: dict[type[ast.AST], str] = {
     ast.Match: "a script cannot use 'match'",
     ast.Delete: "a script cannot use 'del'",
 }
-# Attributes that lead from a value to the frames and the code behind it.
 INNER_PREFIXES = ("_", "gi_", "cr_", "ag_", "f_", "tb_", "co_")
-# Attributes that read other attributes by a name held in a string, or climb to `object`.
 INNER_NAMES = frozenset({"format", "format_map", "mro"})
 
 
@@ -261,7 +254,6 @@ def run(
         exec(compile(tree, SCRIPT, "exec"), names)
         value = asyncio.run(names[ENTRY]())
         if value is not None:
-            # No more of it is sent than the agent will be shown.
             whole = json.dumps(value, default=repr, ensure_ascii=False)
             done["value"], done["value_cut"] = whole[:limit], len(whole) > limit
     except StepError as failed:
@@ -296,7 +288,6 @@ class Nowhere(io.TextIOBase):
 
 def main() -> None:
     lines, out = sys.stdin.buffer, sys.stdout.buffer
-    # Nothing a script prints, and nothing Python prints by itself, reaches the core's channel.
     sys.stdout = sys.stderr = Nowhere()
 
     def tell(message: dict[str, Any]) -> None:
@@ -307,7 +298,6 @@ def main() -> None:
         tell(message)
         line = lines.readline()
         if not line:
-            # The core went away: there is nobody left to run for.
             raise SystemExit(0)
         return json.loads(line)
 

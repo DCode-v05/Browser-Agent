@@ -1,6 +1,3 @@
-// The session's steps: one sentence per row, newest on top, with a drawer of evidence behind each
-// row (spec 9.1: every step has a picture and its result).
-
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 
 import type { ViewerOptions } from '../options';
@@ -28,7 +25,6 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
   const started = state.session?.startedAt ?? now;
   const elapsed = (state.ended?.at ?? now) - started;
 
-  // The newest row is on top. Down moves to an older row, which is the one before it in the log.
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button.row'));
@@ -61,7 +57,6 @@ export function Timeline({ state, now, options, selected, onOpen }: Props) {
               title={L.buttons.hint.step}
               aria-haspopup="dialog"
               aria-expanded={selected === row.step.n}
-              // One stop in the tab order; the arrow keys move between rows.
               tabIndex={row.step.n === newest ? 0 : -1}
               onClick={() => onOpen(row.step.n)}
             >
